@@ -73,8 +73,11 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     horizontal = gyroZ;
                     vertical = gyroX;
                     break;
-                case 2: // Yaw + Roll
-                    horizontal = gyroY + gyroZ;
+                case 2: // Yaw + Roll (averaged so horizontal stays magnitude-symmetric with vertical;
+                        // summing the two horizontal sources gave horizontal an effective 2x boost
+                        // from incidental wrist roll during pure-yaw motion, killing slow-end pitch
+                        // accuracy. Sensitivity slider now applies to both axes equally.)
+                    horizontal = (gyroY + gyroZ) * 0.5f;
                     vertical = gyroX;
                     break;
                 default: // 0 = Yaw

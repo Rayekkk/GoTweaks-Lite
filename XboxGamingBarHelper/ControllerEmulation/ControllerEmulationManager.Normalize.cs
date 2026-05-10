@@ -102,14 +102,17 @@ namespace XboxGamingBarHelper.ControllerEmulation
 
         private static int NormalizeGyroActivationButton(int value)
         {
+            // Upper bound matches the case range in IsGyroActivationButtonPressed
+            // (1..16 = standard XInput buttons, 17..22 = Legion aux paddles M3/M1/M2/Y1/Y2/Y3).
+            // Previously clamped at 16, which silently routed every paddle pick to Back (16).
             if (value < 0)
             {
                 return 0;
             }
 
-            if (value > 16)
+            if (value > 22)
             {
-                return 16;
+                return 22;
             }
 
             return value;

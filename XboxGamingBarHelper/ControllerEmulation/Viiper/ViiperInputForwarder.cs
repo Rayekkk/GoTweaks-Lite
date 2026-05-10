@@ -28,7 +28,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         None = 0,
         Left = 1,
         Right = 2,
-        Handheld = 3,  // Windows sensor — not wired yet; treated as None for now.
+        // Built-in handheld IMU. Currently no separate Windows sensor wiring,
+        // so we treat Handheld the same as Mixed (left+right merged) which is
+        // the closest analogue on Legion Go / Go 2 / Go S.
+        Handheld = 3,
         // Both controllers averaged with the right side mirror-inverted so axes
         // agree before the merge. Falls back to whichever single side is
         // currently reporting if only one is available.
@@ -589,13 +592,13 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             accelXRaw = accelYRaw = accelZRaw = 0;
 
             var src = gyroSource;
-            if (src == ViiperGyroSourceKind.None || src == ViiperGyroSourceKind.Handheld)
+            if (src == ViiperGyroSourceKind.None)
             {
                 return false;
             }
 
             float gXdps, gYdps, gZdps, aXg, aYg, aZg;
-            if (src == ViiperGyroSourceKind.Mixed)
+            if (src == ViiperGyroSourceKind.Mixed || src == ViiperGyroSourceKind.Handheld)
             {
                 bool hasLeft = LegionButtonMonitor.TryGetLatestGyroSample(true, out LegionGyroSample left);
                 bool hasRight = LegionButtonMonitor.TryGetLatestGyroSample(false, out LegionGyroSample right);
