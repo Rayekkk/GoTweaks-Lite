@@ -104,6 +104,17 @@ namespace XboxGamingBar
                     return;
                 }
 
+                // Live gyro readings push for the visualizer.
+                if (message.TryGetValue("Function", out object liveFuncObj) &&
+                    Convert.ToInt32(liveFuncObj) == (int)Shared.Enums.Function.ControllerEmulationStickGyroLiveReadings)
+                {
+                    if (message.TryGetValue("Content", out object liveContent) && liveContent is string liveJson)
+                    {
+                        OnStickGyroLiveReadings(liveJson);
+                    }
+                    return;
+                }
+
                 // Helper pushes DriverUpdatesAvailable as an unsolicited message
                 // after its startup driver probe completes. Light up the Quick
                 // tab tile; no other state needs updating yet.

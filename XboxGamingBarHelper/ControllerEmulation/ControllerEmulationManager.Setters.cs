@@ -851,6 +851,100 @@ namespace XboxGamingBarHelper.ControllerEmulation
             Logger.Info($"Controller emulation stick-gyro anti-deadzone threshold set to {stickGyroAntiDeadzoneThreshold / 10.0f:F1}°/s");
         }
 
+        public void SetStickGyroVerticalRatio(int value)
+        {
+            int normalized = Math.Max(10, Math.Min(200, value));
+            if (stickGyroVerticalRatio == normalized) return;
+            stickGyroVerticalRatio = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroCurvePreset(int value)
+        {
+            int normalized = Math.Max(0, Math.Min(2, value));
+            if (stickGyroCurvePreset == normalized) return;
+            stickGyroCurvePreset = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroTightenThreshold(int value)
+        {
+            int normalized = Math.Max(0, Math.Min(500, value));
+            if (stickGyroTightenThreshold == normalized) return;
+            stickGyroTightenThreshold = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroTightenGain(int value)
+        {
+            int normalized = Math.Max(100, Math.Min(300, value));
+            if (stickGyroTightenGain == normalized) return;
+            stickGyroTightenGain = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroTouchDeactivateEnabled(bool value)
+        {
+            if (stickGyroTouchDeactivateEnabled == value) return;
+            stickGyroTouchDeactivateEnabled = value;
+            SaveSettings();
+        }
+
+        public void SetStickGyroTouchDeactivateThreshold(int value)
+        {
+            int normalized = Math.Max(0, Math.Min(50, value));
+            if (stickGyroTouchDeactivateThreshold == normalized) return;
+            stickGyroTouchDeactivateThreshold = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroTouchDeactivateHoldoff(int value)
+        {
+            int normalized = Math.Max(0, Math.Min(1000, value));
+            if (stickGyroTouchDeactivateHoldoff == normalized) return;
+            stickGyroTouchDeactivateHoldoff = normalized;
+            SaveSettings();
+        }
+
+        public void SetStickGyroSmoothing(int value)
+        {
+            int normalized = Math.Max(0, Math.Min(90, value));
+            if (stickGyroSmoothing == normalized) return;
+            stickGyroSmoothing = normalized;
+            smoothedGyroPrimed = false; // reset so the next sample re-primes the filter
+            SaveSettings();
+        }
+
+        // Live readings push — 5 Hz (every 200 ms) so the widget's gyro
+        // visualizer has smooth updates without flooding the pipe.
+        private long lastLiveReadingsTicks;
+        private const long LiveReadingsIntervalTicks = TimeSpan.TicksPerMillisecond * 200;
+
+        internal void PublishStickGyroLiveReadings(float gyroX, float gyroY, float gyroZ,
+            short stickX, short stickY, bool gateOpen)
+        {
+            long now = DateTime.UtcNow.Ticks;
+            if (now - lastLiveReadingsTicks < LiveReadingsIntervalTicks) return;
+            lastLiveReadingsTicks = now;
+            try
+            {
+                string json = string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "{{\"gyro\":[{0:F1},{1:F1},{2:F1}],\"out\":[{3},{4}],\"gate\":{5}}}",
+                    gyroX, gyroY, gyroZ, stickX, stickY, gateOpen ? "true" : "false");
+                ControllerEmulationStickGyroLiveReadings?.SetValue(json);
+            }
+            catch { }
+        }
+
+        internal int StickGyroVerticalRatio => stickGyroVerticalRatio;
+        internal int StickGyroCurvePreset => stickGyroCurvePreset;
+        internal int StickGyroTightenThreshold => stickGyroTightenThreshold;
+        internal int StickGyroTightenGain => stickGyroTightenGain;
+        internal bool StickGyroTouchDeactivateEnabled => stickGyroTouchDeactivateEnabled;
+        internal int StickGyroTouchDeactivateThreshold => stickGyroTouchDeactivateThreshold;
+        internal int StickGyroTouchDeactivateHoldoff => stickGyroTouchDeactivateHoldoff;
+
         public void SetVirtualABXYLayout(int value)
         {
             int normalized = NormalizeVirtualAbxyLayout(value);

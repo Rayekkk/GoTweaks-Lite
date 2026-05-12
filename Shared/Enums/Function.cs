@@ -452,5 +452,34 @@
         // Helper-to-widget calibration progress. Pushed during the JSL
         // calibration run so the UI can show countdown + final bias offset.
         ControllerEmulationCalibrateGyroStatus,             // string JSON: { "phase": "running"|"done"|"error", "secondsLeft": N, "offset": [x,y,z], "weight": w }
+
+        // Per-axis vertical sensitivity multiplier (% of master sensitivity).
+        // Default 100 = vertical matches horizontal. Range 10–200.
+        ControllerEmulationStickGyroVerticalRatio,          // int 10-200
+
+        // Sensitivity curve preset (0=Linear, 1=Slow-and-precise, 2=Snap-aim).
+        ControllerEmulationStickGyroCurvePreset,            // int
+
+        // Tightening: above this gyro speed, output gain ramps up to the
+        // configured "fast-zone" gain. Lets users do precise slow aim AND
+        // quick whip-turns without changing the master slider.
+        ControllerEmulationStickGyroTightenThreshold,       // int 0–500 (deg/s)
+        ControllerEmulationStickGyroTightenGain,            // int 100–300 (% multiplier at full ramp; 100 = off)
+
+        // Stick-touch deactivation. When the physical stick deflects past
+        // the threshold, gyro output is suppressed; resumes after the
+        // hold-off elapses with the stick at rest.
+        ControllerEmulationStickGyroTouchDeactivateEnabled, // bool
+        ControllerEmulationStickGyroTouchDeactivateThreshold, // int 0-50 (% of stick range)
+        ControllerEmulationStickGyroTouchDeactivateHoldoff,   // int 0-1000 (ms)
+
+        // Live gyro readings pushed at ~5 Hz when the widget is visible.
+        ControllerEmulationStickGyroLiveReadings,           // string JSON: { "gyro":[x,y,z], "out":[stickX,stickY], "gate":bool }
+
+        // EMA smoothing strength on the JSL-calibrated gyro stream before
+        // stick conversion. 0 = no smoothing (raw per-sample output, prone to
+        // visible jitter from BMI260 noise). 90 = heavy smoothing (90%
+        // historical weight, adds noticeable lag). Default 30 = light smoother.
+        ControllerEmulationStickGyroSmoothing,              // int 0-90
     }
 }

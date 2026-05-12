@@ -4823,7 +4823,12 @@
                                         </ComboBox>
 
                                         <!-- IMU Axis Mapping — per-axis source selector (with optional flip).
-                                             Applies to both gyro and accel so the output vectors stay coherent. -->
+                                             Only relevant for native-motion target types (DS4, DualSense,
+                                             joycon-pair etc.) where games read the emulated device's IMU
+                                             channels directly. Hidden for xbox360 / xboxelite2 / steam /
+                                             switchpro family which all go through the synthesized stick
+                                             gyro path and ignore IMU bytes. -->
+                                        <StackPanel x:Name="ViiperGyroAxisMappingSection" Visibility="Collapsed">
                                         <TextBlock Text="IMU axis mapping" FontSize="12" Foreground="#CCCCCC" Margin="0,12,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -4862,6 +4867,7 @@
                                                 <ComboBoxItem Content="-Z" Tag="-Z"/>
                                             </ComboBox>
                                         </Grid>
+                                        </StackPanel>
 
                                         <!-- Gyro → Right Stick (synthesized).
                                              Visible only when targetType has no native motion field
@@ -5019,6 +5025,119 @@
                                             <Slider x:Name="ViiperStickGyroAntiDeadzoneThresholdSlider"
                                                     Minimum="0" Maximum="50" StepFrequency="1" SmallChange="1" LargeChange="5"
                                                     ValueChanged="ViiperStickGyroAntiDeadzoneThresholdSlider_ValueChanged"/>
+
+                                            <!-- Smoothing (EMA) on the calibrated gyro stream. -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Smoothing (jitter reduction)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroSmoothingValueText" Grid.Column="1" Text="30%" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroSmoothingSlider"
+                                                    Minimum="0" Maximum="90" StepFrequency="5" SmallChange="5" LargeChange="10"
+                                                    ValueChanged="ViiperStickGyroSmoothingSlider_ValueChanged"/>
+
+                                            <!-- Per-axis vertical sensitivity scale (% of master). -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Vertical sensitivity (% of master)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroVerticalRatioValueText" Grid.Column="1" Text="100%" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroVerticalRatioSlider"
+                                                    Minimum="10" Maximum="200" StepFrequency="5" SmallChange="5" LargeChange="25"
+                                                    ValueChanged="ViiperStickGyroVerticalRatioSlider_ValueChanged"/>
+
+                                            <!-- Sensitivity curve preset. -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Sensitivity curve" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <ComboBox x:Name="ViiperStickGyroCurvePresetComboBox" Grid.Column="1" Width="180"
+                                                          FontSize="12" SelectionChanged="ViiperStickGyroCurvePresetComboBox_SelectionChanged">
+                                                    <ComboBoxItem Content="Linear (flat)" Tag="0"/>
+                                                    <ComboBoxItem Content="Slow + Precise" Tag="1"/>
+                                                    <ComboBoxItem Content="Snap-aim" Tag="2"/>
+                                                </ComboBox>
+                                            </Grid>
+
+                                            <!-- Tightening / fast-zone. -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Tighten threshold (°/s, 0 = off)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroTightenThresholdValueText" Grid.Column="1" Text="0°/s" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroTightenThresholdSlider"
+                                                    Minimum="0" Maximum="500" StepFrequency="10" SmallChange="10" LargeChange="50"
+                                                    ValueChanged="ViiperStickGyroTightenThresholdSlider_ValueChanged"/>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Tighten gain (× at full ramp)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroTightenGainValueText" Grid.Column="1" Text="1.00×" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroTightenGainSlider"
+                                                    Minimum="100" Maximum="300" StepFrequency="10" SmallChange="10" LargeChange="50"
+                                                    ValueChanged="ViiperStickGyroTightenGainSlider_ValueChanged"/>
+
+                                            <!-- Stick-touch deactivation. -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="Stick-touch deactivation" FontSize="13" Foreground="#FFFFFF"/>
+                                                    <TextBlock Text="Suppress gyro while you move the physical stick. Useful in shooters where stick = big turns, gyro = fine aim." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="ViiperStickGyroTouchDeactivateToggle" Grid.Column="1"
+                                                              OnContent="" OffContent="" MinWidth="0"
+                                                              Toggled="ViiperStickGyroTouchDeactivateToggle_Toggled"/>
+                                            </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Touch threshold (% stick)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroTouchThresholdValueText" Grid.Column="1" Text="15%" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroTouchThresholdSlider"
+                                                    Minimum="0" Maximum="50" StepFrequency="1" SmallChange="1" LargeChange="5"
+                                                    ValueChanged="ViiperStickGyroTouchThresholdSlider_ValueChanged"/>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Hold-off after release (ms)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroTouchHoldoffValueText" Grid.Column="1" Text="250 ms" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroTouchHoldoffSlider"
+                                                    Minimum="0" Maximum="1000" StepFrequency="25" SmallChange="25" LargeChange="100"
+                                                    ValueChanged="ViiperStickGyroTouchHoldoffSlider_ValueChanged"/>
+
+                                            <!-- Live gyro readings (visualizer). -->
+                                            <Border Margin="0,12,0,0" Padding="8" BorderBrush="#333" BorderThickness="1" CornerRadius="4">
+                                                <StackPanel>
+                                                    <TextBlock Text="Live gyro readings" FontSize="12" Foreground="#AAAAAA" Margin="0,0,0,4"/>
+                                                    <TextBlock x:Name="ViiperStickGyroLiveReadingsText"
+                                                               Text="(no data — check that CE is enabled and gyro is active)"
+                                                               FontSize="11" FontFamily="Consolas" Foreground="#7FBFFF"
+                                                               TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Border>
 
                                             <!-- Deadzone slider removed in #79 round 5 — pipeline simplified. -->
 

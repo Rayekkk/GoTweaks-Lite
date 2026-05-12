@@ -70,6 +70,32 @@ namespace XboxGamingBarHelper.Labs
         // ±7.08g full-scale ≈ ±8g) and empirical at-rest reading of 0.98G
         // after this change.
         private const float ACCEL_SCALE_G = 8.0f / 32768.0f;
+
+        // Diagnostic counter for actual HID report arrival rate.
+        // Confirms (or refutes) the indirect 64 Hz measurement we inferred
+        // from forwarder stats. Reset every second by the read loop.
+        private static int _hidReportRateCount = 0;
+        private static long _hidReportRateLastEmitTicks = 0;
+        private static readonly System.Collections.Generic.Dictionary<int, int> _hidReportHeaderCounts = new System.Collections.Generic.Dictionary<int, int>();
+
+        /// <summary>
+        /// Auto-reset event signaled after each successful gamepad/gyro parse
+        /// so downstream consumers (VIIPER forwarder, legacy CE forwarder) can
+        /// block on a fresh sample instead of polling. Zero CPU when idle,
+        /// catches every HID report at the moment it lands in the cache.
+        /// </summary>
+        private static readonly System.Threading.AutoResetEvent _newSampleEvent = new System.Threading.AutoResetEvent(false);
+
+        /// <summary>
+        /// Block until a fresh sample is available, or the timeout elapses.
+        /// Returns true if signaled (fresh sample ready), false on timeout.
+        /// Cheap fast path when samples arrive faster than the consumer can
+        /// process them; never wastes CPU when samples are sparse.
+        /// </summary>
+        public static bool WaitForNewSample(int timeoutMs)
+        {
+            return _newSampleEvent.WaitOne(timeoutMs);
+        }
         private const float LEGACY_M8_GYRO_SCALE_DEG_PER_SECOND = 2000.0f / 128.0f;
         private const byte LEGION_CONTROLLER_LEFT_ID = 0x03;
         private const byte LEGION_CONTROLLER_RIGHT_ID = 0x04;
@@ -2445,6 +2471,43 @@ namespace XboxGamingBarHelper.Labs
                         {
                             consecutiveFailures = 0; // Reset on successful read
 
+                            // Diagnostic: measure actual HID report arrival rate.
+                            // Counts every successful ReadFile completion and emits
+                            // a per-second log line with the observed rate so we
+                            // can confirm whether Lenovo's firmware emits at the
+                            // ~64 Hz we measured indirectly, or higher. Adds zero
+                            // overhead in the hot path (just two interlocked
+                            // counters + one tick check).
+                            long _rateNow = DateTime.UtcNow.Ticks;
+                            _hidReportRateCount++;
+                            // Bucket by the first 3 header bytes (Lenovo report type).
+                            // Forwarder sees ~64 Hz of usable samples at the same time
+                            // that the read loop sees 125 Hz reports, so half are some
+                            // other report type. This breaks it down so we can see
+                            // which IDs Lenovo's firmware is interleaving.
+                            if (bytesRead >= 3)
+                            {
+                                int hdr = (buffer[0] << 16) | (buffer[1] << 8) | buffer[2];
+                                if (_hidReportHeaderCounts.TryGetValue(hdr, out int c)) _hidReportHeaderCounts[hdr] = c + 1;
+                                else _hidReportHeaderCounts[hdr] = 1;
+                            }
+                            if (_rateNow - _hidReportRateLastEmitTicks >= TimeSpan.TicksPerSecond)
+                            {
+                                double elapsedSec = (_rateNow - _hidReportRateLastEmitTicks) / (double)TimeSpan.TicksPerSecond;
+                                double rate = _hidReportRateCount / elapsedSec;
+                                var sb = new System.Text.StringBuilder();
+                                sb.Append($"LegionHID report rate: {rate:F1} Hz ({_hidReportRateCount} reports in {elapsedSec:F2}s) | headers: ");
+                                foreach (var kv in _hidReportHeaderCounts)
+                                {
+                                    int h = kv.Key;
+                                    sb.Append($"{(byte)(h >> 16):X2}:{(byte)(h >> 8):X2}:{(byte)h:X2}={kv.Value} ");
+                                }
+                                Logger.Info(sb.ToString());
+                                _hidReportRateCount = 0;
+                                _hidReportRateLastEmitTicks = _rateNow;
+                                _hidReportHeaderCounts.Clear();
+                            }
+
                             // Note: Scroll wheel reports (0x07) are now handled by the dedicated ScrollWheelThreadProc
                             // which reads from the separate mi_01 HID interface. This ensures only Legion Go
                             // scroll wheel events are captured, not events from other mice.
@@ -2960,6 +3023,12 @@ namespace XboxGamingBarHelper.Labs
                     _hasRightTouchpadSample = true;
                 }
             }
+
+            // Wake any consumer thread blocked on WaitForNewSample. AutoReset
+            // releases exactly one waiter per Set, but if both VIIPER + legacy
+            // CE forwarders are waiting only one wakes per HID report — fine,
+            // they both share the cache and either can advance the pipeline.
+            _newSampleEvent.Set();
         }
 
         private static bool TryParseGamepadSample(

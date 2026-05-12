@@ -76,6 +76,59 @@ namespace XboxGamingBar
                     if (ViiperStickGyroAntiDeadzoneThresholdValueText != null)
                         ViiperStickGyroAntiDeadzoneThresholdValueText.Text = $"{(ViiperStickGyroAntiDeadzoneThresholdSlider.Value / 10.0):F1}°/s";
                 }
+                if (ViiperStickGyroSmoothingSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroSmoothing", out object o) && o is int vi ? vi : 30;
+                    ViiperStickGyroSmoothingSlider.Value = Math.Max(0, Math.Min(90, v));
+                    if (ViiperStickGyroSmoothingValueText != null)
+                        ViiperStickGyroSmoothingValueText.Text = v == 0 ? "off" : $"{v}%";
+                }
+                if (ViiperStickGyroVerticalRatioSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroVerticalRatio", out object o) && o is int vi ? vi : 100;
+                    ViiperStickGyroVerticalRatioSlider.Value = Math.Max(10, Math.Min(200, v));
+                    if (ViiperStickGyroVerticalRatioValueText != null)
+                        ViiperStickGyroVerticalRatioValueText.Text = $"{(int)ViiperStickGyroVerticalRatioSlider.Value}%";
+                }
+                if (ViiperStickGyroCurvePresetComboBox != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroCurvePreset", out object o) && o is int vi ? vi : 0;
+                    int idx = Math.Max(0, Math.Min(2, v));
+                    ViiperStickGyroCurvePresetComboBox.SelectedIndex = idx;
+                }
+                if (ViiperStickGyroTightenThresholdSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTightenThreshold", out object o) && o is int vi ? vi : 0;
+                    ViiperStickGyroTightenThresholdSlider.Value = Math.Max(0, Math.Min(500, v));
+                    if (ViiperStickGyroTightenThresholdValueText != null)
+                        ViiperStickGyroTightenThresholdValueText.Text = v == 0 ? "off" : $"{v}°/s";
+                }
+                if (ViiperStickGyroTightenGainSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTightenGain", out object o) && o is int vi ? vi : 100;
+                    ViiperStickGyroTightenGainSlider.Value = Math.Max(100, Math.Min(300, v));
+                    if (ViiperStickGyroTightenGainValueText != null)
+                        ViiperStickGyroTightenGainValueText.Text = $"{(ViiperStickGyroTightenGainSlider.Value / 100.0):F2}×";
+                }
+                if (ViiperStickGyroTouchDeactivateToggle != null)
+                {
+                    bool v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", out object o) && o is bool vb && vb;
+                    ViiperStickGyroTouchDeactivateToggle.IsOn = v;
+                }
+                if (ViiperStickGyroTouchThresholdSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", out object o) && o is int vi ? vi : 15;
+                    ViiperStickGyroTouchThresholdSlider.Value = Math.Max(0, Math.Min(50, v));
+                    if (ViiperStickGyroTouchThresholdValueText != null)
+                        ViiperStickGyroTouchThresholdValueText.Text = $"{(int)ViiperStickGyroTouchThresholdSlider.Value}%";
+                }
+                if (ViiperStickGyroTouchHoldoffSlider != null)
+                {
+                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", out object o) && o is int vi ? vi : 250;
+                    ViiperStickGyroTouchHoldoffSlider.Value = Math.Max(0, Math.Min(1000, v));
+                    if (ViiperStickGyroTouchHoldoffValueText != null)
+                        ViiperStickGyroTouchHoldoffValueText.Text = $"{(int)ViiperStickGyroTouchHoldoffSlider.Value} ms";
+                }
             }
             catch (Exception ex)
             {
@@ -266,6 +319,165 @@ namespace XboxGamingBar
             }
             SaveAntiDeadzoneSettings(null, value);
             SendStickGyroAntiDeadzoneToHelper(null, value);
+        }
+
+        private void ViiperStickGyroSmoothingSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroSmoothingValueText != null) ViiperStickGyroSmoothingValueText.Text = value == 0 ? "off" : $"{value}%";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroSmoothing", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroSmoothing, value);
+        }
+
+        private void ViiperStickGyroVerticalRatioSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroVerticalRatioValueText != null) ViiperStickGyroVerticalRatioValueText.Text = $"{value}%";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroVerticalRatio", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroVerticalRatio, value);
+        }
+
+        private void ViiperStickGyroCurvePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViiperStickGyroCurvePresetComboBox?.SelectedItem is ComboBoxItem item &&
+                item.Tag is string tagStr && int.TryParse(tagStr, out int preset))
+            {
+                SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroCurvePreset", preset);
+                SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroCurvePreset, preset);
+            }
+        }
+
+        private void ViiperStickGyroTightenThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroTightenThresholdValueText != null)
+                ViiperStickGyroTightenThresholdValueText.Text = value == 0 ? "off" : $"{value}°/s";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTightenThreshold", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTightenThreshold, value);
+        }
+
+        private void ViiperStickGyroTightenGainSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroTightenGainValueText != null)
+                ViiperStickGyroTightenGainValueText.Text = $"{(value / 100.0):F2}×";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTightenGain", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTightenGain, value);
+        }
+
+        private void ViiperStickGyroTouchDeactivateToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (ViiperStickGyroTouchDeactivateToggle == null) return;
+            bool on = ViiperStickGyroTouchDeactivateToggle.IsOn;
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateEnabled", on);
+            SendStickGyroBoolToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled, on);
+        }
+
+        private void ViiperStickGyroTouchThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroTouchThresholdValueText != null) ViiperStickGyroTouchThresholdValueText.Text = $"{value}%";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateThreshold", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateThreshold, value);
+        }
+
+        private void ViiperStickGyroTouchHoldoffSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroTouchHoldoffValueText != null) ViiperStickGyroTouchHoldoffValueText.Text = $"{value} ms";
+            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateHoldoff", value);
+            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, value);
+        }
+
+        private static void SaveStickGyroAdvancedSetting(string key, object value)
+        {
+            try { Windows.Storage.ApplicationData.Current.LocalSettings.Values[key] = value; }
+            catch (Exception ex) { Logger.Warn($"SaveStickGyroAdvancedSetting {key} failed: {ex.Message}"); }
+        }
+
+        private static void SendStickGyroIntToHelper(Shared.Enums.Function fn, int value)
+        {
+            try
+            {
+                if (!App.IsConnected) return;
+                var msg = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)fn },
+                    { "Content", value }
+                };
+                App.PipeClient?.SendValueSet(msg);
+            }
+            catch (Exception ex) { Logger.Warn($"SendStickGyroIntToHelper {fn} failed: {ex.Message}"); }
+        }
+
+        private static void SendStickGyroBoolToHelper(Shared.Enums.Function fn, bool value)
+        {
+            try
+            {
+                if (!App.IsConnected) return;
+                var msg = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)fn },
+                    { "Content", value }
+                };
+                App.PipeClient?.SendValueSet(msg);
+            }
+            catch (Exception ex) { Logger.Warn($"SendStickGyroBoolToHelper {fn} failed: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Receive a live gyro readings push and update the visualizer text.
+        /// Helper publishes at ~5 Hz when CE is enabled and gyro is active.
+        /// </summary>
+        public void OnStickGyroLiveReadings(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            try
+            {
+                (float gx, float gy, float gz) = ExtractGyroArray(json, "gyro");
+                (int ox, int oy) = ExtractIntArray2(json, "out");
+                _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                {
+                    if (ViiperStickGyroLiveReadingsText == null) return;
+                    ViiperStickGyroLiveReadingsText.Text = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        "Gyro X={0,7:F1} Y={1,7:F1} Z={2,7:F1} °/s\nStick X={3,6} Y={4,6}",
+                        gx, gy, gz, ox, oy);
+                });
+            }
+            catch (Exception ex) { Logger.Warn($"OnStickGyroLiveReadings failed: {ex.Message}"); }
+        }
+
+        private static (float, float, float) ExtractGyroArray(string json, string key)
+        {
+            string needle = $"\"{key}\":[";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return (0, 0, 0);
+            i += needle.Length;
+            int end = json.IndexOf(']', i);
+            if (end < 0) return (0, 0, 0);
+            string[] parts = json.Substring(i, end - i).Split(',');
+            float x = 0, y = 0, z = 0;
+            if (parts.Length > 0) float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x);
+            if (parts.Length > 1) float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y);
+            if (parts.Length > 2) float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out z);
+            return (x, y, z);
+        }
+
+        private static (int, int) ExtractIntArray2(string json, string key)
+        {
+            string needle = $"\"{key}\":[";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return (0, 0);
+            i += needle.Length;
+            int end = json.IndexOf(']', i);
+            if (end < 0) return (0, 0);
+            string[] parts = json.Substring(i, end - i).Split(',');
+            int.TryParse(parts.Length > 0 ? parts[0] : "0", System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int a);
+            int.TryParse(parts.Length > 1 ? parts[1] : "0", System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int b);
+            return (a, b);
         }
 
         private static void SaveAntiDeadzoneSettings(int? adz, int? threshold)
@@ -659,12 +871,25 @@ namespace XboxGamingBar
         /// </summary>
         private async void UpdateViiperStickGyroSectionVisibility()
         {
-            if (ViiperStickGyroSection == null || viiperDeviceType == null) return;
+            if (viiperDeviceType == null) return;
 
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 bool applicable = IsViiperTargetWithoutNativeMotion(viiperDeviceType.Value);
-                ViiperStickGyroSection.Visibility = applicable ? Visibility.Visible : Visibility.Collapsed;
+                if (ViiperStickGyroSection != null)
+                {
+                    ViiperStickGyroSection.Visibility = applicable ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                // IMU axis mapping is the inverse case — only relevant for
+                // native-motion target types where games read the emulated
+                // device's IMU channels directly. Hidden for the stick-gyro
+                // targets where the channel-mapping does nothing.
+                if (ViiperGyroAxisMappingSection != null)
+                {
+                    ViiperGyroAxisMappingSection.Visibility = applicable ? Visibility.Collapsed : Visibility.Visible;
+                }
+
                 if (applicable)
                 {
                     WireViiperStickGyroMirror();

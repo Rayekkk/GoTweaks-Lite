@@ -793,4 +793,121 @@ namespace XboxGamingBarHelper.ControllerEmulation
         {
         }
     }
+
+    internal class ControllerEmulationStickGyroVerticalRatioProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroVerticalRatioProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroVerticalRatio, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroVerticalRatio changed to {Value}");
+            Manager?.SetStickGyroVerticalRatio(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroCurvePresetProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroCurvePresetProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroCurvePreset, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroCurvePreset changed to {Value}");
+            Manager?.SetStickGyroCurvePreset(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroTightenThresholdProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroTightenThresholdProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroTightenThreshold, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroTightenThreshold changed to {Value}");
+            Manager?.SetStickGyroTightenThreshold(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroTightenGainProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroTightenGainProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroTightenGain, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroTightenGain changed to {Value}");
+            Manager?.SetStickGyroTightenGain(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroTouchDeactivateEnabledProperty : HelperProperty<bool, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroTouchDeactivateEnabledProperty(bool initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateEnabled, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroTouchDeactivateEnabled changed to {Value}");
+            Manager?.SetStickGyroTouchDeactivateEnabled(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroTouchDeactivateThresholdProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroTouchDeactivateThresholdProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateThreshold, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroTouchDeactivateThreshold changed to {Value}");
+            Manager?.SetStickGyroTouchDeactivateThreshold(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroTouchDeactivateHoldoffProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroTouchDeactivateHoldoffProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroTouchDeactivateHoldoff changed to {Value}");
+            Manager?.SetStickGyroTouchDeactivateHoldoff(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroSmoothingProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public ControllerEmulationStickGyroSmoothingProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroSmoothing, manager) { }
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroSmoothing changed to {Value}");
+            Manager?.SetStickGyroSmoothing(Value);
+        }
+    }
+
+    /// <summary>
+    /// Helper-to-widget live gyro readings. Pushed at ~5 Hz when the widget
+    /// is open so the visualizer can show real-time per-axis magnitudes
+    /// + final stick output + activation gate state.
+    /// </summary>
+    internal class ControllerEmulationStickGyroLiveReadingsProperty : HelperProperty<string, ControllerEmulationManager>
+    {
+        public ControllerEmulationStickGyroLiveReadingsProperty(ControllerEmulationManager manager)
+            : base(string.Empty, null, Function.ControllerEmulationStickGyroLiveReadings, manager)
+        {
+        }
+    }
 }

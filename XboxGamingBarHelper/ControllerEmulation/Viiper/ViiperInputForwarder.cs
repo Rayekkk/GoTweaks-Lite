@@ -885,23 +885,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         // aux buttons for activation gating (M1/M2/M3/Y1/Y2/Y3). The
                         // processor honors the user's "Send to joystick" choice via
                         // stickGyro.RoutesToLeftStick (Left vs Right).
-                        if (ViiperStickGyroProcessor.IsApplicableForTarget(targetType) &&
-                            stickGyro.TryComputeStickOverride(gp.Buttons, gp.LeftTrigger, gp.RightTrigger,
-                                sample.AuxButtons, out short sgX, out short sgY))
+                        if (ViiperStickGyroProcessor.IsApplicableForTarget(targetType))
                         {
-                            if (stickGyro.RoutesToLeftStick)
+                            short physX = stickGyro.RoutesToLeftStick ? gp.ThumbLX : gp.ThumbRX;
+                            short physY = stickGyro.RoutesToLeftStick ? gp.ThumbLY : gp.ThumbRY;
+                            if (stickGyro.TryComputeStickOverride(gp.Buttons, gp.LeftTrigger, gp.RightTrigger,
+                                    sample.AuxButtons, physX, physY, out short sgX, out short sgY))
                             {
-                                ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbLX, gp.ThumbLY, sgX, sgY,
-                                    out short mergedX, out short mergedY);
-                                gp.ThumbLX = mergedX;
-                                gp.ThumbLY = mergedY;
-                            }
-                            else
-                            {
-                                ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbRX, gp.ThumbRY, sgX, sgY,
-                                    out short mergedX, out short mergedY);
-                                gp.ThumbRX = mergedX;
-                                gp.ThumbRY = mergedY;
+                                if (stickGyro.RoutesToLeftStick)
+                                {
+                                    ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbLX, gp.ThumbLY, sgX, sgY,
+                                        out short mergedX, out short mergedY);
+                                    gp.ThumbLX = mergedX;
+                                    gp.ThumbLY = mergedY;
+                                }
+                                else
+                                {
+                                    ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbRX, gp.ThumbRY, sgX, sgY,
+                                        out short mergedX, out short mergedY);
+                                    gp.ThumbRX = mergedX;
+                                    gp.ThumbRY = mergedY;
+                                }
                             }
                         }
                         byte[] data = BuildDeviceInput(gp);
@@ -952,23 +956,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         // Stick-gyro override on the XInput input path. No Legion aux
                         // buttons are available here (XInput hardware can't see them),
                         // so activation buttons 17-22 will read 0 and never trigger.
-                        if (ViiperStickGyroProcessor.IsApplicableForTarget(targetType) &&
-                            stickGyro.TryComputeStickOverride(gp.Buttons, gp.LeftTrigger, gp.RightTrigger,
-                                0 /* no aux on XInput path */, out short sgX, out short sgY))
+                        if (ViiperStickGyroProcessor.IsApplicableForTarget(targetType))
                         {
-                            if (stickGyro.RoutesToLeftStick)
+                            short physX2 = stickGyro.RoutesToLeftStick ? gp.ThumbLX : gp.ThumbRX;
+                            short physY2 = stickGyro.RoutesToLeftStick ? gp.ThumbLY : gp.ThumbRY;
+                            if (stickGyro.TryComputeStickOverride(gp.Buttons, gp.LeftTrigger, gp.RightTrigger,
+                                    0 /* no aux on XInput path */, physX2, physY2, out short sgX, out short sgY))
                             {
-                                ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbLX, gp.ThumbLY, sgX, sgY,
-                                    out short mergedXl, out short mergedYl);
-                                gp.ThumbLX = mergedXl;
-                                gp.ThumbLY = mergedYl;
-                            }
-                            else
-                            {
-                                ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbRX, gp.ThumbRY, sgX, sgY,
-                                    out short mergedX, out short mergedY);
-                                gp.ThumbRX = mergedX;
-                                gp.ThumbRY = mergedY;
+                                if (stickGyro.RoutesToLeftStick)
+                                {
+                                    ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbLX, gp.ThumbLY, sgX, sgY,
+                                        out short mergedXl, out short mergedYl);
+                                    gp.ThumbLX = mergedXl;
+                                    gp.ThumbLY = mergedYl;
+                                }
+                                else
+                                {
+                                    ViiperStickGyroProcessor.MergeStickVectors(gp.ThumbRX, gp.ThumbRY, sgX, sgY,
+                                        out short mergedX, out short mergedY);
+                                    gp.ThumbRX = mergedX;
+                                    gp.ThumbRY = mergedY;
+                                }
                             }
                         }
                         byte[] data = BuildDeviceInput(gp);
@@ -984,7 +992,22 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     Logger.Warn($"VIIPER forwarder poll error: {ex.Message}");
                     Thread.Sleep(100);
                 }
-                Thread.Sleep(4);
+
+                // Block until LegionButtonMonitor signals a new sample (or 16ms
+                // timeout as a fallback for non-Legion sources / XInput-only).
+                // Replaces the old unconditional Thread.Sleep(4) which paced
+                // the loop at ~64Hz independent of the 125Hz HID arrival rate
+                // — overwrote half the samples in the cache before we could
+                // read them. Event-driven design: zero CPU when idle, catches
+                // every HID report at its arrival.
+                if (inputSource == ViiperInputSourceKind.LegionHid)
+                {
+                    LegionButtonMonitor.WaitForNewSample(16);
+                }
+                else
+                {
+                    Thread.Sleep(4);
+                }
             }
         }
 

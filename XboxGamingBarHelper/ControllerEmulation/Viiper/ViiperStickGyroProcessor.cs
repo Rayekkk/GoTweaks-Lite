@@ -52,6 +52,18 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // hardcoded constants (10% min stick deflection, 0.5°/s noise floor).
         private int stickGyroAntiDeadzonePercent = 10;
         private int stickGyroAntiDeadzoneThresholdTenths = 3;
+        private int stickGyroVerticalRatio = 100;
+        private int stickGyroCurvePreset = 0;
+        private int stickGyroTightenThreshold = 0;
+        private int stickGyroTightenGain = 100;
+        private bool stickGyroTouchDeactivateEnabled = false;
+        private int stickGyroTouchDeactivateThreshold = 15;
+        private int stickGyroTouchDeactivateHoldoff = 250;
+        private int stickGyroSmoothing = 30;
+        private float smoothedGyroXState;
+        private float smoothedGyroYState;
+        private float smoothedGyroZState;
+        private bool smoothedGyroPrimed;
         private long lastSettingsRefreshTicks;
         // 200 ms refresh — fast enough that slider drags feel instant, slow enough
         // that the LocalSettings dictionary lookups don't show up in poll-loop
@@ -486,6 +498,20 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             out short stickX,
             out short stickY)
         {
+            return TryComputeStickOverride(xinputButtons, leftTrigger, rightTrigger,
+                legionAuxButtonsRaw, 0, 0, out stickX, out stickY);
+        }
+
+        public bool TryComputeStickOverride(
+            ushort xinputButtons,
+            byte leftTrigger,
+            byte rightTrigger,
+            ushort legionAuxButtonsRaw,
+            short physicalStickX,
+            short physicalStickY,
+            out short stickX,
+            out short stickY)
+        {
             stickX = 0;
             stickY = 0;
 
@@ -537,7 +563,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 return false;
             }
 
-            ApplyStickFromGyro(sample, out stickX, out stickY);
+            ApplyStickFromGyro(sample, physicalStickX, physicalStickY, out stickX, out stickY);
             bool produced = stickX != 0 || stickY != 0;
             if (produced) statsMerged++;
             return produced;
@@ -737,6 +763,26 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 ? Math.Max(0, Math.Min(30, v12)) : 10;
             stickGyroAntiDeadzoneThresholdTenths = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out int v13)
                 ? Math.Max(0, Math.Min(50, v13)) : 3;
+            stickGyroVerticalRatio = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroVerticalRatio", out int v14)
+                ? Math.Max(10, Math.Min(200, v14)) : 100;
+            stickGyroCurvePreset = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroCurvePreset", out int v15)
+                ? Math.Max(0, Math.Min(2, v15)) : 0;
+            stickGyroTightenThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTightenThreshold", out int v16)
+                ? Math.Max(0, Math.Min(500, v16)) : 0;
+            stickGyroTightenGain = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTightenGain", out int v17)
+                ? Math.Max(100, Math.Min(300, v17)) : 100;
+            stickGyroTouchDeactivateEnabled = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", out bool v18) && v18;
+            stickGyroTouchDeactivateThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", out int v19)
+                ? Math.Max(0, Math.Min(50, v19)) : 15;
+            stickGyroTouchDeactivateHoldoff = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", out int v20)
+                ? Math.Max(0, Math.Min(1000, v20)) : 250;
+            int newSmoothing = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroSmoothing", out int v21)
+                ? Math.Max(0, Math.Min(90, v21)) : 30;
+            if (newSmoothing != stickGyroSmoothing)
+            {
+                stickGyroSmoothing = newSmoothing;
+                smoothedGyroPrimed = false;
+            }
 
             // Reset the JSL fusion when the conversion or orientation changes —
             // the orientation quaternion carries over otherwise and produces a
@@ -812,7 +858,20 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // Math (port of ControllerEmulationManager.GyroStick.cs:24-171)
         // ----------------------------------------------------------------------
 
+        private long stickTouchActiveTicks = 0;
+
+        // Optional sink for live readings used by the widget visualizer.
+        // Manager registers a delegate on init to forward into its throttled
+        // PublishStickGyroLiveReadings. Keeping this loose avoids a hard
+        // dependency from the Viiper processor back to the manager.
+        public static Action<float, float, float, short, short, bool> LiveReadingsSink;
+
         private void ApplyStickFromGyro(GyroSample sample, out short outputX, out short outputY)
+        {
+            ApplyStickFromGyro(sample, 0, 0, out outputX, out outputY);
+        }
+
+        private void ApplyStickFromGyro(GyroSample sample, short physicalStickX, short physicalStickY, out short outputX, out short outputY)
         {
             // Capture the raw input before the bias-passthrough and conversion so
             // the per-stage diagnostic below has the unmodified gyro for comparison.
@@ -856,8 +915,42 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             //     bias-correction paths before.
             gamepadMotion.GetCalibratedGyro(out float jslGyroX, out float jslGyroY, out float jslGyroZ);
 
-            // No pre-output EMA smoothing — JSL's auto-calibration removes
-            // the drift that made our pipeline need it.
+            // Spike rejection — see legacy CE GyroStick.cs for the rationale.
+            // Filters single-sample USB/EMI transmission glitches that would
+            // otherwise produce one-frame stick flickers at idle.
+            const float SpikeIdleFloorDps = 5.0f;
+            const float SpikeMagnitudeDps = 60.0f;
+            float curMaxAbs = Math.Max(Math.Abs(jslGyroX), Math.Max(Math.Abs(jslGyroY), Math.Abs(jslGyroZ)));
+            float smoothedMaxAbs = Math.Max(Math.Abs(smoothedGyroXState), Math.Max(Math.Abs(smoothedGyroYState), Math.Abs(smoothedGyroZState)));
+            if (smoothedGyroPrimed && smoothedMaxAbs < SpikeIdleFloorDps && curMaxAbs > SpikeMagnitudeDps)
+            {
+                jslGyroX = smoothedGyroXState;
+                jslGyroY = smoothedGyroYState;
+                jslGyroZ = smoothedGyroZState;
+            }
+
+            // Light EMA smoothing on the calibrated gyro stream. See legacy CE
+            // GyroStick file for the rationale; same constants/formula here.
+            if (stickGyroSmoothing > 0)
+            {
+                float alpha = stickGyroSmoothing / 100.0f;
+                if (!smoothedGyroPrimed)
+                {
+                    smoothedGyroXState = jslGyroX;
+                    smoothedGyroYState = jslGyroY;
+                    smoothedGyroZState = jslGyroZ;
+                    smoothedGyroPrimed = true;
+                }
+                else
+                {
+                    smoothedGyroXState = alpha * smoothedGyroXState + (1.0f - alpha) * jslGyroX;
+                    smoothedGyroYState = alpha * smoothedGyroYState + (1.0f - alpha) * jslGyroY;
+                    smoothedGyroZState = alpha * smoothedGyroZState + (1.0f - alpha) * jslGyroZ;
+                }
+                jslGyroX = smoothedGyroXState;
+                jslGyroY = smoothedGyroYState;
+                jslGyroZ = smoothedGyroZState;
+            }
 
             // Diagnostics window accumulators — flushed in the per-second log block below.
             diagSampleCount++;
@@ -1007,11 +1100,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             //    a real sensitivity curve; with the curve, slow precision motion
             //    naturally produces small-but-visible stick output (~5% at 1°/s
             //    with default 1× sens) and fast motion saturates cleanly.
-            float effectiveCurveX = ApplyCustomSensitivity(horizontal, GyroThresholdDegPerSec, DefaultSensCurve);
-            float effectiveCurveY = ApplyCustomSensitivity(vertical,   GyroThresholdDegPerSec, DefaultSensCurve);
-            float perAxisSens = Math.Max(0.01f, stickSensitivityV2 / 100.0f) * HcSensitivityScale;
-            float scaledX = horizontal * effectiveCurveX * perAxisSens;
-            float scaledY = vertical   * effectiveCurveY * perAxisSens;
+            float[] curveTable = SelectStickGyroCurveViiper(stickGyroCurvePreset);
+            float effectiveCurveX = ApplyCustomSensitivity(horizontal, GyroThresholdDegPerSec, curveTable);
+            float effectiveCurveY = ApplyCustomSensitivity(vertical,   GyroThresholdDegPerSec, curveTable);
+            float baseSens = Math.Max(0.01f, stickSensitivityV2 / 100.0f) * HcSensitivityScale;
+            float vertSens = baseSens * Math.Max(10, Math.Min(200, stickGyroVerticalRatio)) / 100.0f;
+            float tightenX = ComputeTightenGainViiper(horizontal, stickGyroTightenThreshold, stickGyroTightenGain);
+            float tightenY = ComputeTightenGainViiper(vertical,   stickGyroTightenThreshold, stickGyroTightenGain);
+            float scaledX = horizontal * effectiveCurveX * baseSens * tightenX;
+            float scaledY = vertical   * effectiveCurveY * vertSens * tightenY;
+
+            // Stick-touch deactivation: suppress gyro output if user is moving
+            // the physical stick. Hold-off prevents gyro snap-back when stick
+            // returns to center.
+            if (stickGyroTouchDeactivateEnabled)
+            {
+                if (UpdateStickTouchSuppressionViiper(physicalStickX, physicalStickY,
+                        stickGyroTouchDeactivateThreshold, stickGyroTouchDeactivateHoldoff))
+                {
+                    scaledX = 0.0f; scaledY = 0.0f;
+                }
+            }
 
             // Anti-deadzone for small-motion precision. See legacy CE
             // GyroStick file for the rationale; same constants/formula here.
@@ -1022,6 +1131,8 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
             outputX = ClampToInt16(scaledX);
             outputY = ClampToInt16(scaledY);
+
+            LiveReadingsSink?.Invoke(horizontal, vertical, 0.0f, outputX, outputY, true);
 
             // Per-second diagnostic — logs raw IMU + JSL gravity (so we can see
             // why a pure-axis motion produces unexpected horizontal/vertical
@@ -1190,6 +1301,72 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // Smooth ramp version — see ControllerEmulationManager.GyroStick.cs
         // for the rationale. Mirror implementation; both pipelines share the
         // same persisted threshold/anti-deadzone settings.
+        // Curve presets — same shapes as the legacy CE GyroStick variant so
+        // both pipelines feel identical with the same preset selection.
+        private static readonly float[] StickGyroCurveLinearViiper = MakeFlatCurve(0.5f);
+        private static readonly float[] StickGyroCurveSlowViiper = MakeSlowPreciseCurve();
+        private static readonly float[] StickGyroCurveSnapViiper = MakeSnapAimCurve();
+
+        private static float[] SelectStickGyroCurveViiper(int preset)
+        {
+            switch (preset)
+            {
+                case 1: return StickGyroCurveSlowViiper;
+                case 2: return StickGyroCurveSnapViiper;
+                default: return StickGyroCurveLinearViiper;
+            }
+        }
+
+        private static float[] MakeSlowPreciseCurve()
+        {
+            var arr = new float[SensCurveNodeCount];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (i <= 5) arr[i] = 0.20f;
+                else if (i <= 15) arr[i] = 0.20f + (0.5f - 0.20f) * (i - 5) / 10.0f;
+                else arr[i] = 0.5f;
+            }
+            return arr;
+        }
+
+        private static float[] MakeSnapAimCurve()
+        {
+            var arr = new float[SensCurveNodeCount];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (i <= 3) arr[i] = 0.20f;
+                else if (i <= 10) arr[i] = 0.20f + (0.5f - 0.20f) * (i - 3) / 7.0f;
+                else if (i <= 25) arr[i] = 0.5f;
+                else if (i <= 40) arr[i] = 0.5f + (0.85f - 0.5f) * (i - 25) / 15.0f;
+                else arr[i] = 0.85f;
+            }
+            return arr;
+        }
+
+        private static float ComputeTightenGainViiper(float gyroDps, int thresholdDps, int gainPercent)
+        {
+            if (thresholdDps <= 0 || gainPercent <= 100) return 1.0f;
+            float absGyro = Math.Abs(gyroDps);
+            if (absGyro <= thresholdDps) return 1.0f;
+            float rampWidth = thresholdDps * 2.0f;
+            float ramp = Math.Min(1.0f, (absGyro - thresholdDps) / rampWidth);
+            float maxBoost = gainPercent / 100.0f;
+            return 1.0f + (maxBoost - 1.0f) * ramp;
+        }
+
+        private bool UpdateStickTouchSuppressionViiper(short physicalX, short physicalY, int thresholdPct, int holdoffMs)
+        {
+            float magPct = (float)Math.Sqrt(physicalX * (double)physicalX + physicalY * (double)physicalY) / short.MaxValue * 100.0f;
+            long now = DateTime.UtcNow.Ticks;
+            if (magPct >= thresholdPct)
+            {
+                stickTouchActiveTicks = now;
+                return true;
+            }
+            long heldOffTicks = holdoffMs * TimeSpan.TicksPerMillisecond;
+            return stickTouchActiveTicks > 0 && (now - stickTouchActiveTicks) < heldOffTicks;
+        }
+
         private static float ApplyAntiDeadzoneStickGyro(float gyroDps, float scaledOutput, float adzInt16, float adzThresholdDps)
         {
             if (adzInt16 <= 0.0f) return scaledOutput;

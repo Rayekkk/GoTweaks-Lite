@@ -592,6 +592,22 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 stickGyroAntiDeadzoneThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out int savedAdzThr)
                     ? Math.Max(0, Math.Min(50, savedAdzThr)) : 3;
 
+                stickGyroVerticalRatio = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroVerticalRatio", out int savedVerticalRatio)
+                    ? Math.Max(10, Math.Min(200, savedVerticalRatio)) : 100;
+                stickGyroCurvePreset = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroCurvePreset", out int savedCurvePreset)
+                    ? Math.Max(0, Math.Min(2, savedCurvePreset)) : 0;
+                stickGyroTightenThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTightenThreshold", out int savedTightenThr)
+                    ? Math.Max(0, Math.Min(500, savedTightenThr)) : 0;
+                stickGyroTightenGain = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTightenGain", out int savedTightenGain)
+                    ? Math.Max(100, Math.Min(300, savedTightenGain)) : 100;
+                stickGyroTouchDeactivateEnabled = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", out bool savedTouchEn) && savedTouchEn;
+                stickGyroTouchDeactivateThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", out int savedTouchThr)
+                    ? Math.Max(0, Math.Min(50, savedTouchThr)) : 15;
+                stickGyroTouchDeactivateHoldoff = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", out int savedTouchHo)
+                    ? Math.Max(0, Math.Min(1000, savedTouchHo)) : 250;
+                stickGyroSmoothing = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroSmoothing", out int savedSmoothing)
+                    ? Math.Max(0, Math.Min(90, savedSmoothing)) : 30;
+
                 if (LocalSettingsHelper.TryGetValue("ControllerEmulationVirtualABXYLayout", out int savedVirtualAbxyLayout))
                 {
                     virtualAbxyLayout = NormalizeVirtualAbxyLayout(savedVirtualAbxyLayout);
@@ -694,6 +710,14 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 LocalSettingsHelper.SetValue("ControllerEmulationStickConversion", stickConversion);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickGyroAntiDeadzone", stickGyroAntiDeadzone);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", stickGyroAntiDeadzoneThreshold);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroVerticalRatio", stickGyroVerticalRatio);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroCurvePreset", stickGyroCurvePreset);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTightenThreshold", stickGyroTightenThreshold);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTightenGain", stickGyroTightenGain);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", stickGyroTouchDeactivateEnabled);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", stickGyroTouchDeactivateThreshold);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", stickGyroTouchDeactivateHoldoff);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroSmoothing", stickGyroSmoothing);
 
                 // Keep legacy keys in sync for compatibility with older builds.
                 LocalSettingsHelper.SetValue("GPDControllerEmulationGyroSource", gyroSource);
@@ -1124,7 +1148,12 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     {
                         if (gyroActive && TryReadGyroSample(out GyroSample stickSample))
                         {
-                            ApplyStickFromGyro(stickSample, out lastGyroStickX, out lastGyroStickY);
+                            // Pass the user-selected physical stick values so stick-touch
+                            // deactivation can suppress gyro when the player is moving
+                            // the stick by hand. stickSelect 0 = Left, 1 = Right.
+                            short physStickX = stickSelect == 1 ? forwardedRightX : forwardedLeftX;
+                            short physStickY = stickSelect == 1 ? forwardedRightY : forwardedLeftY;
+                            ApplyStickFromGyro(stickSample, physStickX, physStickY, out lastGyroStickX, out lastGyroStickY);
                             hasLastGyroStick = true;
                             lastGyroStickTicksUtc = stickSample.TimestampTicksUtc > 0
                                 ? stickSample.TimestampTicksUtc
@@ -1317,7 +1346,18 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     Logger.Warn($"Controller emulation forwarding loop error: {ex.Message}");
                 }
 
-                Thread.Sleep(ForwardingIntervalMs);
+                // Event-driven wait — same fix as the VIIPER forwarder. Blocks
+                // until a fresh HID report arrives from Lenovo (zero CPU until
+                // signaled), or falls through after the timeout for non-Legion
+                // sources / XInput-only paths.
+                if (deviceType == SharedDeviceType.LegionGo || deviceType == SharedDeviceType.LegionGo2)
+                {
+                    Labs.LegionButtonMonitor.WaitForNewSample(16);
+                }
+                else
+                {
+                    Thread.Sleep(ForwardingIntervalMs);
+                }
             }
 
             Logger.Info("Controller emulation forwarding loop stopped");

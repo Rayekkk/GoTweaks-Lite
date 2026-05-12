@@ -78,6 +78,18 @@ namespace XboxGamingBarHelper.ControllerEmulation
         // 0.5°/s gyro noise floor) so existing users see no behavior change.
         private int stickGyroAntiDeadzone = 10;          // percent of stick range (0-30)
         private int stickGyroAntiDeadzoneThreshold = 3;  // 0.1 deg/s units (0-50 → 0.0-5.0 deg/s) — 0.3°/s = post-calibration BMI260 noise floor
+        private int stickGyroVerticalRatio = 100;        // % of master sensitivity (10-200, 100 = same as horizontal)
+        private int stickGyroCurvePreset = 0;            // 0=Linear, 1=Slow-and-precise, 2=Snap-aim
+        private int stickGyroTightenThreshold = 0;       // deg/s above which fast-zone gain ramps in (0 = off)
+        private int stickGyroTightenGain = 100;          // % gain at full ramp (100 = no boost, 200 = 2×)
+        private bool stickGyroTouchDeactivateEnabled = false;
+        private int stickGyroTouchDeactivateThreshold = 15; // % of stick range
+        private int stickGyroTouchDeactivateHoldoff = 250;  // ms hold-off after stick returns
+        private int stickGyroSmoothing = 30;                // EMA alpha % (0=off, 90=heavy)
+        private float smoothedGyroXState;
+        private float smoothedGyroYState;
+        private float smoothedGyroZState;
+        private bool smoothedGyroPrimed;
         private int virtualAbxyLayout;
         private bool hideStockController;
         private int hideTarget;
@@ -472,6 +484,15 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public readonly ControllerEmulationStickGyroAntiDeadzoneProperty ControllerEmulationStickGyroAntiDeadzone;
         public readonly ControllerEmulationStickGyroAntiDeadzoneThresholdProperty ControllerEmulationStickGyroAntiDeadzoneThreshold;
         public readonly ControllerEmulationCalibrateGyroStatusProperty ControllerEmulationCalibrateGyroStatus;
+        public readonly ControllerEmulationStickGyroVerticalRatioProperty ControllerEmulationStickGyroVerticalRatio;
+        public readonly ControllerEmulationStickGyroCurvePresetProperty ControllerEmulationStickGyroCurvePreset;
+        public readonly ControllerEmulationStickGyroTightenThresholdProperty ControllerEmulationStickGyroTightenThreshold;
+        public readonly ControllerEmulationStickGyroTightenGainProperty ControllerEmulationStickGyroTightenGain;
+        public readonly ControllerEmulationStickGyroTouchDeactivateEnabledProperty ControllerEmulationStickGyroTouchDeactivateEnabled;
+        public readonly ControllerEmulationStickGyroTouchDeactivateThresholdProperty ControllerEmulationStickGyroTouchDeactivateThreshold;
+        public readonly ControllerEmulationStickGyroTouchDeactivateHoldoffProperty ControllerEmulationStickGyroTouchDeactivateHoldoff;
+        public readonly ControllerEmulationStickGyroLiveReadingsProperty ControllerEmulationStickGyroLiveReadings;
+        public readonly ControllerEmulationStickGyroSmoothingProperty ControllerEmulationStickGyroSmoothing;
 
         public IEnumerable<IProperty> Properties
         {
@@ -524,6 +545,15 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 yield return ControllerEmulationStickGyroAntiDeadzone;
                 yield return ControllerEmulationStickGyroAntiDeadzoneThreshold;
                 yield return ControllerEmulationCalibrateGyroStatus;
+                yield return ControllerEmulationStickGyroVerticalRatio;
+                yield return ControllerEmulationStickGyroCurvePreset;
+                yield return ControllerEmulationStickGyroTightenThreshold;
+                yield return ControllerEmulationStickGyroTightenGain;
+                yield return ControllerEmulationStickGyroTouchDeactivateEnabled;
+                yield return ControllerEmulationStickGyroTouchDeactivateThreshold;
+                yield return ControllerEmulationStickGyroTouchDeactivateHoldoff;
+                yield return ControllerEmulationStickGyroLiveReadings;
+                yield return ControllerEmulationStickGyroSmoothing;
             }
         }
 
@@ -587,8 +617,24 @@ namespace XboxGamingBarHelper.ControllerEmulation
             ControllerEmulationStickGyroAntiDeadzone = new ControllerEmulationStickGyroAntiDeadzoneProperty(stickGyroAntiDeadzone, this);
             ControllerEmulationStickGyroAntiDeadzoneThreshold = new ControllerEmulationStickGyroAntiDeadzoneThresholdProperty(stickGyroAntiDeadzoneThreshold, this);
             ControllerEmulationCalibrateGyroStatus = new ControllerEmulationCalibrateGyroStatusProperty(this);
+            ControllerEmulationStickGyroVerticalRatio = new ControllerEmulationStickGyroVerticalRatioProperty(stickGyroVerticalRatio, this);
+            ControllerEmulationStickGyroCurvePreset = new ControllerEmulationStickGyroCurvePresetProperty(stickGyroCurvePreset, this);
+            ControllerEmulationStickGyroTightenThreshold = new ControllerEmulationStickGyroTightenThresholdProperty(stickGyroTightenThreshold, this);
+            ControllerEmulationStickGyroTightenGain = new ControllerEmulationStickGyroTightenGainProperty(stickGyroTightenGain, this);
+            ControllerEmulationStickGyroTouchDeactivateEnabled = new ControllerEmulationStickGyroTouchDeactivateEnabledProperty(stickGyroTouchDeactivateEnabled, this);
+            ControllerEmulationStickGyroTouchDeactivateThreshold = new ControllerEmulationStickGyroTouchDeactivateThresholdProperty(stickGyroTouchDeactivateThreshold, this);
+            ControllerEmulationStickGyroTouchDeactivateHoldoff = new ControllerEmulationStickGyroTouchDeactivateHoldoffProperty(stickGyroTouchDeactivateHoldoff, this);
+            ControllerEmulationStickGyroLiveReadings = new ControllerEmulationStickGyroLiveReadingsProperty(this);
+            ControllerEmulationStickGyroSmoothing = new ControllerEmulationStickGyroSmoothingProperty(stickGyroSmoothing, this);
 
             SubscribeForegroundSignal();
+
+            // Forward live gyro readings from the Viiper processor (when it's
+            // the active backend) into the manager's throttled publisher so
+            // the widget visualizer sees data regardless of which backend the
+            // user has selected.
+            Viiper.ViiperStickGyroProcessor.LiveReadingsSink = (gx, gy, gz, sx, sy, gate) =>
+                PublishStickGyroLiveReadings(gx, gy, gz, sx, sy, gate);
 
             // Apply persisted JSL gyro bias offset (from a previous Calibrate
             // Gyro click). The legacy CE side gets it immediately. The Viiper
