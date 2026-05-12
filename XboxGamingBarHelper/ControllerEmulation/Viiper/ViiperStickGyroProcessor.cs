@@ -32,6 +32,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         // ---- Settings cache (refreshed from LocalSettingsHelper periodically) ----
+        // Pipeline pruned in #79 round 5:
+        // conversion → invert → sensitivity → clamp. The deprecated min/max
+        // gyro speed, min/max output, deadzone, precision speed, power curve,
+        // and output mix sliders no longer affect anything; their UI was
+        // removed at the same time.
         private bool enabled;            // ViiperStickGyroEnabled — master kill switch for the feature
         private int gyroSource;          // 0=Mixed (default), 1=Right, 2=Left, 3=Mixed; matches legacy CE convention
         private int stickSelect;         // 0=Left stick, 1=Right stick (Send-to-joystick)
@@ -39,17 +44,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private int gyroActivationButton;
         private bool stickInvertX;
         private bool stickInvertY;
-        private int stickMinGyroSpeed;
-        private int stickMaxGyroSpeed;
-        private int stickMinOutput;
-        private int stickMaxOutput;
-        private int stickPowerCurve;
         private int stickSensitivityV2;
-        private int stickDeadzone;
-        private int stickPrecisionSpeed;
-        private int stickOutputMix;
         private int stickOrientationV2;
         private int stickConversion;
+        // Anti-deadzone tunables — kept in sync with the legacy CE pipeline
+        // via shared LocalSettings keys. Defaults match the previously-
+        // hardcoded constants (10% min stick deflection, 0.5°/s noise floor).
+        private int stickGyroAntiDeadzonePercent = 10;
+        private int stickGyroAntiDeadzoneThresholdTenths = 3;
         private long lastSettingsRefreshTicks;
         // 200 ms refresh — fast enough that slider drags feel instant, slow enough
         // that the LocalSettings dictionary lookups don't show up in poll-loop
@@ -67,8 +69,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // which handheld profile is active). Pack both into a single int: low byte =
         // gyroSource, high byte = (int)deviceType.
         private int activeAdapterKey = -1;
-        // Filter-state-relevant settings tracked separately so a change invalidates
-        // the One-Euro filter without touching activation toggle state.
+        // Track conversion/orientation changes so we can reset the JSL fusion
+        // when the user flips between modes (e.g., Yaw → Player Space). Without
+        // a reset the carried-over orientation quaternion can produce a brief
+        // burst of spurious motion while it re-converges.
         private int prevConversion = -1;
         private int prevOrientation = -1;
 
@@ -88,13 +92,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private long pipelineDiagLastTicks;
         private const long PipelineDiagIntervalTicks = TimeSpan.TicksPerSecond;
 
-        // ---- One-Euro filter state ----
-        private float stickFilteredHorizontal;
-        private float stickFilteredVertical;
-        private float stickFilteredDerivativeHorizontal;
-        private float stickFilteredDerivativeVertical;
-        private bool stickFilterInitialized;
-        private long stickLastSampleTicksUtc;
+        // Player Space (#79 round 5) diagnostic — fires once per second whenever
+        // mode 3 is selected so we can verify JSL's gravity vector matches its
+        // Y-up expectation (gravity ≈ +1g on Y when device flat).
+        private long playerSpaceDiagLastTicks;
 
         // ---- Activation toggle state ----
         private bool gyroToggleActive;
@@ -109,13 +110,37 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // stationary periods so deliberate slow pans aren't learned as bias.
         private readonly GyroBiasEstimator biasEstimator = new GyroBiasEstimator();
 
-        // ---- One-Euro filter constants (mirror legacy CE) ----
-        private const float OneEuroMinCutoff = 1.2f;
-        private const float OneEuroBeta = 0.25f;
-        private const float OneEuroDerivativeCutoff = 1.5f;
+        // ---- Gyro/accel sensor fusion for Player Space conversion (#79 round 5) ----
+        // Wraps Jibb Smart's GamepadMotionHelpers via P/Invoke. The native
+        // library maintains a fused orientation/gravity estimate using a
+        // complementary filter on gyro+accel — much more stable during motion
+        // than a low-pass on accel alone, which is what the first cut here used.
+        // Lifetime tied to this processor; Disposed via Dispose() / finalizer.
+        private readonly GamepadMotion gamepadMotion = new GamepadMotion();
+        private long gamepadMotionLastTicksUtc;
+
+        // Sampling-rate constants — only kept for the JSL ProcessMotion delta
+        // when the IMU sample timestamp gap is unavailable.
         private const float DefaultDeltaSeconds = 1.0f / 250.0f;
-        private const float MinDeltaSeconds = 0.002f;
-        private const float MaxDeltaSeconds = 0.05f;
+
+        // No EMA smoother. The earlier round-5 removal regressed
+        // because we lacked gyro bias correction. JSL is now in
+        // Stillness | SensorFusion mode (PlayerSpaceGyro.cs ctor) so it learns
+        // the BMI260's static bias on its own and the smoother isn't needed.
+
+        // Diagnostics — per-axis min/max gyro and accel-magnitude min/max over
+        // the past second, plus a "spike count" (samples whose absolute delta
+        // from the previous one exceeds a threshold). Helps spot whether
+        // perceived stutter is real motion, sample aliasing, or parser noise.
+        private float diagGyroXMin = float.MaxValue, diagGyroXMax = float.MinValue;
+        private float diagGyroYMin = float.MaxValue, diagGyroYMax = float.MinValue;
+        private float diagGyroZMin = float.MaxValue, diagGyroZMax = float.MinValue;
+        private float diagAccelMagMin = float.MaxValue, diagAccelMagMax = float.MinValue;
+        private int diagSampleCount;
+        private int diagSpikeCount;
+        private float diagPrevGyroX, diagPrevGyroY, diagPrevGyroZ;
+        private bool diagPrevValid;
+        private const float DiagSpikeThresholdDegPerSec = 250.0f;
 
         // ---- Standard XInput button bits (match ViiperXInput in XInputNative.cs) ----
         private const ushort BTN_DPAD_UP = 0x0001;
@@ -147,6 +172,40 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             RefreshSettings();
             lastSettingsRefreshTicks = DateTime.UtcNow.Ticks;
             statsLastEmitTicks = lastSettingsRefreshTicks;
+
+            // Apply any saved JSL gyro bias from a previous Calibrate Gyro click.
+            // Manager-side LoadJslCalibrationOffset can't reach the Viiper
+            // processor on startup because the forwarder singleton hasn't been
+            // created yet — so the processor loads its own offset on construction.
+            // Same key names as ControllerEmulationManager.JslCalibKey* (kept in sync).
+            try
+            {
+                bool hasX = LocalSettingsHelper.TryGetValue("ControllerEmulationGyroBiasX", out float bx);
+                bool hasY = LocalSettingsHelper.TryGetValue("ControllerEmulationGyroBiasY", out float by);
+                bool hasZ = LocalSettingsHelper.TryGetValue("ControllerEmulationGyroBiasZ", out float bz);
+                LocalSettingsHelper.TryGetValue("ControllerEmulationGyroBiasWeight", out int bw);
+                if (hasX && hasY && hasZ)
+                {
+                    gamepadMotion.SetCalibrationOffset(bx, by, bz, bw);
+                    gamepadMotion.SetCalibrationMode(GamepadMotion.JslCalibrationManual);
+                    Logger.Info($"VIIPER stick-gyro: loaded saved JSL bias offset ({bx:F3}, {by:F3}, {bz:F3}) weight={bw} — JSL switched to Manual");
+                }
+                else
+                {
+                    Logger.Info("VIIPER stick-gyro: no saved JSL bias — JSL stays in auto-cal (Stillness|SensorFusion) until user runs Calibrate Gyro");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"VIIPER stick-gyro: failed loading saved JSL bias: {ex.Message}");
+            }
+
+            // Run a quick self-test on the JSL pipeline so the helper log
+            // contains a known-input → known-output trace right after startup.
+            // Lets us A/B-compare against expected values without needing the
+            // user to wave the device around. Only runs once per helper boot.
+            try { RunSelfTest(); }
+            catch (Exception ex) { Logger.Warn($"Stick-gyro self-test threw: {ex.Message}"); }
         }
 
         /// <summary>
@@ -185,17 +244,13 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
         }
 
-        /// <summary>Clear filter + activation state. Call on backend swap / forwarder restart.</summary>
+        /// <summary>Clear activation + JSL state. Call on backend swap / forwarder restart.</summary>
         public void Reset()
         {
-            stickFilterInitialized = false;
-            stickLastSampleTicksUtc = 0;
-            stickFilteredHorizontal = 0f;
-            stickFilteredVertical = 0f;
-            stickFilteredDerivativeHorizontal = 0f;
-            stickFilteredDerivativeVertical = 0f;
             gyroToggleActive = false;
             lastGyroActivationButtonPressed = false;
+            gamepadMotionLastTicksUtc = 0;
+            gamepadMotion.Reset();
             // Bias state is held across forwarder Stop/Start because the IMU's
             // calibration doesn't change when our process pauses. Only forced
             // recalibration (the future "Calibrate now" button or backend
@@ -209,6 +264,199 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// command.
         /// </summary>
         public void RecalibrateBias() => biasEstimator.Reset();
+
+        /// <summary>
+        /// Apply a previously-persisted gyro bias offset so JSL subtracts it from
+        /// every sample. Called on startup with the saved offset (if any).
+        /// </summary>
+        public void ApplyJslCalibrationOffset(float xOffset, float yOffset, float zOffset, int weight)
+        {
+            gamepadMotion.SetCalibrationOffset(xOffset, yOffset, zOffset, weight);
+            Logger.Info($"VIIPER stick-gyro: applied saved JSL bias offset ({xOffset:F3}, {yOffset:F3}, {zOffset:F3}) weight={weight}");
+        }
+
+        /// <summary>
+        /// Run the calibration flow on the Viiper-side JSL instance: reset
+        /// accumulator, switch to Stillness|SensorFusion, wait up to
+        /// <paramref name="timeoutMs"/> for confidence to reach 1.0, capture the
+        /// learned offset, switch back to Manual, and apply the offset so JSL
+        /// uses it immediately. Returns the (xOffset, yOffset, zOffset, weight)
+        /// tuple via out params; caller persists.
+        /// </summary>
+        /// <summary>
+        /// Start an explicit JSL calibration capture (Stillness | SensorFusion).
+        /// Pair with <see cref="EndJslCalibration"/>. Caller drives the wait
+        /// loop and progress reporting.
+        /// </summary>
+        public void BeginJslCalibration()
+        {
+            try
+            {
+                diagPumpSuccess = 0;
+                diagPumpNoAdapter = 0;
+                diagPumpNoSample = 0;
+                gamepadMotion.ResetContinuousCalibration();
+                // Use manual continuous calibration (StartContinuousCalibration)
+                // rather than stillness auto-detection. The stillness detector's
+                // auto-adapting MinDeltaGyro threshold never converges fast
+                // enough on this IMU within a 5s window (confidence stays at
+                // 0); manual continuous mode just averages every sample we
+                // feed it during the window, which is what the user actually
+                // intends when they put the device flat and click Calibrate.
+                gamepadMotion.StartContinuousCalibration();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"BeginJslCalibration failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Polling-friendly current confidence (0.0-1.0) of the auto-calibration.
+        /// </summary>
+        public float GetJslCalibrationConfidence()
+        {
+            return gamepadMotion.GetAutoCalibrationConfidence();
+        }
+
+        /// <summary>
+        /// Feed one IMU sample directly to JSL during the calibration window.
+        /// Bypasses the activation gate (Hold / Toggle button) and the
+        /// stick-gyro enable flag — calibration must work regardless of those.
+        /// Returns true if a fresh sample was pumped through. Caller drives
+        /// the timing (typically once per ~50–250 ms in the calibration loop).
+        /// </summary>
+        // Diagnostic counters for the calibration pump. Reset by
+        // BeginJslCalibration so each capture window's stats are clean.
+        private int diagPumpSuccess;
+        private int diagPumpNoAdapter;
+        private int diagPumpNoSample;
+        private float diagPumpLastGyroX, diagPumpLastGyroY, diagPumpLastGyroZ;
+        private float diagPumpLastAccelX, diagPumpLastAccelY, diagPumpLastAccelZ;
+
+        public bool PumpJslSampleForCalibration()
+        {
+            try
+            {
+                // Make sure we have an adapter; the regular tick path may not
+                // have run yet (e.g. CE just enabled, or stick-gyro disabled).
+                EnsureGyroAdapter();
+                if (activeAdapter == null)
+                {
+                    diagPumpNoAdapter++;
+                    return false;
+                }
+                if (!activeAdapter.TryGetLatestSample(out GyroSample sample))
+                {
+                    diagPumpNoSample++;
+                    return false;
+                }
+
+                long sampleTicks = sample.TimestampTicksUtc;
+                float dt = gamepadMotionLastTicksUtc > 0 && sampleTicks > gamepadMotionLastTicksUtc
+                    ? (float)((sampleTicks - gamepadMotionLastTicksUtc) / (double)TimeSpan.TicksPerSecond)
+                    : DefaultDeltaSeconds;
+                gamepadMotionLastTicksUtc = sampleTicks;
+
+                gamepadMotion.Update(
+                    sample.GyroXDegPerSecond, sample.GyroYDegPerSecond, sample.GyroZDegPerSecond,
+                    sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                    dt);
+                diagPumpSuccess++;
+                diagPumpLastGyroX = sample.GyroXDegPerSecond;
+                diagPumpLastGyroY = sample.GyroYDegPerSecond;
+                diagPumpLastGyroZ = sample.GyroZDegPerSecond;
+                diagPumpLastAccelX = sample.AccelXG;
+                diagPumpLastAccelY = sample.AccelYG;
+                diagPumpLastAccelZ = sample.AccelZG;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"PumpJslSampleForCalibration failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public string GetPumpDiagSummary()
+        {
+            return string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "pump: success={0} noAdapter={1} noSample={2} | last gyro=({3:F2},{4:F2},{5:F2}) accel=({6:F2},{7:F2},{8:F2})G",
+                diagPumpSuccess, diagPumpNoAdapter, diagPumpNoSample,
+                diagPumpLastGyroX, diagPumpLastGyroY, diagPumpLastGyroZ,
+                diagPumpLastAccelX, diagPumpLastAccelY, diagPumpLastAccelZ);
+        }
+
+        /// <summary>
+        /// Capture the learned offset, apply it back via SetCalibrationOffset
+        /// (so JSL uses it on the very next sample), and switch JSL back to
+        /// Manual mode. Pair with <see cref="BeginJslCalibration"/>.
+        /// </summary>
+        public void EndJslCalibration(
+            out float xOffset, out float yOffset, out float zOffset, out int weight)
+        {
+            xOffset = 0; yOffset = 0; zOffset = 0; weight = 0;
+            try
+            {
+                // Manual continuous calibration ends here — Pause clears
+                // IsCalibrating, GetCalibrationOffset returns the average
+                // gyro across all samples pushed during the window.
+                gamepadMotion.PauseContinuousCalibration();
+                gamepadMotion.GetCalibrationOffset(out xOffset, out yOffset, out zOffset);
+
+                // Weight = 10 when we collected enough samples to trust the
+                // capture (≥ ~50 samples during the 5s window), tapering
+                // down linearly below that to surface "low-confidence" in
+                // the widget UI when the source wasn't producing data.
+                int samples = diagPumpSuccess;
+                weight = samples >= 50 ? 10 : (samples / 5);
+                if (weight < 0) weight = 0;
+                if (weight > 10) weight = 10;
+
+                gamepadMotion.SetCalibrationOffset(xOffset, yOffset, zOffset, weight);
+                // SetCalibrationMode left at JslCalibrationManual (the ctor
+                // default) — no Stillness auto-cal running outside this flow.
+                Logger.Info($"VIIPER stick-gyro JSL calibration end: samples={samples} offset=({xOffset:F3}, {yOffset:F3}, {zOffset:F3}) weight={weight} | {GetPumpDiagSummary()}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"EndJslCalibration failed: {ex.Message}");
+            }
+        }
+
+        public bool RunJslCalibration(int timeoutMs,
+            out float xOffset, out float yOffset, out float zOffset, out int weight)
+        {
+            xOffset = 0; yOffset = 0; zOffset = 0; weight = 0;
+            try
+            {
+                gamepadMotion.ResetContinuousCalibration();
+                gamepadMotion.SetCalibrationMode(GamepadMotion.JslCalibrationStillnessFusion);
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                float confidence = 0.0f;
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    confidence = gamepadMotion.GetAutoCalibrationConfidence();
+                    if (confidence >= 1.0f) break;
+                    System.Threading.Thread.Sleep(50);
+                }
+
+                gamepadMotion.GetCalibrationOffset(out xOffset, out yOffset, out zOffset);
+                weight = (int)Math.Round(confidence * 10.0f);
+                gamepadMotion.SetCalibrationOffset(xOffset, yOffset, zOffset, weight);
+                gamepadMotion.SetCalibrationMode(GamepadMotion.JslCalibrationManual);
+
+                Logger.Info($"VIIPER stick-gyro JSL calibration: confidence={confidence:F2} offset=({xOffset:F3}, {yOffset:F3}, {zOffset:F3}) weight={weight} elapsed={sw.ElapsedMilliseconds}ms");
+                return confidence > 0.0f;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"VIIPER stick-gyro JSL calibration failed: {ex.Message}");
+                return false;
+            }
+        }
 
         /// <summary>
         /// Tear down the active gyro source adapter (call from forwarder Stop). Safe
@@ -459,44 +707,44 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             stickInvertX = LocalSettingsHelper.TryGetValue("ControllerEmulationStickInvertX", out bool savedInvX) && savedInvX;
             stickInvertY = LocalSettingsHelper.TryGetValue("ControllerEmulationStickInvertY", out bool savedInvY) && savedInvY;
 
-            // Same defaults as legacy CE (Normalize.cs:554-575) so behavior matches
-            // when a user rolls back to the legacy backend.
-            stickMinGyroSpeed = LocalSettingsHelper.TryGetValue("ControllerEmulationStickMinGyroSpeed", out int v1)
-                ? Math.Max(0, Math.Min(100, v1)) : 0;
-            stickMaxGyroSpeed = LocalSettingsHelper.TryGetValue("ControllerEmulationStickMaxGyroSpeed", out int v2)
-                ? Math.Max(50, Math.Min(720, v2)) : 220;
-            stickMinOutput = LocalSettingsHelper.TryGetValue("ControllerEmulationStickMinOutput", out int v3)
-                ? Math.Max(0, Math.Min(100, v3)) : 0;
-            stickMaxOutput = LocalSettingsHelper.TryGetValue("ControllerEmulationStickMaxOutput", out int v4)
-                ? Math.Max(1, Math.Min(100, v4)) : 100;
-            stickPowerCurve = LocalSettingsHelper.TryGetValue("ControllerEmulationStickPowerCurve", out int v5)
-                ? Math.Max(10, Math.Min(400, v5)) : 100;
+            // Sensitivity multiplier (slider value / 100). Single knob the user
+            // tweaks for feel — collapses what would otherwise be per-axis
+            // sensitivity into one slider since the conversion math is symmetric.
             stickSensitivityV2 = LocalSettingsHelper.TryGetValue("ControllerEmulationStickSensitivityV2", out int v6)
                 ? Math.Max(1, Math.Min(400, v6)) : 100;
-            stickDeadzone = LocalSettingsHelper.TryGetValue("ControllerEmulationStickDeadzone", out int v7)
-                ? Math.Max(0, Math.Min(50, v7)) : 2;
-            stickPrecisionSpeed = LocalSettingsHelper.TryGetValue("ControllerEmulationStickPrecisionSpeed", out int v8)
-                ? Math.Max(0, Math.Min(100, v8)) : 0;
-            stickOutputMix = LocalSettingsHelper.TryGetValue("ControllerEmulationStickOutputMix", out int v9)
-                ? Math.Max(-100, Math.Min(100, v9)) : 0;
+            // 0 = Flat (no Y/Z swap), 1 = Handheld (Y/Z swap applied). Default
+            // Flat: the swap is mainly for users who want roll-of-device to act
+            // as their horizontal stick input; the new default uses Mode 0
+            // (Yaw) where horizontal = gyroY directly, which is the natural
+            // "laser pointer from back of device" feel and works for both flat
+            // and handheld holds because device-Y stays approximately aligned
+            // with world-up in both poses. Saved value wins.
             stickOrientationV2 = LocalSettingsHelper.TryGetValue("ControllerEmulationStickOrientationV2", out int v10)
                 ? (v10 == 1 ? 1 : 0) : 0;
-            // Default 2 (Yaw + Roll) per vvalente30's recommended settings (issue #79).
-            // Kept aligned with ControllerEmulationManager.Normalize.cs:LoadSettings.
+            // 0=Yaw, 1=Roll, 2=Yaw+Roll, 3=Player Space, 4=World Space.
+            // Default 0 (Yaw) — "laser pointer from back of device" mental
+            // model: yawing the device around its own up-axis (gyroY) pans
+            // the camera left/right; pitching (gyroX) pans up/down; rolling
+            // doesn't change the laser direction so produces no stick output.
+            // Player/World Space treat *gravity* as the yaw axis, which means
+            // a tilted handheld feels like the laser is pointing at the sky
+            // instead of out the back of the device — perceptually wrong for
+            // most handheld users. Saved value wins.
             stickConversion = LocalSettingsHelper.TryGetValue("ControllerEmulationStickConversion", out int v11)
-                ? Math.Max(0, Math.Min(2, v11)) : 2;
+                ? Math.Max(0, Math.Min(4, v11)) : 0;
 
-            // Conversion / Orientation reshape the input axes; with the One-Euro filter
-            // initialized from previous-axis values, switching mid-stream produces
-            // ~50ms of "ghost" stick output as the filter adapts. Drop the filter
-            // state on these specific changes so the new mapping starts clean.
+            stickGyroAntiDeadzonePercent = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzone", out int v12)
+                ? Math.Max(0, Math.Min(30, v12)) : 10;
+            stickGyroAntiDeadzoneThresholdTenths = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out int v13)
+                ? Math.Max(0, Math.Min(50, v13)) : 3;
+
+            // Reset the JSL fusion when the conversion or orientation changes —
+            // the orientation quaternion carries over otherwise and produces a
+            // brief burst of spurious output as it re-converges.
             if (prevConversion != -1 && (prevConversion != stickConversion || prevOrientation != stickOrientationV2))
             {
-                stickFilterInitialized = false;
-                stickFilteredHorizontal = 0f;
-                stickFilteredVertical = 0f;
-                stickFilteredDerivativeHorizontal = 0f;
-                stickFilteredDerivativeVertical = 0f;
+                gamepadMotion.Reset();
+                gamepadMotionLastTicksUtc = 0;
             }
             prevConversion = stickConversion;
             prevOrientation = stickOrientationV2;
@@ -572,20 +820,84 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             float rawGyroY = sample.GyroYDegPerSecond;
             float rawGyroZ = sample.GyroZDegPerSecond;
 
-            // 0. Bias correction — see GyroBiasEstimator. Tracks rest-state IMU
-            //    offset and subtracts it before the deadzone so users on the
-            //    VIIPER backend don't see Always-On drift.
-            sample = biasEstimator.Correct(sample);
+            // 0a. Sensor fusion update — push the RAW sample (pre-bias-correction)
+            //     into JSL so its continuous-calibration "is steady" detector and
+            //     internal gyro-bias estimator see actual sensor data rather than
+            //     a sample we already corrected. Without raw input, JSL learns
+            //     bias~=0 against an already-flat signal and the gravity vector
+            //     drifts when our biasEstimator is wrong; with raw input, JSL
+            //     subtracts the right offset on its own and produces a stable
+            //     gravity estimate even during tilt motion.
+            long sampleTicks = sample.TimestampTicksUtc;
+            float jslDeltaSeconds = gamepadMotionLastTicksUtc > 0 && sampleTicks > gamepadMotionLastTicksUtc
+                ? (float)((sampleTicks - gamepadMotionLastTicksUtc) / (double)TimeSpan.TicksPerSecond)
+                : DefaultDeltaSeconds;
+            gamepadMotionLastTicksUtc = sampleTicks;
 
-            // 1. Orientation correction — swap Y↔Z (with sign flip on Z) when IMU
-            //    is mounted orthogonally on this device.
-            float gyroX = sample.GyroXDegPerSecond;
-            float gyroY = sample.GyroYDegPerSecond;
-            float gyroZ = sample.GyroZDegPerSecond;
+            // Always feed JSL the real accelerometer reading. We previously
+            // overrode it with a synthetic (0,1,0) when orientation==Handheld
+            // to make Player/World Space behave like Mode 0 in tilted poses,
+            // but that permanently broke JSL's complementary filter — gravity
+            // tracking died, every transient looked like "not gravity," and
+            // the projections degenerated. JSL must always see the real accel;
+            // the orientation toggle is meant for the legacy modes
+            // 0/1/2 only and Player/World Space self-adapt to held orientation
+            // through their gravity-aware math.
+            gamepadMotion.Update(
+                rawGyroX, rawGyroY, rawGyroZ,
+                sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                jslDeltaSeconds);
+
+            // 0b. Read gyro from JSL's calibrated path (raw - learned bias) for
+            //     ALL conversion modes, not just the JSL-projected ones. This
+            //     puts modes 0/1/2 on the same input feed as Player/World
+            //     Space, so the user-perceived "smooth motion in Player Space
+            //     vs jittery in Yaw" gap closes — they were eating different
+            //     bias-correction paths before.
+            gamepadMotion.GetCalibratedGyro(out float jslGyroX, out float jslGyroY, out float jslGyroZ);
+
+            // No pre-output EMA smoothing — JSL's auto-calibration removes
+            // the drift that made our pipeline need it.
+
+            // Diagnostics window accumulators — flushed in the per-second log block below.
+            diagSampleCount++;
+            if (rawGyroX < diagGyroXMin) diagGyroXMin = rawGyroX; if (rawGyroX > diagGyroXMax) diagGyroXMax = rawGyroX;
+            if (rawGyroY < diagGyroYMin) diagGyroYMin = rawGyroY; if (rawGyroY > diagGyroYMax) diagGyroYMax = rawGyroY;
+            if (rawGyroZ < diagGyroZMin) diagGyroZMin = rawGyroZ; if (rawGyroZ > diagGyroZMax) diagGyroZMax = rawGyroZ;
+            float accelMagSq = sample.AccelXG * sample.AccelXG + sample.AccelYG * sample.AccelYG + sample.AccelZG * sample.AccelZG;
+            float accelMag = (float)Math.Sqrt(accelMagSq);
+            if (accelMag < diagAccelMagMin) diagAccelMagMin = accelMag; if (accelMag > diagAccelMagMax) diagAccelMagMax = accelMag;
+            if (diagPrevValid)
+            {
+                float dx = Math.Abs(rawGyroX - diagPrevGyroX);
+                float dy = Math.Abs(rawGyroY - diagPrevGyroY);
+                float dz = Math.Abs(rawGyroZ - diagPrevGyroZ);
+                if (dx > DiagSpikeThresholdDegPerSec || dy > DiagSpikeThresholdDegPerSec || dz > DiagSpikeThresholdDegPerSec)
+                {
+                    diagSpikeCount++;
+                }
+            }
+            diagPrevGyroX = rawGyroX; diagPrevGyroY = rawGyroY; diagPrevGyroZ = rawGyroZ; diagPrevValid = true;
+
+            // Run the legacy biasEstimator just to keep its internal "is
+            // stationary" state warm (some other callers consult it).
+            biasEstimator.Correct(sample);
+
+            // 1. Orientation correction — SwapYawRoll:
+            //    (X, Y, Z) → (X, -Z, -Y). Both Y and Z are negated, not just Z.
+            //    Ours used to do (X, Z, -Y) which dropped the sign on Y, so a
+            //    handheld-posture user's real yaw signal landed on +gyroZ
+            //    (Mode 0 doesn't use Z) and pure noise floor landed on +gyroY
+            //    (Mode 0's horizontal). That is what produced the saturated
+            //    noise-driven stutter in vvalente30's logs.
+            float gyroX = jslGyroX;
+            float gyroY = jslGyroY;
+            float gyroZ = jslGyroZ;
             if (stickOrientationV2 == 1)
             {
                 float origY = gyroY;
-                gyroY = gyroZ;
+                float origZ = gyroZ;
+                gyroY = -origZ;
                 gyroZ = -origY;
             }
 
@@ -605,190 +917,300 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     horizontal = (gyroY + gyroZ) * 0.5f;
                     vertical = gyroX;
                     break;
+                case 3: // Player Space — gravity-aware projection. Good for
+                        // device held roughly flat; assumes pitch axis = device-X.
+                        // For tilted handhelds the pitch axis assumption breaks
+                        // down — use Player Space when the device is held flat,
+                        // World Space (case 4) when held at an angle.
+                    gamepadMotion.GetPlayerSpaceGyro(out horizontal, out vertical, gyroY, gyroX);
+
+                    // Diagnostic — log JSL's gravity vector + raw IMU + projection
+                    // result periodically. Compare to expected: device flat with
+                    // screen up should give gravity ≈ (0, +1, 0) in JSL's Y-up
+                    // convention. Anything else means our IMU sign/axis convention
+                    // doesn't match what JSL expects, which is the most likely
+                    // cause of the "roll/yaw swapped" feel.
+                    {
+                        long nowPsDiag = DateTime.UtcNow.Ticks;
+                        if (nowPsDiag - playerSpaceDiagLastTicks >= PipelineDiagIntervalTicks)
+                        {
+                            playerSpaceDiagLastTicks = nowPsDiag;
+                            gamepadMotion.GetGravity(out float gvx, out float gvy, out float gvz);
+                            Logger.Info(
+                                "PlayerSpace diag: rawGyro=({0:F1},{1:F1},{2:F1}) " +
+                                "rawAccel=({3:F2},{4:F2},{5:F2})G | " +
+                                "JSL.gravity=({6:F2},{7:F2},{8:F2}) | " +
+                                "JSL→(h={9:F1},v={10:F1})",
+                                rawGyroX, rawGyroY, rawGyroZ,
+                                sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                                gvx, gvy, gvz,
+                                horizontal, vertical);
+                        }
+                    }
+                    break;
+                case 4: // World Space — gravity-aware projection that re-derives
+                        // the pitch axis from the current gravity vector instead
+                        // of assuming pitch = device-X. Better than Player Space
+                        // when the device is held at an angle (tilted handheld);
+                        // for flat-held devices the two produce identical output.
+                        // Includes JSL's "side reduction" — output fades to zero
+                        // when the device is held nearly vertical or upside down,
+                        // preventing huge swings from edge-case orientations.
+                    gamepadMotion.GetWorldSpaceGyro(out horizontal, out vertical, gyroY, gyroX);
+
+                    // Reuse the Player Space diagnostic throttle so World Space
+                    // also emits one log line per second with gravity + output.
+                    {
+                        long nowWsDiag = DateTime.UtcNow.Ticks;
+                        if (nowWsDiag - playerSpaceDiagLastTicks >= PipelineDiagIntervalTicks)
+                        {
+                            playerSpaceDiagLastTicks = nowWsDiag;
+                            gamepadMotion.GetGravity(out float gvx, out float gvy, out float gvz);
+                            Logger.Info(
+                                "WorldSpace diag: rawGyro=({0:F1},{1:F1},{2:F1}) " +
+                                "rawAccel=({3:F2},{4:F2},{5:F2})G | " +
+                                "JSL.gravity=({6:F2},{7:F2},{8:F2}) | " +
+                                "JSL→(h={9:F1},v={10:F1})",
+                                rawGyroX, rawGyroY, rawGyroZ,
+                                sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                                gvx, gvy, gvz,
+                                horizontal, vertical);
+                        }
+                    }
+                    break;
                 default: // Yaw
                     horizontal = gyroY;
                     vertical = gyroX;
                     break;
             }
-            float postConvHorizontal = horizontal;
-            float postConvVertical = vertical;
+            // Bake in the Invert X preference — see legacy CE GyroStick.cs for
+            // the rationale. Inverting horizontal at this single point covers
+            // every conv mode (Yaw/Roll/Yaw+Roll/Player Space/World Space).
+            horizontal = -horizontal;
 
-            // 3. Axis invert
+            // 3. Axis invert (user-facing toggles, for in-game preference)
             if (stickInvertX) horizontal = -horizontal;
             if (stickInvertY) vertical = -vertical;
 
-            // 4. Deadzone
-            float deadzone = Math.Max(0.0f, stickDeadzone);
-            horizontal = ApplyDeadzone(horizontal, deadzone);
-            vertical = ApplyDeadzone(vertical, deadzone);
-            float postDeadzoneHorizontal = horizontal;
-            float postDeadzoneVertical = vertical;
+            // 4. Sensitivity curve + clamp:
+            //      output * ApplyCustomSensitivity(curve, threshold)
+            //              * sensitivityX/Y                (= sensitivity * 1000)
+            //              -> clamp to int16
+            //    The lookup-table curve is currently a flat 0.5-everywhere stub,
+            //    so the effective factor before per-axis sens is 1.0 across all
+            //    gyro magnitudes. Per-axis sens defaults to
+            //    stickSensitivityV2/100 * 1000 so a user-facing "1×" produces
+            //    ~1000 stick units per °/s.
+            //
+            //    All previous band-aids (noise floor, anti-deadzone offset, EMA
+            //    smoother) are removed. They were patching around the absence of
+            //    a real sensitivity curve; with the curve, slow precision motion
+            //    naturally produces small-but-visible stick output (~5% at 1°/s
+            //    with default 1× sens) and fast motion saturates cleanly.
+            float effectiveCurveX = ApplyCustomSensitivity(horizontal, GyroThresholdDegPerSec, DefaultSensCurve);
+            float effectiveCurveY = ApplyCustomSensitivity(vertical,   GyroThresholdDegPerSec, DefaultSensCurve);
+            float perAxisSens = Math.Max(0.01f, stickSensitivityV2 / 100.0f) * HcSensitivityScale;
+            float scaledX = horizontal * effectiveCurveX * perAxisSens;
+            float scaledY = vertical   * effectiveCurveY * perAxisSens;
 
-            // 5. One-Euro filter
-            float deltaSeconds;
-            if (stickLastSampleTicksUtc > 0 && sample.TimestampTicksUtc > stickLastSampleTicksUtc)
-            {
-                deltaSeconds = (sample.TimestampTicksUtc - stickLastSampleTicksUtc) / (float)TimeSpan.TicksPerSecond;
-                deltaSeconds = Math.Max(MinDeltaSeconds, Math.Min(MaxDeltaSeconds, deltaSeconds));
-            }
-            else
-            {
-                deltaSeconds = DefaultDeltaSeconds;
-            }
-            stickLastSampleTicksUtc = sample.TimestampTicksUtc;
+            // Anti-deadzone for small-motion precision. See legacy CE
+            // GyroStick file for the rationale; same constants/formula here.
+            float adzInt16 = (stickGyroAntiDeadzonePercent / 100.0f) * short.MaxValue;
+            float adzThresholdDps = stickGyroAntiDeadzoneThresholdTenths / 10.0f;
+            scaledX = ApplyAntiDeadzoneStickGyro(horizontal, scaledX, adzInt16, adzThresholdDps);
+            scaledY = ApplyAntiDeadzoneStickGyro(vertical,   scaledY, adzInt16, adzThresholdDps);
 
-            if (!stickFilterInitialized)
-            {
-                stickFilteredHorizontal = horizontal;
-                stickFilteredVertical = vertical;
-                stickFilteredDerivativeHorizontal = 0.0f;
-                stickFilteredDerivativeVertical = 0.0f;
-                stickFilterInitialized = true;
-            }
-            else
-            {
-                ApplyOneEuroAxis(horizontal, stickFilteredHorizontal,
-                    stickFilteredDerivativeHorizontal, deltaSeconds,
-                    out stickFilteredHorizontal, out stickFilteredDerivativeHorizontal);
-                ApplyOneEuroAxis(vertical, stickFilteredVertical,
-                    stickFilteredDerivativeVertical, deltaSeconds,
-                    out stickFilteredVertical, out stickFilteredDerivativeVertical);
-                horizontal = stickFilteredHorizontal;
-                vertical = stickFilteredVertical;
-            }
+            outputX = ClampToInt16(scaledX);
+            outputY = ClampToInt16(scaledY);
 
-            // 6. Precision speed (slow-tilt damping)
-            if (stickPrecisionSpeed > 0)
-            {
-                float speed = (float)Math.Sqrt(horizontal * horizontal + vertical * vertical);
-                if (speed > 0.0f && speed < stickPrecisionSpeed)
-                {
-                    float scale = speed / stickPrecisionSpeed;
-                    horizontal *= scale;
-                    vertical *= scale;
-                }
-            }
-
-            // 7. Sensitivity
-            float sensitivity = Math.Max(0.01f, stickSensitivityV2 / 100.0f);
-            horizontal *= sensitivity;
-            vertical *= sensitivity;
-            float postSensHorizontal = horizontal;
-            float postSensVertical = vertical;
-
-            // 8. Speed → normalized [-1, 1]
-            float minSpeed = Math.Max(0.0f, stickMinGyroSpeed);
-            float maxSpeed = Math.Max(1.0f, stickMaxGyroSpeed);
-            float normalizedX = MapAxisWithCurve(horizontal, minSpeed, maxSpeed);
-            float normalizedY = MapAxisWithCurve(-vertical, minSpeed, maxSpeed);
-
-            // 9. Power curve
-            float power = Math.Max(0.1f, stickPowerCurve / 100.0f);
-            normalizedX = Math.Sign(normalizedX) * (float)Math.Pow(Math.Abs(normalizedX), power);
-            normalizedY = Math.Sign(normalizedY) * (float)Math.Pow(Math.Abs(normalizedY), power);
-
-            // 10. Output mix (bias horizontal vs vertical)
-            if (stickOutputMix > 0)
-            {
-                float vertScale = 1.0f - (stickOutputMix / 100.0f);
-                normalizedY *= vertScale;
-            }
-            else if (stickOutputMix < 0)
-            {
-                float horizScale = 1.0f + (stickOutputMix / 100.0f);
-                normalizedX *= horizScale;
-            }
-
-            // 11. Output anti-deadzone + max range
-            float minOut = stickMinOutput / 100.0f;
-            float maxOut = Math.Max(0.01f, stickMaxOutput / 100.0f);
-            normalizedX = ApplyOutputRange(normalizedX, minOut, maxOut);
-            normalizedY = ApplyOutputRange(normalizedY, minOut, maxOut);
-
-            // 12. Clamp & convert
-            outputX = ConvertNormalizedToInt16(normalizedX);
-            outputY = ConvertNormalizedToInt16(normalizedY);
-
-            // Per-stage pipeline diagnostic — emit at most once per second when
-            // raw gyro shows real motion, regardless of whether the output ended
-            // up zero. Helps triage "horizontal works, vertical doesn't" by
-            // pinpointing the stage where the value gets dropped.
+            // Per-second diagnostic — logs raw IMU + JSL gravity (so we can see
+            // why a pure-axis motion produces unexpected horizontal/vertical
+            // splits — usually the gravity tilt is making one device axis
+            // align with world-up and JSL's projection is doing the right
+            // thing on a held-funny handheld) + final output.
             long nowDiag = DateTime.UtcNow.Ticks;
             float rawMag = Math.Abs(rawGyroX) + Math.Abs(rawGyroY) + Math.Abs(rawGyroZ);
             if (rawMag > 5.0f && (nowDiag - pipelineDiagLastTicks) >= PipelineDiagIntervalTicks)
             {
                 pipelineDiagLastTicks = nowDiag;
+                gamepadMotion.GetGravity(out float gvx, out float gvy, out float gvz);
+                float gravMag = (float)Math.Sqrt(gvx * gvx + gvy * gvy + gvz * gvz);
                 Logger.Info(
                     "VIIPER stick-gyro pipeline: raw=({0:F1},{1:F1},{2:F1}) " +
-                    "conv{3}→H={4:F1} V={5:F1} | postDz(dz={6:F1})→H={7:F1} V={8:F1} | " +
-                    "postSens(x{9:F2})→H={10:F1} V={11:F1} | norm=({12:F2},{13:F2}) | out=({14},{15})",
+                    "accel=({3:F2},{4:F2},{5:F2})G grav=({6:F2},{7:F2},{8:F2})|m={15:F2} | " +
+                    "conv{9}→H={10:F1} V={11:F1} | sens=x{12:F2} | out=({13},{14})",
                     rawGyroX, rawGyroY, rawGyroZ,
-                    stickConversion, postConvHorizontal, postConvVertical,
-                    deadzone, postDeadzoneHorizontal, postDeadzoneVertical,
-                    sensitivity, postSensHorizontal, postSensVertical,
-                    normalizedX, normalizedY,
-                    outputX, outputY);
+                    sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                    gvx, gvy, gvz,
+                    stickConversion, horizontal, vertical,
+                    Math.Max(0.01f, stickSensitivityV2 / 100.0f),
+                    outputX, outputY,
+                    gravMag);
+                Logger.Info(
+                    "VIIPER stick-gyro window (1s): n={0} spikes={1} | gyroX[{2:F0},{3:F0}] gyroY[{4:F0},{5:F0}] gyroZ[{6:F0},{7:F0}] | accelMag[{8:F2},{9:F2}]G | gravMag={10:F2}",
+                    diagSampleCount, diagSpikeCount,
+                    diagGyroXMin == float.MaxValue ? 0 : diagGyroXMin, diagGyroXMax == float.MinValue ? 0 : diagGyroXMax,
+                    diagGyroYMin == float.MaxValue ? 0 : diagGyroYMin, diagGyroYMax == float.MinValue ? 0 : diagGyroYMax,
+                    diagGyroZMin == float.MaxValue ? 0 : diagGyroZMin, diagGyroZMax == float.MinValue ? 0 : diagGyroZMax,
+                    diagAccelMagMin == float.MaxValue ? 0 : diagAccelMagMin, diagAccelMagMax == float.MinValue ? 0 : diagAccelMagMax,
+                    gravMag);
+                diagGyroXMin = float.MaxValue; diagGyroXMax = float.MinValue;
+                diagGyroYMin = float.MaxValue; diagGyroYMax = float.MinValue;
+                diagGyroZMin = float.MaxValue; diagGyroZMax = float.MinValue;
+                diagAccelMagMin = float.MaxValue; diagAccelMagMax = float.MinValue;
+                diagSampleCount = 0;
+                diagSpikeCount = 0;
             }
         }
 
         // ----------------------------------------------------------------------
-        // Math helpers — duplicate of the legacy CE versions to keep this
-        // processor self-contained. Same constants and exact same behavior.
+        // Self-test — runs the full pipeline on synthetic inputs so we can
+        // verify the math without needing live IMU data. Called from the helper
+        // CLI / pipe debug commands; logs each test case's input → output for
+        // comparison against expected values. Exposed as a static helper so it
+        // doesn't depend on a live forwarder/JSL handle (it builds its own).
         // ----------------------------------------------------------------------
-
-        private static float ApplyDeadzone(float value, float deadzone)
+        public static void RunSelfTest()
         {
-            float magnitude = Math.Abs(value);
-            if (magnitude <= deadzone) return 0.0f;
-            return Math.Sign(value) * (magnitude - deadzone);
+            Logger.Info("=== VIIPER stick-gyro self-test ===");
+
+            // Test 1: device flat (gravity ≈ (0, +1, 0) after JSL fusion converges)
+            // Expected: pure yaw → horizontal, pure pitch → vertical, pure roll → ~0
+            RunTestCase("FLAT, pure yaw +30deg/s", flat: true,
+                gyroX: 0, gyroY: 30, gyroZ: 0,
+                expectedHorizontal: -30 * 1.41f, // -worldYaw with sign flip
+                expectedVertical: 0);
+            RunTestCase("FLAT, pure pitch +30deg/s", flat: true,
+                gyroX: 30, gyroY: 0, gyroZ: 0,
+                expectedHorizontal: 0,
+                expectedVertical: 30);
+            RunTestCase("FLAT, pure roll +30deg/s", flat: true,
+                gyroX: 0, gyroY: 0, gyroZ: 30,
+                expectedHorizontal: 0,
+                expectedVertical: 0);
+
+            // Test 2: handheld tilted forward 45° — gravity ≈ (0, -0.5, +0.5*sqrt(2))
+            // Player Space mixes yaw+roll → roll motion produces horizontal output
+            RunTestCase("TILTED 45° forward, pure yaw +30", flat: false,
+                gyroX: 0, gyroY: 30, gyroZ: 0,
+                expectedHorizontal: float.NaN, // depends on tilt; just for inspection
+                expectedVertical: 0);
+            RunTestCase("TILTED 45° forward, pure roll +30", flat: false,
+                gyroX: 0, gyroY: 0, gyroZ: 30,
+                expectedHorizontal: float.NaN,
+                expectedVertical: 0);
+
+            Logger.Info("=== self-test end ===");
         }
 
-        private static float ComputeOneEuroAlpha(float cutoff, float deltaSeconds)
+        private static void RunTestCase(string name, bool flat,
+            float gyroX, float gyroY, float gyroZ,
+            float expectedHorizontal, float expectedVertical)
         {
-            if (cutoff <= 0.0f) return 1.0f;
-            float dt = Math.Max(0.0005f, deltaSeconds);
-            float tau = 1.0f / (2.0f * (float)Math.PI * cutoff);
-            return 1.0f / (1.0f + (tau / dt));
+            // Build a fresh JSL instance and prime it with a few accel samples to
+            // converge gravity in the chosen orientation.
+            using var motion = new GamepadMotion();
+            float ax, ay, az;
+            if (flat)
+            {
+                // Y-up at rest: accelerometer reads pull-against-gravity along +Y.
+                ax = 0; ay = 1.0f; az = 0;
+            }
+            else
+            {
+                // Tilted 45° forward — gravity has equal Y and Z components.
+                ax = 0; ay = 0.707f; az = -0.707f;
+            }
+            // Prime fusion with ~50 samples at 16ms each = 0.8s of "rest" so JSL
+            // converges its gravity vector before we apply the gyro motion.
+            for (int i = 0; i < 50; i++)
+                motion.Update(0, 0, 0, ax, ay, az, 0.016f);
+            // Apply the test gyro for one frame (with the same accel reading).
+            motion.Update(gyroX, gyroY, gyroZ, ax, ay, az, 0.016f);
+            motion.GetPlayerSpaceGyro(out float h, out float v, gyroY, gyroX);
+            motion.GetGravity(out float gx, out float gy, out float gz);
+
+            string expectedStr = float.IsNaN(expectedHorizontal)
+                ? "(no specific expectation)"
+                : $"expected H≈{expectedHorizontal:F1}, V≈{expectedVertical:F1}";
+            Logger.Info($"  [{name}] grav=({gx:F2},{gy:F2},{gz:F2}) → H={h:F1} V={v:F1}  {expectedStr}");
         }
 
-        private static void ApplyOneEuroAxis(
-            float rawValue,
-            float previousFilteredValue,
-            float previousFilteredDerivative,
-            float deltaSeconds,
-            out float filteredValue,
-            out float filteredDerivative)
+        // ----- Sensitivity curve (replaces noise gate / anti-deadzone / EMA) -----
+        //
+        // 49-node lookup table with values in [0, 1];
+        // default is flat 0.5 across the board (== effective multiplier 1.0 after the
+        // ×2 below). Each node represents one multiple of GyroThresholdDegPerSec;
+        // linear interpolation between adjacent nodes. Above the last node, output
+        // saturates at 2 × curve[last].
+        //
+        // GyroThresholdDegPerSec = 124 °/s. Tunes how fast the user has to move
+        // before they "fall off" node 0 of the curve.
+        //
+        // HcSensitivityScale = 1000 — per-axis sensitivity default is 1.0,
+        // multiplied by 1000 to convert deg/s into stick units. We bake the same
+        // scale into a single user-facing slider that defaults to 1×.
+        private const float GyroThresholdDegPerSec = 124.0f;
+        private const float HcSensitivityScale = 1000.0f;
+        private const int SensCurveNodeCount = 49;
+        private static readonly float[] DefaultSensCurve = MakeFlatCurve(0.5f);
+
+        private static float[] MakeFlatCurve(float value)
         {
-            float dx = (rawValue - previousFilteredValue) / Math.Max(0.0005f, deltaSeconds);
-            float derivativeAlpha = ComputeOneEuroAlpha(OneEuroDerivativeCutoff, deltaSeconds);
-            filteredDerivative = previousFilteredDerivative + ((dx - previousFilteredDerivative) * derivativeAlpha);
-            float dynamicCutoff = OneEuroMinCutoff + (OneEuroBeta * Math.Abs(filteredDerivative));
-            float valueAlpha = ComputeOneEuroAlpha(dynamicCutoff, deltaSeconds);
-            filteredValue = previousFilteredValue + ((rawValue - previousFilteredValue) * valueAlpha);
+            var arr = new float[SensCurveNodeCount];
+            for (int i = 0; i < arr.Length; i++) arr[i] = value;
+            return arr;
         }
 
-        private static float MapAxisWithCurve(float degPerSec, float minSpeed, float maxSpeed)
+        /// <summary>
+        /// Lookup-and-interpolate sensitivity multiplier for a given gyro axis
+        /// magnitude: position = |value| / threshold; clamped to curve range; ×2
+        /// scale on output so a flat 0.5 curve produces an effective 1.0 multiplier.
+        /// </summary>
+        private static float ApplyCustomSensitivity(float value, float threshold, float[] curve)
         {
-            float abs = Math.Abs(degPerSec);
-            if (abs <= minSpeed) return 0.0f;
-            float range = maxSpeed - minSpeed;
-            if (range <= 0.0f) return Math.Sign(degPerSec);
-            float normalized = (abs - minSpeed) / range;
-            return Math.Sign(degPerSec) * Math.Min(1.0f, normalized);
+            if (curve == null || curve.Length == 0 || threshold <= 0.0f) return 1.0f;
+
+            float position = Math.Abs(value) / threshold;
+            if (position >= curve.Length - 1)
+            {
+                return curve[curve.Length - 1] * 2.0f;
+            }
+
+            int lo = (int)Math.Floor(position);
+            int hi = lo + 1;
+            float t = position - lo;
+            return ((1.0f - t) * curve[lo] + t * curve[hi]) * 2.0f;
         }
 
-        private static float ApplyOutputRange(float normalized, float minOutput, float maxOutput)
+        // Anti-deadzone constants — see ControllerEmulationManager.GyroStick.cs
+        // for full rationale. Smooth rescale: tiny non-zero motions land just
+        // past typical game stick deadzones (5–10%) instead of being silently
+        // killed; large motions still saturate at int16 max cleanly.
+        // Smooth ramp version — see ControllerEmulationManager.GyroStick.cs
+        // for the rationale. Mirror implementation; both pipelines share the
+        // same persisted threshold/anti-deadzone settings.
+        private static float ApplyAntiDeadzoneStickGyro(float gyroDps, float scaledOutput, float adzInt16, float adzThresholdDps)
         {
-            if (normalized == 0.0f) return 0.0f;
-            float abs = Math.Abs(normalized);
-            float scaled = minOutput + (abs * (maxOutput - minOutput));
-            return Math.Sign(normalized) * Math.Min(1.0f, scaled);
+            if (adzInt16 <= 0.0f) return scaledOutput;
+            float absGyro = Math.Abs(gyroDps);
+            float deadFloor = adzThresholdDps * 0.5f;
+            if (absGyro < deadFloor) return 0.0f;
+            float ramp = adzThresholdDps > deadFloor
+                ? Math.Min(1.0f, (absGyro - deadFloor) / (adzThresholdDps - deadFloor))
+                : 1.0f;
+            float sign = scaledOutput >= 0.0f ? 1.0f : -1.0f;
+            float absScaled = Math.Abs(scaledOutput);
+            float effectiveAdz = adzInt16 * ramp;
+            float remap = effectiveAdz + absScaled * (1.0f - effectiveAdz / short.MaxValue);
+            return sign * remap;
         }
 
-        private static short ConvertNormalizedToInt16(float normalized)
+        private static short ClampToInt16(float value)
         {
-            float clamped = Math.Max(-1.0f, Math.Min(1.0f, normalized));
-            return (short)Math.Round(clamped * short.MaxValue);
+            if (value > short.MaxValue) return short.MaxValue;
+            if (value < short.MinValue) return short.MinValue;
+            return (short)value;
         }
 
         /// <summary>
@@ -811,13 +1233,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             mergedX = ClampToInt16(sumX);
             mergedY = ClampToInt16(sumY);
-        }
-
-        private static short ClampToInt16(float value)
-        {
-            if (value > short.MaxValue) return short.MaxValue;
-            if (value < short.MinValue) return short.MinValue;
-            return (short)Math.Round(value);
         }
     }
 }

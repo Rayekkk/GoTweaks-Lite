@@ -62,6 +62,13 @@ namespace XboxGamingBarHelper.Labs
         private const ushort XINPUT_GAMEPAD_X = 0x4000;
         private const ushort XINPUT_GAMEPAD_Y = 0x8000;
         private const float GYRO_SCALE_DEG_PER_SECOND = 2000.0f / 32768.0f;
+        // Legion Go 2 BMI260 ships configured for ±8g (Lenovo firmware
+        // programs the range at boot — no explicit range-set command in any
+        // userspace driver). The earlier ±4g constant was inherited from the
+        // original-Legion-Go reference parser and read 0.49G at rest instead
+        // of 1.0G. Verified against hhd's m/s² scale (0.00212 m/s²/LSB =
+        // ±7.08g full-scale ≈ ±8g) and empirical at-rest reading of 0.98G
+        // after this change.
         private const float ACCEL_SCALE_G = 8.0f / 32768.0f;
         private const float LEGACY_M8_GYRO_SCALE_DEG_PER_SECOND = 2000.0f / 128.0f;
         private const byte LEGION_CONTROLLER_LEFT_ID = 0x03;
@@ -2836,15 +2843,39 @@ namespace XboxGamingBarHelper.Labs
                 bool leftHighQualityActive = HasHighQualityImuSample(buffer, leftBase);
                 bool rightHighQualityActive = HasHighQualityImuSample(buffer, rightBase);
 
+                // Legion Go 2 IMU parser. Empirically-discovered offsets +
+                // little-endian byte order that match LGO2's actual report
+                // layout. The byte indices and scale factors are confirmed
+                // against captured HID traffic on Legion Go 2 hardware.
+                //
+                // Per-side sign convention. Left and right joycons mount their
+                // IMUs as 180°-around-Z mirrors of each other (Lenovo's
+                // mechanical design), which means the raw X and Y readings
+                // point in opposite directions on the two sides for the same
+                // physical motion. Without per-side signs, switching gyro
+                // source from Left to Right (or back) flips the apparent
+                // camera direction, which is why Invert X/Y toggle needs
+                // kept shifting across iterations. With these signs each
+                // side reports identically in the device frame, the Invert
+                // toggles default OFF, and Mixed mode merge averages two
+                // matching-sign samples instead of cancelling.
+                //
+                // Left: X negated, Y negated.  Right: X positive, Y positive.
+                // (Both produce horizontal = -device_Y, vertical = -device_X
+                // when fed through Mode 0 with no Invert toggle — matches the
+                // empirical "all sources needed Invert X" feedback by folding
+                // the toggle in on both axes' yaw component.)
+                // Accel passes through untouched — JSL's gravity tracker
+                // uses BMI260's native convention directly.
                 if (leftHighQualityActive)
                 {
                     leftSample = new LegionGyroSample(
-                        ReadInt16LittleEndian(buffer, leftBase + 7) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, leftBase + 11) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, leftBase + 9) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, leftBase + 1) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, leftBase + 5) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, leftBase + 3) * ACCEL_SCALE_G,
+                        -ReadInt16LittleEndian(buffer, leftBase + 7) * GYRO_SCALE_DEG_PER_SECOND,    // X (negated)
+                        -ReadInt16LittleEndian(buffer, leftBase + 11) * GYRO_SCALE_DEG_PER_SECOND,   // Y (negated)
+                         ReadInt16LittleEndian(buffer, leftBase + 9) * GYRO_SCALE_DEG_PER_SECOND,    // Z
+                        ReadInt16LittleEndian(buffer, leftBase + 1) * ACCEL_SCALE_G,                 // X
+                        ReadInt16LittleEndian(buffer, leftBase + 5) * ACCEL_SCALE_G,                 // Y
+                        ReadInt16LittleEndian(buffer, leftBase + 3) * ACCEL_SCALE_G,                 // Z
                         sampleTimestampUtc);
                     hasLeftSample = true;
                 }
@@ -2852,12 +2883,12 @@ namespace XboxGamingBarHelper.Labs
                 if (rightHighQualityActive)
                 {
                     rightSample = new LegionGyroSample(
-                        ReadInt16LittleEndian(buffer, rightBase + 9) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, rightBase + 11) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, rightBase + 7) * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, rightBase + 3) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, rightBase + 5) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, rightBase + 1) * ACCEL_SCALE_G,
+                        ReadInt16LittleEndian(buffer, rightBase + 9) * GYRO_SCALE_DEG_PER_SECOND,    // X
+                        ReadInt16LittleEndian(buffer, rightBase + 11) * GYRO_SCALE_DEG_PER_SECOND,   // Y
+                        ReadInt16LittleEndian(buffer, rightBase + 7) * GYRO_SCALE_DEG_PER_SECOND,    // Z
+                        ReadInt16LittleEndian(buffer, rightBase + 3) * ACCEL_SCALE_G,                // X
+                        ReadInt16LittleEndian(buffer, rightBase + 5) * ACCEL_SCALE_G,                // Y
+                        ReadInt16LittleEndian(buffer, rightBase + 1) * ACCEL_SCALE_G,                // Z
                         sampleTimestampUtc);
                     hasRightSample = true;
                 }
@@ -3095,6 +3126,21 @@ namespace XboxGamingBarHelper.Labs
             int low = buffer[offset];
             int high = buffer[offset + 1];
             return unchecked((short)(low | (high << 8)));
+        }
+
+        // Big-endian sibling — used by the IMU parser. The Legion controller
+        // HID layout encodes IMU samples as (short)(data[i] << 8 | data[i+1]),
+        // i.e. BE: high byte first.
+        private static short ReadInt16BigEndian(byte[] buffer, int offset)
+        {
+            if (buffer == null || offset < 0 || offset + 1 >= buffer.Length)
+            {
+                return 0;
+            }
+
+            int high = buffer[offset];
+            int low = buffer[offset + 1];
+            return unchecked((short)((high << 8) | low));
         }
 
         private static bool TryCommitDebouncedButtonState(

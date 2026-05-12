@@ -17,7 +17,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
 
     /// <summary>
     /// GPD Win 5 fan controller using EC (Embedded Controller) communication.
-    /// Addresses derived from Handheld Companion research.
     /// </summary>
     internal class GPDFanController : IDisposable
     {

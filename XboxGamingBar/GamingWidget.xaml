@@ -2466,20 +2466,35 @@
                                                   IsEnabled="False"/>
                                 </Grid>
 
-                                <!-- SDR Brightness Sync — only meaningful when HDR is on, but keep visible whenever the card is so users can pre-select a mode. -->
+                                <!-- Collapsed by default to keep the card compact. SDR sync UI + its
+                                     description live inside the expander; users opening it see the
+                                     combo and the explanation together, and the card stays clean
+                                     when the user only cares about the HDR toggle. -->
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="SDR Brightness Sync"
+                                               FontSize="12" Foreground="#AAAAAA"
+                                               VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="SdrWhiteLevelSyncExpanderToggle"
+                                                  Grid.Column="1" IsChecked="False"
+                                                  VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
+                                                  Padding="8,4" Click="SdrWhiteLevelSyncExpanderToggle_Click">
+                                        <FontIcon x:Name="SdrWhiteLevelSyncExpanderIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                    </ToggleButton>
+                                </Grid>
                                 <StackPanel x:Name="SdrWhiteLevelSyncPanel"
-                                            Margin="0,12,0,0">
+                                            Margin="0,8,0,0" Visibility="Collapsed">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="SDR Brightness Sync" FontSize="14" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Tie SDR content brightness to the backlight slider while HDR is on"
-                                                       Style="{StaticResource CardCaptionStyle}"
-                                                       TextWrapping="Wrap"/>
-                                        </StackPanel>
+                                        <TextBlock Grid.Column="0" Text="Mode"
+                                                   FontSize="13" Foreground="#FFFFFF"
+                                                   VerticalAlignment="Center"/>
                                         <ComboBox x:Name="SdrWhiteLevelSyncModeComboBox"
                                                   Grid.Column="1"
                                                   Width="170"
@@ -2500,20 +2515,71 @@
 
                         <!-- Adaptive Brightness Card -->
                         <Border Style="{StaticResource CardStyle}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="Adaptive Brightness" Style="{StaticResource CardTitleStyle}"/>
-                                    <TextBlock Text="Auto-adjust based on ambient light (requires sensor)" Style="{StaticResource CardCaptionStyle}"/>
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Adaptive Brightness" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Auto-adjust based on ambient light (requires sensor)" Style="{StaticResource CardCaptionStyle}"/>
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="AdaptiveBrightnessToggle"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernToggleStyle}"
+                                                  Toggled="AdaptiveBrightnessToggle_Toggled"/>
+                                </Grid>
+
+                                <!-- Mode picker collapses behind a chevron when the toggle is on, so the
+                                     card shows only "Adaptive Brightness + toggle" by default. Expander
+                                     row itself is hidden until the master toggle is on. -->
+                                <Grid Margin="0,12,0,0"
+                                      Visibility="{Binding ElementName=AdaptiveBrightnessToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Engine &amp; details"
+                                               FontSize="12" Foreground="#AAAAAA"
+                                               VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="AdaptiveBrightnessExpanderToggle"
+                                                  Grid.Column="1" IsChecked="False"
+                                                  VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
+                                                  Padding="8,4" Click="AdaptiveBrightnessExpanderToggle_Click">
+                                        <FontIcon x:Name="AdaptiveBrightnessExpanderIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                    </ToggleButton>
+                                </Grid>
+                                <StackPanel x:Name="AdaptiveBrightnessPanel"
+                                            Margin="0,8,0,0" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Mode"
+                                                   FontSize="13" Foreground="#FFFFFF"
+                                                   VerticalAlignment="Center"/>
+                                        <ComboBox x:Name="AdaptiveBrightnessModeComboBox"
+                                                  Grid.Column="1"
+                                                  Width="170"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <x:String>Windows</x:String>
+                                            <x:String>Helper (learns)</x:String>
+                                        </ComboBox>
+                                    </Grid>
+                                    <TextBlock Margin="0,8,0,0"
+                                               TextWrapping="Wrap"
+                                               FontSize="11"
+                                               Foreground="#9AA0A6">
+                                        <Run FontWeight="SemiBold" Foreground="#CFD2D6" Text="Windows"/>
+                                        <Run Text=" — uses the OS adaptive brightness service (ADAPTBRIGHT). Slow, opaque, single hard-coded curve, no learning."/>
+                                        <LineBreak/>
+                                        <Run FontWeight="SemiBold" Foreground="#CFD2D6" Text="Helper (learns)"/>
+                                        <Run Text=" — reads the ALS directly. One-Euro-filtered lux signal, log lux → brightness curve, sustained-change requirement before reacting (won't twitch on transient flashes), direction-aware response (brightens quickly when entering a darker space, dims slowly to avoid flicker), smooth eased transitions instead of stepped jumps, lux-ratio override hold (your manual adjustment sticks until ambient changes by 2×). Each time you nudge the slider, the helper learns your preferred offset for that ambient range (six log-spaced lux buckets) and biases future predictions toward what you picked. Switching to Helper turns Windows ADAPTBRIGHT off so the two don't fight."/>
+                                    </TextBlock>
                                 </StackPanel>
-                                <ToggleSwitch x:Name="AdaptiveBrightnessToggle"
-                                              Grid.Column="1"
-                                              Style="{StaticResource ModernToggleStyle}"
-                                              Toggled="AdaptiveBrightnessToggle_Toggled"/>
-                            </Grid>
+                            </StackPanel>
                         </Border>
 
                         <!-- Display Color Settings Card -->
@@ -4228,8 +4294,8 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Calibrate Gyro" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Hold controllers still during calibration" FontSize="11" Foreground="#888888"/>
+                                            <TextBlock Text="Calibrate Gyro (Stick Output)" FontSize="13" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Place device flat and still for ~5 seconds. Learns gyro bias for stick conversion." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <Button x:Name="CalibrateGyroButton" Grid.Column="1"
                                                 Content="Calibrate" Style="{StaticResource ModernButtonStyle}"
@@ -4625,9 +4691,11 @@
                                         <ComboBox x:Name="StickConversionComboBox"
                                                   Grid.Column="1" Width="180"
                                                   Style="{StaticResource ModernComboBoxStyle}" IsEnabled="False">
-                                            <ComboBoxItem Content="Yaw" Tag="0"/>
+                                            <ComboBoxItem Content="Yaw (laser pointer from back)" Tag="0" IsSelected="True"/>
                                             <ComboBoxItem Content="Roll" Tag="1"/>
-                                            <ComboBoxItem Content="Yaw + Roll" Tag="2" IsSelected="True"/>
+                                            <ComboBoxItem Content="Yaw + Roll" Tag="2"/>
+                                            <ComboBoxItem Content="Player Space (gravity-aware)" Tag="3"/>
+                                            <ComboBoxItem Content="World Space (gravity-aware)" Tag="4"/>
                                         </ComboBox>
                                     </Grid>
 
@@ -4638,14 +4706,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Gyro Orientation" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Handheld posture for stick output" FontSize="11" Foreground="#888888"/>
+                                            <TextBlock Text="Hold Orientation" FontSize="13" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="How you hold the device. Flat = on a table, Handheld = held in front of you (default)." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <ComboBox x:Name="StickOrientationV2ComboBox"
-                                                  Grid.Column="1" Width="180"
+                                                  Grid.Column="1" Width="220"
                                                   Style="{StaticResource ModernComboBoxStyle}" IsEnabled="False">
-                                            <ComboBoxItem Content="Parallel" Tag="0" IsSelected="True"/>
-                                            <ComboBoxItem Content="Orthogonal" Tag="1"/>
+                                            <ComboBoxItem Content="Flat (parallel to ground)" Tag="0" IsSelected="True"/>
+                                            <ComboBoxItem Content="Handheld (held in front)" Tag="1"/>
                                         </ComboBox>
                                     </Grid>
 
@@ -4688,146 +4756,12 @@
                                             Minimum="1" Maximum="400" TickFrequency="1" SnapsTo="Ticks" Value="100"
                                             IsEnabled="False" ValueChanged="StickSensitivityV2Slider_ValueChanged"/>
 
-                                    <!-- Min Gyro Input Speed -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Min Gyro Input Speed" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Ignore motion below this speed" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickMinGyroSpeedValueText" Grid.Column="1" Text="0°/s"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickMinGyroSpeedSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="100" TickFrequency="1" SnapsTo="Ticks" Value="0"
-                                            IsEnabled="False" ValueChanged="StickMinGyroSpeedSlider_ValueChanged"/>
-
-                                    <!-- Max Gyro Input Speed -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Max Gyro Input Speed" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Speed for full stick deflection" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickMaxGyroSpeedValueText" Grid.Column="1" Text="220°/s"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickMaxGyroSpeedSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="50" Maximum="720" TickFrequency="1" SnapsTo="Ticks" Value="220"
-                                            IsEnabled="False" ValueChanged="StickMaxGyroSpeedSlider_ValueChanged"/>
-
-                                    <!-- Min Joystick Output (anti-deadzone) -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Min Joystick Output" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Anti-deadzone: minimum output when moving" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickMinOutputValueText" Grid.Column="1" Text="0%"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickMinOutputSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="100" TickFrequency="1" SnapsTo="Ticks" Value="0"
-                                            IsEnabled="False" ValueChanged="StickMinOutputSlider_ValueChanged"/>
-
-                                    <!-- Max Joystick Output -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Max Joystick Output" FontSize="13" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="StickMaxOutputValueText" Grid.Column="1" Text="100%"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickMaxOutputSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="1" Maximum="100" TickFrequency="1" SnapsTo="Ticks" Value="100"
-                                            IsEnabled="False" ValueChanged="StickMaxOutputSlider_ValueChanged"/>
-
-                                    <!-- Power Curve -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Power Curve" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="0.1 = aggressive, 1.0 = linear, 4.0 = relaxed" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickPowerCurveValueText" Grid.Column="1" Text="1.0"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickPowerCurveSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="10" Maximum="400" TickFrequency="1" SnapsTo="Ticks" Value="100"
-                                            IsEnabled="False" ValueChanged="StickPowerCurveSlider_ValueChanged"/>
-
-                                    <!-- Gyro Speed Deadzone -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Gyro Speed Deadzone" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Smooth recovery above threshold" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickDeadzoneValueText" Grid.Column="1" Text="2°/s"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickDeadzoneSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="50" TickFrequency="1" SnapsTo="Ticks" Value="2"
-                                            IsEnabled="False" ValueChanged="StickDeadzoneSlider_ValueChanged"/>
-
-                                    <!-- Precision Speed -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Precision Speed" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Reduces sensitivity below this speed" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickPrecisionSpeedValueText" Grid.Column="1" Text="Off"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickPrecisionSpeedSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="100" TickFrequency="1" SnapsTo="Ticks" Value="0"
-                                            IsEnabled="False" ValueChanged="StickPrecisionSpeedSlider_ValueChanged"/>
-
-                                    <!-- Output Mix -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Output Mix" FontSize="13" Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Balance between vertical and horizontal output" FontSize="11" Foreground="#888888"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="StickOutputMixValueText" Grid.Column="1" Text="Balanced"
-                                                   FontSize="13" Foreground="#4CAF50" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="StickOutputMixSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="-100" Maximum="100" TickFrequency="1" SnapsTo="Ticks" Value="0"
-                                            IsEnabled="False" ValueChanged="StickOutputMixSlider_ValueChanged"/>
+                                    <!-- Pipeline simplified in #79 round 5:
+                                         conversion → invert → sensitivity → clamp. The deprecated Min/Max Gyro
+                                         Input Speed, Min/Max Joystick Output, Power Curve, Gyro Speed Deadzone,
+                                         Precision Speed, and Output Mix sliders are removed — JSL's fusion
+                                         already smooths internally and any extra processing was stacking
+                                         distortion on top. Use the Sensitivity slider above for tuning. -->
 
                                     <!-- Reset to recommended defaults (issue #79: vvalente30 asked for a
                                          reset button after experimenting and getting lost in the settings).
@@ -5036,17 +4970,58 @@
                                                     Minimum="1" Maximum="400" StepFrequency="1" SmallChange="5" LargeChange="25"
                                                     ValueChanged="ViiperStickGyroSensitivitySlider_ValueChanged"/>
 
-                                            <Grid Margin="0,4,0,0">
+                                            <!-- JSL gyro bias calibration. Place device flat and still for ~5s
+                                                 after click; helper captures bias and persists it. -->
+                                            <Grid Margin="0,12,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Deadzone" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
-                                                <TextBlock x:Name="ViiperStickGyroDeadzoneValueText" Grid.Column="1" Text="2°/s" FontSize="12" Foreground="#888888"/>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="Calibrate Gyro (Stick Output)" FontSize="13" Foreground="#FFFFFF"/>
+                                                    <TextBlock Text="Place device flat and still for ~5 seconds. Learns gyro bias for stick conversion."
+                                                               FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <Button x:Name="ViiperStickGyroCalibrateButton" Grid.Column="1"
+                                                        Content="Calibrate" Style="{StaticResource ModernButtonStyle}"
+                                                        Click="ViiperStickGyroCalibrateButton_Click"/>
                                             </Grid>
-                                            <Slider x:Name="ViiperStickGyroDeadzoneSlider"
+                                            <TextBlock x:Name="ViiperStickGyroCalibrateStatusText"
+                                                       Text=""
+                                                       FontSize="11"
+                                                       Foreground="#7FBFFF"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="Collapsed"/>
+
+                                            <!-- Anti-deadzone tuning. Default 10% / 0.5°/s clears most game
+                                                 stick deadzones while filtering sensor noise. -->
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Anti-deadzone (% of stick)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroAntiDeadzoneValueText" Grid.Column="1" Text="10%" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroAntiDeadzoneSlider"
+                                                    Minimum="0" Maximum="30" StepFrequency="1" SmallChange="1" LargeChange="5"
+                                                    ValueChanged="ViiperStickGyroAntiDeadzoneSlider_ValueChanged"/>
+
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Input threshold (°/s)" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#CCCCCC"/>
+                                                <TextBlock x:Name="ViiperStickGyroAntiDeadzoneThresholdValueText" Grid.Column="1" Text="0.3°/s" FontSize="12" Foreground="#888888"/>
+                                            </Grid>
+                                            <Slider x:Name="ViiperStickGyroAntiDeadzoneThresholdSlider"
                                                     Minimum="0" Maximum="50" StepFrequency="1" SmallChange="1" LargeChange="5"
-                                                    ValueChanged="ViiperStickGyroDeadzoneSlider_ValueChanged"/>
+                                                    ValueChanged="ViiperStickGyroAntiDeadzoneThresholdSlider_ValueChanged"/>
+
+                                            <!-- Deadzone slider removed in #79 round 5 — pipeline simplified. -->
+
 
                                             <!-- Advanced expander.
                                                  Each control mirrors a legacy ControllerEmulation* control via
@@ -5095,32 +5070,34 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                         <TextBlock Text="3DOF to 2D conversion" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Which gyro axes drive the stick. Yaw = look L/R, Roll = tilt L/R, Yaw+Roll = both." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="Yaw (default) = laser pointer from back of device: yaw the device → camera pans, roll has no effect. Player/World Space use gravity as the yaw axis (camera pans relative to world up, not device direction)." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
                                                     </StackPanel>
                                                     <ComboBox x:Name="ViiperStickGyroConversionComboBox"
-                                                              Grid.Column="1" Width="160"
+                                                              Grid.Column="1" Width="220"
                                                               SelectionChanged="ViiperStickGyroConversionComboBox_SelectionChanged">
-                                                        <ComboBoxItem Content="Yaw" Tag="0"/>
+                                                        <ComboBoxItem Content="Yaw (laser pointer)" Tag="0" IsSelected="True"/>
                                                         <ComboBoxItem Content="Roll" Tag="1"/>
-                                                        <ComboBoxItem Content="Yaw + Roll" Tag="2" IsSelected="True"/>
+                                                        <ComboBoxItem Content="Yaw + Roll" Tag="2"/>
+                                                        <ComboBoxItem Content="Player Space" Tag="3"/>
+                                                        <ComboBoxItem Content="World Space" Tag="4"/>
                                                     </ComboBox>
                                                 </Grid>
 
-                                                <!-- Gyro orientation -->
+                                                <!-- Hold orientation -->
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Gyro orientation" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Handheld posture. Switch to Orthogonal if your IMU axes feel rotated 90°." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="Hold orientation" FontSize="12" Foreground="#CCCCCC"/>
+                                                        <TextBlock Text="Flat = on a table; Handheld = held in front of you (default for Legion Go 2)." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
                                                     </StackPanel>
                                                     <ComboBox x:Name="ViiperStickGyroOrientationComboBox"
-                                                              Grid.Column="1" Width="160"
+                                                              Grid.Column="1" Width="200"
                                                               SelectionChanged="ViiperStickGyroOrientationComboBox_SelectionChanged">
-                                                        <ComboBoxItem Content="Parallel" Tag="0" IsSelected="True"/>
-                                                        <ComboBoxItem Content="Orthogonal" Tag="1"/>
+                                                        <ComboBoxItem Content="Flat (parallel to ground)" Tag="0" IsSelected="True"/>
+                                                        <ComboBoxItem Content="Handheld (held in front)" Tag="1"/>
                                                     </ComboBox>
                                                 </Grid>
 
@@ -5148,117 +5125,11 @@
                                                                   Toggled="ViiperStickGyroInvertYToggle_Toggled"/>
                                                 </Grid>
 
-                                                <!-- Min gyro input speed -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Min gyro input speed" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Ignore motion below this speed (filters drift / micro-shake)." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroMinGyroSpeedValueText" Grid.Column="1" VerticalAlignment="Center" Text="0°/s" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroMinGyroSpeedSlider"
-                                                        Minimum="0" Maximum="100" StepFrequency="1" SmallChange="1" LargeChange="5"
-                                                        ValueChanged="ViiperStickGyroMinGyroSpeedSlider_ValueChanged"/>
-
-                                                <!-- Max gyro input speed -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Max gyro input speed" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Speed at which the stick reaches full deflection." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroMaxGyroSpeedValueText" Grid.Column="1" VerticalAlignment="Center" Text="220°/s" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroMaxGyroSpeedSlider"
-                                                        Minimum="50" Maximum="720" StepFrequency="1" SmallChange="5" LargeChange="50"
-                                                        ValueChanged="ViiperStickGyroMaxGyroSpeedSlider_ValueChanged"/>
-
-                                                <!-- Min joystick output -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Min joystick output" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Anti-deadzone: minimum stick magnitude when any motion is detected." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroMinOutputValueText" Grid.Column="1" VerticalAlignment="Center" Text="0%" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroMinOutputSlider"
-                                                        Minimum="0" Maximum="100" StepFrequency="1" SmallChange="1" LargeChange="5"
-                                                        ValueChanged="ViiperStickGyroMinOutputSlider_ValueChanged"/>
-
-                                                <!-- Max joystick output -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Max joystick output" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Cap the synthesized stick magnitude. Lower for slower, calmer aim." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroMaxOutputValueText" Grid.Column="1" VerticalAlignment="Center" Text="100%" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroMaxOutputSlider"
-                                                        Minimum="1" Maximum="100" StepFrequency="1" SmallChange="1" LargeChange="5"
-                                                        ValueChanged="ViiperStickGyroMaxOutputSlider_ValueChanged"/>
-
-                                                <!-- Power curve -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Power curve" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="0.1 = aggressive (small motion → big stick), 1.0 = linear, 4.0 = relaxed." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroPowerCurveValueText" Grid.Column="1" VerticalAlignment="Center" Text="1.0" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroPowerCurveSlider"
-                                                        Minimum="10" Maximum="400" StepFrequency="1" SmallChange="5" LargeChange="25"
-                                                        ValueChanged="ViiperStickGyroPowerCurveSlider_ValueChanged"/>
-
-                                                <!-- Precision speed -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Precision speed" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Slow-tilt damping. 0 = off." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroPrecisionSpeedValueText" Grid.Column="1" VerticalAlignment="Center" Text="Off" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroPrecisionSpeedSlider"
-                                                        Minimum="0" Maximum="100" StepFrequency="1" SmallChange="1" LargeChange="5"
-                                                        ValueChanged="ViiperStickGyroPrecisionSpeedSlider_ValueChanged"/>
-
-                                                <!-- Output mix -->
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                        <TextBlock Text="Output mix" FontSize="12" Foreground="#CCCCCC"/>
-                                                        <TextBlock Text="Negative bias = vertical, positive = horizontal, 0 = balanced." FontSize="10" Foreground="#666666" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="ViiperStickGyroOutputMixValueText" Grid.Column="1" VerticalAlignment="Center" Text="Balanced" FontSize="12" Foreground="#888888"/>
-                                                </Grid>
-                                                <Slider x:Name="ViiperStickGyroOutputMixSlider"
-                                                        Minimum="-100" Maximum="100" StepFrequency="1" SmallChange="5" LargeChange="25"
-                                                        ValueChanged="ViiperStickGyroOutputMixSlider_ValueChanged"/>
+                                                <!-- Min/Max gyro input speed, Min/Max joystick output, Power curve,
+                                                     Precision speed, and Output mix sliders all removed in #79 round 5
+                                                     when the pipeline was simplified to
+                                                     conversion → invert → sensitivity → clamp. Use the Sensitivity
+                                                     slider above for tuning. -->
 
                                                 <!-- Reset to vvalente30's recommended SteamOS-aligned defaults. Each
                                                      value mirrors over to the legacy CE control via the existing

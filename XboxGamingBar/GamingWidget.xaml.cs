@@ -725,6 +725,7 @@ namespace XboxGamingBar
         private readonly HDRSupportedProperty hdrSupported;
         private readonly HDREnabledProperty hdrEnabled;
         private readonly SdrWhiteLevelSyncModeProperty sdrWhiteLevelSyncMode;
+        private readonly AdaptiveBrightnessModeProperty adaptiveBrightnessMode;
         private readonly TrackedGameProperty trackedGame;
         private readonly RTSSInstalledProperty rtssInstalled;
         private readonly IsForegroundProperty isForeground;
@@ -945,15 +946,7 @@ namespace XboxGamingBar
         private readonly ControllerEmulationStickSelectProperty controllerEmulationStickSelect;
         private readonly ControllerEmulationStickOnlyJoystickDataProperty controllerEmulationStickOnlyJoystickData;
         private readonly ControllerEmulationVirtualABXYLayoutProperty controllerEmulationVirtualAbxyLayout;
-        private readonly ControllerEmulationStickMinGyroSpeedProperty controllerEmulationStickMinGyroSpeed;
-        private readonly ControllerEmulationStickMaxGyroSpeedProperty controllerEmulationStickMaxGyroSpeed;
-        private readonly ControllerEmulationStickMinOutputProperty controllerEmulationStickMinOutput;
-        private readonly ControllerEmulationStickMaxOutputProperty controllerEmulationStickMaxOutput;
-        private readonly ControllerEmulationStickPowerCurveProperty controllerEmulationStickPowerCurve;
         private readonly ControllerEmulationStickSensitivityV2Property controllerEmulationStickSensitivityV2;
-        private readonly ControllerEmulationStickDeadzoneProperty controllerEmulationStickDeadzone;
-        private readonly ControllerEmulationStickPrecisionSpeedProperty controllerEmulationStickPrecisionSpeed;
-        private readonly ControllerEmulationStickOutputMixProperty controllerEmulationStickOutputMix;
         private readonly ControllerEmulationStickOrientationV2Property controllerEmulationStickOrientationV2;
         private readonly ControllerEmulationStickConversionProperty controllerEmulationStickConversion;
         private bool isGyroActivationExpanded;
@@ -1412,6 +1405,7 @@ namespace XboxGamingBar
             hdrSupported = new HDRSupportedProperty(HDRToggle, this);
             hdrEnabled = new HDREnabledProperty(HDRToggle, this);
             sdrWhiteLevelSyncMode = new SdrWhiteLevelSyncModeProperty(SdrWhiteLevelSyncModeComboBox, this);
+            adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(AdaptiveBrightnessModeComboBox, this);
             trackedGame = new TrackedGameProperty(new TrackedGame());
             rtssInstalled = new RTSSInstalledProperty(PerformanceOverlaySlider, this);
             rtssInstalled.SetAdditionalCallback(UpdateFPSLimitControls);
@@ -1647,15 +1641,9 @@ namespace XboxGamingBar
             controllerEmulationStickInvertY = new ControllerEmulationStickInvertYProperty(ControllerEmulationStickInvertYToggle, this);
             controllerEmulationStickSelect = new ControllerEmulationStickSelectProperty(ControllerEmulationStickSelectComboBox, this);
             controllerEmulationStickOnlyJoystickData = new ControllerEmulationStickOnlyJoystickDataProperty(ControllerEmulationStickOnlyJoystickToggle, this);
-            controllerEmulationStickMinGyroSpeed = new ControllerEmulationStickMinGyroSpeedProperty(StickMinGyroSpeedSlider, this);
-            controllerEmulationStickMaxGyroSpeed = new ControllerEmulationStickMaxGyroSpeedProperty(StickMaxGyroSpeedSlider, this);
-            controllerEmulationStickMinOutput = new ControllerEmulationStickMinOutputProperty(StickMinOutputSlider, this);
-            controllerEmulationStickMaxOutput = new ControllerEmulationStickMaxOutputProperty(StickMaxOutputSlider, this);
-            controllerEmulationStickPowerCurve = new ControllerEmulationStickPowerCurveProperty(StickPowerCurveSlider, this);
+            // Min/Max gyro speed, Min/Max output, Power curve, Deadzone, Precision speed,
+            // Output mix — pipeline removed in #79 round 5 (matches HC). Sensitivity stays.
             controllerEmulationStickSensitivityV2 = new ControllerEmulationStickSensitivityV2Property(StickSensitivityV2Slider, this);
-            controllerEmulationStickDeadzone = new ControllerEmulationStickDeadzoneProperty(StickDeadzoneSlider, this);
-            controllerEmulationStickPrecisionSpeed = new ControllerEmulationStickPrecisionSpeedProperty(StickPrecisionSpeedSlider, this);
-            controllerEmulationStickOutputMix = new ControllerEmulationStickOutputMixProperty(StickOutputMixSlider, this);
             controllerEmulationStickOrientationV2 = new ControllerEmulationStickOrientationV2Property(StickOrientationV2ComboBox, this);
             controllerEmulationStickConversion = new ControllerEmulationStickConversionProperty(StickConversionComboBox, this);
             controllerEmulationVirtualAbxyLayout = new ControllerEmulationVirtualABXYLayoutProperty(ControllerEmulationVirtualAbxyLayoutComboBox, this);
@@ -1824,6 +1812,7 @@ namespace XboxGamingBar
                 hdrSupported,
                 hdrEnabled,
                 sdrWhiteLevelSyncMode,
+                adaptiveBrightnessMode,
                 trackedGame,
                 rtssInstalled,
                 isForeground,
@@ -2058,15 +2047,7 @@ namespace XboxGamingBar
                 controllerEmulationStickInvertY,
                 controllerEmulationStickSelect,
                 controllerEmulationStickOnlyJoystickData,
-                controllerEmulationStickMinGyroSpeed,
-                controllerEmulationStickMaxGyroSpeed,
-                controllerEmulationStickMinOutput,
-                controllerEmulationStickMaxOutput,
-                controllerEmulationStickPowerCurve,
                 controllerEmulationStickSensitivityV2,
-                controllerEmulationStickDeadzone,
-                controllerEmulationStickPrecisionSpeed,
-                controllerEmulationStickOutputMix,
                 controllerEmulationStickOrientationV2,
                 controllerEmulationStickConversion,
                 controllerEmulationVirtualAbxyLayout,

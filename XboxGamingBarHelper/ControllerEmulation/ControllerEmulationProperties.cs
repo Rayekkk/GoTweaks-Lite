@@ -746,4 +746,51 @@ namespace XboxGamingBarHelper.ControllerEmulation
             Manager?.SetStickConversion(Value);
         }
     }
+
+    internal class ControllerEmulationStickGyroAntiDeadzoneProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public ControllerEmulationStickGyroAntiDeadzoneProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroAntiDeadzone, manager)
+        {
+        }
+
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroAntiDeadzone changed to {Value}");
+            Manager?.SetStickGyroAntiDeadzone(Value);
+        }
+    }
+
+    internal class ControllerEmulationStickGyroAntiDeadzoneThresholdProperty : HelperProperty<int, ControllerEmulationManager>
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public ControllerEmulationStickGyroAntiDeadzoneThresholdProperty(int initialValue, ControllerEmulationManager manager)
+            : base(initialValue, null, Function.ControllerEmulationStickGyroAntiDeadzoneThreshold, manager)
+        {
+        }
+
+        protected override void NotifyPropertyChanged(string propertyName = "")
+        {
+            base.NotifyPropertyChanged(propertyName);
+            Logger.Info($"ControllerEmulationStickGyroAntiDeadzoneThreshold changed to {Value}");
+            Manager?.SetStickGyroAntiDeadzoneThreshold(Value);
+        }
+    }
+
+    /// <summary>
+    /// Helper-to-widget calibration progress channel. Value is a JSON status
+    /// message; updates fire each second of the calibration window so the
+    /// widget can render a countdown and final bias offset.
+    /// </summary>
+    internal class ControllerEmulationCalibrateGyroStatusProperty : HelperProperty<string, ControllerEmulationManager>
+    {
+        public ControllerEmulationCalibrateGyroStatusProperty(ControllerEmulationManager manager)
+            : base(string.Empty, null, Function.ControllerEmulationCalibrateGyroStatus, manager)
+        {
+        }
+    }
 }

@@ -51,6 +51,32 @@ namespace XboxGamingBar
             await SendDisplayOSDConfigToHelper();
         }
 
+        // Chevron expanders for the SDR Brightness Sync and Adaptive Brightness cards.
+        // Both keep the card compact by default — the combo + description live inside.
+        // Chevron glyph: E70D = down (collapsed), E70E = up (expanded). Same convention
+        // as ViiperStickGyroAdvancedToggle_Click.
+        private void SdrWhiteLevelSyncExpanderToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (SdrWhiteLevelSyncPanel == null || SdrWhiteLevelSyncExpanderToggle == null) return;
+            bool open = SdrWhiteLevelSyncExpanderToggle.IsChecked == true;
+            SdrWhiteLevelSyncPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            if (SdrWhiteLevelSyncExpanderIcon != null)
+            {
+                SdrWhiteLevelSyncExpanderIcon.Glyph = open ? "\uE70E" : "\uE70D";
+            }
+        }
+
+        private void AdaptiveBrightnessExpanderToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (AdaptiveBrightnessPanel == null || AdaptiveBrightnessExpanderToggle == null) return;
+            bool open = AdaptiveBrightnessExpanderToggle.IsChecked == true;
+            AdaptiveBrightnessPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            if (AdaptiveBrightnessExpanderIcon != null)
+            {
+                AdaptiveBrightnessExpanderIcon.Glyph = open ? "\uE70E" : "\uE70D";
+            }
+        }
+
         private async void OSDPositionShiftToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (isLoadingOLEDSettings) return;

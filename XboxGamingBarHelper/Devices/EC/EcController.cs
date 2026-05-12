@@ -10,7 +10,7 @@ namespace XboxGamingBarHelper.Devices.EC
     /// Supports IT5570 (GPD Win 5) using indirect memory access protocol.
     /// Uses inpoutx64.dll for port I/O access.
     ///
-    /// Based on the Linux gpd-fan driver and Handheld Companion implementation.
+    /// Based on the Linux gpd-fan driver.
     /// Reference: https://github.com/Cryolitia/gpd-fan-driver
     /// </summary>
     internal class EcController : IDisposable

@@ -9,7 +9,6 @@ namespace XboxGamingBarHelper.RTSS
     /// <summary>
     /// Provides FPS limiting functionality via RTSS (RivaTuner Statistics Server).
     /// Uses P/Invoke to RTSSHooks64.dll for direct control.
-    /// Based on HandheldCompanion's implementation.
     /// </summary>
     internal static class RTSSFPSLimiter
     {

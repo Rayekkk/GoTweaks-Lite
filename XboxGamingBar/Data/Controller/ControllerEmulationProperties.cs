@@ -757,6 +757,11 @@ namespace XboxGamingBar.Data
     // Stick v2 combo box properties
     internal class ControllerEmulationStickOrientationV2Property : WidgetControlProperty<int, ComboBox>
     {
+        // Default 0 = Flat (no Y/Z swap). With the Mode 0 default, gyroY
+        // already drives horizontal directly, so the swap isn't needed for
+        // the laser-pointer-from-back behavior to work. Users who prefer the
+        // Roll mode (1) for handheld can flip this to Handheld, which makes
+        // gyroZ act as the new gyroY.
         public ControllerEmulationStickOrientationV2Property(ComboBox inUI, Page inOwner)
             : base(0, Function.ControllerEmulationStickOrientationV2, inUI, inOwner)
         {
@@ -793,10 +798,15 @@ namespace XboxGamingBar.Data
 
     internal class ControllerEmulationStickConversionProperty : WidgetControlProperty<int, ComboBox>
     {
-        // Default 2 (Yaw + Roll) — matches helper Normalize.cs default for fresh installs
-        // per vvalente30's recommended SteamOS-aligned settings (issue #79).
+        // Default 0 (Yaw) — "laser pointer from back of device" model.
+        // horizontal = gyroY directly (no gravity projection, no axis remap),
+        // so yawing the device around its own up-axis pans the camera left/
+        // right and rolling doesn't change camera direction. Matches what
+        // most users intuit when aiming with a handheld. Player/World Space
+        // (3/4) use gravity as the yaw axis, which feels like the laser is
+        // pointing at the sky on a tilted handheld.
         public ControllerEmulationStickConversionProperty(ComboBox inUI, Page inOwner)
-            : base(2, Function.ControllerEmulationStickConversion, inUI, inOwner)
+            : base(0, Function.ControllerEmulationStickConversion, inUI, inOwner)
         {
             if (UI != null)
             {

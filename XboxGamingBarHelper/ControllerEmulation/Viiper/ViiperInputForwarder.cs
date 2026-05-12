@@ -125,6 +125,8 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
         // Singleton so Labs-side code can reach the active forwarder without circular DI.
         private static ViiperInputForwarder activeInstance;
+        internal static ViiperInputForwarder ActiveInstance => activeInstance;
+        internal ViiperStickGyroProcessor StickGyroProcessor => stickGyro;
 
         // Rumble feedback counters. Incremented on the libviiper callback thread inside
         // OnFeedbackReceived; drained and logged from PollLoop's 5s stats window. Used

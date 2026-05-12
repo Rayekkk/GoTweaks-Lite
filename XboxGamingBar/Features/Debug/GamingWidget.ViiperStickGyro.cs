@@ -42,14 +42,9 @@ namespace XboxGamingBar
             HookLegacyToViiperToggle(ControllerEmulationStickInvertYToggle, ViiperStickGyroInvertYToggle);
 
             HookLegacyToViiperSlider(StickSensitivityV2Slider, ViiperStickGyroSensitivitySlider, ViiperStickGyroSensitivityValueText, FormatSensitivity);
-            HookLegacyToViiperSlider(StickDeadzoneSlider, ViiperStickGyroDeadzoneSlider, ViiperStickGyroDeadzoneValueText, FormatDegPerSec);
-            HookLegacyToViiperSlider(StickMinGyroSpeedSlider, ViiperStickGyroMinGyroSpeedSlider, ViiperStickGyroMinGyroSpeedValueText, FormatDegPerSec);
-            HookLegacyToViiperSlider(StickMaxGyroSpeedSlider, ViiperStickGyroMaxGyroSpeedSlider, ViiperStickGyroMaxGyroSpeedValueText, FormatDegPerSec);
-            HookLegacyToViiperSlider(StickMinOutputSlider, ViiperStickGyroMinOutputSlider, ViiperStickGyroMinOutputValueText, FormatPercent);
-            HookLegacyToViiperSlider(StickMaxOutputSlider, ViiperStickGyroMaxOutputSlider, ViiperStickGyroMaxOutputValueText, FormatPercent);
-            HookLegacyToViiperSlider(StickPowerCurveSlider, ViiperStickGyroPowerCurveSlider, ViiperStickGyroPowerCurveValueText, FormatPowerCurve);
-            HookLegacyToViiperSlider(StickPrecisionSpeedSlider, ViiperStickGyroPrecisionSpeedSlider, ViiperStickGyroPrecisionSpeedValueText, FormatPrecisionSpeed);
-            HookLegacyToViiperSlider(StickOutputMixSlider, ViiperStickGyroOutputMixSlider, ViiperStickGyroOutputMixValueText, FormatOutputMix);
+            // Deadzone, Min/Max gyro speed, Min/Max output, Power curve, Precision speed,
+            // Output mix mirrors all removed in #79 round 5 (corresponding sliders + pipeline
+            // stages were removed to match HC's minimal flow).
 
             // Initial sync from legacy (which already holds the synced helper value).
             MirrorComboBoxIndex(ControllerEmulationGyroActivationModeComboBox, ViiperStickGyroActivationModeComboBox);
@@ -60,14 +55,32 @@ namespace XboxGamingBar
             MirrorToggle(ControllerEmulationStickInvertXToggle, ViiperStickGyroInvertXToggle);
             MirrorToggle(ControllerEmulationStickInvertYToggle, ViiperStickGyroInvertYToggle);
             MirrorSliderValue(StickSensitivityV2Slider, ViiperStickGyroSensitivitySlider, ViiperStickGyroSensitivityValueText, FormatSensitivity);
-            MirrorSliderValue(StickDeadzoneSlider, ViiperStickGyroDeadzoneSlider, ViiperStickGyroDeadzoneValueText, FormatDegPerSec);
-            MirrorSliderValue(StickMinGyroSpeedSlider, ViiperStickGyroMinGyroSpeedSlider, ViiperStickGyroMinGyroSpeedValueText, FormatDegPerSec);
-            MirrorSliderValue(StickMaxGyroSpeedSlider, ViiperStickGyroMaxGyroSpeedSlider, ViiperStickGyroMaxGyroSpeedValueText, FormatDegPerSec);
-            MirrorSliderValue(StickMinOutputSlider, ViiperStickGyroMinOutputSlider, ViiperStickGyroMinOutputValueText, FormatPercent);
-            MirrorSliderValue(StickMaxOutputSlider, ViiperStickGyroMaxOutputSlider, ViiperStickGyroMaxOutputValueText, FormatPercent);
-            MirrorSliderValue(StickPowerCurveSlider, ViiperStickGyroPowerCurveSlider, ViiperStickGyroPowerCurveValueText, FormatPowerCurve);
-            MirrorSliderValue(StickPrecisionSpeedSlider, ViiperStickGyroPrecisionSpeedSlider, ViiperStickGyroPrecisionSpeedValueText, FormatPrecisionSpeed);
-            MirrorSliderValue(StickOutputMixSlider, ViiperStickGyroOutputMixSlider, ViiperStickGyroOutputMixValueText, FormatOutputMix);
+
+            // Restore anti-deadzone slider values from LocalSettings (set by
+            // a prior session / set on the helper side). No matching legacy
+            // slider to mirror — these settings live only in the Viiper UI for now.
+            try
+            {
+                var s = Windows.Storage.ApplicationData.Current.LocalSettings;
+                if (ViiperStickGyroAntiDeadzoneSlider != null)
+                {
+                    int adz = s.Values.TryGetValue("ControllerEmulationStickGyroAntiDeadzone", out object adzObj) && adzObj is int ai ? ai : 10;
+                    ViiperStickGyroAntiDeadzoneSlider.Value = Math.Max(0, Math.Min(30, adz));
+                    if (ViiperStickGyroAntiDeadzoneValueText != null)
+                        ViiperStickGyroAntiDeadzoneValueText.Text = $"{(int)ViiperStickGyroAntiDeadzoneSlider.Value}%";
+                }
+                if (ViiperStickGyroAntiDeadzoneThresholdSlider != null)
+                {
+                    int thr = s.Values.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out object thrObj) && thrObj is int ti ? ti : 3;
+                    ViiperStickGyroAntiDeadzoneThresholdSlider.Value = Math.Max(0, Math.Min(50, thr));
+                    if (ViiperStickGyroAntiDeadzoneThresholdValueText != null)
+                        ViiperStickGyroAntiDeadzoneThresholdValueText.Text = $"{(ViiperStickGyroAntiDeadzoneThresholdSlider.Value / 10.0):F1}°/s";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to restore anti-deadzone slider values: {ex.Message}");
+            }
 
             // Master-enable toggle drives the badge + cascading enable state. The
             // toggle itself is bound to a real WidgetProperty so its value pushes
@@ -132,7 +145,6 @@ namespace XboxGamingBar
             if (ViiperStickGyroActivationButtonComboBox != null)
                 ViiperStickGyroActivationButtonComboBox.IsEnabled = on && (ViiperStickGyroActivationModeComboBox?.SelectedIndex != 0);
             if (ViiperStickGyroSensitivitySlider != null) ViiperStickGyroSensitivitySlider.IsEnabled = on;
-            if (ViiperStickGyroDeadzoneSlider != null) ViiperStickGyroDeadzoneSlider.IsEnabled = on;
             if (ViiperStickGyroAdvancedToggle != null) ViiperStickGyroAdvancedToggle.IsEnabled = on;
             if (ViiperStickGyroResetButton != null) ViiperStickGyroResetButton.IsEnabled = on;
             // Collapse advanced when disabled so the user doesn't see live-but-inert sliders.
@@ -234,14 +246,173 @@ namespace XboxGamingBar
             MirrorSliderValue(ViiperStickGyroSensitivitySlider, StickSensitivityV2Slider, null, null);
         }
 
-        private void ViiperStickGyroDeadzoneSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        private void ViiperStickGyroAntiDeadzoneSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
-            if (ViiperStickGyroDeadzoneValueText != null)
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroAntiDeadzoneValueText != null)
             {
-                ViiperStickGyroDeadzoneValueText.Text = FormatDegPerSec(e.NewValue);
+                ViiperStickGyroAntiDeadzoneValueText.Text = $"{value}%";
             }
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroDeadzoneSlider, StickDeadzoneSlider, null, null);
+            SaveAntiDeadzoneSettings(value, null);
+            SendStickGyroAntiDeadzoneToHelper(value, null);
+        }
+
+        private void ViiperStickGyroAntiDeadzoneThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            int value = (int)Math.Round(e.NewValue);
+            if (ViiperStickGyroAntiDeadzoneThresholdValueText != null)
+            {
+                ViiperStickGyroAntiDeadzoneThresholdValueText.Text = $"{(value / 10.0):F1}°/s";
+            }
+            SaveAntiDeadzoneSettings(null, value);
+            SendStickGyroAntiDeadzoneToHelper(null, value);
+        }
+
+        private static void SaveAntiDeadzoneSettings(int? adz, int? threshold)
+        {
+            try
+            {
+                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+                if (adz.HasValue)
+                {
+                    settings.Values["ControllerEmulationStickGyroAntiDeadzone"] = adz.Value;
+                }
+                if (threshold.HasValue)
+                {
+                    settings.Values["ControllerEmulationStickGyroAntiDeadzoneThreshold"] = threshold.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"SaveAntiDeadzoneSettings failed: {ex.Message}");
+            }
+        }
+
+        private static void SendStickGyroAntiDeadzoneToHelper(int? adz, int? threshold)
+        {
+            try
+            {
+                if (!App.IsConnected) return;
+                if (adz.HasValue)
+                {
+                    var msg = new Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Command", (int)Shared.Enums.Command.Set },
+                        { "Function", (int)Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzone },
+                        { "Content", adz.Value }
+                    };
+                    App.PipeClient?.SendValueSet(msg);
+                }
+                if (threshold.HasValue)
+                {
+                    var msg = new Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Command", (int)Shared.Enums.Command.Set },
+                        { "Function", (int)Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzoneThreshold },
+                        { "Content", threshold.Value }
+                    };
+                    App.PipeClient?.SendValueSet(msg);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"SendStickGyroAntiDeadzoneToHelper failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Receive a calibration progress JSON from the helper and update the
+        /// status label below the Calibrate button. Helper publishes to
+        /// <c>Function.ControllerEmulationCalibrateGyroStatus</c> at start,
+        /// every ~250ms during the 5s capture, and once on completion with
+        /// the captured bias offset.
+        /// </summary>
+        public void OnCalibrateGyroStatus(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            try
+            {
+                string phase = ExtractJsonString(json, "phase");
+                int secondsLeft = ExtractJsonInt(json, "secondsLeft");
+                int weight = ExtractJsonInt(json, "weight");
+                (float x, float y, float z) = ExtractJsonOffset(json);
+
+                string text;
+                switch (phase)
+                {
+                    case "preparing":
+                        text = secondsLeft > 0
+                            ? $"Place device flat — capturing in {secondsLeft}s"
+                            : "Get ready…";
+                        break;
+                    case "running":
+                        text = secondsLeft > 0
+                            ? $"Capturing… hold still ({secondsLeft}s)"
+                            : "Capturing…";
+                        break;
+                    case "done":
+                        text = $"Calibrated. Bias = ({x:F2}, {y:F2}, {z:F2}) °/s, confidence {weight * 10}%";
+                        break;
+                    case "low_confidence":
+                        text = $"Captured (low confidence {weight * 10}%). Bias = ({x:F2}, {y:F2}, {z:F2}) °/s — try again with device flat.";
+                        break;
+                    case "error":
+                        text = "Calibration failed — see helper log";
+                        break;
+                    default:
+                        text = phase;
+                        break;
+                }
+
+                _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                {
+                    if (ViiperStickGyroCalibrateStatusText == null) return;
+                    ViiperStickGyroCalibrateStatusText.Text = text;
+                    ViiperStickGyroCalibrateStatusText.Visibility = Visibility.Visible;
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"OnCalibrateGyroStatus failed: {ex.Message}");
+            }
+        }
+
+        private static string ExtractJsonString(string json, string key)
+        {
+            string needle = $"\"{key}\":\"";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return string.Empty;
+            i += needle.Length;
+            int end = json.IndexOf('"', i);
+            return end < 0 ? string.Empty : json.Substring(i, end - i);
+        }
+
+        private static int ExtractJsonInt(string json, string key)
+        {
+            string needle = $"\"{key}\":";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return 0;
+            i += needle.Length;
+            int end = i;
+            while (end < json.Length && (char.IsDigit(json[end]) || json[end] == '-')) end++;
+            int.TryParse(json.Substring(i, end - i), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int v);
+            return v;
+        }
+
+        private static (float, float, float) ExtractJsonOffset(string json)
+        {
+            const string needle = "\"offset\":[";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return (0, 0, 0);
+            i += needle.Length;
+            int end = json.IndexOf(']', i);
+            if (end < 0) return (0, 0, 0);
+            string[] parts = json.Substring(i, end - i).Split(',');
+            float x = 0, y = 0, z = 0;
+            if (parts.Length > 0) float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x);
+            if (parts.Length > 1) float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y);
+            if (parts.Length > 2) float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out z);
+            return (x, y, z);
         }
 
         // ----- Advanced expander -----
@@ -288,61 +459,9 @@ namespace XboxGamingBar
             MirrorToggle(ViiperStickGyroInvertYToggle, ControllerEmulationStickInvertYToggle);
         }
 
-        private void ViiperStickGyroMinGyroSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroMinGyroSpeedValueText != null)
-                ViiperStickGyroMinGyroSpeedValueText.Text = FormatDegPerSec(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroMinGyroSpeedSlider, StickMinGyroSpeedSlider, null, null);
-        }
-
-        private void ViiperStickGyroMaxGyroSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroMaxGyroSpeedValueText != null)
-                ViiperStickGyroMaxGyroSpeedValueText.Text = FormatDegPerSec(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroMaxGyroSpeedSlider, StickMaxGyroSpeedSlider, null, null);
-        }
-
-        private void ViiperStickGyroMinOutputSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroMinOutputValueText != null)
-                ViiperStickGyroMinOutputValueText.Text = FormatPercent(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroMinOutputSlider, StickMinOutputSlider, null, null);
-        }
-
-        private void ViiperStickGyroMaxOutputSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroMaxOutputValueText != null)
-                ViiperStickGyroMaxOutputValueText.Text = FormatPercent(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroMaxOutputSlider, StickMaxOutputSlider, null, null);
-        }
-
-        private void ViiperStickGyroPowerCurveSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroPowerCurveValueText != null)
-                ViiperStickGyroPowerCurveValueText.Text = FormatPowerCurve(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroPowerCurveSlider, StickPowerCurveSlider, null, null);
-        }
-
-        private void ViiperStickGyroPrecisionSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroPrecisionSpeedValueText != null)
-                ViiperStickGyroPrecisionSpeedValueText.Text = FormatPrecisionSpeed(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroPrecisionSpeedSlider, StickPrecisionSpeedSlider, null, null);
-        }
-
-        private void ViiperStickGyroOutputMixSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ViiperStickGyroOutputMixValueText != null)
-                ViiperStickGyroOutputMixValueText.Text = FormatOutputMix(e.NewValue);
-            if (isMirroringStickGyro) return;
-            MirrorSliderValue(ViiperStickGyroOutputMixSlider, StickOutputMixSlider, null, null);
-        }
+        // Min/Max gyro speed, Min/Max output, Power curve, Precision speed,
+        // Output mix slider handlers all removed in #79 round 5 (sliders + pipeline
+        // stages were removed to match HC's minimal flow).
 
         // ----- Reset to recommended defaults -----
 
@@ -353,6 +472,37 @@ namespace XboxGamingBar
         /// VIIPER twin controls. One write path, no duplication.
         /// </summary>
         private void ViiperStickGyroResetButton_Click(object sender, RoutedEventArgs e) => ApplyStickGyroRecommendedDefaults();
+
+        /// <summary>
+        /// Trigger the helper-side JSL gyro bias calibration. Same pipe
+        /// function as the legacy CE Calibrate Gyro button — one helper
+        /// handler, two UI entry points so VIIPER users have the control
+        /// where they're already configuring stick gyro.
+        /// </summary>
+        private void ViiperStickGyroCalibrateButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!App.IsConnected)
+                {
+                    Logger.Warn("VIIPER stick-gyro calibrate: helper not connected");
+                    return;
+                }
+
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.ControllerEmulationCalibrateGyro },
+                    { "Content", true }
+                };
+                App.PipeClient?.SendValueSet(request);
+                Logger.Info("Sent gyro calibration request to helper (VIIPER stick-gyro)");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error sending VIIPER stick-gyro calibration: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Twin handler used by the legacy CE panel's reset button (issue #79
@@ -371,23 +521,15 @@ namespace XboxGamingBar
 
             // Routing + axis mapping
             SetComboBoxByTag(ControllerEmulationStickSelectComboBox, "1");          // Right
-            SetComboBoxByTag(StickConversionComboBox, "2");                         // Yaw + Roll
-            SetComboBoxByTag(StickOrientationV2ComboBox, "0");                      // Parallel
+            SetComboBoxByTag(StickConversionComboBox, "4");                         // World Space
+            SetComboBoxByTag(StickOrientationV2ComboBox, "1");                      // Handheld (held in front)
 
             // Inverts
             if (ControllerEmulationStickInvertXToggle != null) ControllerEmulationStickInvertXToggle.IsOn = false;
             if (ControllerEmulationStickInvertYToggle != null) ControllerEmulationStickInvertYToggle.IsOn = false;
 
-            // Slider values
+            // Slider values — only Sensitivity remains after #79 round-5 cleanup.
             if (StickSensitivityV2Slider != null) StickSensitivityV2Slider.Value = 100;   // 1.00x
-            if (StickDeadzoneSlider != null) StickDeadzoneSlider.Value = 2;
-            if (StickMinGyroSpeedSlider != null) StickMinGyroSpeedSlider.Value = 0;
-            if (StickMaxGyroSpeedSlider != null) StickMaxGyroSpeedSlider.Value = 220;
-            if (StickMinOutputSlider != null) StickMinOutputSlider.Value = 0;
-            if (StickMaxOutputSlider != null) StickMaxOutputSlider.Value = 100;
-            if (StickPowerCurveSlider != null) StickPowerCurveSlider.Value = 100;         // 1.0
-            if (StickPrecisionSpeedSlider != null) StickPrecisionSpeedSlider.Value = 0;   // Off
-            if (StickOutputMixSlider != null) StickOutputMixSlider.Value = 0;             // Balanced
 
             // Master enable defaults to true (the section's whole reason to exist).
             if (ViiperStickGyroEnabledToggle != null) ViiperStickGyroEnabledToggle.IsOn = true;

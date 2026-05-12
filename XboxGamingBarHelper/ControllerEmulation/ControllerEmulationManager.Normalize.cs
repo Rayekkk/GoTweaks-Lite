@@ -572,12 +572,25 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     ? Math.Max(0, Math.Min(100, savedPrecision)) : 0;
                 stickOutputMix = LocalSettingsHelper.TryGetValue("ControllerEmulationStickOutputMix", out int savedOutputMix)
                     ? Math.Max(-100, Math.Min(100, savedOutputMix)) : 0;
+                // 0 = Flat (no Y/Z swap), 1 = Handheld (Y/Z swap). Default Flat
+                // because the new Mode 0 (Yaw) default uses gyroY directly,
+                // which works for both flat and handheld holds without needing
+                // the swap. Saved value wins.
                 stickOrientationV2 = LocalSettingsHelper.TryGetValue("ControllerEmulationStickOrientationV2", out int savedOrientV2)
                     ? ((savedOrientV2 == 1) ? 1 : 0) : 0;
-                // Default 2 (Yaw + Roll) per vvalente30's recommended SteamOS-aligned settings
-                // (issue #79). Existing users with a saved value keep what they have.
+                // 0=Yaw, 1=Roll, 2=Yaw+Roll, 3=Player Space, 4=World Space.
+                // Default 0 (Yaw) — "laser pointer from back of device" model:
+                // gyroY directly drives horizontal, gyroX drives vertical, roll
+                // doesn't move the camera. Player/World Space use gravity as
+                // the yaw axis, which feels like the laser is pointing at the
+                // sky on a tilted handheld. Saved value wins.
                 stickConversion = LocalSettingsHelper.TryGetValue("ControllerEmulationStickConversion", out int savedConversion)
-                    ? Math.Max(0, Math.Min(2, savedConversion)) : 2;
+                    ? Math.Max(0, Math.Min(4, savedConversion)) : 0;
+
+                stickGyroAntiDeadzone = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzone", out int savedAdz)
+                    ? Math.Max(0, Math.Min(30, savedAdz)) : 10;
+                stickGyroAntiDeadzoneThreshold = LocalSettingsHelper.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out int savedAdzThr)
+                    ? Math.Max(0, Math.Min(50, savedAdzThr)) : 3;
 
                 if (LocalSettingsHelper.TryGetValue("ControllerEmulationVirtualABXYLayout", out int savedVirtualAbxyLayout))
                 {
@@ -679,6 +692,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 LocalSettingsHelper.SetValue("ControllerEmulationStickOutputMix", stickOutputMix);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickOrientationV2", stickOrientationV2);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickConversion", stickConversion);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroAntiDeadzone", stickGyroAntiDeadzone);
+                LocalSettingsHelper.SetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", stickGyroAntiDeadzoneThreshold);
 
                 // Keep legacy keys in sync for compatibility with older builds.
                 LocalSettingsHelper.SetValue("GPDControllerEmulationGyroSource", gyroSource);

@@ -214,14 +214,15 @@ namespace XboxGamingBar
 
             if (CalibrateGyroGrid != null)
             {
-                bool isControllerSource = ControllerEmulationGyroSourceComboBox != null &&
-                                          ControllerEmulationGyroSourceComboBox.SelectedIndex > 0;
-                CalibrateGyroGrid.Visibility = isControllerSource
-                    ? Windows.UI.Xaml.Visibility.Visible
-                    : Windows.UI.Xaml.Visibility.Collapsed;
+                // Always visible when CE is available — JSL calibration applies
+                // regardless of gyro source (handheld or controller). Previously
+                // gated on isControllerSource because the original button only
+                // ran the Legion firmware reset; now it also runs JSL software
+                // calibration which works on any gyro feed.
+                CalibrateGyroGrid.Visibility = Windows.UI.Xaml.Visibility.Visible;
                 if (CalibrateGyroButton != null)
                 {
-                    CalibrateGyroButton.IsEnabled = enabled && isControllerSource && App.IsConnected;
+                    CalibrateGyroButton.IsEnabled = enabled && App.IsConnected;
                 }
             }
 
@@ -318,22 +319,8 @@ namespace XboxGamingBar
                 ControllerEmulationStickInvertYToggle.IsEnabled = stickControlsEnabled;
             if (StickSensitivityV2Slider != null)
                 StickSensitivityV2Slider.IsEnabled = stickControlsEnabled;
-            if (StickMinGyroSpeedSlider != null)
-                StickMinGyroSpeedSlider.IsEnabled = stickControlsEnabled;
-            if (StickMaxGyroSpeedSlider != null)
-                StickMaxGyroSpeedSlider.IsEnabled = stickControlsEnabled;
-            if (StickMinOutputSlider != null)
-                StickMinOutputSlider.IsEnabled = stickControlsEnabled;
-            if (StickMaxOutputSlider != null)
-                StickMaxOutputSlider.IsEnabled = stickControlsEnabled;
-            if (StickPowerCurveSlider != null)
-                StickPowerCurveSlider.IsEnabled = stickControlsEnabled;
-            if (StickDeadzoneSlider != null)
-                StickDeadzoneSlider.IsEnabled = stickControlsEnabled;
-            if (StickPrecisionSpeedSlider != null)
-                StickPrecisionSpeedSlider.IsEnabled = stickControlsEnabled;
-            if (StickOutputMixSlider != null)
-                StickOutputMixSlider.IsEnabled = stickControlsEnabled;
+            // Min/Max gyro speed, Min/Max output, Power curve, Deadzone, Precision speed,
+            // Output mix sliders all removed in #79 round 5.
 
             // Keep Legion remap advanced controls aligned with current emulation toggles
             // even when startup/property sync order suppresses Toggle events.

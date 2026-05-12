@@ -44,23 +44,55 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 }
             }
 
-            // 0. Bias correction — subtract the IMU's rest-state offset so a
-            //    5°/s residual on YAW doesn't survive as a 1.4% persistent right-
-            //    stick deflection in Always-On mode. Estimator updates only when
-            //    the controller is stationary; safe to call every tick.
-            sample = stickGyroBiasEstimator.Correct(sample);
+            // 0a. Sensor fusion update — push the RAW sample (pre-bias-correction)
+            //     into JSL so its continuous-calibration "is steady" detector and
+            //     internal gyro-bias estimator see actual sensor data rather than
+            //     a sample we already corrected. Without raw input, JSL learns
+            //     bias~=0 against an already-flat signal and the gravity vector
+            //     drifts when our biasEstimator is wrong.
+            long sampleTicks = sample.TimestampTicksUtc;
+            float jslDeltaSeconds = stickGamepadMotionLastTicksUtc > 0 && sampleTicks > stickGamepadMotionLastTicksUtc
+                ? (float)((sampleTicks - stickGamepadMotionLastTicksUtc) / (double)TimeSpan.TicksPerSecond)
+                : DefaultDeltaSeconds;
+            stickGamepadMotionLastTicksUtc = sampleTicks;
 
-            // 1. Orientation-corrected input axes
-            //    Parallel = standard (Y=Yaw, Z=Roll)
-            //    Orthogonal = swap Y↔Z for devices where IMU axes are rotated
-            float gyroX = sample.GyroXDegPerSecond;
-            float gyroY = sample.GyroYDegPerSecond;
-            float gyroZ = sample.GyroZDegPerSecond;
+            // Always feed JSL the real accelerometer — see ViiperStickGyroProcessor
+            // for full notes. The handheld override broke JSL's gravity tracking,
+            // so we no longer override accel.
+            stickGamepadMotion.Update(
+                sample.GyroXDegPerSecond, sample.GyroYDegPerSecond, sample.GyroZDegPerSecond,
+                sample.AccelXG, sample.AccelYG, sample.AccelZG,
+                jslDeltaSeconds);
+
+            // 0b. Read gyro from JSL's calibrated path for ALL conversion modes
+            //     so Mode 0/1/2 share the same input feed as Player/World Space.
+            //     Closes the felt-jitter gap between gravity-projected modes
+            //     (which already used JSL state) and the raw-axis modes.
+            stickGamepadMotion.GetCalibratedGyro(out float jslGyroX, out float jslGyroY, out float jslGyroZ);
+
+            // No EMA smoother — JSL auto-calibration (Stillness | SensorFusion)
+            // handles bias drift, so no pre-output smoothing is needed.
+
+            // Keep our biasEstimator running on the raw sample so its internal
+            // "is stationary" state stays warm for any callers that still
+            // consult it. Output unused.
+            stickGyroBiasEstimator.Correct(sample);
+
+            // 1. Orientation correction — SwapYawRoll:
+            //    (X, Y, Z) → (X, -Z, -Y). The previous
+            //    (X, Z, -Y) form had a sign error that pushed the user's actual
+            //    yaw signal onto +gyroZ (unused by Mode 0) and noise floor onto
+            //    +gyroY (Mode 0's horizontal) — that was the saturated-stutter
+            //    cause in the regression logs.
+            float gyroX = jslGyroX;
+            float gyroY = jslGyroY;
+            float gyroZ = jslGyroZ;
 
             if (stickOrientationV2 == 1)
             {
                 float origY = gyroY;
-                gyroY = gyroZ;
+                float origZ = gyroZ;
+                gyroY = -origZ;
                 gyroZ = -origY;
             }
 
@@ -80,103 +112,115 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     horizontal = (gyroY + gyroZ) * 0.5f;
                     vertical = gyroX;
                     break;
+                case 3: // Player Space — gravity-aware projection. Good for
+                        // device held flat; assumes pitch axis = device-X.
+                    stickGamepadMotion.GetPlayerSpaceGyro(out horizontal, out vertical, gyroY, gyroX);
+                    break;
+                case 4: // World Space — re-derives pitch axis from gravity
+                        // instead of assuming pitch = device-X. Better for
+                        // tilted handhelds; identical output when held flat.
+                    stickGamepadMotion.GetWorldSpaceGyro(out horizontal, out vertical, gyroY, gyroX);
+                    break;
                 default: // 0 = Yaw
                     horizontal = gyroY;
                     vertical = gyroX;
                     break;
             }
 
-            // 3. Invert axes
+            // Bake in the Invert X preference observed across all gyro sources
+            // and conv modes (Player/World Space's wrapper negation and our
+            // parser flips kept canceling out at the apply layer). Inverting
+            // horizontal at the output stage handles every conversion mode
+            // uniformly — Yaw/Roll/Yaw+Roll/Player Space/World Space all flow
+            // through this same point. The Invert X toggle remains available
+            // as an in-game preference (will now revert to "raw" if user
+            // explicitly wants the opposite direction in some game).
+            horizontal = -horizontal;
+
+            // 3. Invert axes (user-facing toggles, for in-game preference)
             if (stickInvertX) horizontal = -horizontal;
             if (stickInvertY) vertical = -vertical;
 
-            // 4. Deadzone with smooth recovery
-            float deadzone = Math.Max(0.0f, stickDeadzone);
-            horizontal = ApplyDeadzone(horizontal, deadzone);
-            vertical = ApplyDeadzone(vertical, deadzone);
+            // 4. Sensitivity curve + clamp. Direct mirror of the
+            //    Viiper-side processor; both feed into the same default 0.5-flat
+            //    lookup table with a 124°/s threshold and a 1000× per-axis scale.
+            float curveX = HcApplyCustomSensitivity(horizontal);
+            float curveY = HcApplyCustomSensitivity(vertical);
+            float perAxisSens = Math.Max(0.01f, stickSensitivityV2 / 100.0f) * StickGyroHcSensScale;
+            float scaledX = horizontal * curveX * perAxisSens;
+            float scaledY = vertical   * curveY * perAxisSens;
 
-            // 5. One Euro filter
-            float deltaSeconds;
-            if (stickLastSampleTicksUtc > 0 && sample.TimestampTicksUtc > stickLastSampleTicksUtc)
+            // 5. Anti-deadzone for small-motion precision. Most games kill
+            //    stick output below ~10–20% as built-in deadzone; without this
+            //    rescale, a 2°/s aim adjustment produces ~6% deflection that
+            //    the game silently swallows. Smooth rescale: any
+            //    non-trivial input (>0.5°/s) is mapped from [0, max] to
+            //    [adz, max], so tiny motions land just past typical deadzones
+            //    while large motions still saturate cleanly. Default offset is
+            //    ~0.10 of stick range.
+            // Anti-deadzone uses the manager-level settings so the widget can
+            // tune them live. UserPercent (0-30) maps linearly into [0, 0.30]
+            // of int16 range; UserThreshold (0-50) maps linearly into [0, 5.0]
+            // °/s. Both 0 disables (preserves the no-rescale path for users
+            // who want true raw output).
+            float adzInt16 = (Math.Max(0, Math.Min(30, stickGyroAntiDeadzone)) / 100.0f) * short.MaxValue;
+            float adzThresholdDps = Math.Max(0, Math.Min(50, stickGyroAntiDeadzoneThreshold)) / 10.0f;
+            scaledX = ApplyStickGyroAntiDeadzone(horizontal, scaledX, adzInt16, adzThresholdDps);
+            scaledY = ApplyStickGyroAntiDeadzone(vertical,   scaledY, adzInt16, adzThresholdDps);
+
+            outputX = ClampToInt16(scaledX);
+            outputY = ClampToInt16(scaledY);
+        }
+
+        // Smooth anti-deadzone: the hard "below threshold → output 0" cutoff
+        // killed precision aim. We now treat the user-set threshold as the
+        // *top* of a ramp zone whose bottom is threshold/2 — below threshold/2
+        // it's a true dead zone, between threshold/2 and threshold the
+        // anti-deadzone offset ramps in linearly, above threshold it's at
+        // full strength. End result for slow pitch motion: continuous output
+        // from ~0 up through the full stick range, no felt step.
+        private static float ApplyStickGyroAntiDeadzone(float gyroDps, float scaledOutput, float adzInt16, float adzThresholdDps)
+        {
+            if (adzInt16 <= 0.0f) return scaledOutput;
+            float absGyro = Math.Abs(gyroDps);
+            float deadFloor = adzThresholdDps * 0.5f;
+            if (absGyro < deadFloor) return 0.0f;
+            float ramp = adzThresholdDps > deadFloor
+                ? Math.Min(1.0f, (absGyro - deadFloor) / (adzThresholdDps - deadFloor))
+                : 1.0f;
+            float sign = scaledOutput >= 0.0f ? 1.0f : -1.0f;
+            float absScaled = Math.Abs(scaledOutput);
+            float effectiveAdz = adzInt16 * ramp;
+            float remap = effectiveAdz + absScaled * (1.0f - effectiveAdz / short.MaxValue);
+            return sign * remap;
+        }
+
+        // Per-axis sensitivity scale: default 1.0,
+        // multiplied by 1000 to convert deg/s into stick units.
+        private const float StickGyroHcSensScale = 1000.0f;
+        private const float StickGyroHcThresholdDegPerSec = 124.0f;
+        private const int StickGyroHcCurveNodeCount = 49;
+        private static readonly float[] StickGyroHcCurve = MakeStickGyroFlatCurve(0.5f);
+
+        private static float[] MakeStickGyroFlatCurve(float v)
+        {
+            var arr = new float[StickGyroHcCurveNodeCount];
+            for (int i = 0; i < arr.Length; i++) arr[i] = v;
+            return arr;
+        }
+
+        private static float HcApplyCustomSensitivity(float value)
+        {
+            if (StickGyroHcThresholdDegPerSec <= 0.0f) return 1.0f;
+            float position = Math.Abs(value) / StickGyroHcThresholdDegPerSec;
+            if (position >= StickGyroHcCurve.Length - 1)
             {
-                deltaSeconds = (sample.TimestampTicksUtc - stickLastSampleTicksUtc) / (float)TimeSpan.TicksPerSecond;
-                deltaSeconds = Math.Max(MinDeltaSeconds, Math.Min(MaxDeltaSeconds, deltaSeconds));
+                return StickGyroHcCurve[StickGyroHcCurve.Length - 1] * 2.0f;
             }
-            else
-            {
-                deltaSeconds = DefaultDeltaSeconds;
-            }
-            stickLastSampleTicksUtc = sample.TimestampTicksUtc;
-
-            if (!stickFilterInitialized)
-            {
-                stickFilteredHorizontal = horizontal;
-                stickFilteredVertical = vertical;
-                stickFilteredDerivativeHorizontal = 0.0f;
-                stickFilteredDerivativeVertical = 0.0f;
-                stickFilterInitialized = true;
-            }
-            else
-            {
-                ApplyOneEuroAxis(horizontal, stickFilteredHorizontal,
-                    stickFilteredDerivativeHorizontal, deltaSeconds,
-                    out stickFilteredHorizontal, out stickFilteredDerivativeHorizontal);
-                ApplyOneEuroAxis(vertical, stickFilteredVertical,
-                    stickFilteredDerivativeVertical, deltaSeconds,
-                    out stickFilteredVertical, out stickFilteredDerivativeVertical);
-                horizontal = stickFilteredHorizontal;
-                vertical = stickFilteredVertical;
-            }
-
-            // 6. Precision speed
-            if (stickPrecisionSpeed > 0)
-            {
-                float speed = (float)Math.Sqrt(horizontal * horizontal + vertical * vertical);
-                if (speed > 0.0f && speed < stickPrecisionSpeed)
-                {
-                    float scale = speed / stickPrecisionSpeed;
-                    horizontal *= scale;
-                    vertical *= scale;
-                }
-            }
-
-            // 7. Sensitivity
-            float sensitivity = Math.Max(0.01f, stickSensitivityV2 / 100.0f);
-            horizontal *= sensitivity;
-            vertical *= sensitivity;
-
-            // 8. Normalize to 0-1 using min/max gyro speed
-            float minSpeed = Math.Max(0.0f, stickMinGyroSpeed);
-            float maxSpeed = Math.Max(1.0f, stickMaxGyroSpeed);
-            float normalizedX = MapAxisWithCurve(horizontal, minSpeed, maxSpeed);
-            float normalizedY = MapAxisWithCurve(-vertical, minSpeed, maxSpeed);
-
-            // 9. Power curve
-            float power = Math.Max(0.1f, stickPowerCurve / 100.0f);
-            normalizedX = Math.Sign(normalizedX) * (float)Math.Pow(Math.Abs(normalizedX), power);
-            normalizedY = Math.Sign(normalizedY) * (float)Math.Pow(Math.Abs(normalizedY), power);
-
-            // 10. Output mix
-            if (stickOutputMix > 0)
-            {
-                float vertScale = 1.0f - (stickOutputMix / 100.0f);
-                normalizedY *= vertScale;
-            }
-            else if (stickOutputMix < 0)
-            {
-                float horizScale = 1.0f + (stickOutputMix / 100.0f);
-                normalizedX *= horizScale;
-            }
-
-            // 11. Output range (anti-deadzone + max output)
-            float minOut = stickMinOutput / 100.0f;
-            float maxOut = Math.Max(0.01f, stickMaxOutput / 100.0f);
-            normalizedX = ApplyOutputRange(normalizedX, minOut, maxOut);
-            normalizedY = ApplyOutputRange(normalizedY, minOut, maxOut);
-
-            // 12. Clamp and convert
-            outputX = ConvertNormalizedToInt16(normalizedX);
-            outputY = ConvertNormalizedToInt16(normalizedY);
+            int lo = (int)Math.Floor(position);
+            int hi = lo + 1;
+            float t = position - lo;
+            return ((1.0f - t) * StickGyroHcCurve[lo] + t * StickGyroHcCurve[hi]) * 2.0f;
         }
 
         private void ApplyDs4Orientation(

@@ -720,6 +720,9 @@ namespace XboxGamingBarHelper
                 // Handle gyro-calibration request. Widget fires this as a one-shot while
                 // the user holds the Legion controllers still; helper sends the HID
                 // output report to the controllers' firmware to capture a fresh bias.
+                // Strictly firmware-only; JSL calibration lives on the separate
+                // ControllerEmulation Calibrate Gyro button (different concern, kept
+                // separate per user request).
                 if (pipeMsg.Extra.ContainsKey("CalibrateLegionGyro"))
                 {
                     try

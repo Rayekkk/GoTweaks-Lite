@@ -73,6 +73,11 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private int stickOutputMix;
         private int stickOrientationV2;
         private int stickConversion;
+        // Anti-deadzone settings — tunable from the widget. Defaults match
+        // the previously-hardcoded constants (10% min stick deflection,
+        // 0.5°/s gyro noise floor) so existing users see no behavior change.
+        private int stickGyroAntiDeadzone = 10;          // percent of stick range (0-30)
+        private int stickGyroAntiDeadzoneThreshold = 3;  // 0.1 deg/s units (0-50 → 0.0-5.0 deg/s) — 0.3°/s = post-calibration BMI260 noise floor
         private int virtualAbxyLayout;
         private bool hideStockController;
         private int hideTarget;
@@ -213,6 +218,15 @@ namespace XboxGamingBarHelper.ControllerEmulation
         // processor — each pipeline owns its own instance because filter state
         // shouldn't cross backend swaps.
         private readonly GyroBiasEstimator stickGyroBiasEstimator = new GyroBiasEstimator();
+
+        // Sensor-fusion state for the Player Space conversion mode (#79 round 5).
+        // Wraps Jibb Smart's GamepadMotionHelpers via P/Invoke. The native
+        // library maintains a fused gravity/orientation quaternion using gyro
+        // and accel together — much more stable than a low-pass on accel alone.
+        // Updated every stick-gyro tick so flipping to Player Space mid-session
+        // is instant.
+        private readonly GamepadMotion stickGamepadMotion = new GamepadMotion();
+        private long stickGamepadMotionLastTicksUtc;
 
         private const int ForwardingIntervalMs = 4;
         private const uint ERROR_SUCCESS = 0;
@@ -455,6 +469,9 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public readonly ControllerEmulationStickOutputMixProperty ControllerEmulationStickOutputMix;
         public readonly ControllerEmulationStickOrientationV2Property ControllerEmulationStickOrientationV2;
         public readonly ControllerEmulationStickConversionProperty ControllerEmulationStickConversion;
+        public readonly ControllerEmulationStickGyroAntiDeadzoneProperty ControllerEmulationStickGyroAntiDeadzone;
+        public readonly ControllerEmulationStickGyroAntiDeadzoneThresholdProperty ControllerEmulationStickGyroAntiDeadzoneThreshold;
+        public readonly ControllerEmulationCalibrateGyroStatusProperty ControllerEmulationCalibrateGyroStatus;
 
         public IEnumerable<IProperty> Properties
         {
@@ -504,6 +521,9 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 yield return ControllerEmulationStickOutputMix;
                 yield return ControllerEmulationStickOrientationV2;
                 yield return ControllerEmulationStickConversion;
+                yield return ControllerEmulationStickGyroAntiDeadzone;
+                yield return ControllerEmulationStickGyroAntiDeadzoneThreshold;
+                yield return ControllerEmulationCalibrateGyroStatus;
             }
         }
 
@@ -564,8 +584,19 @@ namespace XboxGamingBarHelper.ControllerEmulation
             ControllerEmulationStickOutputMix = new ControllerEmulationStickOutputMixProperty(stickOutputMix, this);
             ControllerEmulationStickOrientationV2 = new ControllerEmulationStickOrientationV2Property(stickOrientationV2, this);
             ControllerEmulationStickConversion = new ControllerEmulationStickConversionProperty(stickConversion, this);
+            ControllerEmulationStickGyroAntiDeadzone = new ControllerEmulationStickGyroAntiDeadzoneProperty(stickGyroAntiDeadzone, this);
+            ControllerEmulationStickGyroAntiDeadzoneThreshold = new ControllerEmulationStickGyroAntiDeadzoneThresholdProperty(stickGyroAntiDeadzoneThreshold, this);
+            ControllerEmulationCalibrateGyroStatus = new ControllerEmulationCalibrateGyroStatusProperty(this);
 
             SubscribeForegroundSignal();
+
+            // Apply persisted JSL gyro bias offset (from a previous Calibrate
+            // Gyro click). The legacy CE side gets it immediately. The Viiper
+            // side picks it up via the same call path once its forwarder
+            // becomes active (the ActiveInstance singleton is null until
+            // Viiper starts), and on subsequent calibrations the offset is
+            // re-applied to both sides via SetCalibrationOffset.
+            LoadJslCalibrationOffset();
 
             Logger.Info($"ControllerEmulationManager initialized. DeviceType={deviceType}, Supported={isSupported}, Enabled={enabled}, HideStockController={hideStockController}, HideTarget={hideTarget}, ImprovedInput={improvedInputRead}, GyroSource={gyroSource}, Mode={mode}, RumbleProfile={rumbleProfile}, GyroActivationMode={gyroActivationMode}, GyroActivationButton={gyroActivationButton}, Ds4Orientation={ds4Orientation}, Ps4TouchpadEnabled={ps4TouchpadEnabled}");
 

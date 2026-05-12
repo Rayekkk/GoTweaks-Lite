@@ -89,6 +89,21 @@ namespace XboxGamingBar
                     return;
                 }
 
+                // Calibration progress messages from helper. Pushed at start,
+                // every ~250ms during the 5s capture, and once on completion
+                // with the captured bias offset. Routed to the Viiper stick-
+                // gyro section so the status text below the Calibrate button
+                // updates live.
+                if (message.TryGetValue("Function", out object calFuncObj) &&
+                    Convert.ToInt32(calFuncObj) == (int)Shared.Enums.Function.ControllerEmulationCalibrateGyroStatus)
+                {
+                    if (message.TryGetValue("Content", out object calContent) && calContent is string calJson)
+                    {
+                        OnCalibrateGyroStatus(calJson);
+                    }
+                    return;
+                }
+
                 // Helper pushes DriverUpdatesAvailable as an unsolicited message
                 // after its startup driver probe completes. Light up the Quick
                 // tab tile; no other state needs updating yet.

@@ -617,6 +617,8 @@
     <Compile Include="Systems\HDRSupportedProperty.cs" />
     <Compile Include="Systems\SdrWhiteLevelSyncModeProperty.cs" />
     <Compile Include="Systems\SdrWhiteLevelSyncManager.cs" />
+    <Compile Include="Systems\AdaptiveBrightnessModeProperty.cs" />
+    <Compile Include="Systems\AdaptiveBrightnessManager.cs" />
     <Compile Include="Systems\CPUCoreConfigProperty.cs" />
     <Compile Include="Systems\CPUCoreActiveConfigProperty.cs" />
     <Compile Include="Systems\CoreParkingPercentProperty.cs" />
@@ -673,6 +675,7 @@
     <Compile Include="ControllerEmulation\ControllerSuppressionManager.cs" />
     <Compile Include="ControllerEmulation\GyroBiasEstimator.cs" />
     <Compile Include="ControllerEmulation\GyroSourceAdapters.cs" />
+    <Compile Include="ControllerEmulation\PlayerSpaceGyro.cs" />
     <Compile Include="DefaultGameProfiles\CpuDetector.cs" />
     <Compile Include="DefaultGameProfiles\ProfileParser.cs" />
     <Compile Include="DefaultGameProfiles\BundledProfileExporter.cs" />
@@ -747,6 +750,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="ADLXCSharpBind.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- Native gyro fusion (Jibb Smart's GamepadMotionHelpers, MIT). Built from
+         Native/GamepadMotion/. Statically links the CRT (/MT) so it has no
+         MSVCP/VCRUNTIME runtime dependencies — same lesson as ADLXCSharpBind. -->
+    <None Include="GamepadMotion.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

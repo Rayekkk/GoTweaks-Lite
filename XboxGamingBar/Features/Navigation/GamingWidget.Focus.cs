@@ -251,22 +251,8 @@ namespace XboxGamingBar
             ControllerEmulationStickInvertXToggle.LostFocus += Control_LostFocus;
             ControllerEmulationStickInvertYToggle.GotFocus += Control_GotFocus;
             ControllerEmulationStickInvertYToggle.LostFocus += Control_LostFocus;
-            StickMinGyroSpeedSlider.GotFocus += Control_GotFocus;
-            StickMinGyroSpeedSlider.LostFocus += Control_LostFocus;
-            StickMaxGyroSpeedSlider.GotFocus += Control_GotFocus;
-            StickMaxGyroSpeedSlider.LostFocus += Control_LostFocus;
-            StickMinOutputSlider.GotFocus += Control_GotFocus;
-            StickMinOutputSlider.LostFocus += Control_LostFocus;
-            StickMaxOutputSlider.GotFocus += Control_GotFocus;
-            StickMaxOutputSlider.LostFocus += Control_LostFocus;
-            StickPowerCurveSlider.GotFocus += Control_GotFocus;
-            StickPowerCurveSlider.LostFocus += Control_LostFocus;
-            StickDeadzoneSlider.GotFocus += Control_GotFocus;
-            StickDeadzoneSlider.LostFocus += Control_LostFocus;
-            StickPrecisionSpeedSlider.GotFocus += Control_GotFocus;
-            StickPrecisionSpeedSlider.LostFocus += Control_LostFocus;
-            StickOutputMixSlider.GotFocus += Control_GotFocus;
-            StickOutputMixSlider.LostFocus += Control_LostFocus;
+            // Min/Max gyro speed, Min/Max output, Power curve, Deadzone, Precision speed,
+            // Output mix sliders all removed in #79 round 5 (pipeline matches HC).
             ControllerEmulationStickSelectComboBox.GotFocus += Control_GotFocus;
             ControllerEmulationStickSelectComboBox.LostFocus += Control_LostFocus;
             GyroActivationExpandToggle.GotFocus += Control_GotFocus;

@@ -435,5 +435,22 @@
         // Helper listens to WmiMonitorBrightnessEvent and re-writes SDR white level via
         // DISPLAYCONFIG_SET_SDR_WHITE_LEVEL on each change.
         SdrWhiteLevelSyncMode,                     // int (SdrWhiteLevelSyncMode enum) - 0=Off, 1=Auto (EDID + gamma), 2=Legion Go 2 preset
+
+        // Adaptive Brightness backend selector. The existing Adaptive Brightness toggle is
+        // the master on/off; this picks which loop runs underneath. Helper mode subscribes to
+        // Windows.Devices.Sensors.LightSensor, log-scales lux into a brightness target with
+        // EMA smoothing, asymmetric hysteresis, stepped output, and per-environment learning.
+        AdaptiveBrightnessMode,                    // int (AdaptiveBrightnessMode enum) - 0=Windows native, 1=Helper
+
+        // Stick-gyro anti-deadzone tuning. Stick output below the in-game
+        // deadzone (typically 10-20%) gets silently killed; anti-deadzone
+        // pumps any non-noise gyro motion into a guaranteed minimum stick
+        // deflection so small precision aim adjustments register.
+        ControllerEmulationStickGyroAntiDeadzone,           // int 0-30 — minimum stick deflection % (default 10 ≈ 3500 int16)
+        ControllerEmulationStickGyroAntiDeadzoneThreshold,  // int 0-50 — gyro magnitude floor in 0.1°/s units (default 5 = 0.5°/s)
+
+        // Helper-to-widget calibration progress. Pushed during the JSL
+        // calibration run so the UI can show countdown + final bias offset.
+        ControllerEmulationCalibrateGyroStatus,             // string JSON: { "phase": "running"|"done"|"error", "secondsLeft": N, "offset": [x,y,z], "weight": w }
     }
 }

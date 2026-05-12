@@ -483,7 +483,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         ///
         /// Uses the 64-byte FanTable layout the Lenovo WMI interface actually accepts on
         /// Legion Go firmware (confirmed by WMI returning "Invalid parameter" on the
-        /// prior 40-byte HandheldCompanion-style layout):
+        /// prior 40-byte layout):
         ///     [0]   FSTM = 0x01  (table mode: custom)
         ///     [1]   FSID = 0x00  (fan id; 0 = combined)
         ///     [2..5] FSTL = 0x00000000  (length/flags)

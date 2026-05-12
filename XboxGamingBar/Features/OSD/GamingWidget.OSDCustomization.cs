@@ -1194,64 +1194,9 @@ namespace XboxGamingBar
                 StickSensitivityV2ValueText.Text = $"{(e.NewValue / 100.0):0.00}x";
         }
 
-        private void StickMinGyroSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickMinGyroSpeedValueText != null)
-                StickMinGyroSpeedValueText.Text = $"{(int)e.NewValue}\u00B0/s";
-        }
-
-        private void StickMaxGyroSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickMaxGyroSpeedValueText != null)
-                StickMaxGyroSpeedValueText.Text = $"{(int)e.NewValue}\u00B0/s";
-        }
-
-        private void StickMinOutputSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickMinOutputValueText != null)
-                StickMinOutputValueText.Text = $"{(int)e.NewValue}%";
-        }
-
-        private void StickMaxOutputSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickMaxOutputValueText != null)
-                StickMaxOutputValueText.Text = $"{(int)e.NewValue}%";
-        }
-
-        private void StickPowerCurveSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickPowerCurveValueText != null)
-                StickPowerCurveValueText.Text = $"{(e.NewValue / 100.0):0.0}";
-        }
-
-        private void StickDeadzoneSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickDeadzoneValueText != null)
-                StickDeadzoneValueText.Text = $"{(int)e.NewValue}\u00B0/s";
-        }
-
-        private void StickPrecisionSpeedSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickPrecisionSpeedValueText != null)
-            {
-                int val = (int)e.NewValue;
-                StickPrecisionSpeedValueText.Text = val == 0 ? "Off" : $"{val}\u00B0/s";
-            }
-        }
-
-        private void StickOutputMixSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (StickOutputMixValueText != null)
-            {
-                int val = (int)e.NewValue;
-                if (val > 0)
-                    StickOutputMixValueText.Text = $"H+{val}";
-                else if (val < 0)
-                    StickOutputMixValueText.Text = $"V+{-val}";
-                else
-                    StickOutputMixValueText.Text = "Balanced";
-            }
-        }
+        // Min/Max gyro speed, Min/Max output, Power curve, Deadzone, Precision speed,
+        // Output mix slider value-change handlers all removed in #79 round 5
+        // along with the underlying sliders.
 
         private async void AutoHibernateModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
