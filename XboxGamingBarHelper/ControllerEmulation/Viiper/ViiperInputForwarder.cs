@@ -145,6 +145,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
         // Latest touchpad sample from Legion HID, written into the DS4/DSE wire format.
         private bool currentTouchActive;
+        private bool currentTouchPressed;
         private ushort currentTouchX;
         private ushort currentTouchY;
 
@@ -861,12 +862,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         if (LegionButtonMonitor.TryGetLatestRightTouchpadSample(out touch))
                         {
                             currentTouchActive = touch.IsTouching;
+                            currentTouchPressed = touch.IsPressed;
                             currentTouchX = touch.RawX;
                             currentTouchY = touch.RawY;
                         }
                         else
                         {
                             currentTouchActive = false;
+                            currentTouchPressed = false;
                         }
 
                         var gp = ConvertLegionToXInputGamepad(sample);
@@ -940,6 +943,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         statsXInputFreshPackets++;
                         currentAuxButtons = 0;  // XInput has no Legion aux buttons.
                         currentTouchActive = false;
+                        currentTouchPressed = false;
 
                         bool guidePressed = (xiState.Gamepad.Buttons & ViiperXInput.Guide) != 0;
                         ApplyGuideModeEdge(guidePressed);
@@ -1348,7 +1352,62 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
             // Share → reserved bit at byte 13 (matches reference app's mapping).
             if ((aux & LegionAux.Share) != 0) data[13] |= 0x01;
+
+            // Bytes 14-25: IMU (gyro X/Y/Z + accel X/Y/Z as int16). libviiper's
+            // xboxelite2 InputState already carries these on the wire for Steam
+            // Deck / Steam Generic profiles (see vigemtest/viiper/device/
+            // xboxelite2/inputstate.go:18-19) — we just hadn't been populating
+            // them, so games seeing the device through Steam Deck native HID
+            // path got zero gyro/accel. Reuses TryBuildImuCounts, the same
+            // helper our DS4/DSE wire builders use.
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteI16(data, 14, gx);
+                WriteI16(data, 16, gy);
+                WriteI16(data, 18, gz);
+                WriteI16(data, 20, ax);
+                WriteI16(data, 22, ay);
+                WriteI16(data, 24, az);
+            }
+
+            // Bytes 26-32: right-touchpad (Legion's only touchpad). libviiper's
+            // xboxelite2 InputState uses signed int16 centered coords for
+            // Steam Deck profiles (-32768..32767, 0 = center) per the wire
+            // contract in device/xboxelite2/inputstate.go:21-24. Force/
+            // pressure is a uint16 — we don't have a force sensor on Legion's
+            // touchpad, so set a midrange value (0x4000 ≈ 16384) when pressed
+            // and 0 when only touching, matching Steam Deck's typical wire
+            // emission for a non-force-sensitive press.
+            // Touchpad bytes already gated by ps4TouchpadEnabled at the source
+            // (forwarder zeroes currentTouchActive when disabled) so this
+            // honors the user's existing toggle.
+            if (currentTouchActive)
+            {
+                byte flags = (byte)LibViiperTouchFlags.RightPadTouch;
+                if (currentTouchPressed) flags |= (byte)LibViiperTouchFlags.RightPadPress;
+                data[26] = flags;
+                // Convert Legion's 10-bit raw (0..1023) to libviiper's centered int16.
+                // (raw - 512) * 64 maps 0..1023 → -32768..32704 — close to the
+                // full int16 range without overflow at the edges.
+                short padX = (short)(((int)currentTouchX - 512) * 64);
+                short padY = (short)(((int)currentTouchY - 512) * 64);
+                WriteI16(data, 27, padX);
+                WriteI16(data, 29, padY);
+                ushort force = currentTouchPressed ? (ushort)0x4000 : (ushort)0;
+                WriteU16(data, 31, force);
+            }
+
             return data;
+        }
+
+        // Mirror of the libviiper xboxelite2 InputState touch-flag bits
+        // (device/xboxelite2/inputstate.go:39-40).
+        [Flags]
+        private enum LibViiperTouchFlags : byte
+        {
+            RightPadTouch = 0x01,
+            RightPadPress = 0x02,
         }
 
         // -------------------------------------------------------------------
