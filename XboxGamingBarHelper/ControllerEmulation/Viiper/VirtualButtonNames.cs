@@ -64,9 +64,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     return DualShock4Buttons;
                 case "dualsenseedge":
                     return DualSenseEdgeButtons;
+                case "steamdeck":
+                case "steam-deck":
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
+                case "legion-go":
+                case "legion-go-s":
+                case "legion-go-2":
+                case "msi-claw":
+                case "rog-ally":
+                case "zotac-zone":
                     return SteamButtons;
                 case "switchpro":
                 case "joycon-left":

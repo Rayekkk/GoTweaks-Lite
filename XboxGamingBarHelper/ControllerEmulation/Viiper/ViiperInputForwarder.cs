@@ -76,6 +76,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private uint physicalIndex;
         private uint busId;
         private uint deviceId;
+        // Monotonic frame counter written into the steamdeck wire format's frame
+        // field (bytes 4-7). libviiper's steamdeck device tracks it for sequence/
+        // deduplication purposes — we just need it to advance per call.
+        private uint steamDeckFrameCounter;
 
         // Throttle LED writes — Legion's WMI/USB write path is slow; don't re-send the same color.
         private long lastLedPacked = -1;
@@ -202,10 +206,35 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "xboxelite2":
                 case "xbox-one":
                 case "xbox-elite":
+                    if (data.Length >= 2) { rumbleLarge = data[0]; rumbleSmall = data[1]; }
+                    break;
+                // libviiper 32c8ed3 + clib rework — steam-handheld targets now use
+                // the steamdeck OutputState container (64-byte command framing).
+                // Multiple command types are multiplexed on data[0]; only 0xeb
+                // (FeatureTriggerRumbleCommand) carries motor speeds, the others
+                // (haptic, audio, mappings) must be ignored or the helper would
+                // mis-decode their command IDs as constant rumble (e.g. a haptic
+                // command type byte of 0xea decodes as 234/255 ≈ 92% LeftMotor).
+                // Format: [0]=0xeb [3]=EventType [4]=Intensity [5..7]=LeftSpeed
+                // u16LE [7..9]=RightSpeed u16LE. Scale to XInput's 0..255 by /257.
+                case "steamdeck":
+                case "steam-deck":
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
-                    if (data.Length >= 2) { rumbleLarge = data[0]; rumbleSmall = data[1]; }
+                case "legion-go":
+                case "legion-go-s":
+                case "legion-go-2":
+                case "msi-claw":
+                case "rog-ally":
+                case "zotac-zone":
+                    if (data.Length >= 9 && data[0] == 0xEB)
+                    {
+                        ushort steamLeft  = (ushort)(data[5] | (data[6] << 8));
+                        ushort steamRight = (ushort)(data[7] | (data[8] << 8));
+                        rumbleLarge = (byte)(steamLeft  / 257);
+                        rumbleSmall = (byte)(steamRight / 257);
+                    }
                     break;
                 case "switchpro":
                 case "joycon-left":
@@ -1071,10 +1100,26 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "xboxelite2":
                 case "xbox-one":
                 case "xbox-elite":
+                    return BuildXboxElite2Input(gp);
+                // libviiper 32c8ed3 + clib rework split Steam-handheld targets off into
+                // a dedicated steamdeck device with a 64-byte native wire format. The
+                // old steam-generic / steamdeck-generic aliases now route to steamdeck
+                // (with deprecation warnings) and any per-handheld alias (legion-go-2,
+                // rog-ally, etc.) does the same with a VID/PID override. All of them
+                // need the new wire format; sending the prior 33-byte elite2 format
+                // fails UnmarshalBinary inside libviiper and the virtual pad receives
+                // no input.
+                case "steamdeck":
+                case "steam-deck":
                 case "steamdeck-generic":
                 case "steam-generic":
-                case "steam-controller":
-                    return BuildXboxElite2Input(gp);
+                case "legion-go":
+                case "legion-go-s":
+                case "legion-go-2":
+                case "msi-claw":
+                case "rog-ally":
+                case "zotac-zone":
+                    return BuildSteamDeckInput(gp);
                 case "switchpro":
                 case "joycon-left":
                 case "joycon-right":
@@ -1408,6 +1453,137 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         {
             RightPadTouch = 0x01,
             RightPadPress = 0x02,
+        }
+
+        // libviiper's steamdeck device wire format (device/steamdeck/inputstate.go +
+        // const.go). 64-byte report:
+        //   [0]  = 0x01           magic (zero would clear Frame in UnmarshalBinary)
+        //   [1]  = 0x00
+        //   [2]  = 0x09           InputReportID
+        //   [3]  = 0x38           DeckInputPayloadLen (56)
+        //   [4..7] = uint32 LE frame counter
+        //   [8]  bits: A=0x80 X=0x40 B=0x20 Y=0x10 L1=0x08 R1=0x04 L2D=0x02 R2D=0x01
+        //   [9]  bits: L5=0x80 Menu=0x40 Steam=0x20 Options=0x10 Down=0x08 Left=0x04 Right=0x02 Up=0x01
+        //   [10] bits: L3=0x40 RPadTouch=0x10 LPadTouch=0x08 RPadPress=0x04 LPadPress=0x02 R5=0x01
+        //   [11] bits: R3=0x04
+        //   [12] = unused
+        //   [13] bits: RStickTouch=0x80 LStickTouch=0x40 R4=0x04 L4=0x02
+        //   [14] bits: QuickAccess=0x04
+        //   [15] = Reserved15
+        //   [16..23]  LPadX/Y, RPadX/Y      (i16 LE × 4)
+        //   [24..29]  AccelX/Y/Z            (i16 LE × 3)
+        //   [30..35]  Pitch/Yaw/Roll        (raw gyro X/Y/Z, i16 LE × 3)
+        //   [36..43]  GyroQuatW/X/Y/Z       (i16 LE × 4, unused — we don't ship a quaternion)
+        //   [44..47]  LTrigger, RTrigger    (u16 LE × 2; XInput byte is scaled ×257 → 0..65535)
+        //   [48..55]  LStickX/Y, RStickX/Y  (i16 LE × 4, passthrough from XInput sticks)
+        //   [56..63]  LPadForce, RPadForce, LStickForce, RStickForce (u16 LE × 4)
+        //
+        // Legion aux → SteamDeck back-button mapping mirrors the pattern we already
+        // ship for BuildXboxElite2Input on the old Steam Deck profile (Y1→L4,
+        // Y3→R4, Y2→L5, M3→R5) so users who relied on paddles via Steam Input on
+        // the legacy emulation see no behavior change.
+        private byte[] BuildSteamDeckInput(ViiperXInputGamepad gp)
+        {
+            var data = new byte[64];
+            data[0] = 0x01;
+            data[1] = 0x00;
+            data[2] = 0x09;
+            data[3] = 0x38;
+            unchecked { steamDeckFrameCounter++; }
+            WriteU32(data, 4, steamDeckFrameCounter);
+
+            ushort aux = currentAuxButtons;
+
+            // Byte 8 — face buttons, shoulders, digital triggers.
+            byte b8 = 0;
+            if ((gp.Buttons & ViiperXInput.A) != 0) b8 |= 0x80;
+            if ((gp.Buttons & ViiperXInput.X) != 0) b8 |= 0x40;
+            if ((gp.Buttons & ViiperXInput.B) != 0) b8 |= 0x20;
+            if ((gp.Buttons & ViiperXInput.Y) != 0) b8 |= 0x10;
+            if ((gp.Buttons & ViiperXInput.LB) != 0) b8 |= 0x08;
+            if ((gp.Buttons & ViiperXInput.RB) != 0) b8 |= 0x04;
+            if (gp.LeftTrigger > 30) b8 |= 0x02;                                // XInput trigger deadzone
+            if (gp.RightTrigger > 30) b8 |= 0x01;
+            data[8] = b8;
+
+            // Byte 9 — system buttons + dpad (Steam button = Guide).
+            byte b9 = 0;
+            if ((aux & LegionAux.Y2) != 0) b9 |= 0x80;                          // L5 (back L lower)
+            if ((gp.Buttons & ViiperXInput.Start) != 0) b9 |= 0x40;             // Menu
+            if (((gp.Buttons & ViiperXInput.Guide) != 0)
+                || ((aux & LegionAux.Mode) != 0)) b9 |= 0x20;                   // Steam (Mode → Steam)
+            if ((gp.Buttons & ViiperXInput.Back) != 0) b9 |= 0x10;              // Options
+            if ((gp.Buttons & ViiperXInput.DPadDown) != 0) b9 |= 0x08;
+            if ((gp.Buttons & ViiperXInput.DPadLeft) != 0) b9 |= 0x04;
+            if ((gp.Buttons & ViiperXInput.DPadRight) != 0) b9 |= 0x02;
+            if ((gp.Buttons & ViiperXInput.DPadUp) != 0) b9 |= 0x01;
+            data[9] = b9;
+
+            // Byte 10 — L3, touchpad touches/presses, R5.
+            byte b10 = 0;
+            if ((gp.Buttons & ViiperXInput.LeftThumb) != 0) b10 |= 0x40;        // L3
+            if ((aux & LegionAux.M3) != 0) b10 |= 0x01;                         // R5 (back R lower)
+            if (currentTouchActive) b10 |= 0x10;                                // RPadTouch
+            if (currentTouchPressed) b10 |= 0x04;                               // RPadPress
+            data[10] = b10;
+
+            // Byte 11 — R3.
+            byte b11 = 0;
+            if ((gp.Buttons & ViiperXInput.RightThumb) != 0) b11 |= 0x04;
+            data[11] = b11;
+
+            // Byte 13 — stick-cap touches + L4/R4 (upper paddles).
+            byte b13 = 0;
+            if ((aux & LegionAux.Y3) != 0) b13 |= 0x04;                         // R4 (back R upper)
+            if ((aux & LegionAux.Y1) != 0) b13 |= 0x02;                         // L4 (back L upper)
+            data[13] = b13;
+
+            // Byte 14 — QuickAccess (Legion's Share button if present, else unused).
+            if ((aux & LegionAux.Share) != 0) data[14] |= 0x04;
+
+            // Touchpad coords (Legion has only the right touchpad). Left pad bytes
+            // stay zero; right pad uses the same centered-int16 mapping the
+            // xboxelite2 builder already produces.
+            if (currentTouchActive)
+            {
+                short padX = (short)(((int)currentTouchX - 512) * 64);
+                short padY = (short)(((int)currentTouchY - 512) * 64);
+                WriteI16(data, 20, padX);
+                WriteI16(data, 22, padY);
+                if (currentTouchPressed)
+                {
+                    WriteU16(data, 58, (ushort)0x4000);                         // RPadForce midrange when pressed
+                }
+            }
+
+            // IMU — accel at 24..29, raw gyro at 30..35 (the Pitch/Yaw/Roll slots).
+            // Quaternion slots stay zero; Steam Input synthesizes orientation from
+            // raw gyro when the quaternion is null. Same TryBuildImuCounts helper
+            // the DS4/DSE/Elite2 builders use, so gyro behavior matches across
+            // backends for the same Legion controller.
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteI16(data, 24, ax);
+                WriteI16(data, 26, ay);
+                WriteI16(data, 28, az);
+                WriteI16(data, 30, gx);
+                WriteI16(data, 32, gy);
+                WriteI16(data, 34, gz);
+            }
+
+            // Triggers — XInput is 0..255, steamdeck wire is u16. ×257 spans the
+            // full 0..65535 range without rounding loss (255*257 == 65535).
+            WriteU16(data, 44, (ushort)(gp.LeftTrigger * 257));
+            WriteU16(data, 46, (ushort)(gp.RightTrigger * 257));
+
+            // Sticks — XInput int16 -> wire int16 passthrough.
+            WriteI16(data, 48, gp.ThumbLX);
+            WriteI16(data, 50, gp.ThumbLY);
+            WriteI16(data, 52, gp.ThumbRX);
+            WriteI16(data, 54, gp.ThumbRY);
+
+            return data;
         }
 
         // -------------------------------------------------------------------
