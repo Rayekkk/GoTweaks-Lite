@@ -146,6 +146,16 @@ namespace XboxGamingBarHelper.Systems
 
         private readonly SdrWhiteLevelSyncManager sdrWhiteLevelSyncManager = new SdrWhiteLevelSyncManager();
 
+        private readonly AdaptiveBrightnessModeProperty adaptiveBrightnessMode;
+        public AdaptiveBrightnessModeProperty AdaptiveBrightnessMode
+        {
+            get { return adaptiveBrightnessMode; }
+        }
+
+        private readonly AdaptiveBrightnessManager adaptiveBrightnessManager = new AdaptiveBrightnessManager();
+        private const string AdaptiveBrightnessRequestedKey = "AdaptiveBrightnessRequested";
+        private bool adaptiveBrightnessRequested;
+
         // CPU Core Configuration
         public int TotalPCores { get; private set; }
         public int TotalECores { get; private set; }
@@ -235,6 +245,20 @@ namespace XboxGamingBarHelper.Systems
             sdrWhiteLevelSyncMode = new SdrWhiteLevelSyncModeProperty(this);
             sdrWhiteLevelSyncManager.SetHdrEnabled(hdrStatus.Enabled);
             sdrWhiteLevelSyncManager.SetMode(sdrWhiteLevelSyncMode.Mode);
+
+            adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(this);
+            // Master AB toggle lives inside the OSD/Display bundle and is only re-sent on
+            // widget change — so a helper restart loses the in-memory "requested" flag.
+            // Persist it locally and re-apply on startup so mode flips work after restarts.
+            if (XboxGamingBarHelper.Settings.LocalSettingsHelper.TryGetValue<bool>(AdaptiveBrightnessRequestedKey, out var savedRequested))
+            {
+                adaptiveBrightnessRequested = savedRequested;
+                if (savedRequested)
+                {
+                    Logger.Info($"AdaptiveBrightness: restoring requested=true on startup, mode={adaptiveBrightnessMode.Mode}");
+                    ApplyAdaptiveBrightnessBackend(true, adaptiveBrightnessMode.Mode);
+                }
+            }
 
             Logger.Info("Detecting CPU core configuration.");
             DetectCPUCoreConfiguration();
@@ -1412,21 +1436,11 @@ namespace XboxGamingBarHelper.Systems
         /// </summary>
         public void SetAdaptiveBrightness(bool enabled)
         {
-            try
-            {
-                Logger.Info($"Setting adaptive brightness: {enabled}");
-
-                // ADAPTBRIGHT controls "Change brightness automatically when lighting changes"
-                RunPowerCfgCommand($"/setacvalueindex scheme_current sub_video ADAPTBRIGHT {(enabled ? 1 : 0)}");
-                RunPowerCfgCommand($"/setdcvalueindex scheme_current sub_video ADAPTBRIGHT {(enabled ? 1 : 0)}");
-                RunPowerCfgCommand("/setactive scheme_current");
-
-                Logger.Info($"Adaptive brightness set to {enabled}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error setting adaptive brightness: {ex.Message}");
-            }
+            adaptiveBrightnessRequested = enabled;
+            try { XboxGamingBarHelper.Settings.LocalSettingsHelper.SetValue(AdaptiveBrightnessRequestedKey, enabled); } catch { }
+            var mode = adaptiveBrightnessMode != null ? adaptiveBrightnessMode.Mode : Shared.Enums.AdaptiveBrightnessMode.Windows;
+            Logger.Info($"SetAdaptiveBrightness requested={enabled} mode={mode}");
+            ApplyAdaptiveBrightnessBackend(enabled, mode);
         }
 
         public void OnSdrWhiteLevelSyncModeChanged(Shared.Enums.SdrWhiteLevelSyncMode mode)
@@ -1437,6 +1451,47 @@ namespace XboxGamingBarHelper.Systems
         public void OnHdrEnabledChanged(bool enabled)
         {
             sdrWhiteLevelSyncManager.SetHdrEnabled(enabled);
+        }
+
+        public void OnAdaptiveBrightnessModeChanged(Shared.Enums.AdaptiveBrightnessMode mode)
+        {
+            // Re-apply the current requested state so the right backend ends up running.
+            ApplyAdaptiveBrightnessBackend(adaptiveBrightnessRequested, mode);
+        }
+
+        private void ApplyAdaptiveBrightnessBackend(bool requested, Shared.Enums.AdaptiveBrightnessMode mode)
+        {
+            if (!requested)
+            {
+                adaptiveBrightnessManager.Stop();
+                ApplyWindowsAdaptiveBrightness(false);
+                return;
+            }
+            if (mode == Shared.Enums.AdaptiveBrightnessMode.Helper)
+            {
+                ApplyWindowsAdaptiveBrightness(false);
+                adaptiveBrightnessManager.Start();
+            }
+            else
+            {
+                adaptiveBrightnessManager.Stop();
+                ApplyWindowsAdaptiveBrightness(true);
+            }
+        }
+
+        private void ApplyWindowsAdaptiveBrightness(bool enabled)
+        {
+            try
+            {
+                RunPowerCfgCommand($"/setacvalueindex scheme_current sub_video ADAPTBRIGHT {(enabled ? 1 : 0)}");
+                RunPowerCfgCommand($"/setdcvalueindex scheme_current sub_video ADAPTBRIGHT {(enabled ? 1 : 0)}");
+                RunPowerCfgCommand("/setactive scheme_current");
+                Logger.Info($"Windows ADAPTBRIGHT set to {enabled}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error setting Windows ADAPTBRIGHT: {ex.Message}");
+            }
         }
 
         /// <summary>
