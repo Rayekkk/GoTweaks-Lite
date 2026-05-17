@@ -255,19 +255,33 @@ namespace XboxGamingBarHelper.ControllerEmulation
             PublishStickGyroLiveReadings(horizontal, vertical, 0.0f, outputX, outputY, true);
         }
 
-        // Smooth anti-deadzone: the hard "below threshold → output 0" cutoff
-        // killed precision aim. We now treat the user-set threshold as the
-        // *top* of a ramp zone whose bottom is threshold/2 — below threshold/2
-        // it's a true dead zone, between threshold/2 and threshold the
-        // anti-deadzone offset ramps in linearly, above threshold it's at
-        // full strength. End result for slow pitch motion: continuous output
-        // from ~0 up through the full stick range, no felt step.
+        // Two independent gates that share the same threshold setting:
+        //   1) Noise-floor gate (ALWAYS active when threshold > 0): if gyro
+        //      magnitude is below threshold/2, return 0. Suppresses
+        //      single-axis noise floor regardless of anti-deadzone setting.
+        //      This is what users actually mean by "input threshold".
+        //   2) Anti-deadzone offset (active only when adzInt16 > 0): smooth
+        //      ramp from threshold/2 up to threshold of the configured
+        //      offset, plateauing at the offset for higher magnitudes.
+        //      Optional — disabled when slider is 0%.
+        // Earlier these were coupled in one function with the anti-deadzone
+        // early-return bypassing the noise-floor gate; setting anti-deadzone
+        // to 0 silently disabled the threshold too.
         private static float ApplyStickGyroAntiDeadzone(float gyroDps, float scaledOutput, float adzInt16, float adzThresholdDps)
         {
-            if (adzInt16 <= 0.0f) return scaledOutput;
             float absGyro = Math.Abs(gyroDps);
+
+            // Noise-floor gate — always honored.
+            if (adzThresholdDps > 0.0f && absGyro < adzThresholdDps * 0.5f)
+            {
+                return 0.0f;
+            }
+
+            // Anti-deadzone offset — bypass when set to 0% so user gets
+            // pure linear-from-threshold output.
+            if (adzInt16 <= 0.0f) return scaledOutput;
+
             float deadFloor = adzThresholdDps * 0.5f;
-            if (absGyro < deadFloor) return 0.0f;
             float ramp = adzThresholdDps > deadFloor
                 ? Math.Min(1.0f, (absGyro - deadFloor) / (adzThresholdDps - deadFloor))
                 : 1.0f;

@@ -1367,12 +1367,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             return stickTouchActiveTicks > 0 && (now - stickTouchActiveTicks) < heldOffTicks;
         }
 
+        // Decoupled noise-floor gate + anti-deadzone offset. The threshold
+        // ALWAYS gates noise below threshold/2 (regardless of anti-deadzone
+        // setting); the anti-deadzone offset is optional (skipped when
+        // adzInt16 == 0). Previously these were coupled and setting anti-
+        // deadzone to 0 silently disabled the threshold too.
         private static float ApplyAntiDeadzoneStickGyro(float gyroDps, float scaledOutput, float adzInt16, float adzThresholdDps)
         {
-            if (adzInt16 <= 0.0f) return scaledOutput;
             float absGyro = Math.Abs(gyroDps);
+            if (adzThresholdDps > 0.0f && absGyro < adzThresholdDps * 0.5f) return 0.0f;
+            if (adzInt16 <= 0.0f) return scaledOutput;
             float deadFloor = adzThresholdDps * 0.5f;
-            if (absGyro < deadFloor) return 0.0f;
             float ramp = adzThresholdDps > deadFloor
                 ? Math.Min(1.0f, (absGyro - deadFloor) / (adzThresholdDps - deadFloor))
                 : 1.0f;
