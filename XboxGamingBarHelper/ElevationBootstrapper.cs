@@ -127,13 +127,53 @@ namespace XboxGamingBarHelper
                 }
                 catch (WaitHandleCannotBeOpenedException)
                 {
-                    // Mutex doesn't exist = no other instance running, we can proceed
+                    // Mutex doesn't exist = no other instance running, fall through to
+                    // process-enumeration as belt-and-suspenders before firing schtasks.
                     Logger.Debug("No existing helper instance detected (mutex not found)");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug($"Mutex check failed: {ex.Message}");
-                    // Continue anyway - let the normal mutex in Main() handle duplicates
+                    // OpenExisting on a Global\ mutex created by an elevated (High-IL)
+                    // helper fails with UnauthorizedAccessException from a Medium-IL
+                    // launcher (mandatory integrity policy: NoReadUp). Don't treat that
+                    // as "no helper exists" — fall through to process enumeration below.
+                    Logger.Debug($"Mutex check inconclusive ({ex.GetType().Name}: {ex.Message}); falling back to process enumeration");
+                }
+
+                // Process-enumeration fallback. Same-session XboxGamingBarHelper.exe
+                // peers indicate either an alive elevated helper (the common case for
+                // a Medium-IL launcher unable to OpenExisting the High-IL mutex) or a
+                // zombie helper that released its mutex but didn't fully exit. Either
+                // way, do NOT fire schtasks /Run — that would spawn a duplicate.
+                try
+                {
+                    var self = Process.GetCurrentProcess();
+                    int selfPid = self.Id;
+                    int selfSession = self.SessionId;
+                    var peers = Process.GetProcessesByName("XboxGamingBarHelper");
+                    var foundPids = new System.Collections.Generic.List<int>();
+                    foreach (var p in peers)
+                    {
+                        try
+                        {
+                            if (p.Id != selfPid && !p.HasExited && p.SessionId == selfSession)
+                            {
+                                foundPids.Add(p.Id);
+                            }
+                        }
+                        catch { /* race with process exit */ }
+                        finally { try { p.Dispose(); } catch { } }
+                    }
+                    if (foundPids.Count > 0)
+                    {
+                        Logger.Info($"Another helper instance is running (PIDs={string.Join(",", foundPids)}). Exiting gracefully without elevation.");
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Process-enumeration fallback failed: {ex.Message}");
+                    // Continue — Main()'s own AnotherHelperIsAlive gate is the final guard.
                 }
 
                 // Try to launch via scheduled task (no UAC)

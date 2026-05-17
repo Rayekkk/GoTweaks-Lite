@@ -53,6 +53,13 @@ namespace XboxGamingBarHelper
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static Mutex singleInstanceMutex;
+        // Held by the --setup helper while it deploys files + creates the scheduled
+        // task + waits for the new task-launched helper to acquire the main mutex.
+        // The new helper's AnotherHelperIsAlive() check skips peers while this kernel
+        // object is alive so the setup helper isn't mistaken for a duplicate during
+        // the handoff. Auto-releases when the setup process exits.
+        private const string SetupInProgressMutexName = "Global\\GoTweaks_SetupInProgress";
+        private static Mutex setupInProgressMutex;
         private static CancellationToken _serviceCancellationToken;
         private static bool _isRunningAsService = false;
         private static volatile bool _isShuttingDown = false;
@@ -296,6 +303,26 @@ namespace XboxGamingBarHelper
             Logger.Info($"=== Helper starting, PID={Process.GetCurrentProcess().Id} ===");
             LogManager.Flush();
 
+            // Early process-uniqueness gate. Catches the case where a previous helper
+            // crashed/zombied (released or disposed its single-instance mutex but didn't
+            // fully exit), or where the bootstrapper fired schtasks /Run twice during a
+            // redeploy. Without this gate, two elevated helpers can race past the mutex
+            // check in Main()/RunAsService(), each creating its own ViGEm Guide pad and
+            // leaving stale PnP entries that survive reboot.
+            //
+            // Skip the gate for one-shot CLI modes (they're expected to coexist with a
+            // running helper for the duration of their work and exit immediately after).
+            bool isOneShotMode = args != null && (
+                args.Contains("--export-profiles") ||
+                args.Contains("--setup") ||
+                args.Contains("--uninstall"));
+            if (!isOneShotMode && AnotherHelperIsAlive())
+            {
+                Logger.Warn("Another XboxGamingBarHelper.exe is already running. Exiting to prevent duplicate.");
+                LogManager.Flush();
+                return;
+            }
+
             // Process-exit + unhandled-exception cleanup: release any active EC fan
             // override so the fan doesn't stay stuck at the last RPM we wrote. Without
             // this, a crash leaves 0xC6C8 holding our last value indefinitely (or until
@@ -343,6 +370,20 @@ namespace XboxGamingBarHelper
             // The task launches the elevated helper which will connect to the widget.
             if (args.Contains("--setup"))
             {
+                // Signal that setup is in progress via a Global\ mutex. The newly
+                // task-launched helper checks this in AnotherHelperIsAlive() so that
+                // the setup process (still alive while polling for the new helper's
+                // main mutex) is not mistaken for a duplicate. Auto-releases on exit.
+                try
+                {
+                    setupInProgressMutex = new Mutex(true, SetupInProgressMutexName, out _);
+                    Logger.Info("Setup-in-progress mutex acquired");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Could not acquire setup-in-progress mutex: {ex.Message} — continuing anyway");
+                }
+
                 // Debug file for tracing setup issues (independent of NLog)
                 var setupDebugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "setup_debug.txt");
                 void SetupDebugLog(string msg) { try { File.AppendAllText(setupDebugPath, $"{DateTime.Now}: [Main] {msg}\n"); } catch { } }
@@ -452,38 +493,93 @@ namespace XboxGamingBarHelper
             {
                 sidebarManager?.Dispose();
                 DisposeTrayIndicator();
-                ReleaseSingleInstanceMutexSafe();
+                // Intentionally NOT releasing/disposing singleInstanceMutex here.
+                // The kernel releases named mutexes automatically on process exit.
+                // Releasing in finally caused a duplicate-helper race: a slow shutdown
+                // would free the mutex while threads were still draining, letting a
+                // new schtasks /Run-spawned helper acquire it and run concurrently
+                // (each creating its own ViGEm Guide pad → 2 phantom Xbox 360
+                // controllers surviving reboot).
             }
 
         }
 
-        // Release the single-instance mutex without crashing when the finally block
-        // happens to be running on a different thread than the one that acquired it.
-        // ReleaseMutex() throws ApplicationException ("Object synchronization method
-        // was called from an unsynchronized block of code") in that case, which then
-        // unwinds out of Main as an unhandled exception and tears the helper down.
-        // The kernel releases named mutexes automatically on process exit, so dropping
-        // the explicit Release on a thread mismatch is safe.
-        private static void ReleaseSingleInstanceMutexSafe()
+        /// <summary>
+        /// Belt-and-suspenders single-instance check that does not depend on the named
+        /// mutex. Returns true when any other XboxGamingBarHelper.exe is alive in this
+        /// session. The named mutex is the primary guard; this catches edge cases:
+        ///   - a previous helper zombied (released the mutex but is still alive),
+        ///   - a non-elevated launcher cannot open the elevated helper's Global\ mutex
+        ///     (mandatory integrity policy denies Medium-IL OpenExisting against
+        ///     High-IL kernel objects).
+        /// </summary>
+        private static bool AnotherHelperIsAlive()
         {
-            var m = singleInstanceMutex;
-            if (m == null) return;
             try
             {
-                m.ReleaseMutex();
-            }
-            catch (ApplicationException)
-            {
-                // Continuation resumed on a different thread than the one that
-                // acquired the mutex. Process exit releases it for us.
+                var self = Process.GetCurrentProcess();
+                int selfPid = self.Id;
+                int selfSession = self.SessionId;
+                Process[] peers = Process.GetProcessesByName("XboxGamingBarHelper");
+                bool found = false;
+                var foundPids = new List<int>();
+                foreach (var p in peers)
+                {
+                    try
+                    {
+                        if (p.Id == selfPid) continue;
+                        if (p.HasExited) continue;
+                        // Same-session peers only — different sessions would belong to
+                        // a different user and the named pipe would not collide.
+                        if (p.SessionId != selfSession) continue;
+                        found = true;
+                        foundPids.Add(p.Id);
+                    }
+                    catch { /* process may have exited between enum and access */ }
+                    finally
+                    {
+                        try { p.Dispose(); } catch { }
+                    }
+                }
+                if (!found) return false;
+
+                // If --setup is in progress, the only alive peer is almost certainly
+                // the setup-mode helper (waiting on us via RunTaskNow polling). Don't
+                // treat it as a duplicate — proceed with normal startup so we can
+                // acquire the main mutex, which is what setup's RunTaskNow is waiting
+                // to see. The setup helper exits as soon as we take that mutex, so the
+                // brief overlap is intentional and harmless.
+                if (IsSetupInProgress())
+                {
+                    Logger.Info($"Peer(s) found ({string.Join(",", foundPids)}) but setup-in-progress mutex is held — proceeding with normal startup (setup-side handoff)");
+                    return false;
+                }
+
+                Logger.Info($"Existing helper PIDs in session {selfSession}: {string.Join(", ", foundPids)}");
+                return true;
             }
             catch (Exception ex)
             {
-                Logger.Debug($"Single-instance mutex release skipped: {ex.Message}");
+                Logger.Debug($"AnotherHelperIsAlive check failed: {ex.Message}");
+                return false; // fail-open: don't block startup on probe failures
             }
-            try { m.Dispose(); }
-            catch { }
-            singleInstanceMutex = null;
+        }
+
+        private static bool IsSetupInProgress()
+        {
+            try
+            {
+                using (Mutex.OpenExisting(SetupInProgressMutexName))
+                {
+                    return true;
+                }
+            }
+            catch (WaitHandleCannotBeOpenedException) { return false; }
+            catch (Exception ex)
+            {
+                Logger.Debug($"IsSetupInProgress probe failed: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
@@ -526,7 +622,10 @@ namespace XboxGamingBarHelper
             }
             finally
             {
-                ReleaseSingleInstanceMutexSafe();
+                // Intentionally not releasing the mutex here — see Main() for rationale.
+                // The kernel releases the named mutex on process exit; releasing it on
+                // shutdown opens a window where a concurrently-starting helper can
+                // acquire it while this process is still draining threads.
             }
         }
 
