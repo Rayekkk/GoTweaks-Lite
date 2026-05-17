@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Shared.Enums;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Controls;
@@ -12,6 +14,16 @@ namespace XboxGamingBar.Data
     /// </summary>
     internal class ViiperStringComboProperty : WidgetControlProperty<string, ComboBox>
     {
+        // SelectionChanged fires on every intermediate item when the user navigates
+        // a closed combo with keyboard/D-pad (UWP's default behavior). For the device-
+        // type combo each fire triggers a 1-2 s VIIPER hot-swap, so scrolling from
+        // "Xbox 360" to "Steam Controller" used to cascade through DS4, DSE, and
+        // xboxelite2 before settling — visible as a stutter of virtual pads in joy.cpl
+        // and "VIIPER hot-swap" spam in the helper log. Debounce the commit so only
+        // the value the user settles on is sent to the helper.
+        private const int DebounceMs = 500;
+        private CancellationTokenSource debounceCts;
+
         public ViiperStringComboProperty(string initialValue, Function inFunction, ComboBox inUI, Page inOwner)
             : base(initialValue, inFunction, inUI, inOwner)
         {
@@ -49,17 +61,39 @@ namespace XboxGamingBar.Data
             }
         }
 
-        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selectedItem = UI.SelectedItem as ComboBoxItem;
-            if (selectedItem != null)
+            if (selectedItem == null) return;
+            var tagString = selectedItem.Tag as string;
+            if (tagString == null || tagString == Value) return;
+
+            // Cancel any pending commit from a prior intermediate selection.
+            var previous = debounceCts;
+            debounceCts = new CancellationTokenSource();
+            previous?.Cancel();
+            previous?.Dispose();
+            var token = debounceCts.Token;
+
+            try
             {
-                var tagString = selectedItem.Tag as string;
-                if (tagString != null && tagString != Value)
-                {
-                    Logger.Info($"{Function} combo updated to {tagString}.");
-                    SetValue(tagString);
-                }
+                await Task.Delay(DebounceMs, token);
+            }
+            catch (TaskCanceledException) { return; }
+            if (token.IsCancellationRequested) return;
+
+            // Re-read the current ComboBox state at commit time — the user may have
+            // arrowed past `tagString` since we started this timer, and the latest
+            // tag is the one we want to ship.
+            string commit = null;
+            if (UI != null && UI.SelectedItem is ComboBoxItem latest)
+            {
+                commit = latest.Tag as string;
+            }
+            if (commit != null && commit != Value)
+            {
+                Logger.Info($"{Function} combo settled at {commit} (debounced).");
+                SetValue(commit);
             }
         }
 
