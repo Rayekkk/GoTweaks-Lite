@@ -81,6 +81,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // deduplication purposes — we just need it to advance per call.
         private uint steamDeckFrameCounter;
 
+        // First-sighting set of steamdeck OutputState command IDs (data[0]). Used
+        // to log new command bytes once each so "rumble doesn't work" reports can
+        // be triaged: if no 0xEB/0xEA shows up here, Steam Input is not sending
+        // rumble to the virtual device at all.
+        private readonly System.Collections.Generic.HashSet<byte> seenSteamDeckCommandIds = new System.Collections.Generic.HashSet<byte>();
+
         // Throttle LED writes — Legion's WMI/USB write path is slow; don't re-send the same color.
         private long lastLedPacked = -1;
         private long lastLedWriteTicks;
@@ -175,6 +181,35 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// from the consuming application. We parse the relevant motor bytes based on the
         /// current device type and forward them to the physical XInput controller.
         /// </summary>
+        private void LogSteamDeckCommandIdOnce(byte[] data)
+        {
+            if (data == null || data.Length == 0) return;
+            byte id = data[0];
+            bool isNew;
+            lock (seenSteamDeckCommandIds)
+            {
+                isNew = seenSteamDeckCommandIds.Add(id);
+            }
+            if (!isNew) return;
+            string name;
+            switch (id)
+            {
+                case 0x80: name = "SetDigitalMappings"; break;
+                case 0x81: name = "ClearDigitalMappings"; break;
+                case 0x83: name = "GetAttributesValues"; break;
+                case 0x87: name = "SetSettingsValues"; break;
+                case 0x88: name = "ClearSettingsValues"; break;
+                case 0x8D: name = "SetControllerMode"; break;
+                case 0x8F: name = "TriggerHapticPulse"; break;
+                case 0xA1: name = "GetDeviceInfo"; break;
+                case 0xCE: name = "ResetIMU"; break;
+                case 0xEA: name = "TriggerHapticCommand (LRA rumble)"; break;
+                case 0xEB: name = "TriggerRumbleCommand (motor rumble)"; break;
+                default:   name = "(unknown)"; break;
+            }
+            Logger.Info($"VIIPER steamdeck OutputState first sighting: cmd=0x{id:X2} ({name}) len={data.Length}");
+        }
+
         private void OnFeedbackReceived(uint cbBusId, uint cbDeviceId, byte[] data)
         {
             if (!running || data == null || data.Length == 0) return;
@@ -210,13 +245,21 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     break;
                 // libviiper 32c8ed3 + clib rework — steam-handheld targets now use
                 // the steamdeck OutputState container (64-byte command framing).
-                // Multiple command types are multiplexed on data[0]; only 0xeb
-                // (FeatureTriggerRumbleCommand) carries motor speeds, the others
-                // (haptic, audio, mappings) must be ignored or the helper would
-                // mis-decode their command IDs as constant rumble (e.g. a haptic
-                // command type byte of 0xea decodes as 234/255 ≈ 92% LeftMotor).
-                // Format: [0]=0xeb [3]=EventType [4]=Intensity [5..7]=LeftSpeed
-                // u16LE [7..9]=RightSpeed u16LE. Scale to XInput's 0..255 by /257.
+                // Multiple command types are multiplexed on data[0]:
+                //   0xEB (FeatureTriggerRumbleCommand): motor-style rumble. Layout
+                //        [0]=0xEB [3]=EventType [4]=Intensity [5..7]=LeftSpeed u16LE
+                //        [7..9]=RightSpeed u16LE. Scale to XInput's 0..255 by /257.
+                //   0xEA (FeatureTriggerHapticCommand): LRA haptic pulse, used by
+                //        Steam Input as the primary rumble channel on Steam Deck-
+                //        family devices (the physical Deck has LRA actuators, not
+                //        ERM motors). Layout [0]=0xEA [2]=Side(0=L/1=R/2=Both)
+                //        [3]=Type [4]=Intensity(0-4) [5]=Gain(int8 dB). Map the
+                //        intensity ladder onto a rumble strength byte and route
+                //        to the side(s) specified.
+                // Other command IDs (mode, settings, audio, mappings) must be
+                // ignored or the helper would mis-decode their command bytes as
+                // constant rumble. First sighting of each ID gets logged at INFO
+                // so "no rumble" reports can be triaged without packet capture.
                 case "steamdeck":
                 case "steam-deck":
                 case "steamdeck-generic":
@@ -228,12 +271,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "msi-claw":
                 case "rog-ally":
                 case "zotac-zone":
+                    LogSteamDeckCommandIdOnce(data);
                     if (data.Length >= 9 && data[0] == 0xEB)
                     {
                         ushort steamLeft  = (ushort)(data[5] | (data[6] << 8));
                         ushort steamRight = (ushort)(data[7] | (data[8] << 8));
                         rumbleLarge = (byte)(steamLeft  / 257);
                         rumbleSmall = (byte)(steamRight / 257);
+                    }
+                    else if (data.Length >= 5 && data[0] == 0xEA)
+                    {
+                        byte side = data[2];
+                        byte hapticType = data[3];
+                        byte intensity = data[4];   // 0=Default 1=Short 2=Medium 3=Long 4=Insane
+                        // Off command (Type=0) → silence. Otherwise scale 0..4 to
+                        // 0..255 linearly; Steam typically alternates Off and one
+                        // of the higher intensities during continuous game rumble.
+                        byte strength = (hapticType == 0) ? (byte)0 :
+                            (intensity >= 4) ? (byte)255 : (byte)(intensity * 64);
+                        if (side == 0)      { rumbleLarge = strength; }                 // Left only
+                        else if (side == 1) { rumbleSmall = strength; }                 // Right only
+                        else                { rumbleLarge = strength; rumbleSmall = strength; }
                     }
                     break;
                 case "switchpro":
@@ -1542,12 +1600,22 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             if ((aux & LegionAux.Share) != 0) data[14] |= 0x04;
 
             // Touchpad coords (Legion has only the right touchpad). Left pad bytes
-            // stay zero; right pad uses the same centered-int16 mapping the
-            // xboxelite2 builder already produces.
+            // stay zero. Right pad maps to libviiper's steamdeck wire slots at
+            // offsets 20-23 (RPadX/Y int16 LE).
+            //
+            // Y-axis sign: Steam Deck convention is +32767 = top of pad, -32768 =
+            // bottom (joystick-style, Y-up). Legion's raw touchpad reports
+            // screen-style coords with Y=0 at the top, Y=1023 at the bottom — so
+            // an un-inverted (currentY - 512) * 64 produces NEGATIVE values when
+            // the user touches the top of the pad, which Steam/SDL then interprets
+            // as a downward swipe. Negate to convert screen-up → wire-up.
+            //
+            // Horizontal axis matches directly (both Legion and Steam Deck use
+            // X=0..1023 left-to-right / -32768..+32767 left-to-right).
             if (currentTouchActive)
             {
                 short padX = (short)(((int)currentTouchX - 512) * 64);
-                short padY = (short)(((int)currentTouchY - 512) * 64);
+                short padY = (short)((512 - (int)currentTouchY) * 64);          // Y inverted: Legion 0=top → wire +32767
                 WriteI16(data, 20, padX);
                 WriteI16(data, 22, padY);
                 if (currentTouchPressed)
