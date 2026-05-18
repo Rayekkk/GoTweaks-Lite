@@ -233,6 +233,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             catch (Exception ex) { Logger.Warn($"VIIPER HidHide Enable threw: {ex.Message}"); }
 
+            // Sweep ghost PnP entries left over from a previous helper session.
+            // Hot-swaps in libviiper detach the old USB device, but Windows keeps
+            // a Present=False entry for every (VID,PID,serial) it has ever seen.
+            // Steam Input's controller manager enumerates those ghosts and can
+            // pin a game's rumble routing to one, so live rumble events stop
+            // reaching the active device. Run this BEFORE AddDevice so the bus
+            // is clean when the new device arrives.
+            ViiperPnpCleanup.CleanupAllKnownGhosts();
+
             // Create the initial virtual device using current settings.
             string targetType;
             ushort vid, pid;
@@ -468,6 +477,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 activeDeviceId = swap.DeviceId;
                 activeDeviceType = newType;
                 forwarder.UpdateTarget(activeBusId, activeDeviceId, activeDeviceType);
+
+                // RemoveDevice in SwitchDeviceType succeeded, but Windows keeps
+                // the OLD target's PnP entry as Present=False — and Steam Input
+                // can still see/route to it. Run a focused cleanup pass for the
+                // old target's VID/PID set so Steam's controller manager doesn't
+                // show or rumble-route to stale entries. Async + best-effort:
+                // a slow pnputil can't block the swap or the forwarder unpause.
+                ViiperPnpCleanup.CleanupGhostsForTarget(oldType);
             }
             catch (Exception ex)
             {

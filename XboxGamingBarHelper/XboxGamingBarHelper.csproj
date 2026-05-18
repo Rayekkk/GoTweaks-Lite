@@ -585,6 +585,7 @@
     <Compile Include="ControllerEmulation\Viiper\XInputNative.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperInputForwarder.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperStickGyroProcessor.cs" />
+    <Compile Include="ControllerEmulation\Viiper\ViiperPnpCleanup.cs" />
     <Compile Include="Settings\UsbipInstalledProperty.cs" />
     <Compile Include="Settings\ViiperDeviceTypeProperty.cs" />
     <Compile Include="Settings\ViiperInputSourceProperty.cs" />
