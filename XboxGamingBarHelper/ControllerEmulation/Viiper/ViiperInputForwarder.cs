@@ -83,9 +83,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
         // First-sighting set of steamdeck OutputState command IDs (data[0]). Used
         // to log new command bytes once each so "rumble doesn't work" reports can
-        // be triaged: if no 0xEB/0xEA shows up here, Steam Input is not sending
-        // rumble to the virtual device at all.
+        // be triaged: if no 0x8F / 0xEA / 0xEB shows up here, Steam Input is not
+        // sending rumble to the virtual device at all.
         private readonly System.Collections.Generic.HashSet<byte> seenSteamDeckCommandIds = new System.Collections.Generic.HashSet<byte>();
+
+        // Steam sends 0x8F TriggerHapticPulse separately per motor side (Left or
+        // Right), and the XInput SetState we pass to the physical pad requires
+        // BOTH motor strengths in every call. Track the most-recent per-side
+        // strength so a "right motor only" pulse doesn't unintentionally silence
+        // the left motor (and vice-versa).
+        private byte steamDeckMotorLeft;
+        private byte steamDeckMotorRight;
 
         // Throttle LED writes — Legion's WMI/USB write path is slow; don't re-send the same color.
         private long lastLedPacked = -1;
@@ -245,21 +253,33 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     break;
                 // libviiper 32c8ed3 + clib rework — steam-handheld targets now use
                 // the steamdeck OutputState container (64-byte command framing).
-                // Multiple command types are multiplexed on data[0]:
-                //   0xEB (FeatureTriggerRumbleCommand): motor-style rumble. Layout
-                //        [0]=0xEB [3]=EventType [4]=Intensity [5..7]=LeftSpeed u16LE
-                //        [7..9]=RightSpeed u16LE. Scale to XInput's 0..255 by /257.
-                //   0xEA (FeatureTriggerHapticCommand): LRA haptic pulse, used by
-                //        Steam Input as the primary rumble channel on Steam Deck-
-                //        family devices (the physical Deck has LRA actuators, not
-                //        ERM motors). Layout [0]=0xEA [2]=Side(0=L/1=R/2=Both)
-                //        [3]=Type [4]=Intensity(0-4) [5]=Gain(int8 dB). Map the
-                //        intensity ladder onto a rumble strength byte and route
-                //        to the side(s) specified.
-                // Other command IDs (mode, settings, audio, mappings) must be
-                // ignored or the helper would mis-decode their command bytes as
-                // constant rumble. First sighting of each ID gets logged at INFO
-                // so "no rumble" reports can be triaged without packet capture.
+                // Multiple command types are multiplexed on data[0]. In the wild
+                // Steam Input emits ONLY 0x8F TriggerHapticPulse for game rumble
+                // (verified from helper_2026-05-17_20.log first-sighting trace);
+                // 0xEA/0xEB are spec'd but unused on current Steam Deck virtual
+                // device. The 0x8F handler is primary, 0xEA/0xEB kept for safety.
+                //
+                // 0x8F TriggerHapticPulse layout (per device/steamdeck/inputstate.go
+                // AsHapticPulse):
+                //   [0] = 0x8F
+                //   [2] = Side (0=Left, 1=Right, 2=Both)
+                //   [3..5] = Duration µs (u16 LE)   — pulse ON time
+                //   [5..7] = Interval µs (u16 LE)   — pulse OFF time
+                //   [7..9] = Count (u16 LE)         — number of pulses (or 0xFFFF/0 = continuous)
+                //   [9]    = Gain (int8 dB)         — amplitude (0 = full)
+                //
+                // Steam Input emits one 0x8F per motor side independently, so we
+                // must remember the OTHER motor's most-recent strength across
+                // commands. Otherwise a "right motor only" pulse would arrive
+                // with the left motor implicitly silenced at the bottom of this
+                // method (XInput SetState needs BOTH motor speeds).
+                //
+                // Rumble strength heuristic: duty cycle of the pulse train
+                // (Duration / (Duration + Interval)) scaled to 0..255. Steam's
+                // typical continuous-rumble emission has Duration ≈ 600µs and
+                // Interval ≈ 400µs (duty ~60%) at full strength, with Count set
+                // to a large value. A "stop" command has Count == 0 OR Duration
+                // == 0. Gain in dB scales further: each -6 dB ≈ halve strength.
                 case "steamdeck":
                 case "steam-deck":
                 case "steamdeck-generic":
@@ -272,27 +292,68 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "rog-ally":
                 case "zotac-zone":
                     LogSteamDeckCommandIdOnce(data);
-                    if (data.Length >= 9 && data[0] == 0xEB)
+                    if (data.Length >= 10 && data[0] == 0x8F)
                     {
+                        byte side = data[2];
+                        ushort duration = (ushort)(data[3] | (data[4] << 8));
+                        ushort interval = (ushort)(data[5] | (data[6] << 8));
+                        ushort count    = (ushort)(data[7] | (data[8] << 8));
+                        sbyte gainDb    = (sbyte)data[9];
+
+                        byte strength;
+                        if (count == 0 || duration == 0)
+                        {
+                            strength = 0;
+                        }
+                        else
+                        {
+                            int total = duration + interval;
+                            int dutyScaled = (total > 0) ? (duration * 255) / total : 0;
+                            // Gain attenuation — each -6 dB drop halves amplitude.
+                            // Positive gain (rare from Steam) treated as 0 dB cap.
+                            if (gainDb < 0)
+                            {
+                                int dropSteps = (-gainDb + 3) / 6;
+                                if (dropSteps > 8) dropSteps = 8;
+                                dutyScaled >>= dropSteps;
+                            }
+                            if (dutyScaled < 0) dutyScaled = 0;
+                            if (dutyScaled > 255) dutyScaled = 255;
+                            strength = (byte)dutyScaled;
+                        }
+
+                        if (side == 0)      { steamDeckMotorLeft = strength; }
+                        else if (side == 1) { steamDeckMotorRight = strength; }
+                        else                { steamDeckMotorLeft = strength; steamDeckMotorRight = strength; }
+                    }
+                    else if (data.Length >= 9 && data[0] == 0xEB)
+                    {
+                        // FeatureTriggerRumbleCommand — keep for parity in case
+                        // a future Steam build switches to direct motor speeds.
                         ushort steamLeft  = (ushort)(data[5] | (data[6] << 8));
                         ushort steamRight = (ushort)(data[7] | (data[8] << 8));
-                        rumbleLarge = (byte)(steamLeft  / 257);
-                        rumbleSmall = (byte)(steamRight / 257);
+                        steamDeckMotorLeft  = (byte)(steamLeft  / 257);
+                        steamDeckMotorRight = (byte)(steamRight / 257);
                     }
                     else if (data.Length >= 5 && data[0] == 0xEA)
                     {
+                        // FeatureTriggerHapticCommand — newer command class,
+                        // intensity ladder 0..4. Kept as a fallback channel.
                         byte side = data[2];
                         byte hapticType = data[3];
-                        byte intensity = data[4];   // 0=Default 1=Short 2=Medium 3=Long 4=Insane
-                        // Off command (Type=0) → silence. Otherwise scale 0..4 to
-                        // 0..255 linearly; Steam typically alternates Off and one
-                        // of the higher intensities during continuous game rumble.
+                        byte intensity = data[4];
                         byte strength = (hapticType == 0) ? (byte)0 :
                             (intensity >= 4) ? (byte)255 : (byte)(intensity * 64);
-                        if (side == 0)      { rumbleLarge = strength; }                 // Left only
-                        else if (side == 1) { rumbleSmall = strength; }                 // Right only
-                        else                { rumbleLarge = strength; rumbleSmall = strength; }
+                        if (side == 0)      { steamDeckMotorLeft = strength; }
+                        else if (side == 1) { steamDeckMotorRight = strength; }
+                        else                { steamDeckMotorLeft = strength; steamDeckMotorRight = strength; }
                     }
+                    // Always populate rumbleLarge/Small from persistent per-side
+                    // state — even on a command we don't recognize, the existing
+                    // motor state must reach the XInput SetState below or the
+                    // physical pad will receive (0, 0) and stop vibrating.
+                    rumbleLarge = steamDeckMotorLeft;
+                    rumbleSmall = steamDeckMotorRight;
                     break;
                 case "switchpro":
                 case "joycon-left":
