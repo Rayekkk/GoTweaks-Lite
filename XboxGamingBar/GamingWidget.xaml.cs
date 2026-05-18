@@ -2090,14 +2090,14 @@ namespace XboxGamingBar
             Logger.Info($"GamingWidget_Loaded called. Widget is null: {widget == null}, WidgetActivity is null: {widgetActivity == null}, Pipe connected: {App.IsConnected}");
 
             // Set initial navigation selection (first RadioButton - Quick tab).
-            // Mark before IsChecked= so the nav drift guard treats the initial Loaded
-            // selection as user-driven, not as focus drift.
-            MarkUserNavInteraction();
+            // Pre-arm the destination tag so the nav drift guard treats the initial
+            // Loaded selection as user-driven, not as focus drift.
+            ArmUserNavIntent("Quick");
             QuickNavItem.IsChecked = true;
 
-            // Attach Pointer/Tap/KeyDown listeners on every nav RadioButton so genuine
-            // user-driven activation marks the user-intent timestamp before the
-            // resulting Checked event fires (and the drift guard accepts it).
+            // Attach Pointer/Tap/KeyDown listeners on every nav RadioButton via
+            // AddHandler(handledEventsToo: true) so the drift guard gets pre-armed
+            // even when UWP's RadioButton marks the input event Handled internally.
             AttachNavInteractionTracking();
 
             // Load profile customization settings
