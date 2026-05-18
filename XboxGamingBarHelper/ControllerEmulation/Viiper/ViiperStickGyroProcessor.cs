@@ -249,12 +249,18 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
+                case "steam-controller-v1":
+                case "steamcontroller-v1":
+                case "gordon":
                 case "legion-go":
                 case "legion-go-s":
                 case "legion-go-2":
                 case "msi-claw":
                 case "rog-ally":
                 case "zotac-zone":
+                case "dualsense":
+                case "ds5":
+                case "dualsense-edge":
                 case "switchpro":
                 case "joycon-left":
                 case "joycon-right":

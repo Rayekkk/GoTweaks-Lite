@@ -590,6 +590,7 @@
     <Compile Include="Settings\ViiperInputSourceProperty.cs" />
     <Compile Include="Settings\ViiperGyroSourceProperty.cs" />
     <Compile Include="Settings\ViiperSteamSubDeviceProperty.cs" />
+    <Compile Include="Settings\ViiperSonySubDeviceProperty.cs" />
     <Compile Include="Settings\ViiperGuideButtonModeProperty.cs" />
     <Compile Include="Settings\ViiperSwapRumbleMotorsProperty.cs" />
     <Compile Include="Settings\ViiperRumbleIntensityProperty.cs" />

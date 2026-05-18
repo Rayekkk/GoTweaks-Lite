@@ -57,6 +57,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 {
                     settingsManager.ViiperSteamSubDevice.PropertyChanged += OnDeviceConfigChanged;
                 }
+                if (settingsManager.ViiperSonySubDevice != null)
+                {
+                    settingsManager.ViiperSonySubDevice.PropertyChanged += OnDeviceConfigChanged;
+                }
                 if (settingsManager.ViiperInputSource != null)
                 {
                     settingsManager.ViiperInputSource.PropertyChanged += OnInputSourceChanged;
@@ -301,13 +305,35 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 targetType = settingsManager.ViiperDeviceType.Value;
             }
 
-            // Steam controller family: need to resolve sub-device PID.
+            // "sony" is the widget's parent grouping for Sony virtual devices —
+            // the actual libviiper target comes from ViiperSonySubDevice.
+            // Values: dualsense / dualsense-edge / dualshock4. No VID/PID
+            // override (libviiper's aliases supply correct defaults).
+            if (targetType == "sony" && settingsManager?.ViiperSonySubDevice != null)
+            {
+                targetType = ViiperSonySubDeviceProperty.ResolveLibViiperTarget(settingsManager.ViiperSonySubDevice.Value);
+                return;
+            }
+
+            // Steam family. Sub-device determines BOTH the libviiper target and
+            // the VID/PID override:
+            //   "gordon"        → libviiper target "gordon" (Steam Controller V1,
+            //                     own native wire format, native VID/PID — no override)
+            //   anything else   → libviiper target stays "steam-generic" (routes
+            //                     to the steamdeck device) with a per-handheld
+            //                     VID/PID override applied.
             bool isSteam = targetType == "steam-generic"
                 || targetType == "steam-controller"
                 || targetType == "steamdeck-generic";
             if (isSteam && settingsManager?.ViiperSteamSubDevice != null)
             {
-                ViiperSteamSubDeviceProperty.TryGetSteamVidPid(settingsManager.ViiperSteamSubDevice.Value, out vid, out pid);
+                string subDev = settingsManager.ViiperSteamSubDevice.Value;
+                if (subDev == "gordon")
+                {
+                    targetType = "gordon";
+                    return;
+                }
+                ViiperSteamSubDeviceProperty.TryGetSteamVidPid(subDev, out vid, out pid);
             }
         }
 
@@ -516,6 +542,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     if (settingsManager.ViiperSteamSubDevice != null)
                     {
                         settingsManager.ViiperSteamSubDevice.PropertyChanged -= OnDeviceConfigChanged;
+                    }
+                    if (settingsManager.ViiperSonySubDevice != null)
+                    {
+                        settingsManager.ViiperSonySubDevice.PropertyChanged -= OnDeviceConfigChanged;
                     }
                     if (settingsManager.ViiperInputSource != null)
                     {

@@ -81,6 +81,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // deduplication purposes — we just need it to advance per call.
         private uint steamDeckFrameCounter;
 
+        // Monotonic frame counter for the steamcontroller (Gordon V1) wire format.
+        // Same role as steamDeckFrameCounter — Gordon uses its own per-device
+        // sequence number at bytes 4-7 of the 64-byte report.
+        private uint gordonFrameCounter;
+
         // First-sighting set of steamdeck OutputState command IDs (data[0]). Used
         // to log new command bytes once each so "rumble doesn't work" reports can
         // be triaged: if no 0x8F / 0xEA / 0xEB shows up here, Steam Input is not
@@ -268,6 +273,9 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
+                case "steam-controller-v1":
+                case "steamcontroller-v1":
+                case "gordon":
                 case "legion-go":
                 case "legion-go-s":
                 case "legion-go-2":
@@ -332,8 +340,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     if (data.Length >= 5) { haveLed = true; ledR = data[2]; ledG = data[3]; ledB = data[4]; }
                     break;
                 case "dualsenseedge":
-                    // DSE report: data[0]=rumbleSmall, data[1]=rumbleLarge, data[2..4]=LED RGB,
-                    // data[5]=playerLeds.
+                case "dualsense-edge":
+                case "dualsense":
+                case "ds5":
+                    // DSE/DS5 report: data[0]=rumbleSmall, data[1]=rumbleLarge, data[2..4]=LED RGB,
+                    // data[5]=playerLeds (DSE only — non-Edge stops at 5 bytes).
                     if (data.Length >= 2) { rumbleSmall = data[0]; rumbleLarge = data[1]; }
                     if (data.Length >= 5) { haveLed = true; ledR = data[2]; ledG = data[3]; ledB = data[4]; }
                     break;
@@ -376,6 +387,9 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
+                case "steam-controller-v1":
+                case "steamcontroller-v1":
+                case "gordon":
                 case "legion-go":
                 case "legion-go-s":
                 case "legion-go-2":
@@ -1334,7 +1348,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "dualshock4":
                     return BuildDualShock4Input(gp);
                 case "dualsenseedge":
+                case "dualsense-edge":
                     return BuildDualSenseEdgeInput(gp);
+                case "dualsense":
+                case "ds5":
+                    return BuildDualSenseInput(gp);
                 case "xboxelite2":
                 case "xbox-one":
                 case "xbox-elite":
@@ -1358,6 +1376,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "rog-ally":
                 case "zotac-zone":
                     return BuildSteamDeckInput(gp);
+                // Steam Controller V1 (Gordon) — separate libviiper device from
+                // steamdeck, separate 64-byte wire layout. Routed here via the
+                // Steam sub-device combo (Tag="gordon") which ViiperEmulationManager
+                // translates to targetType = "gordon" in ResolveDeviceTargets.
+                case "gordon":
+                case "steam-controller-v1":
+                case "steamcontroller-v1":
+                case "steam-controller":
+                    return BuildSteamControllerInput(gp);
                 case "switchpro":
                 case "joycon-left":
                 case "joycon-right":
@@ -1549,6 +1576,206 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
 
             // DSE IMU bytes at offsets 21..32.
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteI16(data, 21, gx);
+                WriteI16(data, 23, gy);
+                WriteI16(data, 25, gz);
+                WriteI16(data, 27, ScaleDs4Accel(ax));
+                WriteI16(data, 29, ScaleDs4Accel(ay));
+                WriteI16(data, 31, ScaleDs4Accel(az));
+            }
+            return data;
+        }
+
+        /// <summary>
+        /// Steam Controller V1 (Gordon, PID 0x1102) wire format from libviiper
+        /// device/steamcontroller/inputstate.go. 64-byte native report (matches
+        /// the physical wired Steam Controller's USB report) — same framing as
+        /// steamdeck (0x01 / 0x00 / ReportID / PayloadLen / u32 frame at 0..7)
+        /// but the button bits, axis layout, and the lack of a right stick all
+        /// differ. Gordon hardware has: ABXY/L1/R1, L2/R2 analog triggers,
+        /// Menu/Steam/Options, dpad, L3, left+right grip buttons, twin clickable
+        /// touchpads (no L4/L5/R4/R5/QuickAccess like the Deck), one analog
+        /// stick on the LEFT only, and IMU.
+        ///
+        /// XInput → Gordon mapping:
+        ///   A/B/X/Y, LB/RB        → byte 8 (A=0x80 X=0x40 B=0x20 Y=0x10
+        ///                                   L1=0x08 R1=0x04 L2=0x02 R2=0x01)
+        ///   LT/RT > deadzone      → L2/R2 digital bits in byte 8
+        ///   DPad                  → byte 9 (Up=0x01 Right=0x02 Left=0x04 Down=0x08)
+        ///   Start/Back/Guide      → Menu (0x10) / Options (0x40) / Steam (0x20) byte 9
+        ///   LeftThumb (L3)        → byte 10 bit 0x40
+        ///   LStick                → bytes 54..58 (LStickX/Y i16 LE)
+        ///   RStick                → bytes 20..24 (RPadX/Y — Gordon has no right
+        ///                           stick; Steam treats the right touchpad as
+        ///                           the virtual right stick, so XInput RStick
+        ///                           maps there for natural game compat)
+        ///   LT/RT analog          → byte 11/12 (single-byte) AND bytes 24..28
+        ///                           (u16 LE, scaled ×257). Gordon writes both
+        ///                           slots; consumers may read either.
+        ///   Legion paddles        → grip / pad-press: Y1 → LPadPress (byte 10
+        ///                           bit 0x02), Y2 → LGrip (byte 9 bit 0x80),
+        ///                           Y3 → RPadPress (byte 10 bit 0x04),
+        ///                           M3 → RGrip (byte 10 bit 0x01). Mode → Steam,
+        ///                           Share → unused (no DS-style touch click).
+        ///
+        /// Legion's right touchpad coords feed RPadX/Y (Steam Controller's
+        /// right touchpad). LPadX/Y stays at zero — Gordon's left touchpad has
+        /// no physical analog on the Legion.
+        /// </summary>
+        private byte[] BuildSteamControllerInput(ViiperXInputGamepad gp)
+        {
+            var data = new byte[64];
+            data[0] = 0x01;
+            data[1] = 0x00;
+            data[2] = 0x01;     // InputReportID — Gordon's input report ID
+            data[3] = 0x3C;     // payload length placeholder (60); device parses by offset
+            unchecked { gordonFrameCounter++; }
+            WriteU32(data, 4, gordonFrameCounter);
+
+            ushort aux = currentAuxButtons;
+
+            // Byte 8 — A/X/B/Y/L1/R1/L2digital/R2digital.
+            byte b8 = 0;
+            if ((gp.Buttons & ViiperXInput.A) != 0) b8 |= 0x80;
+            if ((gp.Buttons & ViiperXInput.X) != 0) b8 |= 0x40;
+            if ((gp.Buttons & ViiperXInput.B) != 0) b8 |= 0x20;
+            if ((gp.Buttons & ViiperXInput.Y) != 0) b8 |= 0x10;
+            if ((gp.Buttons & ViiperXInput.LB) != 0) b8 |= 0x08;
+            if ((gp.Buttons & ViiperXInput.RB) != 0) b8 |= 0x04;
+            if (gp.LeftTrigger > 30) b8 |= 0x02;
+            if (gp.RightTrigger > 30) b8 |= 0x01;
+            data[8] = b8;
+
+            // Byte 9 — Up/Right/Left/Down/Menu/Steam/Options/LGrip.
+            byte b9 = 0;
+            if ((gp.Buttons & ViiperXInput.DPadUp) != 0) b9 |= 0x01;
+            if ((gp.Buttons & ViiperXInput.DPadRight) != 0) b9 |= 0x02;
+            if ((gp.Buttons & ViiperXInput.DPadLeft) != 0) b9 |= 0x04;
+            if ((gp.Buttons & ViiperXInput.DPadDown) != 0) b9 |= 0x08;
+            if ((gp.Buttons & ViiperXInput.Start) != 0) b9 |= 0x10;             // Menu
+            if (((gp.Buttons & ViiperXInput.Guide) != 0)
+                || ((aux & LegionAux.Mode) != 0)) b9 |= 0x20;                   // Steam
+            if ((gp.Buttons & ViiperXInput.Back) != 0) b9 |= 0x40;              // Options
+            if ((aux & LegionAux.Y2) != 0) b9 |= 0x80;                          // LGrip (Y2 = back L lower)
+            data[9] = b9;
+
+            // Byte 10 — RGrip/LPadPress/RPadPress/LPadTouch/RPadTouch/L3/LPadAndJoy.
+            byte b10 = 0;
+            if ((aux & LegionAux.M3) != 0) b10 |= 0x01;                         // RGrip (M3 = back R lower)
+            if ((aux & LegionAux.Y1) != 0) b10 |= 0x02;                         // LPadPress (Y1 = back L upper)
+            if ((aux & LegionAux.Y3) != 0) b10 |= 0x04;                         // RPadPress (Y3 = back R upper)
+            if (currentTouchActive)        b10 |= 0x10;                         // RPadTouch (Legion's pad → Gordon's right pad)
+            if ((gp.Buttons & ViiperXInput.LeftThumb) != 0) b10 |= 0x40;        // L3
+            // LPadAndJoy (0x80) stays off — we route XInput LStick to the LStick slot, not the LPad slot.
+            data[10] = b10;
+
+            // Bytes 11/12 — analog trigger single-byte slots (Gordon writes them
+            // alongside the 16-bit slots at 24..28).
+            data[11] = gp.LeftTrigger;
+            data[12] = gp.RightTrigger;
+
+            // Bytes 20..24 — RPadX/Y (XInput right stick → right touchpad coords).
+            WriteI16(data, 20, gp.ThumbRX);
+            WriteI16(data, 22, gp.ThumbRY);
+
+            // Bytes 24..28 — LTrigger/RTrigger u16 LE.
+            WriteU16(data, 24, (ushort)(gp.LeftTrigger * 257));
+            WriteU16(data, 26, (ushort)(gp.RightTrigger * 257));
+
+            // Bytes 28..40 — Accel X/Y/Z then Gyro X/Y/Z (raw counts).
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteI16(data, 28, ax);
+                WriteI16(data, 30, ay);
+                WriteI16(data, 32, az);
+                WriteI16(data, 34, gx);
+                WriteI16(data, 36, gy);
+                WriteI16(data, 38, gz);
+            }
+            // Bytes 40..48 — gyroQuat W/X/Y/Z left zero (we don't emit a quaternion).
+
+            // Bytes 50..54 — duplicate trigger slots Gordon firmware also fills.
+            WriteU16(data, 50, (ushort)(gp.LeftTrigger * 257));
+            WriteU16(data, 52, (ushort)(gp.RightTrigger * 257));
+
+            // Bytes 54..58 — LStickX/Y (Gordon's only physical stick).
+            WriteI16(data, 54, gp.ThumbLX);
+            WriteI16(data, 56, gp.ThumbLY);
+
+            // Bytes 58..62 — LPadX/Y (left touchpad — Legion has no left pad,
+            // leave zero). Bytes 62..64 = BatteryMilliVolts; leave zero (wired
+            // Gordon reports zero too).
+            return data;
+        }
+
+        /// <summary>
+        /// DualSense (non-Edge, PID 0x0CE6) wire format from libviiper
+        /// device/dualsense/inputstate.go. Same 33-byte layout as DSE through
+        /// offset 15 — sticks (i8×4) + buttons (u32) + dpad (u8) + L2/R2 (u8)
+        /// + touch1X/Y (u16×2) + touchActive (bool). At offsets 16..20 DSE
+        /// has touch2 (5 bytes); DS5 has 5 reserved bytes there. The IMU
+        /// block at 21..32 is identical (gyro X/Y/Z + accel X/Y/Z, int16
+        /// each, accel pre-scaled by ScaleDs4Accel). Skipping touch2 leaves
+        /// those bytes zero, which matches DS5's reserved-bytes contract.
+        ///
+        /// XInput → DS5 button mapping mirrors BuildDualSenseEdgeInput but
+        /// without the four paddle bits (0x00100000-0x00800000) — the
+        /// non-Edge DS has no paddles, so those bits are unused in its
+        /// Buttons u32. Legion paddles still map onto PS/Touchpad via
+        /// Mode/Share so the user keeps some back-button signal.
+        /// </summary>
+        private byte[] BuildDualSenseInput(ViiperXInputGamepad gp)
+        {
+            var data = new byte[33];
+            data[0] = (byte)(gp.ThumbLX >> 8);
+            data[1] = (byte)(NegateClamp(gp.ThumbLY) >> 8);
+            data[2] = (byte)(gp.ThumbRX >> 8);
+            data[3] = (byte)(NegateClamp(gp.ThumbRY) >> 8);
+
+            uint dsButtons = 0;
+            if ((gp.Buttons & ViiperXInput.A) != 0) dsButtons |= 0x0020;
+            if ((gp.Buttons & ViiperXInput.B) != 0) dsButtons |= 0x0040;
+            if ((gp.Buttons & ViiperXInput.X) != 0) dsButtons |= 0x0010;
+            if ((gp.Buttons & ViiperXInput.Y) != 0) dsButtons |= 0x0080;
+            if ((gp.Buttons & ViiperXInput.LB) != 0) dsButtons |= 0x0100;
+            if ((gp.Buttons & ViiperXInput.RB) != 0) dsButtons |= 0x0200;
+            if ((gp.Buttons & ViiperXInput.Back) != 0) dsButtons |= 0x1000;       // Create
+            if ((gp.Buttons & ViiperXInput.Start) != 0) dsButtons |= 0x2000;      // Options
+            if ((gp.Buttons & ViiperXInput.LeftThumb) != 0) dsButtons |= 0x4000;  // L3
+            if ((gp.Buttons & ViiperXInput.RightThumb) != 0) dsButtons |= 0x8000; // R3
+            if ((gp.Buttons & ViiperXInput.Guide) != 0) dsButtons |= 0x00010000;  // PS
+
+            ushort aux = currentAuxButtons;
+            if ((aux & LegionAux.Mode) != 0) dsButtons |= 0x00010000;             // Mode  → PS
+            if ((aux & LegionAux.Share) != 0) dsButtons |= 0x00020000;            // Share → Touchpad click
+            WriteU32(data, 4, dsButtons);
+
+            byte dpad = 0;
+            if ((gp.Buttons & ViiperXInput.DPadUp) != 0) dpad |= 0x01;
+            if ((gp.Buttons & ViiperXInput.DPadDown) != 0) dpad |= 0x02;
+            if ((gp.Buttons & ViiperXInput.DPadLeft) != 0) dpad |= 0x04;
+            if ((gp.Buttons & ViiperXInput.DPadRight) != 0) dpad |= 0x08;
+            data[8] = dpad;
+
+            data[9] = gp.LeftTrigger;
+            data[10] = gp.RightTrigger;
+
+            // DS5 single touch slot (offsets 11-15: X u16, Y u16, active bool).
+            if (currentTouchActive)
+            {
+                ushort tx = ScaleTouchAxis(currentTouchX, 1920);
+                ushort ty = ScaleTouchAxis(currentTouchY, 1080);
+                WriteU16(data, 11, tx);
+                WriteU16(data, 13, ty);
+                data[15] = 1;
+            }
+            // Offsets 16..20 stay zero — reserved bytes on DS5 wire.
+
+            // IMU at 21..32, same scaling as DSE/DS4 builders.
             short gx, gy, gz, ax, ay, az;
             if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
             {

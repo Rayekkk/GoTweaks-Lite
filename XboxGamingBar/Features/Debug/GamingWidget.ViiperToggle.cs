@@ -93,11 +93,19 @@ namespace XboxGamingBar
                     }
                 }
 
-                if (ViiperSteamSubDevicePanel != null && viiperDeviceType != null)
+                if (viiperDeviceType != null)
                 {
                     string t = viiperDeviceType.Value ?? string.Empty;
                     bool isSteam = t == "steam-generic" || t == "steam-controller" || t == "steamdeck-generic";
-                    ViiperSteamSubDevicePanel.Visibility = (backendOn && isSteam) ? Visibility.Visible : Visibility.Collapsed;
+                    bool isSony = t == "sony";
+                    if (ViiperSteamSubDevicePanel != null)
+                    {
+                        ViiperSteamSubDevicePanel.Visibility = (backendOn && isSteam) ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    if (ViiperSonySubDevicePanel != null)
+                    {
+                        ViiperSonySubDevicePanel.Visibility = (backendOn && isSony) ? Visibility.Visible : Visibility.Collapsed;
+                    }
                 }
             });
         }

@@ -63,12 +63,19 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "dualshock4":
                     return DualShock4Buttons;
                 case "dualsenseedge":
+                case "dualsense-edge":
                     return DualSenseEdgeButtons;
+                case "dualsense":
+                case "ds5":
+                    return DualShock4Buttons;   // DS5 non-Edge shares DS4-style face buttons; no paddles
                 case "steamdeck":
                 case "steam-deck":
                 case "steamdeck-generic":
                 case "steam-generic":
                 case "steam-controller":
+                case "steam-controller-v1":
+                case "steamcontroller-v1":
+                case "gordon":
                 case "legion-go":
                 case "legion-go-s":
                 case "legion-go-2":

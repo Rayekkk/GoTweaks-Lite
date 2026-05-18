@@ -4786,10 +4786,9 @@
                                         <TextBlock Text="Virtual device" FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,4"/>
                                         <ComboBox x:Name="ViiperDeviceTypeComboBox" HorizontalAlignment="Stretch">
                                             <ComboBoxItem Content="Xbox 360" Tag="xbox360"/>
-                                            <ComboBoxItem Content="DualShock 4" Tag="dualshock4"/>
-                                            <ComboBoxItem Content="DualSense Edge" Tag="dualsenseedge"/>
                                             <ComboBoxItem Content="Xbox Elite 2" Tag="xboxelite2"/>
-                                            <ComboBoxItem Content="Steam Controller" Tag="steam-generic"/>
+                                            <ComboBoxItem Content="Steam" Tag="steam-generic"/>
+                                            <ComboBoxItem Content="Sony Virtual Device" Tag="sony"/>
                                             <ComboBoxItem Content="Switch Pro" Tag="switchpro"/>
                                         </ComboBox>
 
@@ -4804,6 +4803,16 @@
                                                 <ComboBoxItem Content="ROG Ally" Tag="rog-ally"/>
                                                 <ComboBoxItem Content="MSI Claw" Tag="msi-claw"/>
                                                 <ComboBoxItem Content="Zotac Zone" Tag="zotac-zone"/>
+                                                <ComboBoxItem Content="Steam Controller V1 (Gordon)" Tag="gordon"/>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="ViiperSonySubDevicePanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                            <TextBlock Text="Sony sub-device" FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,4"/>
+                                            <ComboBox x:Name="ViiperSonySubDeviceComboBox" HorizontalAlignment="Stretch">
+                                                <ComboBoxItem Content="DualSense" Tag="dualsense"/>
+                                                <ComboBoxItem Content="DualSense Edge" Tag="dualsense-edge"/>
+                                                <ComboBoxItem Content="DualShock 4" Tag="dualshock4"/>
                                             </ComboBox>
                                         </StackPanel>
 

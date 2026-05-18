@@ -972,6 +972,7 @@ namespace XboxGamingBar
         private readonly ViiperStringComboProperty viiperInputSource;
         private readonly ViiperStringComboProperty viiperGyroSource;
         private readonly ViiperStringComboProperty viiperSteamSubDevice;
+        private readonly ViiperStringComboProperty viiperSonySubDevice;
         private readonly ViiperStringComboProperty viiperGuideButtonMode;
         private readonly ViiperSwapRumbleMotorsProperty viiperSwapRumbleMotors;
         private readonly ViiperMirrorLightbarToStickProperty viiperMirrorLightbarToStick;
@@ -1673,6 +1674,7 @@ namespace XboxGamingBar
             viiperInputSource = new ViiperStringComboProperty("XInput", Shared.Enums.Function.Viiper_InputSource, ViiperInputSourceComboBox, this);
             viiperGyroSource = new ViiperStringComboProperty("Left", Shared.Enums.Function.Viiper_GyroSource, ViiperGyroSourceComboBox, this);
             viiperSteamSubDevice = new ViiperStringComboProperty("legion-go", Shared.Enums.Function.Viiper_SteamSubDevice, ViiperSteamSubDeviceComboBox, this);
+            viiperSonySubDevice = new ViiperStringComboProperty("dualsense-edge", Shared.Enums.Function.Viiper_SonySubDevice, ViiperSonySubDeviceComboBox, this);
             viiperGuideButtonMode = new ViiperStringComboProperty("Native", Shared.Enums.Function.Viiper_GuideButtonMode, ViiperGuideButtonModeComboBox, this);
             viiperSwapRumbleMotors = new ViiperSwapRumbleMotorsProperty(ViiperSwapRumbleMotorsToggle, this);
             viiperMirrorLightbarToStick = new ViiperMirrorLightbarToStickProperty(ViiperMirrorLightbarToStickToggle, this);
@@ -1939,6 +1941,7 @@ namespace XboxGamingBar
                 viiperInputSource,
                 viiperGyroSource,
                 viiperSteamSubDevice,
+                viiperSonySubDevice,
                 viiperGuideButtonMode,
                 viiperSwapRumbleMotors,
                 viiperRumbleIntensity,
