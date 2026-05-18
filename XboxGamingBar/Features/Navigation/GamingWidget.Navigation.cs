@@ -44,11 +44,112 @@ namespace XboxGamingBar
     public sealed partial class GamingWidget
     {
 
+        // Last tag the USER actually picked (via click, Space/Enter, gamepad A, D-pad/arrow
+        // nav within the bar, LT/RT trigger nav, or a programmatic IsChecked from code we
+        // know to be user-driven like the QuickDriverUpdatesTile shortcut). Used to revert
+        // focus-restoration-driven Checked events that otherwise change the tab when the
+        // widget regains window focus and UWP RadioButton group's selection-follows-focus
+        // hijacks the previously-checked state. Default matches GamingWidget_Loaded's
+        // initial QuickNavItem.IsChecked=true so the very first NavRadioButton_Checked
+        // is treated as the user-intended starting tab, not a drift.
+        private string lastUserNavTag = "Quick";
+        // Monotonic timestamp of the most-recent user-intent signal on a nav RadioButton.
+        // A Checked event fired without a recent matching signal is treated as focus drift.
+        private long lastUserNavInteractionTicks = DateTime.UtcNow.Ticks;
+        // Widening this beyond the Checked event's dispatch latency would let a single
+        // user click bleed into accepting subsequent focus drifts. 350 ms is empirically
+        // enough cover for the Loaded→Checked round-trip and Pointer→Checked latency on
+        // Game Bar's overlay-host while staying tight enough to reject focus restoration
+        // that happens 1–2 s after the window regains focus.
+        private static readonly TimeSpan UserNavInteractionWindow = TimeSpan.FromMilliseconds(350);
+
+        /// <summary>
+        /// Mark a user-intent signal on the nav bar. Call from any code path that
+        /// legitimately changes the active tab so the NavRadioButton_Checked guard
+        /// accepts the resulting Checked event instead of reverting it as focus drift.
+        /// </summary>
+        internal void MarkUserNavInteraction()
+        {
+            lastUserNavInteractionTicks = DateTime.UtcNow.Ticks;
+        }
+
+        /// <summary>
+        /// Wired once at widget init. Adds Pointer/Tap/KeyDown listeners on every nav
+        /// RadioButton so any genuine user-driven activation marks the user-intent
+        /// timestamp before the resulting Checked event fires.
+        /// </summary>
+        internal void AttachNavInteractionTracking()
+        {
+            foreach (var child in MainNavPanel.Children)
+            {
+                if (child is RadioButton rb)
+                {
+                    rb.PointerPressed += (s, e) => MarkUserNavInteraction();
+                    rb.Tapped += (s, e) => MarkUserNavInteraction();
+                    rb.KeyDown += NavRadio_KeyDown_TrackIntent;
+                }
+            }
+        }
+
+        private void NavRadio_KeyDown_TrackIntent(object sender, KeyRoutedEventArgs e)
+        {
+            // Space, Enter, and the gamepad A button are the explicit "click" keys
+            // for a RadioButton in WinUI. Arrow keys / D-pad / left-stick directional
+            // input are how the user navigates WITHIN the nav bar — UWP's RadioButton
+            // group selection-follows-focus reacts to them on purpose, so we want to
+            // accept those Checked events as user-driven and not revert them.
+            switch (e.Key)
+            {
+                case VirtualKey.Space:
+                case VirtualKey.Enter:
+                case VirtualKey.GamepadA:
+                case VirtualKey.Left:
+                case VirtualKey.Right:
+                case VirtualKey.Up:
+                case VirtualKey.Down:
+                case VirtualKey.GamepadDPadLeft:
+                case VirtualKey.GamepadDPadRight:
+                case VirtualKey.GamepadDPadUp:
+                case VirtualKey.GamepadDPadDown:
+                case VirtualKey.GamepadLeftThumbstickLeft:
+                case VirtualKey.GamepadLeftThumbstickRight:
+                case VirtualKey.GamepadLeftThumbstickUp:
+                case VirtualKey.GamepadLeftThumbstickDown:
+                    MarkUserNavInteraction();
+                    break;
+            }
+        }
+
         private void NavRadioButton_Checked(object sender, RoutedEventArgs e)
         {
             if (sender is RadioButton selectedItem)
             {
                 string tag = selectedItem.Tag?.ToString() ?? "";
+
+                // Focus-drift suppression. When the widget's window regains focus, UWP
+                // can land focus on a nav RadioButton other than the currently-checked
+                // one — and the RadioButton group's selection-follows-focus default then
+                // auto-Checks it, firing this handler with no user input. Reject those
+                // Checked events: if the tag differs from the last user-selected tag AND
+                // no user-intent signal arrived in the recent past, revert by re-checking
+                // the original tag's button.
+                bool recentUserIntent = (DateTime.UtcNow - new DateTime(lastUserNavInteractionTicks, DateTimeKind.Utc))
+                                          < UserNavInteractionWindow;
+                if (!recentUserIntent && tag != lastUserNavTag)
+                {
+                    Logger.Info($"Nav drift suppressed: focus-driven Checked='{tag}' but no recent user intent — reverting to '{lastUserNavTag}'");
+                    var revert = MainNavPanel.Children.OfType<RadioButton>()
+                                              .FirstOrDefault(rb => string.Equals((rb.Tag as string) ?? string.Empty, lastUserNavTag, StringComparison.Ordinal));
+                    if (revert != null && revert.IsChecked != true)
+                    {
+                        // Re-checking will fire NavRadioButton_Checked again with the
+                        // original tag matching lastUserNavTag, so the guard passes and
+                        // the content stays where the user left it.
+                        revert.IsChecked = true;
+                    }
+                    return;
+                }
+                lastUserNavTag = tag;
 
                 // Hide all sections
                 QuickSettingsScrollViewer.Visibility = Visibility.Collapsed;
@@ -276,6 +377,9 @@ namespace XboxGamingBar
             var currentItem = visibleItems.FirstOrDefault(rb => rb.IsChecked == true);
             int currentIndex = currentItem != null ? visibleItems.IndexOf(currentItem) : 0;
 
+            // LT trigger nav is explicit user intent — mark before IsChecked= so the
+            // resulting NavRadioButton_Checked guard accepts the tab change.
+            MarkUserNavInteraction();
             if (currentIndex > 0)
             {
                 visibleItems[currentIndex - 1].IsChecked = true;
@@ -296,6 +400,7 @@ namespace XboxGamingBar
             var currentItem = visibleItems.FirstOrDefault(rb => rb.IsChecked == true);
             int currentIndex = currentItem != null ? visibleItems.IndexOf(currentItem) : 0;
 
+            MarkUserNavInteraction();
             if (currentIndex < visibleItems.Count - 1)
             {
                 visibleItems[currentIndex + 1].IsChecked = true;

@@ -740,9 +740,12 @@ namespace XboxGamingBar
         {
             try
             {
-                // Switch to Legion tab first (idempotent if already selected).
+                // Switch to Legion tab first (idempotent if already selected). This is
+                // user-driven (they tapped a Quick-tab shortcut), so mark the user-intent
+                // signal before IsChecked= so the nav drift guard accepts the change.
                 if (LegionNavItem != null && LegionNavItem.IsChecked != true)
                 {
+                    MarkUserNavInteraction();
                     LegionNavItem.IsChecked = true;
                 }
 
