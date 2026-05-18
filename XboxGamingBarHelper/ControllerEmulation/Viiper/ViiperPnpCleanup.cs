@@ -112,12 +112,20 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         {
             // /disconnected restricts the listing to Present=False entries —
             // exactly the ghosts we want to clean. Avoids the cost of parsing
-            // every HID device on the system and avoids the risk of removing
-            // a Present device by mistake (Status line is omitted in the bulk
-            // enumeration for some Present entries, so filtering by status
-            // string is unreliable; the /disconnected filter is the canonical
-            // way to scope to ghosts).
-            string raw = RunPnputil("/enum-devices /class HIDClass /disconnected");
+            // every device on the system and avoids the risk of removing a
+            // Present device by mistake.
+            //
+            // No /class filter: a single virtual Steam-handheld attachment
+            // spawns PnP children in multiple device classes — the gamepad
+            // HID is HIDClass, but the Steam-style keyboard/mouse companion
+            // interfaces (VID_28DE PID_12Fx with &MI_00 / &MI_01 suffixes)
+            // land in classes Keyboard and Mouse, the USB roots
+            // (USB\VID_28DE&PID_12Fx\KEYBOARD) are class USB, and the Xbox
+            // 360 / Xbox One Elite virtual devices are XnaComposite and
+            // XboxComposite respectively. Scoping by /class HIDClass missed
+            // every non-HID class, leaving Steam's controller list cluttered
+            // with companion-device ghosts the helper had supposedly cleaned.
+            string raw = RunPnputil("/enum-devices /disconnected");
             if (string.IsNullOrEmpty(raw)) return;
 
             var targetVidPids = new HashSet<string>();
