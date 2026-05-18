@@ -94,6 +94,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // the left motor (and vice-versa).
         private byte steamDeckMotorLeft;
         private byte steamDeckMotorRight;
+        // Per-side expiration ticks (DateTime.UtcNow.Ticks). Steam Deck haptic
+        // pulses are FINITE — each 0x8F plays for Count * (Duration + Interval)
+        // microseconds and then ends naturally on the real Deck. To create
+        // continuous rumble Steam re-sends pulse trains; to stop rumble Steam
+        // simply stops sending them, relying on the train's natural end.
+        // XInput motors don't auto-stop, so without an explicit SetState(0,0)
+        // the physical controller would buzz forever at the last commanded
+        // strength. The poll loop checks these expirations every tick and
+        // forces a zero SetState when they pass. Value 0 = no pending pulse.
+        private long steamDeckMotorLeftExpiresTicks;
+        private long steamDeckMotorRightExpiresTicks;
 
         // Throttle LED writes — Legion's WMI/USB write path is slow; don't re-send the same color.
         private long lastLedPacked = -1;
@@ -189,6 +200,86 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// from the consuming application. We parse the relevant motor bytes based on the
         /// current device type and forward them to the physical XInput controller.
         /// </summary>
+        /// <summary>
+        /// Zero out per-side steamdeck motor strengths whose pulse-train timer has
+        /// elapsed. Returns true if any side just decayed from non-zero to zero,
+        /// which the caller can use to know it needs to flush a SetState(0,0) to
+        /// the physical pad (XInput motors don't auto-stop).
+        /// </summary>
+        private bool DecayExpiredSteamDeckRumble()
+        {
+            long now = DateTime.UtcNow.Ticks;
+            bool changed = false;
+            if (steamDeckMotorLeft != 0 && now >= steamDeckMotorLeftExpiresTicks)
+            {
+                steamDeckMotorLeft = 0;
+                steamDeckMotorLeftExpiresTicks = 0;
+                changed = true;
+            }
+            if (steamDeckMotorRight != 0 && now >= steamDeckMotorRightExpiresTicks)
+            {
+                steamDeckMotorRight = 0;
+                steamDeckMotorRightExpiresTicks = 0;
+                changed = true;
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// Pushes the current per-side steamdeck motor strengths to the physical
+        /// XInput controller. Mirrors the rumble-emit code path in
+        /// OnFeedbackReceived so the poll-loop decay timer can stop a rumble
+        /// without piggy-backing on an incoming feedback event.
+        /// </summary>
+        private void FlushSteamDeckRumbleToXInput()
+        {
+            try
+            {
+                byte large = steamDeckMotorLeft;
+                byte small = steamDeckMotorRight;
+                if (swapRumbleMotors)
+                {
+                    byte tmp = large; large = small; small = tmp;
+                }
+                int scaled = rumbleIntensityScaled;
+                int leftSpeed = (large * 257 * scaled) / 1000;
+                int rightSpeed = (small * 257 * scaled) / 1000;
+                if (leftSpeed > 65535) leftSpeed = 65535;
+                if (rightSpeed > 65535) rightSpeed = 65535;
+                var vib = new ViiperXInputVibration
+                {
+                    LeftMotorSpeed = (ushort)leftSpeed,
+                    RightMotorSpeed = (ushort)rightSpeed,
+                };
+                ViiperXInput.SetState(physicalIndex, ref vib);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Steamdeck rumble decay SetState failed: {ex.Message}");
+            }
+        }
+
+        private bool IsSteamDeckLikeTarget()
+        {
+            switch (targetType)
+            {
+                case "steamdeck":
+                case "steam-deck":
+                case "steamdeck-generic":
+                case "steam-generic":
+                case "steam-controller":
+                case "legion-go":
+                case "legion-go-s":
+                case "legion-go-2":
+                case "msi-claw":
+                case "rog-ally":
+                case "zotac-zone":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private void LogSteamDeckCommandIdOnce(byte[] data)
         {
             if (data == null || data.Length == 0) return;
@@ -322,32 +413,48 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                             strength = (byte)dutyScaled;
                         }
 
-                        if (side == 0)      { steamDeckMotorLeft = strength; }
-                        else if (side == 1) { steamDeckMotorRight = strength; }
-                        else                { steamDeckMotorLeft = strength; steamDeckMotorRight = strength; }
+                        // Compute auto-stop time. Pulse train plays for
+                        // Count * (Duration + Interval) microseconds; convert
+                        // to .NET ticks (1µs = 10 ticks). PollLoop zeros the
+                        // motor + sends XInput SetState(0,0) once we pass it.
+                        long totalPlayUs = (long)count * ((long)duration + interval);
+                        long stopTicks = DateTime.UtcNow.Ticks + totalPlayUs * 10;
+                        if (side == 0)      { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = stopTicks; }
+                        else if (side == 1) { steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
+                        else                { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = stopTicks;
+                                              steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
                     }
                     else if (data.Length >= 9 && data[0] == 0xEB)
                     {
-                        // FeatureTriggerRumbleCommand — keep for parity in case
-                        // a future Steam build switches to direct motor speeds.
+                        // FeatureTriggerRumbleCommand — direct motor speeds.
+                        // No natural end; keep the strength latched until
+                        // Steam sends another 0xEB to update it.
                         ushort steamLeft  = (ushort)(data[5] | (data[6] << 8));
                         ushort steamRight = (ushort)(data[7] | (data[8] << 8));
                         steamDeckMotorLeft  = (byte)(steamLeft  / 257);
                         steamDeckMotorRight = (byte)(steamRight / 257);
+                        steamDeckMotorLeftExpiresTicks  = long.MaxValue;
+                        steamDeckMotorRightExpiresTicks = long.MaxValue;
                     }
                     else if (data.Length >= 5 && data[0] == 0xEA)
                     {
                         // FeatureTriggerHapticCommand — newer command class,
                         // intensity ladder 0..4. Kept as a fallback channel.
+                        // Treat as latched (no natural end) like 0xEB.
                         byte side = data[2];
                         byte hapticType = data[3];
                         byte intensity = data[4];
                         byte strength = (hapticType == 0) ? (byte)0 :
                             (intensity >= 4) ? (byte)255 : (byte)(intensity * 64);
-                        if (side == 0)      { steamDeckMotorLeft = strength; }
-                        else if (side == 1) { steamDeckMotorRight = strength; }
-                        else                { steamDeckMotorLeft = strength; steamDeckMotorRight = strength; }
+                        if (side == 0)      { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = long.MaxValue; }
+                        else if (side == 1) { steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = long.MaxValue; }
+                        else                { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = long.MaxValue;
+                                              steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = long.MaxValue; }
                     }
+                    // Decay any per-side strength whose pulse train has elapsed
+                    // since the last command arrived — Steam often coalesces a
+                    // burst of pulses then goes silent expecting natural decay.
+                    DecayExpiredSteamDeckRumble();
                     // Always populate rumbleLarge/Small from persistent per-side
                     // state — even on a command we don't recognize, the existing
                     // motor state must reach the XInput SetState below or the
@@ -957,6 +1064,18 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     statsReportsSent = 0;
                     statsReportsFailed = 0;
                     statsWindowStartTicks = nowTicks;
+                }
+
+                // Steamdeck rumble auto-stop. Steam Deck haptic pulses are finite
+                // (one 0x8F plays for Count * (Duration + Interval) microseconds);
+                // when the train ends, Steam expects the physical Deck's LRAs to
+                // fall silent naturally. XInput motors do NOT auto-stop, so we
+                // detect expiration here and force a SetState(0,0) once the
+                // pulse train has elapsed. Without this the physical pad buzzes
+                // indefinitely after any single rumble event.
+                if (IsSteamDeckLikeTarget() && DecayExpiredSteamDeckRumble())
+                {
+                    FlushSteamDeckRumbleToXInput();
                 }
 
                 try
