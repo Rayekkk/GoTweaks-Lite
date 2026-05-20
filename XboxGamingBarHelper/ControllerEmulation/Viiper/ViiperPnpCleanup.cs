@@ -41,6 +41,16 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             ["xboxelite2"]           = new[] { ((ushort)0x045E, (ushort)0x0B13) },
             ["xbox-one"]             = new[] { ((ushort)0x045E, (ushort)0x02D1) },
             ["xbox-elite"]           = new[] { ((ushort)0x045E, (ushort)0x0B00) },
+            // xboxgip target removed from widget after 2026-05-19 RE
+            // (see [[project_gip_definitive_walls_2026-05-19]]). Cleanup
+            // still covers all PIDs the experimental builds used, so any
+            // ghost PnP entries from those builds get swept on next start.
+            ["xboxgip"]              = new[]
+            {
+                ((ushort)0x045E, (ushort)0x02D1),
+                ((ushort)0x045E, (ushort)0x02D2),
+                ((ushort)0x045E, (ushort)0x0B00),
+            },
             ["dualshock4"]           = new[] { ((ushort)0x054C, (ushort)0x05C4) },
             ["dualsense"]            = new[] { ((ushort)0x054C, (ushort)0x0CE6) },
             ["ds5"]                  = new[] { ((ushort)0x054C, (ushort)0x0CE6) },

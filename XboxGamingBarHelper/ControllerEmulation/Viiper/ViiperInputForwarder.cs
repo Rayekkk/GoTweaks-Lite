@@ -1357,6 +1357,16 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "xbox-one":
                 case "xbox-elite":
                     return BuildXboxElite2Input(gp);
+                // libviiper xboxgip target — 3-interface USB GIP device.
+                // Wire format is the same 20-byte InputState as xbox360
+                // (per device/xboxgip/inputstate.go); libviiper remaps to
+                // GIP buttons internally and ships paddles via the
+                // Reserved[0]/Reserved[1] bytes when PID=0x0B00. We use
+                // the xbox360 builder here for now (no paddle bytes yet);
+                // dedicated paddle path can be added once descriptor +
+                // metadata path is verified by USB tree dump.
+                case "xboxgip":
+                    return BuildXbox360Input(gp);
                 // libviiper 32c8ed3 + clib rework split Steam-handheld targets off into
                 // a dedicated steamdeck device with a 64-byte native wire format. The
                 // old steam-generic / steamdeck-generic aliases now route to steamdeck

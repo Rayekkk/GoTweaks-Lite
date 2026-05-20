@@ -344,6 +344,16 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 }
                 ViiperSteamSubDeviceProperty.TryGetSteamVidPid(subDev, out vid, out pid);
             }
+
+            // xboxgip target removed from widget after 2026-05-19 RE
+            // (see [[project_gip_definitive_walls_2026-05-19]]). For
+            // USB-IP virtual gamepads, xboxgip.sys's descriptor-handler
+            // state gate (slot+0x140==1 Interrogating) is never set by
+            // any code path on USB main devices, so IGamepad child PDOs
+            // can't publish. The target alias is left handled in libviiper
+            // and in the BuildDeviceInput dispatcher for future experiments
+            // (wireless-adapter emulation, sub-device-under-preloaded-PID
+            // parent), but is no longer user-selectable.
         }
 
         private ViiperInputSourceKind ResolveInputSource()
