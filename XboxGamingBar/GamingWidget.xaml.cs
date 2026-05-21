@@ -981,6 +981,9 @@ namespace XboxGamingBar
         private readonly ViiperStringComboProperty viiperGyroAxisMapX;
         private readonly ViiperStringComboProperty viiperGyroAxisMapY;
         private readonly ViiperStringComboProperty viiperGyroAxisMapZ;
+        private readonly ViiperStickTriggerConfigProperty viiperStickTriggerConfig;
+        private readonly ViiperStickTriggerPreviewEnabledProperty viiperStickTriggerPreviewEnabled;
+        private readonly ViiperStickTriggerLiveSampleProperty viiperStickTriggerLiveSample;
         private readonly WinRing0AvailableProperty winRing0Available;
         private readonly PawnIOAvailableProperty pawnIOAvailable;
         private readonly PawnIOInstalledProperty pawnIOInstalled;
@@ -1683,6 +1686,11 @@ namespace XboxGamingBar
             viiperGyroAxisMapX = new ViiperStringComboProperty("X", Shared.Enums.Function.Viiper_GyroAxisMapX, ViiperGyroAxisMapXComboBox, this);
             viiperGyroAxisMapY = new ViiperStringComboProperty("Y", Shared.Enums.Function.Viiper_GyroAxisMapY, ViiperGyroAxisMapYComboBox, this);
             viiperGyroAxisMapZ = new ViiperStringComboProperty("Z", Shared.Enums.Function.Viiper_GyroAxisMapZ, ViiperGyroAxisMapZComboBox, this);
+            viiperStickTriggerConfig = new ViiperStickTriggerConfigProperty(string.Empty);
+            viiperStickTriggerPreviewEnabled = new ViiperStickTriggerPreviewEnabledProperty();
+            viiperStickTriggerLiveSample = new ViiperStickTriggerLiveSampleProperty();
+            InitStickTriggerControls();
+            InitStickTriggerPreview();
             // Keep the "nn%" label in sync as the user drags.
             if (ViiperRumbleIntensitySlider != null)
             {
@@ -1950,6 +1958,9 @@ namespace XboxGamingBar
                 viiperGyroAxisMapX,
                 viiperGyroAxisMapY,
                 viiperGyroAxisMapZ,
+                viiperStickTriggerConfig,
+                viiperStickTriggerPreviewEnabled,
+                viiperStickTriggerLiveSample,
                 winRing0Available,
                 pawnIOAvailable,
                 pawnIOInstalled,

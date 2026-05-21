@@ -586,6 +586,8 @@
     <Compile Include="ControllerEmulation\Viiper\ViiperInputForwarder.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperStickGyroProcessor.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperPnpCleanup.cs" />
+    <Compile Include="ControllerEmulation\Viiper\ViiperStickTriggerLiveSampleProperty.cs" />
+    <Compile Include="Settings\ViiperStickTriggerPreviewEnabledProperty.cs" />
     <Compile Include="Settings\UsbipInstalledProperty.cs" />
     <Compile Include="Settings\ViiperDeviceTypeProperty.cs" />
     <Compile Include="Settings\ViiperInputSourceProperty.cs" />
@@ -597,6 +599,7 @@
     <Compile Include="Settings\ViiperRumbleIntensityProperty.cs" />
     <Compile Include="Settings\ViiperMirrorLightbarToStickProperty.cs" />
     <Compile Include="Settings\ViiperStickGyroEnabledProperty.cs" />
+    <Compile Include="Settings\ViiperStickTriggerConfigProperty.cs" />
     <Compile Include="Settings\ViiperGyroAxisMapProperty.cs" />
     <Compile Include="Settings\ProfileMatchByExeProperty.cs" />
     <Compile Include="Settings\ProfileCustomGamePathProperty.cs" />

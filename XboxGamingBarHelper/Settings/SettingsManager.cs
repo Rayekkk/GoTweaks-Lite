@@ -138,6 +138,18 @@ namespace XboxGamingBarHelper.Settings
             get { return viiperStickGyroEnabled; }
         }
 
+        private readonly ViiperStickTriggerConfigProperty viiperStickTriggerConfig;
+        public ViiperStickTriggerConfigProperty ViiperStickTriggerConfig
+        {
+            get { return viiperStickTriggerConfig; }
+        }
+
+        private readonly ViiperStickTriggerPreviewEnabledProperty viiperStickTriggerPreviewEnabled;
+        public ViiperStickTriggerPreviewEnabledProperty ViiperStickTriggerPreviewEnabled
+        {
+            get { return viiperStickTriggerPreviewEnabled; }
+        }
+
         private readonly ViiperGyroAxisMapProperty viiperGyroAxisMapX;
         public ViiperGyroAxisMapProperty ViiperGyroAxisMapX
         {
@@ -202,6 +214,8 @@ namespace XboxGamingBarHelper.Settings
             viiperRumbleIntensity = new ViiperRumbleIntensityProperty(this);
             viiperMirrorLightbarToStick = new ViiperMirrorLightbarToStickProperty(this);
             viiperStickGyroEnabled = new ViiperStickGyroEnabledProperty(this);
+            viiperStickTriggerConfig = new ViiperStickTriggerConfigProperty(this);
+            viiperStickTriggerPreviewEnabled = new ViiperStickTriggerPreviewEnabledProperty(this);
             viiperGyroAxisMapX = new ViiperGyroAxisMapProperty(this, Shared.Enums.Function.Viiper_GyroAxisMapX, "ViiperGyroAxisMapX", "X");
             viiperGyroAxisMapY = new ViiperGyroAxisMapProperty(this, Shared.Enums.Function.Viiper_GyroAxisMapY, "ViiperGyroAxisMapY", "Y");
             viiperGyroAxisMapZ = new ViiperGyroAxisMapProperty(this, Shared.Enums.Function.Viiper_GyroAxisMapZ, "ViiperGyroAxisMapZ", "Z");

@@ -125,6 +125,9 @@
     <Compile Include="Data\ViiperRumbleIntensityProperty.cs" />
     <Compile Include="Data\ViiperMirrorLightbarToStickProperty.cs" />
     <Compile Include="Data\ViiperStickGyroEnabledProperty.cs" />
+    <Compile Include="Data\ViiperStickTriggerConfigProperty.cs" />
+    <Compile Include="Data\ViiperStickTriggerPreviewEnabledProperty.cs" />
+    <Compile Include="Data\ViiperStickTriggerLiveSampleProperty.cs" />
     <Compile Include="Data\WinRing0AvailableProperty.cs" />
     <Compile Include="Data\PawnIOAvailableProperty.cs" />
     <Compile Include="Data\PawnIOInstalledProperty.cs" />
@@ -287,6 +290,9 @@
     <Compile Include="Event\BackgroundTaskCancellationEventArgs.cs" />
     <Compile Include="IPC\NamedPipeClient.cs" />
     <Compile Include="GamingWidget.xaml.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="GamingWidget.ViiperStickTrigger.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Performance\GamingWidget.CPUState.cs">

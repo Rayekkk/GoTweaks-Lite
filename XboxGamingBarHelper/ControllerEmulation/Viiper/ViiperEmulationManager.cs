@@ -1,5 +1,6 @@
 using System;
 using NLog;
+using Shared.Data;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Settings;
@@ -23,6 +24,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private readonly ControllerEmulationManager legacyManager;
         private readonly ViiperService service = new ViiperService();
         private readonly ViiperInputForwarder forwarder;
+
+        // Helper-owned live-sample property pushed to the widget at ~30Hz while
+        // the Sticks & Triggers preview panel is open. Owned here so Program.cs
+        // can pick it up via its standard registration list; the forwarder
+        // writes to it from the input hot path under its own throttle.
+        public readonly ViiperStickTriggerLiveSampleProperty StickTriggerLiveSample;
 
         private bool isRunning;
         private uint activeBusId;
@@ -56,6 +63,8 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             settingsManager = inSettingsManager;
             legacyManager = inLegacyManager;
             forwarder = new ViiperInputForwarder(service, inLegionManager);
+            StickTriggerLiveSample = new ViiperStickTriggerLiveSampleProperty(this);
+            forwarder.SetStickTriggerLiveSink(StickTriggerLiveSample);
             activeInstance = this;
             if (legacyManager != null)
             {
@@ -118,6 +127,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 if (settingsManager.ViiperGyroAxisMapZ != null)
                 {
                     settingsManager.ViiperGyroAxisMapZ.PropertyChanged += OnGyroAxisMapChanged;
+                }
+                if (settingsManager.ViiperStickTriggerConfig != null)
+                {
+                    settingsManager.ViiperStickTriggerConfig.PropertyChanged += OnStickTriggerConfigChanged;
+                }
+                if (settingsManager.ViiperStickTriggerPreviewEnabled != null)
+                {
+                    settingsManager.ViiperStickTriggerPreviewEnabled.PropertyChanged += OnStickTriggerPreviewEnabledChanged;
+                    // Apply persisted state immediately so a session restart that
+                    // had preview on keeps streaming until the widget collapses.
+                    forwarder.SetStickTriggerPreviewEnabled(settingsManager.ViiperStickTriggerPreviewEnabled.Value);
                 }
                 // Apply initial state — deferred.
                 //
@@ -612,6 +632,8 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 settingsManager?.ViiperGyroAxisMapX?.Value ?? "X",
                 settingsManager?.ViiperGyroAxisMapY?.Value ?? "Y",
                 settingsManager?.ViiperGyroAxisMapZ?.Value ?? "Z");
+            forwarder.SetStickTriggerConfig(StickTriggerConfigBundle.Deserialize(
+                settingsManager?.ViiperStickTriggerConfig?.Value ?? string.Empty));
             forwarder.Start(xinputIdx, activeBusId, activeDeviceId, activeDeviceType);
 
             isRunning = true;
@@ -756,6 +778,23 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         {
             try { forwarder.SetRumbleIntensity(settingsManager?.ViiperRumbleIntensity?.Value ?? 100); }
             catch (Exception ex) { Logger.Warn($"OnRumbleIntensityChanged threw: {ex.Message}"); }
+        }
+
+        private void OnStickTriggerConfigChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try
+            {
+                var serialized = settingsManager?.ViiperStickTriggerConfig?.Value ?? string.Empty;
+                var bundle = StickTriggerConfigBundle.Deserialize(serialized);
+                forwarder.SetStickTriggerConfig(bundle);
+            }
+            catch (Exception ex) { Logger.Warn($"OnStickTriggerConfigChanged threw: {ex.Message}"); }
+        }
+
+        private void OnStickTriggerPreviewEnabledChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try { forwarder.SetStickTriggerPreviewEnabled(settingsManager?.ViiperStickTriggerPreviewEnabled?.Value ?? false); }
+            catch (Exception ex) { Logger.Warn($"OnStickTriggerPreviewEnabledChanged threw: {ex.Message}"); }
         }
 
         private void OnMirrorLightbarChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -958,6 +997,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     if (settingsManager.ViiperGuideButtonMode != null)
                     {
                         settingsManager.ViiperGuideButtonMode.PropertyChanged -= OnGuideModeChanged;
+                    }
+                    if (settingsManager.ViiperStickTriggerConfig != null)
+                    {
+                        settingsManager.ViiperStickTriggerConfig.PropertyChanged -= OnStickTriggerConfigChanged;
+                    }
+                    if (settingsManager.ViiperStickTriggerPreviewEnabled != null)
+                    {
+                        settingsManager.ViiperStickTriggerPreviewEnabled.PropertyChanged -= OnStickTriggerPreviewEnabledChanged;
                     }
                 }
                 Stop();

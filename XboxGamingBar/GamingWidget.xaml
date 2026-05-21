@@ -4902,20 +4902,27 @@
                                                 <!-- Configuration summary badge: at-a-glance "ON: Hold RT" / "ON: Always" /
                                                      "OFF" so first-time users can verify activation without expanding any
                                                      groups. Pure widget-side computation; no helper round-trip. -->
-                                                <Border x:Name="ViiperStickGyroStatusBadge"
-                                                        Grid.Column="1"
-                                                        Background="#1F2A3D"
-                                                        BorderBrush="#3D5A80"
-                                                        BorderThickness="1"
-                                                        CornerRadius="4"
-                                                        Padding="6,2"
-                                                        VerticalAlignment="Center">
-                                                    <TextBlock x:Name="ViiperStickGyroStatusBadgeText"
-                                                               Text="OFF"
-                                                               FontSize="10"
-                                                               Foreground="#AAAAAA"/>
-                                                </Border>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border x:Name="ViiperStickGyroStatusBadge"
+                                                            Background="#1F2A3D"
+                                                            BorderBrush="#3D5A80"
+                                                            BorderThickness="1"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock x:Name="ViiperStickGyroStatusBadgeText"
+                                                                   Text="OFF"
+                                                                   FontSize="10"
+                                                                   Foreground="#AAAAAA"/>
+                                                    </Border>
+                                                    <ToggleButton x:Name="ViiperStickGyroExpandButton" Width="22" Height="22" Padding="0" Margin="6,0,0,0"
+                                                                  Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                                                  Click="ViiperStickGyroExpandButton_Click">
+                                                        <FontIcon x:Name="ViiperStickGyroExpandIcon" Glyph="&#xE70D;" FontSize="11"/>
+                                                    </ToggleButton>
+                                                </StackPanel>
                                             </Grid>
+                                            <StackPanel x:Name="ViiperStickGyroContent" Visibility="Collapsed">
                                             <TextBlock Text="Synthesizes a stick contribution from gyro motion for emulated targets without a native motion field (Xbox 360, Xbox Elite 2, Switch Pro)."
                                                        FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,2,0,8"/>
 
@@ -5269,6 +5276,7 @@
                                                         Style="{StaticResource ModernButtonStyle}"
                                                         Click="ViiperStickGyroResetButton_Click"/>
                                             </StackPanel>
+                                            </StackPanel>
                                         </StackPanel>
 
                                         <TextBlock Text="Guide/Mode button" FontSize="12" Foreground="#CCCCCC" Margin="0,12,0,4"/>
@@ -5337,6 +5345,337 @@
                                                     Minimum="0" Maximum="200"
                                                     Value="100"
                                                     StepFrequency="5"/>
+                                        </StackPanel>
+
+                                        <!-- =============== Sticks & Triggers (PadForge-inspired shaping) =============== -->
+                                        <StackPanel x:Name="ViiperStickTriggerSection" Margin="0,16,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Sticks &amp; Triggers" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                                <ToggleButton x:Name="ViiperStickTriggerExpandButton"
+                                                              Grid.Column="1"
+                                                              Background="Transparent"
+                                                              BorderBrush="Transparent"
+                                                              Padding="6,2"
+                                                              Click="ViiperStickTriggerExpandButton_Click">
+                                                    <FontIcon x:Name="ViiperStickTriggerExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                                </ToggleButton>
+                                            </Grid>
+                                            <TextBlock Text="Deadzone shape, anti-deadzone, sensitivity curves per stick/trigger."
+                                                       FontSize="11" Foreground="#999999" TextWrapping="Wrap" Margin="0,2,0,0"/>
+
+                                            <StackPanel x:Name="ViiperStickTriggerContent" Visibility="Collapsed" Margin="0,8,0,0">
+
+                                                <!-- ============= LIVE PREVIEW ============= -->
+                                                <TextBlock Text="Live preview" FontSize="12" FontWeight="SemiBold" Foreground="#FFD000" Margin="0,4,0,4"/>
+                                                <TextBlock Text="Gray = raw, yellow = shaped. Move the sticks/triggers to verify the curve." FontSize="11" Foreground="#999999" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                                                <!-- Two stick boxes side by side -->
+                                                <Grid HorizontalAlignment="Stretch" Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                                        <TextBlock Text="LS" FontSize="11" Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                                                        <Border Background="#11FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" Margin="0,2,0,0">
+                                                            <Canvas x:Name="ViiperLSPreviewCanvas" Width="80" Height="80">
+                                                                <Line X1="40" Y1="0" X2="40" Y2="80" Stroke="#33FFFFFF" StrokeThickness="1"/>
+                                                                <Line X1="0" Y1="40" X2="80" Y2="40" Stroke="#33FFFFFF" StrokeThickness="1"/>
+                                                                <Ellipse x:Name="ViiperLSRawDot" Width="8" Height="8" Fill="#88AAAAAA" Canvas.Left="36" Canvas.Top="36"/>
+                                                                <Ellipse x:Name="ViiperLSShapedDot" Width="8" Height="8" Fill="#FFFFD000" Canvas.Left="36" Canvas.Top="36"/>
+                                                            </Canvas>
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                                        <TextBlock Text="RS" FontSize="11" Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                                                        <Border Background="#11FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" Margin="0,2,0,0">
+                                                            <Canvas x:Name="ViiperRSPreviewCanvas" Width="80" Height="80">
+                                                                <Line X1="40" Y1="0" X2="40" Y2="80" Stroke="#33FFFFFF" StrokeThickness="1"/>
+                                                                <Line X1="0" Y1="40" X2="80" Y2="40" Stroke="#33FFFFFF" StrokeThickness="1"/>
+                                                                <Ellipse x:Name="ViiperRSRawDot" Width="8" Height="8" Fill="#88AAAAAA" Canvas.Left="36" Canvas.Top="36"/>
+                                                                <Ellipse x:Name="ViiperRSShapedDot" Width="8" Height="8" Fill="#FFFFD000" Canvas.Left="36" Canvas.Top="36"/>
+                                                            </Canvas>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- Two trigger bars -->
+                                                <Grid HorizontalAlignment="Stretch" Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="LT" FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,8,2"/>
+                                                    <Border Grid.Row="0" Grid.Column="1" Background="#11FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" Height="14" Margin="0,0,0,2">
+                                                        <Grid HorizontalAlignment="Stretch">
+                                                            <Rectangle x:Name="ViiperLTRawBar" Fill="#88AAAAAA" Width="0" HorizontalAlignment="Left"/>
+                                                            <Rectangle x:Name="ViiperLTShapedBar" Fill="#FFFFD000" Height="6" Width="0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="RT" FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <Border Grid.Row="1" Grid.Column="1" Background="#11FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" Height="14">
+                                                        <Grid HorizontalAlignment="Stretch">
+                                                            <Rectangle x:Name="ViiperRTRawBar" Fill="#88AAAAAA" Width="0" HorizontalAlignment="Left"/>
+                                                            <Rectangle x:Name="ViiperRTShapedBar" Fill="#FFFFD000" Height="6" Width="0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </Grid>
+
+                                                <!-- ============= LEFT STICK ============= -->
+                                                <Grid Margin="0,4,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Left Stick" FontSize="12" FontWeight="SemiBold" Foreground="#FFD000" VerticalAlignment="Center"/>
+                                                    <ToggleButton Grid.Column="1" x:Name="ViiperLSExpandButton" Width="22" Height="22" Padding="0"
+                                                                  Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                                                  Click="ViiperLSExpandButton_Click">
+                                                        <FontIcon x:Name="ViiperLSExpandIcon" Glyph="&#xE70D;" FontSize="11"/>
+                                                    </ToggleButton>
+                                                </Grid>
+                                                <StackPanel x:Name="ViiperLSContent" Visibility="Collapsed">
+
+                                                <TextBlock Text="Deadzone shape" FontSize="12" Foreground="#CCCCCC" Margin="0,4,0,2"/>
+                                                <ComboBox x:Name="ViiperLSShapeComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Scaled Radial" Tag="0"/>
+                                                    <ComboBoxItem Content="Radial" Tag="1"/>
+                                                    <ComboBoxItem Content="Axial" Tag="2"/>
+                                                </ComboBox>
+
+                                                <Grid Margin="0,8,0,0">
+                                                    <TextBlock Text="Deadzone X" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLSDXValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLSDXSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Deadzone Y" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLSDYValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLSDYSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone X" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLSADXValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLSADXSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone Y" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLSADYValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLSADYSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <TextBlock Text="Sensitivity X" FontSize="12" Foreground="#CCCCCC" Margin="0,8,0,2"/>
+                                                <ComboBox x:Name="ViiperLSCurveXComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                <TextBlock Text="Sensitivity Y" FontSize="12" Foreground="#CCCCCC" Margin="0,4,0,2"/>
+                                                <ComboBox x:Name="ViiperLSCurveYComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                </StackPanel>
+                                                <!-- ============= RIGHT STICK ============= -->
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Right Stick" FontSize="12" FontWeight="SemiBold" Foreground="#FFD000" VerticalAlignment="Center"/>
+                                                    <ToggleButton Grid.Column="1" x:Name="ViiperRSExpandButton" Width="22" Height="22" Padding="0"
+                                                                  Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                                                  Click="ViiperRSExpandButton_Click">
+                                                        <FontIcon x:Name="ViiperRSExpandIcon" Glyph="&#xE70D;" FontSize="11"/>
+                                                    </ToggleButton>
+                                                </Grid>
+                                                <StackPanel x:Name="ViiperRSContent" Visibility="Collapsed">
+
+                                                <TextBlock Text="Deadzone shape" FontSize="12" Foreground="#CCCCCC" Margin="0,4,0,2"/>
+                                                <ComboBox x:Name="ViiperRSShapeComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Scaled Radial" Tag="0"/>
+                                                    <ComboBoxItem Content="Radial" Tag="1"/>
+                                                    <ComboBoxItem Content="Axial" Tag="2"/>
+                                                </ComboBox>
+
+                                                <Grid Margin="0,8,0,0">
+                                                    <TextBlock Text="Deadzone X" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRSDXValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRSDXSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Deadzone Y" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRSDYValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRSDYSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone X" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRSADXValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRSADXSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone Y" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRSADYValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRSADYSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <TextBlock Text="Sensitivity X" FontSize="12" Foreground="#CCCCCC" Margin="0,8,0,2"/>
+                                                <ComboBox x:Name="ViiperRSCurveXComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                <TextBlock Text="Sensitivity Y" FontSize="12" Foreground="#CCCCCC" Margin="0,4,0,2"/>
+                                                <ComboBox x:Name="ViiperRSCurveYComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                </StackPanel>
+                                                <!-- ============= LEFT TRIGGER ============= -->
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Left Trigger" FontSize="12" FontWeight="SemiBold" Foreground="#FFD000" VerticalAlignment="Center"/>
+                                                    <ToggleButton Grid.Column="1" x:Name="ViiperLTExpandButton" Width="22" Height="22" Padding="0"
+                                                                  Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                                                  Click="ViiperLTExpandButton_Click">
+                                                        <FontIcon x:Name="ViiperLTExpandIcon" Glyph="&#xE70D;" FontSize="11"/>
+                                                    </ToggleButton>
+                                                </Grid>
+                                                <StackPanel x:Name="ViiperLTContent" Visibility="Collapsed">
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Deadzone start" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLTDZValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLTDZSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Range max" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLTRMValue" Text="100%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLTRMSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="10" Maximum="100" Value="100" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperLTADValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperLTADSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <TextBlock Text="Sensitivity" FontSize="12" Foreground="#CCCCCC" Margin="0,8,0,2"/>
+                                                <ComboBox x:Name="ViiperLTCurveComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                </StackPanel>
+                                                <!-- ============= RIGHT TRIGGER ============= -->
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Right Trigger" FontSize="12" FontWeight="SemiBold" Foreground="#FFD000" VerticalAlignment="Center"/>
+                                                    <ToggleButton Grid.Column="1" x:Name="ViiperRTExpandButton" Width="22" Height="22" Padding="0"
+                                                                  Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                                                  Click="ViiperRTExpandButton_Click">
+                                                        <FontIcon x:Name="ViiperRTExpandIcon" Glyph="&#xE70D;" FontSize="11"/>
+                                                    </ToggleButton>
+                                                </Grid>
+                                                <StackPanel x:Name="ViiperRTContent" Visibility="Collapsed">
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Deadzone start" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRTDZValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRTDZSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Range max" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRTRMValue" Text="100%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRTRMSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="10" Maximum="100" Value="100" StepFrequency="1"/>
+
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Anti-deadzone" FontSize="12" Foreground="#CCCCCC"/>
+                                                    <TextBlock x:Name="ViiperRTADValue" Text="0%" Style="{StaticResource CardValueStyle}"/>
+                                                </Grid>
+                                                <Slider x:Name="ViiperRTADSlider" Style="{StaticResource ModernSliderStyle}"
+                                                        Minimum="0" Maximum="50" Value="0" StepFrequency="1"/>
+
+                                                <TextBlock Text="Sensitivity" FontSize="12" Foreground="#CCCCCC" Margin="0,8,0,2"/>
+                                                <ComboBox x:Name="ViiperRTCurveComboBox" HorizontalAlignment="Stretch" FontSize="12">
+                                                    <ComboBoxItem Content="Linear" Tag="0"/>
+                                                    <ComboBoxItem Content="Smooth" Tag="1"/>
+                                                    <ComboBoxItem Content="Aggressive" Tag="2"/>
+                                                    <ComboBoxItem Content="Instant" Tag="3"/>
+                                                    <ComboBoxItem Content="S-Curve" Tag="4"/>
+                                                    <ComboBoxItem Content="Delay" Tag="5"/>
+                                                </ComboBox>
+
+                                                </StackPanel>
+                                                <Button x:Name="ViiperStickTriggerResetButton"
+                                                        Content="Reset to defaults"
+                                                        HorizontalAlignment="Stretch"
+                                                        Margin="0,16,0,0"
+                                                        FontSize="12"
+                                                        Click="ViiperStickTriggerResetButton_Click"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

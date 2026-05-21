@@ -301,7 +301,14 @@ namespace XboxGamingBar
             // press-edge should advance a tab. One press == one tab.
             if (e.Key == VirtualKey.GamepadLeftTrigger)
             {
-                if (!ltTriggerHeld && !e.KeyStatus.WasKeyDown
+                // While the VIIPER Sticks & Triggers live-preview panel is
+                // open the user is pulling the triggers ON PURPOSE to test
+                // their shaping curve — jumping to the previous tab would
+                // make the section impossible to verify. Swallow the press
+                // (still mark Handled so ScrollViewer doesn't scroll) and
+                // let the helper-side telemetry drive the visualizer.
+                if (!IsStickTriggerPreviewOpen
+                    && !ltTriggerHeld && !e.KeyStatus.WasKeyDown
                     && (DateTime.UtcNow - lastTriggerNavigateUtc) >= TriggerNavigateDebounce)
                 {
                     ltTriggerHeld = true;
@@ -313,7 +320,8 @@ namespace XboxGamingBar
             }
             else if (e.Key == VirtualKey.GamepadRightTrigger)
             {
-                if (!rtTriggerHeld && !e.KeyStatus.WasKeyDown
+                if (!IsStickTriggerPreviewOpen
+                    && !rtTriggerHeld && !e.KeyStatus.WasKeyDown
                     && (DateTime.UtcNow - lastTriggerNavigateUtc) >= TriggerNavigateDebounce)
                 {
                     rtTriggerHeld = true;

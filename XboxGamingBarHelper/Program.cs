@@ -1366,6 +1366,9 @@ namespace XboxGamingBarHelper
                 settingsManager.ViiperGyroAxisMapX,
                 settingsManager.ViiperGyroAxisMapY,
                 settingsManager.ViiperGyroAxisMapZ,
+                settingsManager.ViiperStickTriggerConfig,
+                settingsManager.ViiperStickTriggerPreviewEnabled,
+                viiperEmulationManager.StickTriggerLiveSample,
                 // Profile Detection Settings
                 settingsManager.ProfileMatchByExe,
                 settingsManager.ProfileCustomGamePath,

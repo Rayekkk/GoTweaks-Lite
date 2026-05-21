@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using NLog;
+using Shared.Data;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Labs;
 
@@ -141,6 +142,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // For DS4 / DSE the wire format already carries IMU bytes via TryBuildImuCounts,
         // so this processor stays dormant on those targets.
         private readonly ViiperStickGyroProcessor stickGyro = new ViiperStickGyroProcessor();
+
+        // Per-stick / per-trigger shaping bundle: deadzone shapes, anti-deadzones,
+        // sensitivity curves. Default is identity (passthrough); the manager pushes
+        // updates via SetStickTriggerConfig when the user changes settings. Read by
+        // ApplyStickTriggerShaping right before BuildDeviceInput, so transformations
+        // affect every wire format consistently.
+        private StickTriggerConfigBundle stickTriggerConfig = StickTriggerConfigBundle.Default;
+        private readonly object stickTriggerConfigLock = new object();
+        private bool stickTriggerConfigActive;  // fast bypass when bundle == defaults
+
+        // Live-preview channel for the widget's Sticks & Triggers canvas. Sink
+        // is wired once at manager init; the volatile bool flips when the
+        // panel is expanded/collapsed. ApplyStickTriggerShaping reads the raw
+        // sample before transforming it, and pushes one frame every ~33ms so
+        // the widget can render both raw and shaped indicators at ~30Hz.
+        // Throttled at the source (not on the pipe consumer) to keep IPC churn
+        // bounded even when the controller is being moved rapidly.
+        private volatile bool stickTriggerPreviewEnabled;
+        private ViiperStickTriggerLiveSampleProperty stickTriggerLiveSink;
+        private int stickTriggerLastPreviewTickMs;
+        private const int StickTriggerPreviewIntervalMs = 33;
 
         // Edge-detection state for the Guide/Mode -> Win+G shortcut. We only fire the
         // shortcut on press-transition, not on every poll while the button is held.
@@ -705,6 +727,109 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             Logger.Info($"VIIPER forwarder mirror-lightbar-to-stick -> {enabled}");
         }
 
+        /// <summary>
+        /// Updates the per-stick + per-trigger shaping configuration. Applied
+        /// inside PollLoop right before BuildDeviceInput so all wire formats
+        /// see the transformed values. Read under a lock; the active flag is
+        /// the fast bypass when the bundle is identity (no per-axis work).
+        /// </summary>
+        public void SetStickTriggerConfig(StickTriggerConfigBundle bundle)
+        {
+            bool active = IsStickTriggerConfigActive(bundle);
+            lock (stickTriggerConfigLock)
+            {
+                stickTriggerConfig = bundle;
+                stickTriggerConfigActive = active;
+            }
+            Logger.Info($"VIIPER forwarder stick/trigger config updated (active={active})");
+        }
+
+        private static bool IsStickTriggerConfigActive(StickTriggerConfigBundle b)
+        {
+            // Identity check: any non-default field means at least one axis is shaped.
+            return IsStickActive(b.LeftStick) || IsStickActive(b.RightStick)
+                || IsTriggerActive(b.LeftTrigger) || IsTriggerActive(b.RightTrigger);
+        }
+        private static bool IsStickActive(StickConfig c) =>
+            c.DeadzoneX > 0f || c.DeadzoneY > 0f
+            || c.AntiDeadzoneX > 0f || c.AntiDeadzoneY > 0f
+            || c.CurveX != SensitivityCurve.Linear || c.CurveY != SensitivityCurve.Linear
+            || c.Shape != DeadzoneShape.ScaledRadial;
+        private static bool IsTriggerActive(TriggerConfig c) =>
+            c.DeadzoneStart > 0f || c.RangeMax < 1f
+            || c.AntiDeadzone > 0f || c.Curve != SensitivityCurve.Linear;
+
+        /// <summary>
+        /// Wires the helper-owned live-sample sink. Called once by
+        /// <see cref="ViiperEmulationManager"/> at startup. The forwarder
+        /// publishes raw stick/trigger frames to this property whenever the
+        /// preview flag is set.
+        /// </summary>
+        public void SetStickTriggerLiveSink(ViiperStickTriggerLiveSampleProperty sink)
+        {
+            stickTriggerLiveSink = sink;
+        }
+
+        /// <summary>
+        /// Turns the live-preview stream on or off. Called from the manager
+        /// in response to the widget toggling
+        /// <see cref="Function.Viiper_StickTriggerPreviewEnabled"/>.
+        /// </summary>
+        public void SetStickTriggerPreviewEnabled(bool enabled)
+        {
+            stickTriggerPreviewEnabled = enabled;
+            if (!enabled) stickTriggerLastPreviewTickMs = 0;
+            Logger.Info($"VIIPER stick/trigger preview -> {(enabled ? "on" : "off")}");
+        }
+
+        /// <summary>
+        /// Applies the configured shaping to the gamepad sample in-place.
+        /// Called right before BuildDeviceInput so both LegionHid and XInput
+        /// input paths feed transformed values to the wire builders. Cheap
+        /// no-op when no axis is configured.
+        ///
+        /// <para>Also pumps the live-preview stream at the top of the
+        /// function when the widget panel is open: the raw values entering
+        /// this method are exactly what the canvas needs to show, and the
+        /// widget runs the same StickTriggerProcessor locally to render the
+        /// shaped indicators against the user's current bundle.</para>
+        /// </summary>
+        private void ApplyStickTriggerShaping(ref ViiperXInputGamepad gp)
+        {
+            // Push raw frame to the widget BEFORE any shaping. Throttled to
+            // ~30Hz so a 1kHz USB hot path doesn't flood the pipe.
+            if (stickTriggerPreviewEnabled && stickTriggerLiveSink != null)
+            {
+                int nowMs = Environment.TickCount;
+                if (stickTriggerLastPreviewTickMs == 0
+                    || (nowMs - stickTriggerLastPreviewTickMs) >= StickTriggerPreviewIntervalMs)
+                {
+                    stickTriggerLastPreviewTickMs = nowMs;
+                    string payload = gp.ThumbLX + "," + gp.ThumbLY + "," + gp.ThumbRX + "," + gp.ThumbRY + "," + gp.LeftTrigger + "," + gp.RightTrigger;
+                    stickTriggerLiveSink.SetValue(payload);
+                }
+            }
+
+            StickTriggerConfigBundle cfg;
+            bool active;
+            lock (stickTriggerConfigLock)
+            {
+                if (!stickTriggerConfigActive) return;
+                cfg = stickTriggerConfig;
+                active = true;
+            }
+            if (!active) return;
+
+            StickTriggerProcessor.TransformStick(gp.ThumbLX, gp.ThumbLY, cfg.LeftStick, out var lx, out var ly);
+            gp.ThumbLX = lx; gp.ThumbLY = ly;
+
+            StickTriggerProcessor.TransformStick(gp.ThumbRX, gp.ThumbRY, cfg.RightStick, out var rx, out var ry);
+            gp.ThumbRX = rx; gp.ThumbRY = ry;
+
+            gp.LeftTrigger = StickTriggerProcessor.TransformTrigger(gp.LeftTrigger, cfg.LeftTrigger);
+            gp.RightTrigger = StickTriggerProcessor.TransformTrigger(gp.RightTrigger, cfg.RightTrigger);
+        }
+
         /// <summary>Sets the rumble intensity multiplier (percent, 0..200).</summary>
         public void SetRumbleIntensity(int percent)
         {
@@ -1201,6 +1326,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                                 }
                             }
                         }
+                        ApplyStickTriggerShaping(ref gp);
                         byte[] data = BuildDeviceInput(gp);
                         if (data != null && data.Length > 0)
                         {
@@ -1273,6 +1399,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                                 }
                             }
                         }
+                        ApplyStickTriggerShaping(ref gp);
                         byte[] data = BuildDeviceInput(gp);
                         if (data != null && data.Length > 0)
                         {
