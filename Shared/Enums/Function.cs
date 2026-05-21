@@ -421,6 +421,7 @@
         Viiper_GyroSource,                         // string - gyro source ("Left", "Right", "Mixed", "Handheld", "None")
         Viiper_SteamSubDevice,                     // string - Steam sub-device selector (generic, steam-deck, legion-go, legion-go-2, ..., gordon)
         Viiper_SonySubDevice,                      // string - Sony sub-device selector (dualsense, dualsense-edge, dualshock4) — used when Viiper_DeviceType == "sony"
+        Viiper_NintendoSubDevice,                  // string - Nintendo sub-device selector (switchpro, switchpro2, joycon-left, joycon-right, joycon-pair) — used when Viiper_DeviceType == "nintendo". switchpro2 is a placeholder pending the libviiper ns2pro port (Cookiekira/VIIPER#ns2pro); selecting it currently falls back to switchpro at the helper.
         Viiper_GuideButtonMode,                    // string - "Native" (send device Guide/PS) or "GameBar" (send Win+G on Mode/Guide press)
         Viiper_SwapRumbleMotors,                   // bool  - swap large/small motor values before forwarding rumble feedback
         Viiper_RumbleIntensity,                    // int (0-200) - percentage multiplier applied to rumble motor values (100 = unity)

@@ -77,6 +77,13 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private uint physicalIndex;
         private uint busId;
         private uint deviceId;
+        // Set when the target topology requires two libviiper devices on the
+        // same bus (currently only joycon-pair: joycon-left + joycon-right).
+        // When non-zero the poll loop mirrors each SetInput onto this device
+        // too. libviiper's per-profile InputState parser slices the same
+        // 24-byte switchpro frame to the left/right half, so a single wire
+        // build serves both halves correctly.
+        private volatile uint secondaryDeviceId;
         // Monotonic frame counter written into the steamdeck wire format's frame
         // field (bytes 4-7). libviiper's steamdeck device tracks it for sequence/
         // deduplication purposes — we just need it to advance per call.
@@ -513,6 +520,52 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "joycon-pair":
                     if (data.Length >= 2) { rumbleLarge = data[0]; rumbleSmall = data[1]; }
                     break;
+                case "ns2pro":
+                    // ns2pro OUT reports arrive in one of two shapes:
+                    //
+                    //   (a) Switch 2 Pro native HD-LRA pattern — 32 bytes,
+                    //       two 16-byte amplitude windows (left then right).
+                    //       Peak-of-window is the best ERM proxy because
+                    //       click/heartbeat patterns sandwich the peak
+                    //       between low samples.
+                    //
+                    //   (b) Switch 1 Pro rumble subcommand fallback —
+                    //       Steam Input doesn't ship an HD-LRA driver for
+                    //       Switch 2 Pro yet (2026-05), so when it sees our
+                    //       057E:2069 it sends the legacy 0x10/0x11
+                    //       subcommand: `cmd counter L_HFh L_HFa L_LFh
+                    //       L_LFa R_HFh R_HFa R_LFh R_LFa ...`. Treating
+                    //       those bytes as LRA samples reads the cmd byte
+                    //       (0x10 = 16) and counter (0..15) as faint
+                    //       amplitudes every poll, producing the
+                    //       "vibrates non-stop" symptom we saw on 0x057E.
+                    //
+                    // Discriminate on byte 0 — real HD-LRA patterns start
+                    // with an envelope sample, not 0x10/0x11.
+                    byte ns2L = 0, ns2R = 0;
+                    if (data.Length >= 10 && (data[0] == 0x10 || data[0] == 0x11))
+                    {
+                        // Switch 1 Pro Rumble-only / Rumble+subcommand.
+                        // High-frequency amplitudes sit at offsets 3 (left)
+                        // and 7 (right); low-frequency at 5 / 9. Take the
+                        // larger of HF/LF per side so the motor responds
+                        // to either band.
+                        if (data[3] > ns2L) ns2L = data[3];
+                        if (data[5] > ns2L) ns2L = data[5];
+                        if (data[7] > ns2R) ns2R = data[7];
+                        if (data[9] > ns2R) ns2R = data[9];
+                    }
+                    else if (data.Length >= 32)
+                    {
+                        for (int i = 0; i < 16; i++)
+                        {
+                            if (data[i] > ns2L) ns2L = data[i];
+                            if (data[16 + i] > ns2R) ns2R = data[16 + i];
+                        }
+                    }
+                    rumbleLarge = ns2L;
+                    rumbleSmall = ns2R;
+                    break;
                 default:
                     return;
             }
@@ -654,6 +707,19 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             deviceId = newDeviceId;
             targetType = string.IsNullOrEmpty(newTypeName) ? "xbox360" : newTypeName;
             Logger.Info($"VIIPER forwarder target updated: bus={busId}, dev={deviceId}, type={targetType}");
+        }
+
+        /// <summary>
+        /// Sets the secondary libviiper device ID that input frames should be
+        /// mirrored to. Pass 0 to disable mirroring. Called by
+        /// <see cref="ViiperEmulationManager"/> after a joycon-pair Start
+        /// (both Joy-Con halves get the same 24-byte switchpro frame) and on
+        /// any topology change.
+        /// </summary>
+        public void SetSecondaryDevice(uint deviceId)
+        {
+            secondaryDeviceId = deviceId;
+            Logger.Info($"VIIPER forwarder secondary device set to {deviceId} (0 = none)");
         }
 
         /// <summary>
@@ -1332,6 +1398,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         {
                             if (service.SetInput(busId, deviceId, data)) statsReportsSent++;
                             else statsReportsFailed++;
+                            // Mirror to the secondary device when joycon-pair
+                            // is active. libviiper slices the same wire frame
+                            // into the appropriate Joy-Con half via its
+                            // profile setting on each device.
+                            uint sec = secondaryDeviceId;
+                            if (sec != 0) service.SetInput(busId, sec, data);
                         }
                     }
                     else // XInput
@@ -1405,6 +1477,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         {
                             if (service.SetInput(busId, deviceId, data)) statsReportsSent++;
                             else statsReportsFailed++;
+                            // Mirror to the secondary device when joycon-pair
+                            // is active. libviiper slices the same wire frame
+                            // into the appropriate Joy-Con half via its
+                            // profile setting on each device.
+                            uint sec = secondaryDeviceId;
+                            if (sec != 0) service.SetInput(busId, sec, data);
                         }
                     }
                 }
@@ -1534,7 +1612,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 case "switchpro":
                 case "joycon-left":
                 case "joycon-right":
+                case "joycon-pair":
                     return BuildSwitchProInput(gp);
+                case "ns2pro":
+                    return BuildNS2ProInput(gp);
                 default:
                     return BuildXbox360Input(gp);
             }
@@ -1586,6 +1667,93 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             // if the caller wants gyro on Switch output, TryBuildImuCounts can populate
             // these exactly like the DSE path. Future enhancement.
             return data;
+        }
+
+        /// <summary>
+        /// Switch 2 Pro Controller (ns2pro) wire frame — 27 bytes. Differs
+        /// from the legacy switchpro frame in three ways:
+        ///   1. Sticks are unsigned 12-bit Switch native (0..0xFFF, 0x800 =
+        ///      center), not signed XInput range.
+        ///   2. IMU layout is Accel first, then Gyro (switchpro is the
+        ///      reverse).
+        ///   3. Three trailing power bytes: batteryLevel (0..9), charging,
+        ///      externalPower.
+        ///
+        /// <para>Button mapping mirrors BuildSwitchProInput: positional face
+        /// buttons (Xbox A → Switch B is bottom face on both, etc.), Xbox
+        /// triggers digital-press to ZL/ZR above 50%. ns2pro adds C, GR/GL,
+        /// Headset, Capture buttons — we don't have XInput counterparts so
+        /// leave them off until we expose them through a separate property.</para>
+        /// </summary>
+        private byte[] BuildNS2ProInput(ViiperXInputGamepad gp)
+        {
+            var data = new byte[27];
+            uint buttons = 0;
+
+            // ns2pro button bit layout (see device/ns2pro/const.go in
+            // libviiper). Bit 0 = B, bit 1 = A, bit 2 = Y, bit 3 = X, ...
+            if ((gp.Buttons & ViiperXInput.A) != 0) buttons |= 1u << 0;  // B (bottom)
+            if ((gp.Buttons & ViiperXInput.B) != 0) buttons |= 1u << 1;  // A (right)
+            if ((gp.Buttons & ViiperXInput.X) != 0) buttons |= 1u << 2;  // Y (left)
+            if ((gp.Buttons & ViiperXInput.Y) != 0) buttons |= 1u << 3;  // X (top)
+            if ((gp.Buttons & ViiperXInput.RB) != 0) buttons |= 1u << 4; // R
+            if (gp.RightTrigger > 128) buttons |= 1u << 5;               // ZR
+            if ((gp.Buttons & ViiperXInput.Start) != 0) buttons |= 1u << 6;       // Plus
+            if ((gp.Buttons & ViiperXInput.RightThumb) != 0) buttons |= 1u << 7;  // RightStick
+            if ((gp.Buttons & ViiperXInput.DPadDown) != 0) buttons |= 1u << 8;
+            if ((gp.Buttons & ViiperXInput.DPadRight) != 0) buttons |= 1u << 9;
+            if ((gp.Buttons & ViiperXInput.DPadLeft) != 0) buttons |= 1u << 10;
+            if ((gp.Buttons & ViiperXInput.DPadUp) != 0) buttons |= 1u << 11;
+            if ((gp.Buttons & ViiperXInput.LB) != 0) buttons |= 1u << 12; // L
+            if (gp.LeftTrigger > 128) buttons |= 1u << 13;                // ZL
+            if ((gp.Buttons & ViiperXInput.Back) != 0) buttons |= 1u << 14;       // Minus
+            if ((gp.Buttons & ViiperXInput.LeftThumb) != 0) buttons |= 1u << 15;  // LeftStick
+            if ((gp.Buttons & ViiperXInput.Guide) != 0) buttons |= 1u << 16;      // Home
+            // Bits 17 (Capture), 18 (GR), 19 (GL), 20 (C), 21 (Headset) require
+            // XInput mappings we don't expose yet — left off.
+
+            WriteU32(data, 0, buttons);
+
+            // Sticks: XInput signed int16 (-32768..32767) → ns2pro u16 (0..4095).
+            // Center maps to 0x800, full deflection clamps to 0..0xFFF.
+            WriteU16(data, 4, StickXInputToNS2Pro(gp.ThumbLX));
+            WriteU16(data, 6, StickXInputToNS2Pro(gp.ThumbLY));
+            WriteU16(data, 8, StickXInputToNS2Pro(gp.ThumbRX));
+            WriteU16(data, 10, StickXInputToNS2Pro(gp.ThumbRY));
+
+            // IMU at offsets 12-23: Accel XYZ (i16) then Gyro XYZ (i16) per
+            // ns2pro's inputstate.go layout — note this is the REVERSE of
+            // the DS4 wire which puts gyro first. TryBuildImuCounts returns
+            // raw int16 counts in the same BMI160/BMI260 native units that
+            // Switch firmware expects, so no scaling factor is needed.
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteI16(data, 12, ax);
+                WriteI16(data, 14, ay);
+                WriteI16(data, 16, az);
+                WriteI16(data, 18, gx);
+                WriteI16(data, 20, gy);
+                WriteI16(data, 22, gz);
+            }
+
+            // Power bytes — default to "9/9 battery, externally powered" so
+            // games that gate features on charge level treat it as full.
+            data[24] = 9;  // BatteryLevel (max 9 per ns2pro spec)
+            data[25] = 0;  // Charging
+            data[26] = 1;  // ExternalPower
+
+            return data;
+        }
+
+        private static ushort StickXInputToNS2Pro(short xinputValue)
+        {
+            // Map signed -32768..32767 to unsigned 0..0xFFF. The +32768
+            // shift turns it into 0..65535 then >>4 to 0..4095.
+            int shifted = (int)xinputValue + 32768;
+            if (shifted < 0) shifted = 0;
+            if (shifted > 65535) shifted = 65535;
+            return (ushort)(shifted >> 4);
         }
 
         // -------------------------------------------------------------------

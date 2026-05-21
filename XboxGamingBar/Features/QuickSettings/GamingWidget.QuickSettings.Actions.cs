@@ -1196,7 +1196,11 @@ namespace XboxGamingBar
         private static readonly int[] ControllerEmulationLegacyCycle = new[] { 0, 1, 2, 3 };
         private static readonly string[] ControllerEmulationViiperCycle = new[]
         {
-            "xbox360", "dualshock4", "dualsenseedge", "xboxelite2", "steam-generic", "switchpro"
+            // xboxelite2 dropped from the cycle alongside the UI option (the
+            // helper coerces persisted values forward). switchpro is reachable
+            // through the new "nintendo" family entry — switching backend to
+            // nintendo + picking a sub-device from the Debug-tab dropdown.
+            "xbox360", "dualshock4", "dualsenseedge", "steam-generic", "sony", "nintendo"
         };
 
         private void ToggleControllerEmulation()

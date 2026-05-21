@@ -1358,6 +1358,7 @@ namespace XboxGamingBarHelper
                 settingsManager.ViiperGyroSource,
                 settingsManager.ViiperSteamSubDevice,
                 settingsManager.ViiperSonySubDevice,
+                settingsManager.ViiperNintendoSubDevice,
                 settingsManager.ViiperGuideButtonMode,
                 settingsManager.ViiperSwapRumbleMotors,
                 settingsManager.ViiperRumbleIntensity,

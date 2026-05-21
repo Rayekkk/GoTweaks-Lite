@@ -61,6 +61,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             ["switchpro"]            = new[] { ((ushort)0x057E, (ushort)0x2009) },
             ["joycon-left"]          = new[] { ((ushort)0x057E, (ushort)0x2006) },
             ["joycon-right"]         = new[] { ((ushort)0x057E, (ushort)0x2007) },
+            ["ns2pro"]               = new[] { ((ushort)0x057E, (ushort)0x2069) },
             ["gordon"]               = new[] { ((ushort)0x28DE, (ushort)0x1102) },
             ["steam-controller"]     = new[] { ((ushort)0x28DE, (ushort)0x1102) },
             ["steam-controller-v1"]  = new[] { ((ushort)0x28DE, (ushort)0x1102) },

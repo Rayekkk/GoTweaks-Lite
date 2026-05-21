@@ -4786,10 +4786,18 @@
                                         <TextBlock Text="Virtual device" FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,4"/>
                                         <ComboBox x:Name="ViiperDeviceTypeComboBox" HorizontalAlignment="Stretch">
                                             <ComboBoxItem Content="Xbox 360" Tag="xbox360"/>
+                                            <!--
+                                                Xbox Elite 2 (Tag="xboxelite2") hidden after RE confirmed the
+                                                xboxgip.sys allow-list wall — the virtual GIP device never
+                                                advances past state 0, so no IGamepad XInput child PDO is
+                                                ever published. Helper coerces persisted "xboxelite2" to
+                                                "xbox360" on load. Re-enable when libviiper or the kernel
+                                                state-machine bypass lands.
                                             <ComboBoxItem Content="Xbox Elite 2" Tag="xboxelite2"/>
+                                            -->
                                             <ComboBoxItem Content="Steam" Tag="steam-generic"/>
                                             <ComboBoxItem Content="Sony Virtual Device" Tag="sony"/>
-                                            <ComboBoxItem Content="Switch Pro" Tag="switchpro"/>
+                                            <ComboBoxItem Content="Nintendo Virtual Device" Tag="nintendo"/>
                                         </ComboBox>
 
                                         <StackPanel x:Name="ViiperSteamSubDevicePanel" Visibility="Collapsed" Margin="0,12,0,0">
@@ -4813,6 +4821,17 @@
                                                 <ComboBoxItem Content="DualSense" Tag="dualsense"/>
                                                 <ComboBoxItem Content="DualSense Edge" Tag="dualsense-edge"/>
                                                 <ComboBoxItem Content="DualShock 4" Tag="dualshock4"/>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="ViiperNintendoSubDevicePanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                            <TextBlock Text="Nintendo sub-device" FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,4"/>
+                                            <ComboBox x:Name="ViiperNintendoSubDeviceComboBox" HorizontalAlignment="Stretch">
+                                                <ComboBoxItem Content="Switch Pro" Tag="switchpro"/>
+                                                <ComboBoxItem Content="Switch Pro 2" Tag="switchpro2"/>
+                                                <ComboBoxItem Content="Joy-Con (Left)" Tag="joycon-left"/>
+                                                <ComboBoxItem Content="Joy-Con (Right)" Tag="joycon-right"/>
+                                                <ComboBoxItem Content="Joy-Con Pair (L + R)" Tag="joycon-pair"/>
                                             </ComboBox>
                                         </StackPanel>
 

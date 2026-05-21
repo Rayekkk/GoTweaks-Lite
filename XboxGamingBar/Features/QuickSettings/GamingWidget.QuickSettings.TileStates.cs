@@ -741,9 +741,19 @@ namespace XboxGamingBar
                             case "xbox360": label = "Xbox"; break;
                             case "dualshock4": label = "DS4"; break;
                             case "dualsenseedge": label = "DS Edge"; break;
-                            case "xboxelite2": label = "Elite 2"; break;
+                            // xboxelite2 removed from UI but kept here so legacy
+                            // persisted settings still render a sane label until
+                            // the helper coerces them forward on next launch.
+                            case "xboxelite2": label = "Xbox"; break;
                             case "steam-generic": label = "Steam"; break;
+                            case "sony": label = "Sony"; break;
+                            case "nintendo": label = "Switch"; break;
+                            // Helper resolves nintendo+sub → joycon-left/right/pair;
+                            // keep direct labels for those when they arrive.
                             case "switchpro": label = "Switch"; break;
+                            case "joycon-left": label = "JoyL"; break;
+                            case "joycon-right": label = "JoyR"; break;
+                            case "joycon-pair": label = "JoyPair"; break;
                             default: label = "On"; break;
                         }
                     }

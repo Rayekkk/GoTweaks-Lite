@@ -108,6 +108,12 @@ namespace XboxGamingBarHelper.Settings
             get { return viiperSonySubDevice; }
         }
 
+        private readonly ViiperNintendoSubDeviceProperty viiperNintendoSubDevice;
+        public ViiperNintendoSubDeviceProperty ViiperNintendoSubDevice
+        {
+            get { return viiperNintendoSubDevice; }
+        }
+
         private readonly ViiperGuideButtonModeProperty viiperGuideButtonMode;
         public ViiperGuideButtonModeProperty ViiperGuideButtonMode
         {
@@ -209,6 +215,7 @@ namespace XboxGamingBarHelper.Settings
             viiperGyroSource = new ViiperGyroSourceProperty(this);
             viiperSteamSubDevice = new ViiperSteamSubDeviceProperty(this);
             viiperSonySubDevice = new ViiperSonySubDeviceProperty(this);
+            viiperNintendoSubDevice = new ViiperNintendoSubDeviceProperty(this);
             viiperGuideButtonMode = new ViiperGuideButtonModeProperty(this);
             viiperSwapRumbleMotors = new ViiperSwapRumbleMotorsProperty(this);
             viiperRumbleIntensity = new ViiperRumbleIntensityProperty(this);

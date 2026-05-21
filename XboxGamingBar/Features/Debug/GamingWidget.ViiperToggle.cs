@@ -98,6 +98,7 @@ namespace XboxGamingBar
                     string t = viiperDeviceType.Value ?? string.Empty;
                     bool isSteam = t == "steam-generic" || t == "steam-controller" || t == "steamdeck-generic";
                     bool isSony = t == "sony";
+                    bool isNintendo = t == "nintendo";
                     if (ViiperSteamSubDevicePanel != null)
                     {
                         ViiperSteamSubDevicePanel.Visibility = (backendOn && isSteam) ? Visibility.Visible : Visibility.Collapsed;
@@ -105,6 +106,10 @@ namespace XboxGamingBar
                     if (ViiperSonySubDevicePanel != null)
                     {
                         ViiperSonySubDevicePanel.Visibility = (backendOn && isSony) ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    if (ViiperNintendoSubDevicePanel != null)
+                    {
+                        ViiperNintendoSubDevicePanel.Visibility = (backendOn && isNintendo) ? Visibility.Visible : Visibility.Collapsed;
                     }
                 }
             });

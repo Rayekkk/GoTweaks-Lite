@@ -34,6 +34,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private bool isRunning;
         private uint activeBusId;
         private uint activeDeviceId;
+        // Secondary device used when the user picks Nintendo → Joy-Con Pair.
+        // libviiper publishes Joy-Cons as two distinct USB devices; we hold
+        // the second device ID so the forwarder can mirror input to it and
+        // Stop() can clean it up. Zero whenever we're in single-device mode.
+        private uint activeSecondaryDeviceId;
         private string activeDeviceType = DefaultDeviceType;
         private bool viiperOwnsSuppression;
 
@@ -91,6 +96,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 if (settingsManager.ViiperSonySubDevice != null)
                 {
                     settingsManager.ViiperSonySubDevice.PropertyChanged += OnDeviceConfigChanged;
+                }
+                if (settingsManager.ViiperNintendoSubDevice != null)
+                {
+                    settingsManager.ViiperNintendoSubDevice.PropertyChanged += OnDeviceConfigChanged;
                 }
                 if (settingsManager.ViiperInputSource != null)
                 {
@@ -609,16 +618,40 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             // reaching the active device. Run this BEFORE AddDevice so the bus
             // is clean when the new device arrives.
             ViiperPnpCleanup.CleanupAllKnownGhosts();
-            var addResult = service.AddDevice(activeBusId, targetType, vid, pid);
+
+            // joycon-pair publishes two separate USB devices (left + right
+            // Joy-Cons) on the same bus. libviiper has no "joycon-pair"
+            // alias; we register the left half first, then add the right
+            // half below, and keep activeDeviceType = "joycon-pair" so the
+            // forwarder's BuildDeviceInput picks the paired wire format.
+            string registryName = targetType == "joycon-pair" ? "joycon-left" : targetType;
+            var addResult = service.AddDevice(activeBusId, registryName, vid, pid);
             if (!addResult.Success)
             {
-                Logger.Warn($"VIIPER failed to add {targetType} device; tearing down.");
+                Logger.Warn($"VIIPER failed to add {registryName} device (target={targetType}); tearing down.");
                 service.RemoveBus(activeBusId);
                 service.Dispose();
                 return false;
             }
             activeDeviceId = addResult.DeviceId;
             activeDeviceType = targetType;
+            activeSecondaryDeviceId = 0;
+
+            if (targetType == "joycon-pair")
+            {
+                var secondary = service.AddDevice(activeBusId, "joycon-right", 0, 0);
+                if (!secondary.Success)
+                {
+                    Logger.Warn("VIIPER joycon-pair: secondary joycon-right add failed; tearing down primary.");
+                    service.RemoveDevice(activeBusId, activeDeviceId);
+                    service.RemoveBus(activeBusId);
+                    service.Dispose();
+                    activeDeviceId = 0;
+                    return false;
+                }
+                activeSecondaryDeviceId = secondary.DeviceId;
+                Logger.Info($"VIIPER joycon-pair: primary={activeDeviceId} (joycon-left), secondary={activeSecondaryDeviceId} (joycon-right)");
+            }
 
             // Start forwarding physical input -> virtual device.
             uint xinputIdx = ViiperInputForwarder.DetectPhysicalXInputIndex();
@@ -635,9 +668,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             forwarder.SetStickTriggerConfig(StickTriggerConfigBundle.Deserialize(
                 settingsManager?.ViiperStickTriggerConfig?.Value ?? string.Empty));
             forwarder.Start(xinputIdx, activeBusId, activeDeviceId, activeDeviceType);
+            forwarder.SetSecondaryDevice(activeSecondaryDeviceId);
 
             isRunning = true;
-            Logger.Info($"VIIPER emulation manager started (bus={activeBusId}, dev={activeDeviceId}, type={activeDeviceType}, xinput={xinputIdx})");
+            Logger.Info($"VIIPER emulation manager started (bus={activeBusId}, dev={activeDeviceId}, sec={activeSecondaryDeviceId}, type={activeDeviceType}, xinput={xinputIdx})");
 
             // Tell Labs/LegionButtonMonitor to tear down the dedicated Guide-only ViGEm
             // pad now that VIIPER will deliver the Guide press through its emulated
@@ -679,6 +713,16 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 targetType = settingsManager.ViiperDeviceType.Value;
             }
 
+            // Legacy fallback: "xboxelite2" was removed from the widget after
+            // RE confirmed the GIP allow-list wall (no XInput child resolves).
+            // Coerce persisted user settings forward so anyone who had it
+            // selected before the UI change keeps getting a working pad.
+            if (targetType == "xboxelite2")
+            {
+                Logger.Info("VIIPER: coercing persisted xboxelite2 target → xbox360 (Elite 2 disabled in UI).");
+                targetType = "xbox360";
+            }
+
             // "sony" is the widget's parent grouping for Sony virtual devices —
             // the actual libviiper target comes from ViiperSonySubDevice.
             // Values: dualsense / dualsense-edge / dualshock4. No VID/PID
@@ -686,6 +730,21 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             if (targetType == "sony" && settingsManager?.ViiperSonySubDevice != null)
             {
                 targetType = ViiperSonySubDeviceProperty.ResolveLibViiperTarget(settingsManager.ViiperSonySubDevice.Value);
+                return;
+            }
+
+            // "nintendo" parent grouping: Switch Pro, Switch Pro 2 (placeholder),
+            // and the three Joy-Con configurations. For joycon-pair we keep
+            // targetType = "joycon-pair" so the forwarder picks the dual-Joy-Con
+            // wire format; Start() then publishes BOTH joycon-left AND
+            // joycon-right devices on the bus. ResolvePrimary returns the
+            // libviiper alias for whichever device gets registered first.
+            if (targetType == "nintendo" && settingsManager?.ViiperNintendoSubDevice != null)
+            {
+                string sub = settingsManager.ViiperNintendoSubDevice.Value;
+                targetType = sub == "joycon-pair"
+                    ? "joycon-pair"
+                    : ViiperNintendoSubDeviceProperty.ResolvePrimaryLibViiperTarget(sub);
                 return;
             }
 
@@ -828,6 +887,18 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 return;
             }
 
+            // joycon-pair is a two-device topology; libviiper's SwitchDeviceType
+            // only operates on a single device. Crossing the pair boundary in
+            // either direction requires a clean teardown so we don't leak the
+            // secondary (entering) or end up with an orphan (leaving).
+            if (oldType == "joycon-pair" || newType == "joycon-pair")
+            {
+                Logger.Info($"VIIPER pair-boundary swap ({oldType} -> {newType}): doing full Stop+Start.");
+                Stop();
+                Start();
+                return;
+            }
+
             Logger.Info($"VIIPER hot-swap: {activeDeviceType} -> {newType} (vid=0x{vid:X4}, pid=0x{pid:X4})");
 
             // Pause the forwarder for the whole swap: RemoveDevice is instant but AddDevice
@@ -945,6 +1016,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             catch (Exception ex) { Logger.Warn($"RemoveDevice threw: {ex.Message}"); }
 
+            try
+            {
+                if (activeSecondaryDeviceId != 0)
+                {
+                    service.RemoveDevice(activeBusId, activeSecondaryDeviceId);
+                }
+            }
+            catch (Exception ex) { Logger.Warn($"RemoveDevice (secondary) threw: {ex.Message}"); }
+
             try { service.RemoveBus(activeBusId); }
             catch (Exception ex) { Logger.Warn($"RemoveBus threw: {ex.Message}"); }
 
@@ -952,6 +1032,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             catch (Exception ex) { Logger.Warn($"VIIPER Dispose threw: {ex.Message}"); }
 
             activeDeviceId = 0;
+            activeSecondaryDeviceId = 0;
             isRunning = false;
             Logger.Info("VIIPER emulation manager stopped");
 
@@ -985,6 +1066,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     if (settingsManager.ViiperSonySubDevice != null)
                     {
                         settingsManager.ViiperSonySubDevice.PropertyChanged -= OnDeviceConfigChanged;
+                    }
+                    if (settingsManager.ViiperNintendoSubDevice != null)
+                    {
+                        settingsManager.ViiperNintendoSubDevice.PropertyChanged -= OnDeviceConfigChanged;
                     }
                     if (settingsManager.ViiperInputSource != null)
                     {
