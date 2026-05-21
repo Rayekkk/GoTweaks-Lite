@@ -1411,10 +1411,55 @@ namespace XboxGamingBarHelper.ControllerEmulation
 
         internal static IReadOnlyCollection<string> QueryXboxBridgeDeviceIds()
         {
+            // Filter the raw 045E:028E enumeration down to ones parented by a Lenovo
+            // (VID 17EF) USB device. Without this, hiding "all Xbox 360 bridge devices"
+            // would also hide:
+            //   • The user's real external Xbox 360 / One controller (parented by a USB hub)
+            //   • VIIPER's virtual xbox360 pad (parented by usbip-win2 bus)
+            //   • The legacy backend's ViGEm pad (parented by Virtual Gamepad Emulation Bus)
+            // We only ever want to hide the Legion's *own* XInput child — the 045E:028E
+            // device that xusb22.sys publishes underneath the Legion's USB endpoint.
+            // Walking each candidate's PnP parent chain and matching VID_17EF identifies
+            // it unambiguously, regardless of how the user has the controller attached.
             return QueryPnpDeviceIds(0x045E, 0x028E)
                 .Concat(QueryUsbDeviceIds(0x045E, 0x028E))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(IsLegionParentedXboxBridge)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// True when the given 045E:028E PnP instance has a Lenovo USB device (VID 17EF)
+        /// somewhere in its parent chain. Conservative: returns false on any lookup
+        /// failure so an enumeration glitch never accidentally widens the hide list.
+        /// </summary>
+        private static bool IsLegionParentedXboxBridge(string xboxBridgeInstanceId)
+        {
+            if (string.IsNullOrWhiteSpace(xboxBridgeInstanceId)) return false;
+
+            try
+            {
+                PnPDevice current = PnPDevice.GetDeviceByInstanceId(xboxBridgeInstanceId, DeviceLocationFlags.Normal);
+                // Walk up to ~6 levels — typical depth from a HID child to the USB hub
+                // is 2-3 (HIDClass → USB composite child → USB device). 6 is plenty.
+                for (int depth = 0; depth < 6 && current != null; depth++)
+                {
+                    string id = current.InstanceId;
+                    if (!string.IsNullOrEmpty(id) &&
+                        id.IndexOf("VID_17EF", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return true;
+                    }
+                    string parentId = current.GetProperty<string>(DevicePropertyKey.Device_Parent);
+                    if (string.IsNullOrWhiteSpace(parentId)) return false;
+                    current = PnPDevice.GetDeviceByInstanceId(parentId, DeviceLocationFlags.Normal);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"IsLegionParentedXboxBridge({xboxBridgeInstanceId}) lookup failed: {ex.Message}");
+            }
+            return false;
         }
 
         private static IEnumerable<string> FilterNativeDeviceInstanceIds(
@@ -1477,11 +1522,23 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 return false;
             }
 
-            // USB MI_00 is the primary stock XInput interface we need to hide.
-            // Avoid hiding transient IG_* endpoints, which can churn across reconnects.
+            // USB MI_00 is the primary stock HID gamepad interface — hide it so
+            // games / Steam reading raw HID don't see the Legion.
             if (normalized.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))
             {
                 return normalized.IndexOf("&MI_00\\", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
+            // HID-class IG_xx children published by xinputhid.sys (HID joystick
+            // views of the gamepad). These appear in joy.cpl as duplicate
+            // "Legion Controller for Windows" entries even with USB MI_00
+            // hidden, because Windows enumerates them as separate HID-class
+            // nodes. Hide them too — xinput1_4 / XInputSetState don't read
+            // through them (they use the XUSB device-interface on the 045E:028E
+            // node), so this cleans up joy.cpl without breaking rumble.
+            if (normalized.StartsWith("HID\\", StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("&IG_", StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
             return false;

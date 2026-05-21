@@ -30,11 +30,33 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private string activeDeviceType = DefaultDeviceType;
         private bool viiperOwnsSuppression;
 
+        // Guide-only mode: when backend=VIIPER and the master Controller-Emulation
+        // toggle is OFF, but a Labs button is mapped to "Xbox Guide", we spin up a
+        // minimal xbox360 device through libviiper just to deliver the Guide press.
+        // This replaces the previous ViGEm X360 pad (which Steam mislabeled as
+        // "Nintendo Switch Pro") so VIIPER-only users have zero runtime ViGEm
+        // dependency. No forwarder runs in this mode — only TrySetGuideFromLabs
+        // submits a 20-byte xbox360 input frame with the Guide bit toggled.
+        private bool guideOnlyMode;
+        private readonly byte[] guideOnlyBuffer = new byte[20];
+        private const ushort XInputGuideBit = 0x0400;
+        private static ViiperEmulationManager activeInstance;
+
+        // Rumble-forwarding state for guide-only mode. CE master is OFF in this mode
+        // so HidHide isn't suppressing the Legion at all — the Legion's XInput child
+        // is fully visible, and XInputSetState works the conventional way. We detect
+        // the Legion's XInput slot at plug-in time via XInputGetCapabilitiesEx
+        // (matching VID 17EF) and forward rumble through it.
+        private int guideOnlyPhysicalXInputSlot = -1;
+        private DateTime guideOnlyLastRumbleLog = DateTime.MinValue;
+        private const ushort LegionVendorIdShort = 0x17EF;
+
         public ViiperEmulationManager(SettingsManager inSettingsManager, ControllerEmulationManager inLegacyManager, LegionManager inLegionManager)
         {
             settingsManager = inSettingsManager;
             legacyManager = inLegacyManager;
             forwarder = new ViiperInputForwarder(service, inLegionManager);
+            activeInstance = this;
             if (legacyManager != null)
             {
                 // VIIPER respects the same "Enable Controller Emulation" toggle the legacy
@@ -140,6 +162,32 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
         }
 
+        /// <summary>
+        /// VIIPER-specific HidHide mode selection. Mode 1 — hide only the Legion's
+        /// native HID composite, leave its XInput child (045E:028E) visible.
+        ///
+        /// <para>Mode 3 (also hide the XInput child via parent-VID filter) was
+        /// attempted but broke rumble. xinput1_4.dll's enumeration of the Legion
+        /// goes through xinputhid.sys (the Legion uses HID-mode XInput, not
+        /// xusb22.sys). When HidHide hides the Legion's native HID, xinputhid
+        /// can no longer translate XInput calls for the device — XInputSetState
+        /// returns ERROR_DEVICE_NOT_CONNECTED even from the HidHide-allowlisted
+        /// helper. PadForge-style direct XUSB IOCTLs don't help because xusb22
+        /// never binds. Direct HID-OUT writes don't help because HidHide filters
+        /// the HID class device interface from enumeration globally (allowlist
+        /// only governs CreateFile-by-known-path, and the path can't be obtained
+        /// without enumeration).</para>
+        ///
+        /// <para>Trade-off accepted: a generic "Controller (Xbox 360 for Windows)"
+        /// entry remains in joy.cpl alongside the VIIPER virtual pad. Steam and
+        /// most games handle the duplicate gracefully. The much louder "Legion
+        /// Controller for Windows" entry (native HID) stays hidden.</para>
+        /// </summary>
+        private static int ComputeHideTargetForViiper(string targetType)
+        {
+            return 1;
+        }
+
         /// <summary>True once VIIPER is initialized and a bus is attached.</summary>
         public bool IsRunning { get { return isRunning; } }
 
@@ -160,38 +208,328 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             try { legacyManager?.SetSuppressedByViiper(useViiper); }
             catch (Exception ex) { Logger.Warn($"legacyManager.SetSuppressedByViiper threw: {ex.Message}"); }
 
-            // VIIPER only runs when BOTH the backend selector is on AND the master
-            // "Enable Controller Emulation" switch is on.
-            bool emulationEnabled = legacyManager?.EmulationEnabled ?? true;
-            if (useViiper && emulationEnabled)
-            {
-                Start();
-            }
-            else
-            {
-                Stop();
-            }
+            ReapplyMode();
         }
 
         private void OnEmulationEnabledChanged(bool emulationEnabled)
         {
             bool backendOn = settingsManager?.EmulationBackend?.Value ?? false;
             if (!backendOn) return; // legacy path handles its own state
-            if (emulationEnabled)
+            ReapplyMode();
+        }
+
+        /// <summary>
+        /// Single decision point for which VIIPER mode (full / guide-only / stopped) should
+        /// be active given the current backend selector, master CE toggle, and Labs Guide
+        /// configuration. Called from ApplyBackend, OnEmulationEnabledChanged, and
+        /// OnGuideRouteChanged so any of those inputs flipping converges on the same state.
+        /// </summary>
+        private void ReapplyMode()
+        {
+            // Hold startLock across the whole decision tree so any property
+            // change that overlaps a still-running Start (HidHide cycle-port +
+            // AddDevice can take 2-3s) waits until the current state stabilizes
+            // before re-deciding. Without this, two concurrent ReapplyMode
+            // callers each call Start(), and the second sees isRunning=false
+            // (set late in Start) and tries to CreateBus on an already-init'd
+            // service → "bus already allocated" → service.Dispose() wipes
+            // everything → libviiper "not initialized" thereafter. Symptom
+            // visible in helper_2026-05-20_23.log around 23:13:14.
+            lock (startLock)
             {
-                Start();
+                bool backendOn = settingsManager?.EmulationBackend?.Value ?? false;
+                bool emulationEnabled = legacyManager?.EmulationEnabled ?? true;
+
+                if (backendOn && emulationEnabled)
+                {
+                    if (guideOnlyMode) StopGuideOnly();
+                    StartLocked();
+                    return;
+                }
+
+                if (backendOn && !emulationEnabled && LabsHasGuideConfigured())
+                {
+                    if (isRunning) StopLocked();
+                    StartGuideOnly();
+                    return;
+                }
+
+                if (isRunning) StopLocked();
+                if (guideOnlyMode) StopGuideOnly();
+            }
+        }
+
+        private static bool LabsHasGuideConfigured()
+        {
+            try { return Program.legionButtonMonitor?.HasGuideActionConfigured ?? false; }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Re-evaluate mode when Labs button configuration changes (a Guide action is
+        /// added or removed). Called from Program.NotifyGuideRouteChanged so the guide-only
+        /// pad appears / disappears without waiting for the next backend or CE flip.
+        /// </summary>
+        public void OnGuideRouteChanged()
+        {
+            try { ReapplyMode(); }
+            catch (Exception ex) { Logger.Warn($"ViiperEmulationManager.OnGuideRouteChanged threw: {ex.Message}"); }
+        }
+
+        /// <summary>True when the minimal guide-only xbox360 pad is plugged.</summary>
+        public static bool IsGuideOnlyActive
+        {
+            get
+            {
+                var inst = activeInstance;
+                return inst != null && inst.guideOnlyMode;
+            }
+        }
+
+        /// <summary>
+        /// Called from LegionButtonMonitor when a mapped Labs button raises a Guide
+        /// press/release. Returns true only when guide-only mode is currently active
+        /// (full CE path owns Guide through ViiperInputForwarder.TryHandleGuideButtonFromLabs).
+        /// </summary>
+        public static bool TrySetGuideFromLabs(bool pressed)
+        {
+            var inst = activeInstance;
+            if (inst == null || !inst.guideOnlyMode || inst.activeDeviceId == 0) return false;
+            return inst.SubmitGuideOnlyFrame(pressed);
+        }
+
+        private bool SubmitGuideOnlyFrame(bool pressed)
+        {
+            // xbox360 wire format (BuildXbox360Input): 20 bytes, [0..3] buttons (u32 LE),
+            // [4]=LT, [5]=RT, [6..7]=LX, [8..9]=LY, [10..11]=RX, [12..13]=RY. All zero
+            // except for the Guide bit (0x0400) at byte 1 when pressed.
+            Array.Clear(guideOnlyBuffer, 0, guideOnlyBuffer.Length);
+            if (pressed)
+            {
+                guideOnlyBuffer[1] = (byte)((XInputGuideBit >> 8) & 0xFF);
+                guideOnlyBuffer[0] = (byte)(XInputGuideBit & 0xFF);
+            }
+
+            try
+            {
+                bool ok = service.SetInput(activeBusId, activeDeviceId, guideOnlyBuffer);
+                if (!ok) Logger.Warn($"VIIPER guide-only SetInput(pressed={pressed}) failed");
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"VIIPER guide-only SubmitGuideOnlyFrame threw: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void StartGuideOnly()
+        {
+            if (guideOnlyMode) return;
+
+            if (settingsManager?.UsbipInstalled != null && !settingsManager.UsbipInstalled.Value)
+            {
+                Logger.Warn("VIIPER guide-only requested but usbip-win2 is not installed; staying offline.");
+                return;
+            }
+
+            if (!service.Initialize())
+            {
+                Logger.Warn("VIIPER guide-only: service init failed.");
+                return;
+            }
+
+            if (!service.CreateBus(DefaultBusId))
+            {
+                Logger.Warn($"VIIPER guide-only: failed to create bus {DefaultBusId}.");
+                service.Dispose();
+                return;
+            }
+            activeBusId = DefaultBusId;
+
+            // No HidHide here — we are NOT cloaking the physical controller in this mode.
+            // CE master is off, so the user wants their real pad visible. The guide-only
+            // virtual pad sits alongside it just to deliver Game-Bar guide presses.
+
+            ViiperPnpCleanup.CleanupAllKnownGhosts();
+
+            var addResult = service.AddDevice(activeBusId, DefaultDeviceType, 0, 0);
+            if (!addResult.Success)
+            {
+                Logger.Warn("VIIPER guide-only: failed to add xbox360 device; tearing down.");
+                service.RemoveBus(activeBusId);
+                service.Dispose();
+                return;
+            }
+            activeDeviceId = addResult.DeviceId;
+            activeDeviceType = DefaultDeviceType;
+            guideOnlyMode = true;
+
+            // Seed an idle frame so Windows sees the device as connected/centered before
+            // any Labs press arrives. Some games XInput-poll on connect and would see
+            // garbage if the first frame had Guide latched.
+            SubmitGuideOnlyFrame(false);
+
+            // Wire rumble forwarding via XInputSetState. CE master is off here,
+            // so HidHide isn't applied — Legion XInput child is visible and
+            // standard XInput works. Slot detection runs async after ~1.2s to
+            // let Windows enumerate the new USB-IP virtual pad first; otherwise
+            // the slot table may not show both pads yet.
+            service.FeedbackReceived += OnGuideOnlyFeedback;
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                await System.Threading.Tasks.Task.Delay(1200);
+                DetectGuideOnlyLegionSlot();
+            });
+
+            Logger.Info($"VIIPER guide-only emulation started (bus={activeBusId}, dev={activeDeviceId}, type={DefaultDeviceType})");
+
+            // Pad came up — Labs no longer needs its dedicated ViGEm Guide pad.
+            Program.NotifyGuideRouteChanged();
+        }
+
+        private void OnGuideOnlyFeedback(uint cbBus, uint cbDev, byte[] data)
+        {
+            if (!guideOnlyMode || cbBus != activeBusId || cbDev != activeDeviceId) return;
+            if (data == null || data.Length < 2) return;
+            int slot = guideOnlyPhysicalXInputSlot;
+            if (slot < 0) return;
+
+            // xbox360 wire format: data[0] = large (left) motor, data[1] = small (right).
+            byte large = data[0];
+            byte small = data[1];
+            try
+            {
+                var vib = new ViiperXInputVibration
+                {
+                    LeftMotorSpeed = (ushort)(large * 257),
+                    RightMotorSpeed = (ushort)(small * 257),
+                };
+                uint rc = ViiperXInput.SetState((uint)slot, ref vib);
+                if (rc != ViiperXInput.ErrorSuccess)
+                {
+                    DateTime now = DateTime.UtcNow;
+                    if ((now - guideOnlyLastRumbleLog).TotalSeconds >= 5)
+                    {
+                        guideOnlyLastRumbleLog = now;
+                        Logger.Debug($"VIIPER guide-only rumble forward failed (slot={slot}, rc={rc})");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"VIIPER guide-only OnGuideOnlyFeedback threw: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Scan XInput slots 0..3 with XInputGetCapabilitiesEx, identify the
+        /// slot whose VID is 0x17EF (Legion), cache it for OnGuideOnlyFeedback
+        /// to use. CE master is off in this mode so HidHide isn't suppressing
+        /// the Legion XInput child — it's fully discoverable.
+        /// </summary>
+        private void DetectGuideOnlyLegionSlot()
+        {
+            var caps = new ViiperXInputCapabilitiesEx();
+            var summary = new System.Text.StringBuilder();
+            int physical = -1;
+            for (uint i = 0; i < 4; i++)
+            {
+                caps = default;
+                uint rc;
+                try { rc = ViiperXInput.GetCapabilitiesEx(1, i, 1, ref caps); }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"VIIPER guide-only: XInputGetCapabilitiesEx threw on slot {i}: {ex.Message}");
+                    return;
+                }
+                if (rc != ViiperXInput.ErrorSuccess) continue;
+
+                if (summary.Length > 0) summary.Append(", ");
+                summary.Append($"slot{i}=VID:{caps.VendorId:X4}/PID:{caps.ProductId:X4}");
+                if (caps.VendorId == LegionVendorIdShort && physical < 0)
+                {
+                    physical = (int)i;
+                }
+            }
+            guideOnlyPhysicalXInputSlot = physical;
+            if (physical < 0)
+            {
+                Logger.Warn($"VIIPER guide-only: no Legion (VID:17EF) XInput slot found [{summary}] — rumble forwarding disabled");
             }
             else
             {
-                Stop();
+                Logger.Info($"VIIPER guide-only: XInput slots [{summary}] — physical Legion=slot{physical}, rumble forwarded there");
             }
         }
+
+        private void StopGuideOnly()
+        {
+            if (!guideOnlyMode) return;
+
+            try { service.FeedbackReceived -= OnGuideOnlyFeedback; }
+            catch { /* best-effort unsubscribe */ }
+
+            // Zero out any rumble we left running so we don't strand the real Legion
+            // vibrating when guide-only tears down.
+            if (guideOnlyPhysicalXInputSlot >= 0)
+            {
+                try
+                {
+                    var stop = new ViiperXInputVibration { LeftMotorSpeed = 0, RightMotorSpeed = 0 };
+                    ViiperXInput.SetState((uint)guideOnlyPhysicalXInputSlot, ref stop);
+                }
+                catch { /* harmless */ }
+            }
+            guideOnlyPhysicalXInputSlot = -1;
+
+            try
+            {
+                if (activeDeviceId != 0)
+                {
+                    service.RemoveDevice(activeBusId, activeDeviceId);
+                }
+            }
+            catch (Exception ex) { Logger.Warn($"VIIPER guide-only RemoveDevice threw: {ex.Message}"); }
+
+            try { service.RemoveBus(activeBusId); }
+            catch (Exception ex) { Logger.Warn($"VIIPER guide-only RemoveBus threw: {ex.Message}"); }
+
+            try { service.Dispose(); }
+            catch (Exception ex) { Logger.Warn($"VIIPER guide-only Dispose threw: {ex.Message}"); }
+
+            activeDeviceId = 0;
+            guideOnlyMode = false;
+            Logger.Info("VIIPER guide-only emulation stopped");
+
+            // Pad went away — Labs may need to spin up the legacy ViGEm Guide pad if
+            // backend just flipped to Legacy, or if CE is about to own Guide via the
+            // full forwarder (in which case Labs will skip ViGEm and wait on CE).
+            Program.NotifyGuideRouteChanged();
+        }
+
+        // Serializes Start() so concurrent callers can't both pass the isRunning
+        // guard. isRunning is only set true at the END of Start (after a multi-
+        // second HidHide cycle-port + AddDevice + forwarder.Start dance), so
+        // without this lock a second call from OnBackendChanged / settings load
+        // races and tries to CreateBus on an already-initialized service —
+        // which fails with "bus already allocated" and was previously triggering
+        // a service.Dispose() that wiped out the first caller's working state.
+        private readonly object startLock = new object();
 
         /// <summary>
         /// Idempotent start. Returns true if VIIPER is (or became) running.
         /// Safe to call when usbip-win2 is missing — returns false with a logged error.
         /// </summary>
         public bool Start()
+        {
+            lock (startLock)
+            {
+                return StartLocked();
+            }
+        }
+
+        private bool StartLocked()
         {
             if (isRunning) return true;
 
@@ -215,6 +553,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             activeBusId = DefaultBusId;
 
+            // Resolve the target FIRST so the HidHide call below uses the right hide
+            // mode for the device type we're about to publish. Without this, the user's
+            // saved legacy HideTarget value (often 0 = "native HID only") leaks into
+            // VIIPER and leaves the Legion's XInput child visible to games, producing
+            // double input on Game Bar (Legion XInput + virtual DSE HID).
+            string targetType;
+            ushort vid, pid;
+            ResolveDeviceTargets(out targetType, out vid, out pid);
+
             // Enable HidHide so the stock physical controller is hidden from games while
             // VIIPER is active. Reuses the existing ControllerSuppressionManager instance
             // owned by the legacy manager — sharing the same underlying hide/unhide state
@@ -224,10 +571,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 var suppression = legacyManager?.SuppressionManager;
                 if (suppression != null)
                 {
+                    int hideMode = ComputeHideTargetForViiper(targetType);
                     bool ok = suppression.Enable(
                         legacyManager.HandheldDeviceType,
-                        legacyManager.HideTarget);
-                    Logger.Info($"VIIPER: HidHide suppression enable => {ok}");
+                        hideMode);
+                    Logger.Info($"VIIPER: HidHide suppression enable (target={targetType}, hideMode={hideMode}) => {ok}");
                     viiperOwnsSuppression = ok;
                 }
             }
@@ -241,11 +589,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             // reaching the active device. Run this BEFORE AddDevice so the bus
             // is clean when the new device arrives.
             ViiperPnpCleanup.CleanupAllKnownGhosts();
-
-            // Create the initial virtual device using current settings.
-            string targetType;
-            ushort vid, pid;
-            ResolveDeviceTargets(out targetType, out vid, out pid);
             var addResult = service.AddDevice(activeBusId, targetType, vid, pid);
             if (!addResult.Success)
             {
@@ -488,6 +831,28 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 activeDeviceType = newType;
                 forwarder.UpdateTarget(activeBusId, activeDeviceId, activeDeviceType);
 
+                // If the hide mode required by the new target differs from the
+                // old one (xbox360 ↔ anything else), re-apply HidHide so the
+                // Legion's XInput child gets hidden/unhidden to match. Without
+                // this re-apply, swapping DSE → X360 would leave the XInput
+                // child hidden (and double-hide our X360 with itself); swapping
+                // X360 → DSE would leave it visible (double input returns).
+                int oldHideMode = ComputeHideTargetForViiper(oldType);
+                int newHideMode = ComputeHideTargetForViiper(newType);
+                if (oldHideMode != newHideMode && viiperOwnsSuppression)
+                {
+                    try
+                    {
+                        var suppression = legacyManager?.SuppressionManager;
+                        if (suppression != null)
+                        {
+                            bool ok = suppression.Enable(legacyManager.HandheldDeviceType, newHideMode);
+                            Logger.Info($"VIIPER: HidHide re-applied for hot-swap (target={newType}, hideMode={newHideMode}) => {ok}");
+                        }
+                    }
+                    catch (Exception ex) { Logger.Warn($"VIIPER HidHide re-apply on hot-swap threw: {ex.Message}"); }
+                }
+
                 // RemoveDevice in SwitchDeviceType succeeded, but Windows keeps
                 // the OLD target's PnP entry as Present=False — and Steam Input
                 // can still see/route to it. Run a focused cleanup pass for the
@@ -507,6 +872,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         }
 
         public void Stop()
+        {
+            lock (startLock)
+            {
+                StopLocked();
+            }
+        }
+
+        private void StopLocked()
         {
             if (!isRunning) return;
 
@@ -588,8 +961,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     }
                 }
                 Stop();
+                if (guideOnlyMode) StopGuideOnly();
                 try { forwarder?.Dispose(); }
                 catch (Exception ex) { Logger.Warn($"forwarder.Dispose threw: {ex.Message}"); }
+                if (object.ReferenceEquals(activeInstance, this)) activeInstance = null;
             }
             base.Dispose(disposing);
         }

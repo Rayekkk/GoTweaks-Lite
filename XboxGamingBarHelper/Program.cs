@@ -955,6 +955,49 @@ namespace XboxGamingBarHelper
             deviceTimer.Stop();
             Logger.Info($"[TIMING] DeviceDetector pre-cached: {deviceTimer.ElapsedMilliseconds}ms (Device: {deviceInfo.Manufacturer} {deviceInfo.Model})");
 
+            // Sweep Present=True ViGEm Xbox 360 phantoms from PRIOR helper
+            // sessions BEFORE any manager constructs its own ViGEm pad. ViGEmBus
+            // is supposed to release virtual pads when the owning process exits,
+            // but during MSIX upgrade cycles or abnormal exits, Labs ViGEm Xbox
+            // 360 pads can linger — accumulating one phantom per cycle. Each
+            // phantom is a live virtual controller delivering input to apps, so
+            // games see double (or triple) presses from a single physical button.
+            // Runs on a thread pool task — non-blocking.
+            // Three-phase cleanup. The two Present=True phantom sweeps (VIIPER
+            // and ViGEm) MUST complete before any backend creates a virtual
+            // pad, otherwise the active pad is visible alongside the phantom
+            // for ~5s until pnputil catches up (seen in
+            // helper_2026-05-21_01.log around 01:18:08-14). Run both
+            // synchronously here — blocks ~1-3s total — then fire the
+            // disconnected-ghost sweep async since it's safe to overlap with
+            // any backend's startup.
+            try
+            {
+                XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperPnpCleanup.CleanupPresentViiperPhantomsBlocking();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"ViiperPnpCleanup Present=True VIIPER sweep threw: {ex.Message}");
+            }
+
+            try
+            {
+                XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperPnpCleanup.CleanupPresentVigemPhantomsBlocking();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"ViiperPnpCleanup Present=True ViGEm sweep threw: {ex.Message}");
+            }
+
+            try
+            {
+                XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperPnpCleanup.CleanupAllKnownGhosts();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"ViiperPnpCleanup early sweep threw: {ex.Message}");
+            }
+
             // PARALLEL MANAGER INITIALIZATION - Wave-based to respect dependencies
             var totalTimer = System.Diagnostics.Stopwatch.StartNew();
             Logger.Info("Initialize managers (parallel waves)...");

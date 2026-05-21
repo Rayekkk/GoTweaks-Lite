@@ -190,6 +190,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private const float GyroDpsToRawCounts = 16.0f;
         private const float AccelGToRawCounts = 4096.0f;
 
+        // Rumble delivery — uses XInputSetState via xinput1_4.dll, which on
+        // the Legion ends up at xusb22.sys (bound to MI_00). The helper is on
+        // HidHide's per-application allowlist, so even with MI_00 in the
+        // suppression list xinput1_4's internal opens succeed for us. Mode 1
+        // keeps the XInput child enumerable; mode 3 broke this path (rumble
+        // would route via the now-hidden 045E:028E sibling and fail). The
+        // duplicate "Controller (Xbox 360 for Windows)" entry users see in
+        // joy.cpl is the cost of keeping the rumble channel open.
+
         public ViiperInputForwarder(ViiperService inService, LegionManager inLegionManager)
         {
             service = inService;
@@ -260,7 +269,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             catch (Exception ex)
             {
-                Logger.Debug($"Steamdeck rumble decay SetState failed: {ex.Message}");
+                Logger.Debug($"Steamdeck rumble decay XInput SetState failed: {ex.Message}");
             }
         }
 

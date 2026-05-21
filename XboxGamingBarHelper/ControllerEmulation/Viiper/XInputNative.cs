@@ -15,6 +15,16 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         [DllImport("xinput1_4.dll", EntryPoint = "XInputSetState")]
         public static extern uint SetState(uint dwUserIndex, ref ViiperXInputVibration pVibration);
 
+        // Undocumented but stable export at ordinal 108 in xinput1_4.dll. Same export
+        // is used by DS4Windows / Steam / SDL2 to map an XInput slot back to its USB
+        // VID:PID. Reserved=1, Flags=1 (XINPUT_FLAG_GAMEPAD).
+        [DllImport("xinput1_4.dll", EntryPoint = "#108")]
+        public static extern uint GetCapabilitiesEx(
+            uint dwReserved,
+            uint dwUserIndex,
+            uint dwFlags,
+            ref ViiperXInputCapabilitiesEx pCapabilitiesEx);
+
         public const uint ErrorSuccess = 0;
         public const uint ErrorDeviceNotConnected = 1167;
 
@@ -60,5 +70,21 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
     {
         public ushort LeftMotorSpeed;
         public ushort RightMotorSpeed;
+    }
+
+    // XINPUT_CAPABILITIES (20 bytes) + EX trailer (12 bytes) = 32 bytes total.
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct ViiperXInputCapabilitiesEx
+    {
+        public byte Type;
+        public byte SubType;
+        public ushort Flags;
+        public ViiperXInputGamepad Gamepad;       // 12 bytes
+        public ViiperXInputVibration Vibration;   // 4 bytes
+        public ushort VendorId;
+        public ushort ProductId;
+        public ushort VersionNumber;
+        public ushort Unk1;
+        public uint Unk2;
     }
 }

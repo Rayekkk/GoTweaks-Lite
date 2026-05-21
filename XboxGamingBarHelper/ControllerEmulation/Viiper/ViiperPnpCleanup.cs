@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using NLog;
 
@@ -103,6 +105,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// <summary>
         /// Full sweep across every known VID/PID combination — used at helper
         /// startup to clear any ghost left over from a previous session.
+        /// Also sweeps Present=True ViGEm-bus phantoms (Labs Xbox 360 pads
+        /// from a prior helper instance that didn't release the ViGEmBus
+        /// handle on exit — those show up alive in joy.cpl as duplicate
+        /// "Xbox 360 Controller for Windows" entries delivering double input).
         /// </summary>
         public static void CleanupAllKnownGhosts()
         {
@@ -115,7 +121,254 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 }
                 try { RunCleanup(all); }
                 catch (Exception ex) { Logger.Debug($"ViiperPnpCleanup startup sweep threw: {ex.Message}"); }
+
+                // Both Present=True phantom sweeps (ViGEm and VIIPER) are
+                // intentionally NOT in this async path — see the *Blocking
+                // methods called synchronously from Program.cs at startup,
+                // BEFORE VIIPER's deferred ApplyBackend kicks in. The async
+                // path's slow pnputil calls (5s+ tail latency observed in
+                // helper_2026-05-21_01.log) finish AFTER VIIPER adds its
+                // active pad, leaving the phantom visible alongside the
+                // active pad until the sweep finally catches up.
             });
+        }
+
+        /// <summary>
+        /// Synchronous Present=True VIIPER phantom sweep. Call ONCE at helper
+        /// startup, BEFORE any VIIPER manager is constructed / before any
+        /// libviiper AddDevice call. Blocks for ~1-3 seconds depending on how
+        /// many phantoms need removal (one pnputil call per phantom plus
+        /// enumeration overhead). Returning before VIIPER's first AddDevice
+        /// guarantees no race: any matching Present=True entry we find is a
+        /// stale phantom from a prior helper session, never our active pad.
+        /// </summary>
+        public static void CleanupPresentViiperPhantomsBlocking()
+        {
+            try { CleanupPresentViiperPhantoms(); }
+            catch (Exception ex) { Logger.Debug($"ViiperPnpCleanup VIIPER phantom sweep (blocking) threw: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Synchronous Present=True ViGEm phantom sweep. Same safety profile as
+        /// <see cref="CleanupPresentViiperPhantomsBlocking"/>: call ONCE at
+        /// helper startup BEFORE any backend creates virtual pads. Removes
+        /// ViGEm-bus phantoms from prior helper sessions (e.g. Labs Xbox 360
+        /// pads from before VIIPER was selected as the backend). The async
+        /// equivalent in CleanupAllKnownGhosts had 5s+ tail latency on pnputil,
+        /// completing AFTER VIIPER created its new pad — leaving the phantom
+        /// visible alongside the active pad in the user-observed window.
+        /// </summary>
+        public static void CleanupPresentVigemPhantomsBlocking()
+        {
+            try { CleanupPresentVigemPhantoms(); }
+            catch (Exception ex) { Logger.Debug($"ViiperPnpCleanup ViGEm phantom sweep (blocking) threw: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Removes Present=True VIIPER virtual phantoms that survived a previous
+        /// crashed helper session. usbip-win2 leaves the PnP node Present=True
+        /// even after the original libviiper attachment dies — Windows doesn't
+        /// know the device is unreachable until something else tries to talk to
+        /// it. Steam Input picks these up as live controllers and routes rumble
+        /// to them, draining game feedback from the real active VIIPER pad.
+        ///
+        /// <para>Identification: every VIIPER virtual we publish is parented by
+        /// usbip-win2's software USB bus, which Windows enumerates as a child
+        /// of <c>ROOT\USB\&lt;n&gt;</c>. Real Xbox / DualSense / Switch Pro pads
+        /// plugged into the user's USB ports are PCI-rooted (parent chain ends
+        /// at <c>PCI\VEN_...</c>). Walking the parent chain via cfgmgr32 lets us
+        /// tell the two apart unambiguously.</para>
+        ///
+        /// <para>Called at helper startup BEFORE VIIPER's own <c>service.AddDevice</c>
+        /// runs, so any Present=True 045E:028E / 054C:* / etc. we find is by
+        /// definition a stale phantom — not our active pad.</para>
+        /// </summary>
+        private static void CleanupPresentViiperPhantoms()
+        {
+            string raw = RunPnputil("/enum-devices /connected");
+            if (string.IsNullOrEmpty(raw)) return;
+
+            // Build the set of every VID:PID combination libviiper can produce.
+            // Same source-of-truth as RunCleanup's ghost sweep, so adding a new
+            // libviiper target to TargetVidPids auto-extends both passes.
+            var targetVidPids = new HashSet<string>();
+            foreach (var kvp in TargetVidPids)
+            {
+                foreach (var pair in kvp.Value)
+                {
+                    targetVidPids.Add($"VID_{pair.vid:X4}&PID_{pair.pid:X4}".ToUpperInvariant());
+                }
+            }
+
+            var blocks = raw.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var instanceIdRx = new Regex(@"Instance ID:\s+(\S+)", RegexOptions.IgnoreCase);
+
+            var candidates = new List<string>();
+            foreach (var block in blocks)
+            {
+                var idMatch = instanceIdRx.Match(block);
+                if (!idMatch.Success) continue;
+                string id = idMatch.Groups[1].Value.Trim();
+                string upperId = id.ToUpperInvariant();
+
+                // Only consider USB-level entries (the actual device root).
+                // Removing the USB root cascades the IG_xx HID children, so we
+                // don't need to enumerate them separately.
+                if (!upperId.StartsWith("USB\\", StringComparison.Ordinal)) continue;
+
+                bool matchesViiperTarget = false;
+                foreach (var prefix in targetVidPids)
+                {
+                    if (upperId.Contains(prefix)) { matchesViiperTarget = true; break; }
+                }
+                if (!matchesViiperTarget) continue;
+
+                // Critical safety check: only remove if the parent chain is
+                // software-rooted (usbip-win2 bus, not real PCI hardware). A
+                // real Xbox 360 controller plugged into the user's USB port
+                // would match VID:045E&PID:028E but be PCI-rooted, and we must
+                // not remove the user's actual hardware.
+                if (!IsSoftwareBusRooted(id)) continue;
+
+                candidates.Add(id);
+            }
+
+            if (candidates.Count == 0) return;
+            Logger.Info($"ViiperPnpCleanup: removing {candidates.Count} Present=True VIIPER phantom pad(s) from a prior helper session");
+            foreach (var id in candidates)
+            {
+                string output = RunPnputil($"/remove-device \"{id}\"");
+                Logger.Info($"  pnputil /remove-device {id} → {(output ?? string.Empty).TrimEnd()}");
+            }
+        }
+
+        /// <summary>
+        /// Walks the PnP parent chain of <paramref name="deviceInstanceId"/> up
+        /// to 16 levels looking for the <c>ROOT\USB\</c> software-bus enumerator
+        /// that usbip-win2 publishes. Returns true if found — meaning this
+        /// device sits on a virtual USB bus rather than real hardware. Returns
+        /// false if we find <c>PCI\</c> first (real hardware) or hit an error.
+        /// Conservative on lookup failures: a hardware-rooted device returns
+        /// false, so we never accidentally remove a real controller.
+        /// </summary>
+        private static bool IsSoftwareBusRooted(string deviceInstanceId)
+        {
+            if (string.IsNullOrWhiteSpace(deviceInstanceId)) return false;
+            try
+            {
+                if (CM_Locate_DevNodeW(out uint devInst, deviceInstanceId, 0) != 0) return false;
+
+                var idBuf = new StringBuilder(512);
+                for (int depth = 0; depth < 16; depth++)
+                {
+                    idBuf.Clear();
+                    idBuf.EnsureCapacity(512);
+                    if (CM_Get_Device_IDW(devInst, idBuf, idBuf.Capacity, 0) != 0) return false;
+                    string nodeId = idBuf.ToString();
+                    if (!string.IsNullOrEmpty(nodeId))
+                    {
+                        if (nodeId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)) return false;
+                        if (nodeId.StartsWith("ROOT\\USB\\", StringComparison.OrdinalIgnoreCase)) return true;
+                    }
+                    if (CM_Get_Parent(out uint parent, devInst, 0) != 0) return false;
+                    if (parent == 0 || parent == devInst) return false;
+                    devInst = parent;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"IsSoftwareBusRooted({deviceInstanceId}) threw: {ex.Message}");
+            }
+            return false;
+        }
+
+        [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+        private static extern int CM_Locate_DevNodeW(out uint devInst, string deviceInstanceId, int flags);
+
+        [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+        private static extern int CM_Get_Device_IDW(uint devInst, StringBuilder buffer, int len, int flags);
+
+        [DllImport("cfgmgr32.dll")]
+        private static extern int CM_Get_Parent(out uint parent, uint devInst, int flags);
+
+        /// <summary>
+        /// Removes Present=True ViGEm-bus phantom pads that survived from a
+        /// prior helper session. We identify ViGEm pads (vs real Microsoft
+        /// hardware) via DEVPKEY_Device_LocationInfo == "Virtual Gamepad
+        /// Emulation Bus" — a string set by ViGEmBus itself, so it never
+        /// matches a real Xbox 360 controller plugged into a real USB hub.
+        ///
+        /// This used to be safe to skip because ViGEmBus tracks per-process
+        /// handles and is supposed to clean up its virtual pads when the
+        /// owning process exits. In practice — especially during MSIX
+        /// reinstall cycles where the helper exits abnormally — pads can
+        /// linger, accumulating one phantom per upgrade cycle. Each phantom
+        /// is a live virtual controller delivering input to apps, so the
+        /// game/Xbox Game Bar sees double (or triple) input from a single
+        /// physical press.
+        ///
+        /// Safe to run before any helper-owned ViGEm pad is created. Any
+        /// helper-managed pad live at this point would only exist if a peer
+        /// helper instance is also alive — which the single-instance mutex
+        /// already prevents.
+        /// </summary>
+        private static void CleanupPresentVigemPhantoms()
+        {
+            // Enumerate ALL connected devices with location info; the ViGEm
+            // pad's parent USB device (under which IG_XX interface groups
+            // live) reports LocationInfo = "Virtual Gamepad Emulation Bus"
+            // — a string ViGEmBus itself sets, so real Xbox 360 hardware
+            // plugged into a real USB hub never matches.
+            //
+            // pnputil's /deviceid filter only accepts exact hardware IDs
+            // (not wildcards), and /class HIDClass would miss the USB
+            // parent entries, so we just enum the full connected list and
+            // filter in-process. One-time call at helper startup; the
+            // listing is on a fast in-memory PnP enumerator so wall-clock
+            // cost is well under 1 s on Legion Go 2.
+            string raw = RunPnputil("/enum-devices /connected /location");
+            if (string.IsNullOrEmpty(raw)) return;
+
+            // Each device record is a block of lines; blocks are separated
+            // by blank lines. Parse Instance ID + Location Info per block.
+            var blocks = raw.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var instanceIdRx = new Regex(@"Instance ID:\s+(\S+)", RegexOptions.IgnoreCase);
+            var locationRx = new Regex(@"Location Info:\s+(.+)", RegexOptions.IgnoreCase);
+
+            var toRemove = new List<string>();
+            foreach (var block in blocks)
+            {
+                var locMatch = locationRx.Match(block);
+                if (!locMatch.Success) continue;
+                string loc = locMatch.Groups[1].Value.Trim();
+                if (loc.IndexOf("Virtual Gamepad Emulation Bus", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                var idMatch = instanceIdRx.Match(block);
+                if (!idMatch.Success) continue;
+                string id = idMatch.Groups[1].Value.Trim();
+
+                // Belt-and-suspenders: only target the USB ROOT (parent) entries
+                // for VID_045E&PID_028E (Xbox 360) or VID_054C&PID_05C4 (DS4).
+                // Removing the USB root cascades the IG_XX children. Avoids
+                // touching anything else even if some unrelated device ever
+                // labels itself "Virtual Gamepad Emulation Bus".
+                string upperId = id.ToUpperInvariant();
+                bool isVigemXboxRoot =
+                    upperId.StartsWith("USB\\VID_045E&PID_028E\\", StringComparison.Ordinal) ||
+                    upperId.StartsWith("USB\\VID_054C&PID_05C4\\", StringComparison.Ordinal);
+                if (!isVigemXboxRoot) continue;
+
+                toRemove.Add(id);
+            }
+
+            if (toRemove.Count == 0) return;
+            Logger.Info($"ViiperPnpCleanup: removing {toRemove.Count} Present=True ViGEm phantom pad(s) from a prior helper session");
+            foreach (var id in toRemove)
+            {
+                string output = RunPnputil($"/remove-device \"{id}\"");
+                Logger.Info($"  pnputil /remove-device {id} → {(output ?? string.Empty).TrimEnd()}");
+            }
         }
 
         private static void RunCleanup(IEnumerable<(ushort vid, ushort pid)> pairs)

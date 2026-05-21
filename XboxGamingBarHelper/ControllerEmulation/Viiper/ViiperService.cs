@@ -73,7 +73,19 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             var result = LibViiper.viiper_bus_create(busId);
             if (result != 0)
             {
-                Logger.Error($"viiper_bus_create({busId}) failed: {LibViiper.GetLastError()}");
+                string err = LibViiper.GetLastError() ?? string.Empty;
+                // "bus number N already allocated" means a previous CreateBus
+                // (this session) already established it — treat as success so
+                // re-entrant Start() calls don't think the service is broken
+                // and tear it down. The bus is genuinely usable; libviiper just
+                // rejects the duplicate creation. See helper_2026-05-20_23.log
+                // around 23:13:14 for the race that motivated this.
+                if (err.IndexOf("already allocated", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    Logger.Info($"VIIPER bus {busId} already created (idempotent), continuing");
+                    return true;
+                }
+                Logger.Error($"viiper_bus_create({busId}) failed: {err}");
                 return false;
             }
             Logger.Info($"VIIPER bus {busId} created");

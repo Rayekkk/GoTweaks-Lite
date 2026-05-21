@@ -683,6 +683,19 @@ namespace XboxGamingBarHelper
         /// </summary>
         internal static void NotifyGuideRouteChanged()
         {
+            // Order matters when CE toggles ON: ViiperEmulationManager.OnGuideRouteChanged
+            // may transition guide-only → full (or guide-only → stopped), which itself
+            // re-enters NotifyGuideRouteChanged. Calling Viiper first lets that re-entry
+            // collapse before Labs decides whether it still needs its dedicated ViGEm pad.
+            try
+            {
+                viiperEmulationManager?.OnGuideRouteChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Labs: viiperEmulationManager.OnGuideRouteChanged threw: {ex.Message}");
+            }
+
             try
             {
                 legionButtonMonitor?.ForceReconcileGuideRoute();

@@ -751,10 +751,18 @@ namespace XboxGamingBarHelper.ControllerEmulation
 
             if (suppressedByViiper)
             {
-                StopForwarding();
+                // CRITICAL: preserveSuppression=true so legacy's StopForwarding
+                // does NOT call DisableSuppression. VIIPER owns the HidHide
+                // hide list while suppressedByViiper is in effect. Without
+                // this, legacy's deferred startup apply (which runs AFTER
+                // VIIPER's HidHide enable per helper_2026-05-21_00.log at
+                // 00:41:51-53) wipes the Legion hides VIIPER just established,
+                // and the user has to toggle CE off/on for VIIPER's HidHide
+                // state to stick.
+                StopForwarding(preserveSuppression: true);
                 suppressionPausedForGameBar = false;
                 suppressionPauseUntilTicksUtc = 0;
-                Logger.Info($"Controller emulation suppressed by VIIPER backend ({reason}); legacy forwarding stopped");
+                Logger.Info($"Controller emulation suppressed by VIIPER backend ({reason}); legacy forwarding stopped (HidHide preserved — VIIPER owns it)");
                 return;
             }
 

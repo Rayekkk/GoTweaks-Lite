@@ -780,11 +780,12 @@ namespace XboxGamingBarHelper.Labs
                                "Focus GoTweaks";
             Logger.Info($"LegionButtonMonitor: Configured {buttonName} - Enabled: {enabled}, Action: {actionName}");
 
-            // If monitor is already running and we now need ViGEm, create it
-            if (isRunning && NeedsViGEm && vigemController == null)
-            {
-                EnsureViGEmController();
-            }
+            // Notify so VIIPER can spin up / tear down its guide-only pad when the
+            // mapped Guide action changes. NotifyGuideRouteChanged also calls
+            // ForceReconcileGuideRoute → EnsureViGEmController, which handles the
+            // legacy-backend fallback in one place.
+            try { Program.NotifyGuideRouteChanged(); }
+            catch (Exception ex) { Logger.Debug($"ConfigureButton: NotifyGuideRouteChanged threw: {ex.Message}"); }
         }
 
         /// <summary>
@@ -849,11 +850,10 @@ namespace XboxGamingBarHelper.Labs
                                "Focus GoTweaks";
             Logger.Info($"LegionButtonMonitor: Configured Scroll {direction} - Enabled: {enabled}, Action: {actionName}");
 
-            // If monitor is already running and we now need ViGEm, create it
-            if (isRunning && NeedsViGEm && vigemController == null)
-            {
-                EnsureViGEmController();
-            }
+            // Same notify pattern as ConfigureButton — give VIIPER a chance to
+            // (de)activate its guide-only pad before Labs decides about ViGEm.
+            try { Program.NotifyGuideRouteChanged(); }
+            catch (Exception ex) { Logger.Debug($"ConfigureScrollWheel: NotifyGuideRouteChanged threw: {ex.Message}"); }
 
             // If monitor is already running and scroll is now configured, start the scroll wheel thread
             // This handles the case where scroll is configured after the monitor is already running for buttons/battery
@@ -982,9 +982,11 @@ namespace XboxGamingBarHelper.Labs
         }
 
         /// <summary>
-        /// Get whether ViGEmBus is needed for the current configuration.
+        /// Get whether any user-mapped action is configured to fire the Xbox Guide button.
+        /// Exposed so ViiperEmulationManager can decide whether to spin up its Guide-only
+        /// virtual pad when the master Controller-Emulation toggle is off but backend=VIIPER.
         /// </summary>
-        private bool HasGuideActionConfigured =>
+        public bool HasGuideActionConfigured =>
             (legionLEnabled && legionLActionType == LegionButtonAction.XboxGuide) ||
             (legionREnabled && legionRActionType == LegionButtonAction.XboxGuide) ||
             (scrollUpEnabled && scrollUpActionType == LegionButtonAction.XboxGuide) ||
@@ -993,14 +995,17 @@ namespace XboxGamingBarHelper.Labs
 
         /// <summary>
         /// A dedicated Guide-only ViGEm pad is only needed when a Guide action is mapped
-        /// AND neither emulation backend is ready to deliver the press through its own
-        /// virtual pad. When either the legacy ControllerEmulationManager or the VIIPER
-        /// forwarder is active, the Guide press is routed there and the dedicated pad
-        /// should be torn down to avoid leaving a dangling virtual Xbox controller.
+        /// AND no emulation backend is ready to deliver the press through its own virtual
+        /// pad. Three backends can claim Guide: the legacy ControllerEmulationManager
+        /// (when CE master toggle is on with backend=Legacy), the full VIIPER input forwarder
+        /// (CE on + backend=VIIPER), and the new VIIPER guide-only mode (CE off + backend=VIIPER
+        /// + Guide configured). When any of those owns Guide, the dedicated ViGEm pad is torn
+        /// down so we don't leave a dangling virtual Xbox controller in joy.cpl / Steam.
         /// </summary>
         public bool NeedsViGEm => HasGuideActionConfigured
             && !ControllerEmulationManager.CanHandleExternalGuide()
-            && !XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperInputForwarder.CanHandleExternalGuide();
+            && !XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperInputForwarder.CanHandleExternalGuide()
+            && !XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.IsGuideOnlyActive;
 
         /// <summary>
         /// Get whether any button is configured.
@@ -1467,6 +1472,13 @@ namespace XboxGamingBarHelper.Labs
                     if (XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperInputForwarder.TryHandleGuidePressFromLabs())
                     {
                         Logger.Info($"LegionButtonMonitor: Routed scroll XboxGuide to VIIPER backend ({actionName})");
+                        break;
+                    }
+                    if (XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.TrySetGuideFromLabs(true))
+                    {
+                        Thread.Sleep(50);
+                        XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.TrySetGuideFromLabs(false);
+                        Logger.Info($"LegionButtonMonitor: Routed scroll XboxGuide to VIIPER guide-only pad ({actionName})");
                         break;
                     }
                     if (vigemController != null)
@@ -3291,6 +3303,12 @@ namespace XboxGamingBarHelper.Labs
                             break;
                         }
 
+                        if (XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.TrySetGuideFromLabs(true))
+                        {
+                            Logger.Info($"LegionButtonMonitor: Routed XboxGuide press to VIIPER guide-only pad for {buttonName}");
+                            break;
+                        }
+
                         if (ControllerEmulationManager.TrySetGuideFromExternal(true))
                         {
                             Logger.Info($"LegionButtonMonitor: Routed SetGuide(true) to controller emulation virtual pad for {buttonName}");
@@ -3374,6 +3392,12 @@ namespace XboxGamingBarHelper.Labs
                     if (XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperInputForwarder.TryHandleGuideButtonFromLabs(false))
                     {
                         Logger.Info($"LegionButtonMonitor: Routed XboxGuide release to VIIPER backend for {buttonName}");
+                        return;
+                    }
+
+                    if (XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.TrySetGuideFromLabs(false))
+                    {
+                        Logger.Info($"LegionButtonMonitor: Routed XboxGuide release to VIIPER guide-only pad for {buttonName}");
                         return;
                     }
 
