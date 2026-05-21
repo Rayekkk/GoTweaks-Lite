@@ -323,17 +323,32 @@ namespace XboxGamingBarHelper
                 return;
             }
 
-            // Process-exit + unhandled-exception cleanup: release any active EC fan
-            // override so the fan doesn't stay stuck at the last RPM we wrote. Without
-            // this, a crash leaves 0xC6C8 holding our last value indefinitely (or until
-            // a reboot). ProcessExit covers normal shutdowns and most crashes that
+            // Process-exit + unhandled-exception cleanup. Two shared concerns:
+            //
+            //   1. EC fan override: 0xC6C8 keeps the last RPM we wrote until
+            //      reboot. Release it so the fan returns to firmware control.
+            //
+            //   2. HidHide suppression: BlockedInstanceIds live in HidHide's
+            //      driver registry and persist across helper death. If we
+            //      leave the Legion hidden, games can't see it until the
+            //      next helper boot reapplies state — and if the helper
+            //      stays dead, the user has no controller. Clear it here so
+            //      the user's pad is always visible when the helper isn't.
+            //      The next graceful start re-applies the right state.
+            //
+            // ProcessExit covers normal shutdowns and most crashes that
             // unwind through the runtime; UnhandledException covers the rest.
+            // Neither fires on TerminateProcess (hard kill) — the only
+            // remaining gap, which the helper recovers from on next start
+            // (ApplySuppressionInner diffs against current state).
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
             {
                 try
                 {
-                    Logger.Warn("ProcessExit fired — releasing EC fan override before shutdown");
+                    Logger.Warn("ProcessExit fired — releasing EC fan + HidHide suppression before shutdown");
                     legionManager?.EmergencyReleaseFanOverride();
+                    try { controllerEmulationManager?.SuppressionManager?.Disable(); }
+                    catch (Exception ex) { Logger.Warn($"ProcessExit HidHide.Disable threw: {ex.Message}"); }
                     LogManager.Flush();
                 }
                 catch { }
@@ -342,8 +357,10 @@ namespace XboxGamingBarHelper
             {
                 try
                 {
-                    Logger.Error($"UnhandledException — releasing EC fan override. Exception: {e.ExceptionObject}");
+                    Logger.Error($"UnhandledException — releasing EC fan + HidHide suppression. Exception: {e.ExceptionObject}");
                     legionManager?.EmergencyReleaseFanOverride();
+                    try { controllerEmulationManager?.SuppressionManager?.Disable(); }
+                    catch (Exception ex) { Logger.Warn($"UnhandledException HidHide.Disable threw: {ex.Message}"); }
                     LogManager.Flush();
                 }
                 catch { }
