@@ -2353,12 +2353,20 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             short gx, gy, gz, ax, ay, az;
             if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
             {
-                WriteI16(data, 24, ax);
-                WriteI16(data, 26, ay);
-                WriteI16(data, 28, az);
-                WriteI16(data, 30, gx);
-                WriteI16(data, 32, gy);
-                WriteI16(data, 34, gz);
+                // SteamDeck frame correction (#78 / gyro investigation 2026-05-27): the Legion
+                // BMI parser labels axes in the flat-on-PCB frame, but the Steam Deck gyro
+                // convention is the held-vertical gameplay frame — a ~90deg rotation about the
+                // pitch (X) axis that maps (Y,Z) -> (-Z,+Y). Without it, physical roll lands in
+                // Steam's yaw slot. Applied to gyro AND accel together so the IMU vector stays
+                // coherent. Pitch (X) is unchanged. NOTE: handedness is the +90 variant; if yaw
+                // and roll come out inverted in Steam, switch to the -90 variant: (Y,Z)->(+Z,-Y).
+                // gyro: (Y,Z) -> (-Z,+Y); accel: same rotation
+                WriteI16(data, 24, ax);                              // accel X
+                WriteI16(data, 26, SignedClampToShort(-(int)az));    // accel Y <- -Z
+                WriteI16(data, 28, ay);                              // accel Z <- +Y
+                WriteI16(data, 30, gx);                              // gyro Pitch (X)
+                WriteI16(data, 32, SignedClampToShort(-(int)gz));    // gyro Yaw   <- -Z
+                WriteI16(data, 34, gy);                              // gyro Roll  <- +Y
             }
 
             // Triggers — XInput is 0..255, steamdeck wire is u16. ×257 spans the

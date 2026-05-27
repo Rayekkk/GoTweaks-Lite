@@ -432,25 +432,30 @@ namespace XboxGamingBarHelper.ControllerEmulation
     }
 
     /// <summary>
-    /// Shared mirror-inversion helper. Lenovo's per-side parser already remaps byte
-    /// offsets (X↔Z swap on right) so left/right axes correspond to the same physical
-    /// axis. Field data captured 2026-05-07 (helper_2026-05-07_22.log GyroMix samples)
-    /// confirmed L.GyroX and R.GyroX report SAME sign + same magnitude during pitch
-    /// motion (e.g. L=+3.5 R=+3.5; L=−2.6 R=−2.5). The earlier −1 flip on X cancelled
-    /// pitch entirely, killing vertical-stick output. Y and Z behaved similarly under
-    /// pure motion: both controllers agree in sign once Lenovo's parser pre-aligns
-    /// the chips. Conclusion: no per-axis sign flip is needed; a simple average is
-    /// the correct merge. Constants kept (defaulting to +1) so a future hardware
-    /// variant that genuinely mirrors an axis can flip a sign in one place.
+    /// Shared mirror-inversion helper. Lenovo's per-side parser pre-aligns byte offsets
+    /// so left/right map to the same physical axis, but the two IMUs are sign-opposed on
+    /// the X (pitch) and Y (yaw) axes for the same physical motion, while agreeing on Z
+    /// (roll). Live capture 2026-05-27 (GYRODIAG samples, Legion Go 2 -> SteamDeck) proved
+    /// this: during yaw L.Y=+58 / R.Y=-58, during pitch L.X=-94 / R.X=+96 (opposite), but
+    /// during roll L.Z=+72 / R.Z=+72 (matching). With all-+1 constants the simple average
+    /// cancelled pitch and yaw to ~0 while roll survived — the exact reported bug. Flipping
+    /// the right X/Y signs brings the right chip into the left's frame so the average adds
+    /// instead of cancelling; Z stays +1. (The earlier 2026-05-07 note claiming all axes
+    /// matched in sign held only for the stick-gyro pitch test, not yaw or the native path.)
     /// </summary>
     internal static class LegionMixedGyroMerge
     {
-        public const float RightGyroXSign = +1f;
-        public const float RightGyroYSign = +1f;
-        public const float RightGyroZSign = +1f;
+        public const float RightGyroXSign = -1f;  // pitch: right is mirror-opposed to left
+        public const float RightGyroYSign = -1f;  // yaw:   right is mirror-opposed to left
+        public const float RightGyroZSign = +1f;  // roll:  both chips agree
+        // Accel mirrors complementary to gyro: the two IMUs are mirror images across the
+        // PCB (XY) plane, so the true-vector accel flips only the perpendicular axis (Z)
+        // while X/Y agree. Confirmed 2026-05-27 from at-rest gravity in GYRODIAG: aL.Z=+0.11
+        // vs aR.Z=-0.11 (opposed), aL.X/Y == aR.X/Y. With +1 the average cancelled accel Z
+        // (gravity loss) in Mixed mode; -1 on Z brings the right chip into the left's frame.
         public const float RightAccelXSign = +1f;
         public const float RightAccelYSign = +1f;
-        public const float RightAccelZSign = +1f;
+        public const float RightAccelZSign = -1f;
 
         /// <summary>
         /// Average left and right gyro samples after pre-flipping the right side
