@@ -119,6 +119,21 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private long steamDeckMotorLeftExpiresTicks;
         private long steamDeckMotorRightExpiresTicks;
 
+        // Same auto-decay machinery for the Switch 2 Pro (ns2pro) target.
+        // Steam Input's Switch 2 Pro driver doesn't currently send an explicit
+        // "stop rumble" subcommand — it relies on the LRA envelope baked into
+        // the HD haptic pattern to fade out naturally, and on its built-in
+        // 5-second test-rumble timeout to send a stop after that window. Our
+        // virtual device doesn't simulate the LRA envelope; it just exposes
+        // peak amplitude. Without a decay timer the motor latches at peak for
+        // the full 5 s of Steam's hold, instead of the ~100 ms "ping" the
+        // user actually expects. Same poll-loop tick that drives the Steam
+        // Deck decay handles ns2pro decay too.
+        private byte ns2proMotorLeft;
+        private byte ns2proMotorRight;
+        private long ns2proMotorLeftExpiresTicks;
+        private long ns2proMotorRightExpiresTicks;
+
         // Throttle LED writes — Legion's WMI/USB write path is slow; don't re-send the same color.
         private long lastLedPacked = -1;
         private long lastLedWriteTicks;
@@ -270,6 +285,56 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 changed = true;
             }
             return changed;
+        }
+
+        /// <summary>
+        /// Same idea as <see cref="DecayExpiredSteamDeckRumble"/> but for the
+        /// ns2pro motor state — zeroes per-side strength when the rumble's
+        /// natural play window has elapsed. Returns true if anything decayed
+        /// so the caller can push a SetState(0,0) to the physical pad.
+        /// </summary>
+        private bool DecayExpiredNS2ProRumble()
+        {
+            long now = DateTime.UtcNow.Ticks;
+            bool changed = false;
+            if (ns2proMotorLeft != 0 && now >= ns2proMotorLeftExpiresTicks)
+            {
+                ns2proMotorLeft = 0;
+                ns2proMotorLeftExpiresTicks = 0;
+                changed = true;
+            }
+            if (ns2proMotorRight != 0 && now >= ns2proMotorRightExpiresTicks)
+            {
+                ns2proMotorRight = 0;
+                ns2proMotorRightExpiresTicks = 0;
+                changed = true;
+            }
+            return changed;
+        }
+
+        private void FlushNS2ProRumbleToXInput()
+        {
+            try
+            {
+                byte large = ns2proMotorLeft;
+                byte small = ns2proMotorRight;
+                if (swapRumbleMotors)
+                {
+                    byte tmp = large; large = small; small = tmp;
+                }
+                int scaled = rumbleIntensityScaled;
+                int leftSpeed = (large * 257 * scaled) / 1000;
+                int rightSpeed = (small * 257 * scaled) / 1000;
+                if (leftSpeed > 65535) leftSpeed = 65535;
+                if (rightSpeed > 65535) rightSpeed = 65535;
+                var vib = new ViiperXInputVibration
+                {
+                    LeftMotorSpeed = (ushort)leftSpeed,
+                    RightMotorSpeed = (ushort)rightSpeed,
+                };
+                ViiperXInput.SetState(physicalIndex, ref vib);
+            }
+            catch (Exception ex) { Logger.Warn($"FlushNS2ProRumbleToXInput threw: {ex.Message}"); }
         }
 
         /// <summary>
@@ -531,33 +596,36 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     //       two 16-byte amplitude windows (left then right).
                     //       Peak-of-window is the best ERM proxy because
                     //       click/heartbeat patterns sandwich the peak
-                    //       between low samples.
+                    //       between low samples. Pattern auto-decays in
+                    //       ~16 ms on real hardware (16 samples × 1 ms).
                     //
                     //   (b) Switch 1 Pro rumble subcommand fallback —
                     //       Steam Input doesn't ship an HD-LRA driver for
                     //       Switch 2 Pro yet (2026-05), so when it sees our
                     //       057E:2069 it sends the legacy 0x10/0x11
                     //       subcommand: `cmd counter L_HFh L_HFa L_LFh
-                    //       L_LFa R_HFh R_HFa R_LFh R_LFa ...`. Treating
-                    //       those bytes as LRA samples reads the cmd byte
-                    //       (0x10 = 16) and counter (0..15) as faint
-                    //       amplitudes every poll, producing the
-                    //       "vibrates non-stop" symptom we saw on 0x057E.
+                    //       L_LFa R_HFh R_HFa R_LFh R_LFa ...`. Real Switch
+                    //       firmware plays this for ~100 ms then auto-stops.
                     //
-                    // Discriminate on byte 0 — real HD-LRA patterns start
-                    // with an envelope sample, not 0x10/0x11.
+                    // Either way our virtual device doesn't simulate the
+                    // natural decay — without a timer the XInput motor
+                    // latches at peak for as long as Steam's hold window
+                    // (5 s on the test-rumble button). Stash per-side
+                    // strength + an expiry tick; the poll loop's decay path
+                    // zeroes them and pushes SetState(0,0) when the window
+                    // elapses, matching the real-hardware "ping" feel.
                     byte ns2L = 0, ns2R = 0;
+                    long ns2DurationMs;
                     if (data.Length >= 10 && (data[0] == 0x10 || data[0] == 0x11))
                     {
                         // Switch 1 Pro Rumble-only / Rumble+subcommand.
                         // High-frequency amplitudes sit at offsets 3 (left)
-                        // and 7 (right); low-frequency at 5 / 9. Take the
-                        // larger of HF/LF per side so the motor responds
-                        // to either band.
+                        // and 7 (right); low-frequency at 5 / 9.
                         if (data[3] > ns2L) ns2L = data[3];
                         if (data[5] > ns2L) ns2L = data[5];
                         if (data[7] > ns2R) ns2R = data[7];
                         if (data[9] > ns2R) ns2R = data[9];
+                        ns2DurationMs = 120;
                     }
                     else if (data.Length >= 32)
                     {
@@ -566,9 +634,22 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                             if (data[i] > ns2L) ns2L = data[i];
                             if (data[16 + i] > ns2R) ns2R = data[16 + i];
                         }
+                        ns2DurationMs = 32;
                     }
-                    rumbleLarge = ns2L;
-                    rumbleSmall = ns2R;
+                    else
+                    {
+                        ns2DurationMs = 0;
+                    }
+
+                    long ns2StopTicks = DateTime.UtcNow.Ticks + ns2DurationMs * TimeSpan.TicksPerMillisecond;
+                    // Only update the side if the new pulse is non-zero;
+                    // zero amplitude from Steam means "don't change this
+                    // side" rather than "stop now" — Steam relies on
+                    // expiry, not explicit zeros, for ns2pro.
+                    if (ns2L != 0) { ns2proMotorLeft = ns2L; ns2proMotorLeftExpiresTicks = ns2StopTicks; }
+                    if (ns2R != 0) { ns2proMotorRight = ns2R; ns2proMotorRightExpiresTicks = ns2StopTicks; }
+                    rumbleLarge = ns2proMotorLeft;
+                    rumbleSmall = ns2proMotorRight;
                     break;
                 default:
                     return;
@@ -1385,6 +1466,13 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 if (IsSteamDeckLikeTarget() && DecayExpiredSteamDeckRumble())
                 {
                     FlushSteamDeckRumbleToXInput();
+                }
+                // Switch 2 Pro auto-decay — Steam doesn't send explicit stops,
+                // we model the real-hardware envelope locally and flush a
+                // SetState(0,0) when the pulse window elapses.
+                if (targetType == "ns2pro" && DecayExpiredNS2ProRumble())
+                {
+                    FlushNS2ProRumbleToXInput();
                 }
 
                 try
