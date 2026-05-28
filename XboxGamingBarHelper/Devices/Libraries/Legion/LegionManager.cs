@@ -129,6 +129,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         // Fan curve visibility (widget tells us when to push temp/RPM updates)
         private bool fanCurveVisible = false;
 
+        /// <summary>
+        /// True when the fan-curve UI panel is open in the widget. Read by
+        /// PerformanceManager's consumer-check to keep CPU/VRM temps fresh while
+        /// the user has the panel open.
+        /// </summary>
+        public bool IsFanCurveVisible => fanCurveVisible;
+
         // TDP reapply timer (used when switching to Custom mode)
         private System.Timers.Timer tdpReapplyTimer;
         private int pendingTdpSlow;
@@ -2366,7 +2373,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private int InterpolateFanCurvePercent(int tempC)
         {
             if (tempC <= LegionFanCurveTemps[0]) return fanCurve[0];
-            if (tempC >= LegionFanCurveTemps[9]) return 100;
+            // Clamp to the user's top curve point, not a hardcoded 100. Forcing 100% here
+            // made the fan spike to max ("jet engine", issue #88) any time temp crossed the
+            // top threshold, ignoring the configured top point. True over-temp is handled
+            // separately by panic mode (EC_FAN_PANIC_TEMP_C = 101°C), so respecting the curve
+            // here is safe.
+            if (tempC >= LegionFanCurveTemps[9]) return fanCurve[9];
             for (int i = 0; i < 9; i++)
             {
                 if (tempC >= LegionFanCurveTemps[i] && tempC <= LegionFanCurveTemps[i + 1])
@@ -2908,11 +2920,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     cpuFanSpeed = fanResult.Result.Value;
                 }
 
-                // Only push temp/RPM to widget when fan curve is visible
+                // Always push RPM so the OSD + quick-settings fan readout shows a value
+                // instead of "--" even when the fan-curve panel hasn't been opened (issue
+                // #83/#88). The extra sensor-temp WMI reads below stay gated on the panel
+                // being visible since they're only consumed by the fan-curve UI.
+                LegionCPUFanRPM.UpdateRPM(cpuFanSpeed);
+
                 if (fanCurveVisible)
                 {
-                    LegionCPUFanRPM.UpdateRPM(cpuFanSpeed);
-
                     // Read the fan control sensor temp (0x01 sensor) - this is what the EC uses for fan curve lookup
                     var fanSensorResult = wmiService.GetFanControlSensorTemp();
                     if (fanSensorResult.Success && fanSensorResult.Result.HasValue)
