@@ -118,6 +118,13 @@ namespace XboxGamingBar
                         ViiperJoyconGyroPerHalfPanel.Visibility = (backendOn && isJoyconPair) ? Visibility.Visible : Visibility.Collapsed;
                     }
                 }
+
+                // Backend swap can change which body (legacy vs VIIPER) is currently
+                // visible, so rebuild the System tab D-pad chain (ExpandButton →
+                // EnabledToggle → first-body-item → … → AutoHibernateToggle) for the
+                // new configuration. Without this, gamepad navigation lands wherever
+                // the previous backend's chain pointed.
+                UpdateSystemControllerEmulationNavigation();
             });
         }
 

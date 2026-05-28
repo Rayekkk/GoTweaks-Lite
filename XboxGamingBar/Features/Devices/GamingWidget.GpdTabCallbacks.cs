@@ -506,11 +506,22 @@ namespace XboxGamingBar
                 ControllerEmulationCard.Visibility == Visibility.Visible &&
                 ControllerEmulationExpandButton != null;
 
-            bool emulationCardExpanded =
+            bool legacyBodyVisible =
                 emulationCardVisible &&
                 isControllerEmulationExpanded &&
                 ControllerEmulationContent != null &&
                 ControllerEmulationContent.Visibility == Visibility.Visible;
+
+            bool viiperBodyVisible =
+                emulationCardVisible &&
+                isControllerEmulationExpanded &&
+                ViiperEmulationContent != null &&
+                ViiperEmulationContent.Visibility == Visibility.Visible;
+
+            // "Expanded" now covers either backend body — VIIPER also needs the
+            // ExpandButton → EnabledToggle → first-body-item chain wired up. The
+            // body-specific (legacy vs VIIPER) branching happens further down.
+            bool emulationCardExpanded = legacyBodyVisible || viiperBodyVisible;
 
             bool emulationCardActive =
                 emulationCardExpanded &&
@@ -518,7 +529,7 @@ namespace XboxGamingBar
                 ControllerEmulationEnabledToggle.IsEnabled;
 
             bool emulationModeControlsActive =
-                emulationCardExpanded &&
+                legacyBodyVisible &&
                 ControllerEmulationGyroSourceComboBox != null &&
                 ControllerEmulationGyroSourceComboBox.IsEnabled &&
                 ControllerEmulationModeComboBox != null &&
@@ -549,6 +560,24 @@ namespace XboxGamingBar
                 {
                     ControllerEmulationExpandButton.XYFocusDown = AutoHibernateToggle;
                     AutoHibernateToggle.XYFocusUp = ControllerEmulationExpandButton;
+                    return;
+                }
+
+                if (viiperBodyVisible)
+                {
+                    // VIIPER backend body. Wire the entry/exit explicitly; auto XY traversal
+                    // handles internal navigation between VIIPER controls (sub-device combo,
+                    // toggles, sliders) since they sit in a straightforward vertical stack.
+                    if (ViiperDeviceTypeComboBox != null)
+                    {
+                        ControllerEmulationEnabledToggle.XYFocusDown = ViiperDeviceTypeComboBox;
+                        ViiperDeviceTypeComboBox.XYFocusUp = ControllerEmulationEnabledToggle;
+                        AutoHibernateToggle.XYFocusUp = ViiperDeviceTypeComboBox;
+                    }
+                    else
+                    {
+                        AutoHibernateToggle.XYFocusUp = ControllerEmulationEnabledToggle;
+                    }
                     return;
                 }
 
