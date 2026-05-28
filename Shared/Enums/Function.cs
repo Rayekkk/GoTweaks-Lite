@@ -430,6 +430,7 @@
         Viiper_GyroAxisMapY,                       // string - IMU Y channel mapping (same options)
         Viiper_GyroAxisMapZ,                       // string - IMU Z channel mapping (same options)
         Viiper_StickGyroEnabled,                   // bool  - master enable for the Gyro → Right Stick processor on no-native-motion targets (default true)
+        Viiper_JoyconGyroPerHalf,                  // bool  - joycon-pair only: when true each Joy-Con half is driven by its matching physical controller IMU (left half ← left controller, right half ← right controller); when false (default) both halves share the selected gyro source
         Viiper_StickTriggerConfig,                 // string (JSON) - per-stick + per-trigger shaping config (deadzone shape, dead/anti-dead zones, sensitivity curves). Schema in StickTriggerConfigBundle.
         Viiper_StickTriggerPreviewEnabled,         // bool - widget sets true while the Sticks & Triggers panel is expanded; helper pumps live samples only when this is on.
         Viiper_StickTriggerLiveSample,             // string "LX,LY,RX,RY,LT,RT" - helper streams raw values at ~30 Hz while preview is enabled. Widget runs StickTriggerProcessor locally to compute shaped values for the canvas.

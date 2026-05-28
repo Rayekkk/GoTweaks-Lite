@@ -4835,6 +4835,25 @@
                                             </ComboBox>
                                         </StackPanel>
 
+                                        <!-- Joy-Con Pair: per-half gyro routing (only shown for Joy-Con Pair) -->
+                                        <StackPanel x:Name="ViiperJoyconGyroPerHalfPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="Per-half gyro" FontSize="13" Foreground="#CCCCCC"/>
+                                                    <TextBlock Text="Each Joy-Con uses its own controller's motion (off = both share the selected source)"
+                                                               FontSize="11" Foreground="#808080" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="ViiperJoyconGyroPerHalfToggle"
+                                                              Grid.Column="1"
+                                                              Style="{StaticResource ModernToggleStyle}"
+                                                              IsOn="False"/>
+                                            </Grid>
+                                        </StackPanel>
+
                                         <TextBlock Text="Input source" FontSize="12" Foreground="#CCCCCC" Margin="0,12,0,4"/>
                                         <ComboBox x:Name="ViiperInputSourceComboBox" HorizontalAlignment="Stretch">
                                             <ComboBoxItem Content="XInput (any controller)" Tag="XInput"/>

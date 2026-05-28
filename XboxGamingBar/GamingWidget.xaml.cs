@@ -978,6 +978,7 @@ namespace XboxGamingBar
         private readonly ViiperSwapRumbleMotorsProperty viiperSwapRumbleMotors;
         private readonly ViiperMirrorLightbarToStickProperty viiperMirrorLightbarToStick;
         private readonly ViiperStickGyroEnabledProperty viiperStickGyroEnabled;
+        private readonly ViiperJoyconGyroPerHalfProperty viiperJoyconGyroPerHalf;
         private readonly ViiperRumbleIntensityProperty viiperRumbleIntensity;
         private readonly ViiperStringComboProperty viiperGyroAxisMapX;
         private readonly ViiperStringComboProperty viiperGyroAxisMapY;
@@ -1684,6 +1685,7 @@ namespace XboxGamingBar
             viiperSwapRumbleMotors = new ViiperSwapRumbleMotorsProperty(ViiperSwapRumbleMotorsToggle, this);
             viiperMirrorLightbarToStick = new ViiperMirrorLightbarToStickProperty(ViiperMirrorLightbarToStickToggle, this);
             viiperStickGyroEnabled = new ViiperStickGyroEnabledProperty(ViiperStickGyroEnabledToggle, this);
+            viiperJoyconGyroPerHalf = new ViiperJoyconGyroPerHalfProperty(ViiperJoyconGyroPerHalfToggle, this);
             viiperRumbleIntensity = new ViiperRumbleIntensityProperty(100, ViiperRumbleIntensitySlider, this);
             viiperGyroAxisMapX = new ViiperStringComboProperty("X", Shared.Enums.Function.Viiper_GyroAxisMapX, ViiperGyroAxisMapXComboBox, this);
             viiperGyroAxisMapY = new ViiperStringComboProperty("Y", Shared.Enums.Function.Viiper_GyroAxisMapY, ViiperGyroAxisMapYComboBox, this);
@@ -1711,6 +1713,8 @@ namespace XboxGamingBar
             usbipInstalled.PropertyChanged += (s, e) => UpdateUsbipCardVisibility();
             // Show Steam sub-device picker only when a Steam device type is selected
             viiperDeviceType.PropertyChanged += (s, e) => { UpdateViiperConfigVisibility(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
+            // Re-evaluate sub-device-dependent panels (e.g. Joy-Con Pair per-half gyro) when the Nintendo sub-device changes.
+            viiperNintendoSubDevice.PropertyChanged += (s, e) => UpdateViiperConfigVisibility();
             controllerEmulationMode.PropertyChanged += (s, e) => UpdateQuickSettingsTileStates();
             winRing0Available = new WinRing0AvailableProperty(this);
             pawnIOAvailable = new PawnIOAvailableProperty();
@@ -1958,6 +1962,7 @@ namespace XboxGamingBar
                 viiperRumbleIntensity,
                 viiperMirrorLightbarToStick,
                 viiperStickGyroEnabled,
+                viiperJoyconGyroPerHalf,
                 viiperGyroAxisMapX,
                 viiperGyroAxisMapY,
                 viiperGyroAxisMapZ,

@@ -109,6 +109,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 {
                     settingsManager.ViiperGyroSource.PropertyChanged += OnGyroSourceChanged;
                 }
+                if (settingsManager.ViiperJoyconGyroPerHalf != null)
+                {
+                    settingsManager.ViiperJoyconGyroPerHalf.PropertyChanged += OnJoyconGyroPerHalfChanged;
+                }
                 if (settingsManager.ViiperGuideButtonMode != null)
                 {
                     settingsManager.ViiperGuideButtonMode.PropertyChanged += OnGuideModeChanged;
@@ -657,6 +661,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             uint xinputIdx = ViiperInputForwarder.DetectPhysicalXInputIndex();
             forwarder.SetInputSource(ResolveInputSource());
             forwarder.SetGyroSource(ResolveGyroSource());
+            forwarder.SetJoyconGyroPerHalf(settingsManager?.ViiperJoyconGyroPerHalf?.Value ?? false);
             forwarder.SetGuideButtonMode(ResolveGuideMode());
             forwarder.SetSwapRumbleMotors(settingsManager?.ViiperSwapRumbleMotors?.Value ?? false);
             forwarder.SetRumbleIntensity(settingsManager?.ViiperRumbleIntensity?.Value ?? 100);
@@ -811,6 +816,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         {
             try { forwarder.SetGyroSource(ResolveGyroSource()); }
             catch (Exception ex) { Logger.Warn($"OnGyroSourceChanged threw: {ex.Message}"); }
+        }
+
+        private void OnJoyconGyroPerHalfChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try { forwarder.SetJoyconGyroPerHalf(settingsManager?.ViiperJoyconGyroPerHalf?.Value ?? false); }
+            catch (Exception ex) { Logger.Warn($"OnJoyconGyroPerHalfChanged threw: {ex.Message}"); }
         }
 
         private ViiperGuideButtonMode ResolveGuideMode()
@@ -1078,6 +1089,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     if (settingsManager.ViiperGyroSource != null)
                     {
                         settingsManager.ViiperGyroSource.PropertyChanged -= OnGyroSourceChanged;
+                    }
+                    if (settingsManager.ViiperJoyconGyroPerHalf != null)
+                    {
+                        settingsManager.ViiperJoyconGyroPerHalf.PropertyChanged -= OnJoyconGyroPerHalfChanged;
                     }
                     if (settingsManager.ViiperGuideButtonMode != null)
                     {

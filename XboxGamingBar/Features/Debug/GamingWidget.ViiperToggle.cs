@@ -111,6 +111,12 @@ namespace XboxGamingBar
                     {
                         ViiperNintendoSubDevicePanel.Visibility = (backendOn && isNintendo) ? Visibility.Visible : Visibility.Collapsed;
                     }
+                    if (ViiperJoyconGyroPerHalfPanel != null)
+                    {
+                        // Per-half gyro only applies to the Joy-Con Pair (two physical IMUs → two halves).
+                        bool isJoyconPair = isNintendo && (viiperNintendoSubDevice?.Value == "joycon-pair");
+                        ViiperJoyconGyroPerHalfPanel.Visibility = (backendOn && isJoyconPair) ? Visibility.Visible : Visibility.Collapsed;
+                    }
                 }
             });
         }

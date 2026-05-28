@@ -96,6 +96,12 @@ namespace XboxGamingBarHelper.Settings
             get { return viiperGyroSource; }
         }
 
+        private readonly ViiperJoyconGyroPerHalfProperty viiperJoyconGyroPerHalf;
+        public ViiperJoyconGyroPerHalfProperty ViiperJoyconGyroPerHalf
+        {
+            get { return viiperJoyconGyroPerHalf; }
+        }
+
         private readonly ViiperSteamSubDeviceProperty viiperSteamSubDevice;
         public ViiperSteamSubDeviceProperty ViiperSteamSubDevice
         {
@@ -213,6 +219,7 @@ namespace XboxGamingBarHelper.Settings
             viiperDeviceType = new ViiperDeviceTypeProperty(this);
             viiperInputSource = new ViiperInputSourceProperty(this);
             viiperGyroSource = new ViiperGyroSourceProperty(this);
+            viiperJoyconGyroPerHalf = new ViiperJoyconGyroPerHalfProperty(this);
             viiperSteamSubDevice = new ViiperSteamSubDeviceProperty(this);
             viiperSonySubDevice = new ViiperSonySubDeviceProperty(this);
             viiperNintendoSubDevice = new ViiperNintendoSubDeviceProperty(this);

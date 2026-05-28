@@ -125,6 +125,7 @@
     <Compile Include="Data\ViiperRumbleIntensityProperty.cs" />
     <Compile Include="Data\ViiperMirrorLightbarToStickProperty.cs" />
     <Compile Include="Data\ViiperStickGyroEnabledProperty.cs" />
+    <Compile Include="Data\ViiperJoyconGyroPerHalfProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerConfigProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerPreviewEnabledProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerLiveSampleProperty.cs" />

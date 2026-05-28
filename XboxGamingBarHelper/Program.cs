@@ -1256,6 +1256,25 @@ namespace XboxGamingBarHelper
             // Wire sidebar manager to live managers (WPF thread already running from TryStartSidebar)
             sidebarManager?.SetManagers(performanceManager, autoTDPManager, profileManager, legionManager, controllerEmulationManager, powerManager, rtssManager, systemManager);
 
+            // Gate the per-tick LibreHardwareMonitor walk on whether anyone actually wants
+            // fresh sensor data. PerformanceManager already short-circuits on QuickMetrics
+            // enabled; this predicate covers the other consumers. When idle (no game,
+            // no UI, no AutoTDP, no fan-curve panel) the sensor walk is skipped, which is
+            // the dominant idle-CPU cost in the helper.
+            performanceManager.SetMetricsConsumerCheck(() =>
+            {
+                try
+                {
+                    if (sidebarManager?.IsVisibleCached == true) return true;
+                    if (autoTDPManager?.Enabled?.Value == true) return true;
+                    if (legionManager?.IsFanCurveVisible == true) return true;
+                    var runningGameProp = systemManager?.RunningGame;
+                    if (runningGameProp != null && runningGameProp.Value.GameId.IsValid()) return true;
+                }
+                catch { /* fail-open below */ return true; }
+                return false;
+            });
+
             Logger.Info("Initialize properties.");
             onScreenDisplay = new OnScreenDisplayProperty(0, null, rtssManager);
             onScreenDisplayProviders = new List<OnScreenDisplayManager>() { rtssManager, amdManager };
@@ -1364,6 +1383,7 @@ namespace XboxGamingBarHelper
                 settingsManager.ViiperRumbleIntensity,
                 settingsManager.ViiperMirrorLightbarToStick,
                 settingsManager.ViiperStickGyroEnabled,
+                settingsManager.ViiperJoyconGyroPerHalf,
                 settingsManager.ViiperGyroAxisMapX,
                 settingsManager.ViiperGyroAxisMapY,
                 settingsManager.ViiperGyroAxisMapZ,

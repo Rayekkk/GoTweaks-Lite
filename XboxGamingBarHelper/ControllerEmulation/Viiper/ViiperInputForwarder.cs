@@ -126,6 +126,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         private string targetType = "xbox360";
         private volatile ViiperInputSourceKind inputSource = ViiperInputSourceKind.XInput;
         private volatile ViiperGyroSourceKind gyroSource = ViiperGyroSourceKind.None;
+        // joycon-pair only: when true, the left Joy-Con half is driven by the left
+        // controller IMU and the right half by the right controller IMU. When false,
+        // both halves share `gyroSource`.
+        private volatile bool joyconGyroPerHalf;
         private volatile ViiperGuideButtonMode guideMode = ViiperGuideButtonMode.Native;
         private volatile bool swapRumbleMotors;
         // Percent ×10 so we can apply it with integer math (1000 == unity). Range 0..2000.
@@ -767,6 +771,88 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             Logger.Info($"VIIPER forwarder gyro source -> {kind}");
         }
 
+        public void SetJoyconGyroPerHalf(bool enabled)
+        {
+            if (joyconGyroPerHalf == enabled) return;
+            joyconGyroPerHalf = enabled;
+            Logger.Info($"VIIPER forwarder joycon-pair per-half gyro -> {enabled}");
+        }
+
+        /// <summary>
+        /// Sends a built frame to the primary device and mirrors it to the secondary.
+        /// For a joycon-pair in per-half gyro mode, the primary (joycon-left) gets the
+        /// LEFT controller's IMU and the secondary (joycon-right) gets the RIGHT, by
+        /// overwriting the switchpro-layout IMU bytes in a per-device copy. Otherwise both
+        /// devices receive the same frame. Returns the primary SetInput result.
+        /// </summary>
+        private bool EmitDeviceFrame(byte[] data)
+        {
+            uint sec = secondaryDeviceId;
+            if (joyconGyroPerHalf && targetType == "joycon-pair" && sec != 0
+                && data != null && data.Length >= 24)
+            {
+                byte[] left = (byte[])data.Clone();
+                OverwriteSwitchproImu(left, ViiperGyroSourceKind.Left);
+                bool ok = service.SetInput(busId, deviceId, left);
+
+                byte[] right = (byte[])data.Clone();
+                OverwriteSwitchproImu(right, ViiperGyroSourceKind.Right);
+                service.SetInput(busId, sec, right);
+                return ok;
+            }
+
+            bool primaryOk = service.SetInput(busId, deviceId, data);
+            if (sec != 0) service.SetInput(busId, sec, data);
+            return primaryOk;
+        }
+
+        /// <summary>
+        /// Overwrites the switchpro-layout IMU bytes (gyro-first 12-17, accel 18-23) of an
+        /// already-built 24-byte Joy-Con frame with the counts from a specific source.
+        /// </summary>
+        private void OverwriteSwitchproImu(byte[] frame, ViiperGyroSourceKind src)
+        {
+            if (frame == null || frame.Length < 24) return;
+            if (TryBuildImuCounts(src, out short gx, out short gy, out short gz,
+                                  out short ax, out short ay, out short az))
+            {
+                // Right Joy-Con frame = left rotated 180° about the yaw (vertical) axis:
+                // pitch and roll flip, yaw is unchanged. Verified on the WebHID demo
+                // (#78, 2026-05-27 — right pitch then roll both read inverted, yaw fine).
+                // A 180° turn is a proper rotation, so apply it identically to gyro and
+                // accel to keep the IMU vector coherent.
+                if (src == ViiperGyroSourceKind.Right)
+                {
+                    gx = SignedClampToShort(-(int)gx);   // pitch
+                    gz = SignedClampToShort(-(int)gz);   // roll
+                    ax = SignedClampToShort(-(int)ax);
+                    az = SignedClampToShort(-(int)az);
+                }
+                WriteSwitchproImu(frame, gx, gy, gz, ax, ay, az);
+            }
+        }
+
+        /// <summary>
+        /// Writes the switchpro/Joy-Con wire IMU (gyro-first 12-17, accel 18-23) applying the
+        /// Joy-Con frame correction. The consumer (Steam / joy-con-webhid) reads the switchpro
+        /// IMU slots through the Joy-Con's native orientation, which relabels our axes cyclically
+        /// (our pitch→roll, yaw→pitch, roll→yaw — verified 2026-05-27 on the WebHID demo). We
+        /// pre-rotate so motions display correctly: wire (GyroX,GyroY,GyroZ) ← (roll,pitch,yaw)
+        /// = (gz,gx,gy); accel takes the same rotation. A 3-cycle is a proper rotation so no sign
+        /// flip is needed, and the left/right mirror signs carry through unchanged.
+        /// </summary>
+        private static void WriteSwitchproImu(byte[] frame,
+                                              short gx, short gy, short gz,
+                                              short ax, short ay, short az)
+        {
+            WriteI16(frame, 12, gz);   // GyroX  <- roll
+            WriteI16(frame, 14, gx);   // GyroY  <- pitch
+            WriteI16(frame, 16, gy);   // GyroZ  <- yaw
+            WriteI16(frame, 18, az);   // AccelX <- roll axis
+            WriteI16(frame, 20, ax);   // AccelY <- pitch axis
+            WriteI16(frame, 22, ay);   // AccelZ <- yaw axis
+        }
+
         public void SetGuideButtonMode(ViiperGuideButtonMode mode)
         {
             if (guideMode == mode) return;
@@ -1059,11 +1145,20 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// </summary>
         private bool TryBuildImuCounts(out short gyroXRaw, out short gyroYRaw, out short gyroZRaw,
                                         out short accelXRaw, out short accelYRaw, out short accelZRaw)
+            => TryBuildImuCounts(gyroSource, out gyroXRaw, out gyroYRaw, out gyroZRaw,
+                                 out accelXRaw, out accelYRaw, out accelZRaw);
+
+        /// <summary>
+        /// Variant that reads an explicit source (used by joycon-pair per-half routing to
+        /// pull the left controller IMU for one Joy-Con and the right for the other).
+        /// </summary>
+        private bool TryBuildImuCounts(ViiperGyroSourceKind src,
+                                        out short gyroXRaw, out short gyroYRaw, out short gyroZRaw,
+                                        out short accelXRaw, out short accelYRaw, out short accelZRaw)
         {
             gyroXRaw = gyroYRaw = gyroZRaw = 0;
             accelXRaw = accelYRaw = accelZRaw = 0;
 
-            var src = gyroSource;
             if (src == ViiperGyroSourceKind.None)
             {
                 return false;
@@ -1396,14 +1491,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         byte[] data = BuildDeviceInput(gp);
                         if (data != null && data.Length > 0)
                         {
-                            if (service.SetInput(busId, deviceId, data)) statsReportsSent++;
+                            // EmitDeviceFrame mirrors to the secondary device when
+                            // joycon-pair is active. libviiper slices the same wire frame
+                            // into the appropriate Joy-Con half via its profile; in per-half
+                            // gyro mode each half instead gets its matching controller IMU.
+                            if (EmitDeviceFrame(data)) statsReportsSent++;
                             else statsReportsFailed++;
-                            // Mirror to the secondary device when joycon-pair
-                            // is active. libviiper slices the same wire frame
-                            // into the appropriate Joy-Con half via its
-                            // profile setting on each device.
-                            uint sec = secondaryDeviceId;
-                            if (sec != 0) service.SetInput(busId, sec, data);
                         }
                     }
                     else // XInput
@@ -1475,14 +1568,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         byte[] data = BuildDeviceInput(gp);
                         if (data != null && data.Length > 0)
                         {
-                            if (service.SetInput(busId, deviceId, data)) statsReportsSent++;
+                            // EmitDeviceFrame mirrors to the secondary device when
+                            // joycon-pair is active. libviiper slices the same wire frame
+                            // into the appropriate Joy-Con half via its profile; in per-half
+                            // gyro mode each half instead gets its matching controller IMU.
+                            if (EmitDeviceFrame(data)) statsReportsSent++;
                             else statsReportsFailed++;
-                            // Mirror to the secondary device when joycon-pair
-                            // is active. libviiper slices the same wire frame
-                            // into the appropriate Joy-Con half via its
-                            // profile setting on each device.
-                            uint sec = secondaryDeviceId;
-                            if (sec != 0) service.SetInput(busId, sec, data);
                         }
                     }
                 }
@@ -1628,7 +1719,7 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// Button positions are mapped positionally (Xbox A → Switch B since both are
         /// the bottom face button).
         /// </summary>
-        private static byte[] BuildSwitchProInput(ViiperXInputGamepad gp)
+        private byte[] BuildSwitchProInput(ViiperXInputGamepad gp)
         {
             var data = new byte[24];
             uint buttons = 0;
@@ -1663,9 +1754,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             WriteI16(data, 8, gp.ThumbRX);
             WriteI16(data, 10, gp.ThumbRY);
 
-            // Bytes 12-23 are IMU (gyro XYZ + accel XYZ as int16). Leave zeroed here;
-            // if the caller wants gyro on Switch output, TryBuildImuCounts can populate
-            // these exactly like the DSE path. Future enhancement.
+            // IMU at bytes 12-23, gyro-first per libviiper switchpro InputState
+            // (GyroXYZ 12-17, AccelXYZ 18-23 — the reverse of ns2pro). WriteSwitchproImu
+            // applies the Joy-Con frame correction (see its summary). Shared by the Pro
+            // Controller and all joycon-* targets (same 24-byte frame).
+            short gx, gy, gz, ax, ay, az;
+            if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
+            {
+                WriteSwitchproImu(data, gx, gy, gz, ax, ay, az);
+            }
             return data;
         }
 
