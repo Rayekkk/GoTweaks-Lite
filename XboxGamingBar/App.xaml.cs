@@ -89,6 +89,27 @@ namespace XboxGamingBar
         public App()
         {
             this.InitializeComponent();
+
+            // Global safety net. As a hosted Xbox Game Bar widget, an unhandled exception
+            // on the UI thread tears down the Game Bar widget host — the user sees Game Bar
+            // "close the instant it opens" (issue #81 and a class of reports where a profile
+            // applies a remembered TDP / setting during activation and something throws).
+            // Catch it, log it, and mark it handled so the widget degrades instead of taking
+            // the whole overlay down. The exception is still logged so the real cause can be
+            // diagnosed from the widget log.
+            this.UnhandledException += (s, e) =>
+            {
+                try { Logger.Error($"Unhandled widget exception (suppressed to keep Game Bar alive): {e.Message}\n{e.Exception}"); }
+                catch { /* logging must never re-throw here */ }
+                e.Handled = true;
+            };
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                try { Logger.Warn($"Unobserved task exception: {e.Exception?.GetBaseException().Message}"); }
+                catch { }
+                e.SetObserved();
+            };
+
             this.Suspending += OnSuspending;
             this.EnteredBackground += App_EnteredBackground;
             this.LeavingBackground += App_LeavingBackground;
