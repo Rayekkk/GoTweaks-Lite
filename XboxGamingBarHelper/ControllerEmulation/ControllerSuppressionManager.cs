@@ -1524,18 +1524,29 @@ namespace XboxGamingBarHelper.ControllerEmulation
 
             // USB MI_00 is the primary stock HID gamepad interface — hide it so
             // games / Steam reading raw HID don't see the Legion.
+            //
+            // USB &IG_xx interfaces are the parent USB endpoints that xinputhid.sys
+            // builds the XInput / XUSB device-interface on top of. Earlier code
+            // assumed XInput always read from the standard 045E:028E (Xbox 360)
+            // node so hiding only the HID\IG_xx children was sufficient. In
+            // practice, on Windows 11 25H2 with VIIPER's ViGEm Xbox-360 pad live
+            // at slot 0, XInput slot 1 still latches onto the Legion's native
+            // USB\IG_05 interface, so Game Bar reads BOTH pads and the Legion's
+            // residual stick/trigger noise leaks in (visible as "RT mixed with
+            // every button press" — tab moves right on every UI click). Hiding
+            // the USB&IG_xx endpoint closes that channel.
             if (normalized.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))
             {
-                return normalized.IndexOf("&MI_00\\", StringComparison.OrdinalIgnoreCase) >= 0;
+                return normalized.IndexOf("&MI_00\\", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       normalized.IndexOf("&IG_", StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
             // HID-class IG_xx children published by xinputhid.sys (HID joystick
             // views of the gamepad). These appear in joy.cpl as duplicate
             // "Legion Controller for Windows" entries even with USB MI_00
             // hidden, because Windows enumerates them as separate HID-class
-            // nodes. Hide them too — xinput1_4 / XInputSetState don't read
-            // through them (they use the XUSB device-interface on the 045E:028E
-            // node), so this cleans up joy.cpl without breaking rumble.
+            // nodes. Hide them too — VIIPER's ViGEm Xbox-360 pad keeps games on
+            // a working XInput slot, so this is what gets joy.cpl clean.
             if (normalized.StartsWith("HID\\", StringComparison.OrdinalIgnoreCase))
             {
                 return normalized.IndexOf("&IG_", StringComparison.OrdinalIgnoreCase) >= 0;

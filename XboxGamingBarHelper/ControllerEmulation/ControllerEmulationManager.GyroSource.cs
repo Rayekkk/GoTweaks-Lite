@@ -178,6 +178,21 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 return false;
             }
 
+            // VIIPER owns the HidHide hide list whenever it's the active backend.
+            // The legacy deferred startup apply can land AFTER VIIPER's own
+            // Enable(hideMode=1) but BEFORE SetSuppressedByViiper(true) flips the
+            // suppressedByViiper flag, leaving a window where legacy would call
+            // Enable(hideTarget=user_setting) — which is 0 ("hide ViGEm only") for
+            // anyone who configured it that way, wiping VIIPER's hideMode=1 and
+            // re-exposing the native Legion HID to Windows.Gaming.Input. Gate on
+            // the persisted backend setting itself, which is authoritative the
+            // moment the manager is constructed, regardless of dispatcher ordering.
+            if (settingsManager?.EmulationBackend?.Value == true)
+            {
+                Logger.Info($"Legacy EnableSuppression skipped ({reason}); VIIPER backend owns HidHide");
+                return suppressionActive;
+            }
+
             suppressionPausedForGameBar = false;
             suppressionPauseUntilTicksUtc = 0;
             bool wasActive = suppressionActive;
