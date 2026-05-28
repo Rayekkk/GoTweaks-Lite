@@ -138,14 +138,6 @@ namespace XboxGamingBarHelper.Systems
             get { return displayOrientation; }
         }
 
-        private readonly SdrWhiteLevelSyncModeProperty sdrWhiteLevelSyncMode;
-        public SdrWhiteLevelSyncModeProperty SdrWhiteLevelSyncMode
-        {
-            get { return sdrWhiteLevelSyncMode; }
-        }
-
-        private readonly SdrWhiteLevelSyncManager sdrWhiteLevelSyncManager = new SdrWhiteLevelSyncManager();
-
         private readonly AdaptiveBrightnessModeProperty adaptiveBrightnessMode;
         public AdaptiveBrightnessModeProperty AdaptiveBrightnessMode
         {
@@ -241,10 +233,6 @@ namespace XboxGamingBarHelper.Systems
             hdrEnabled = new HDREnabledProperty(hdrStatus.Enabled, this);
             Logger.Info("Check display orientation.");
             displayOrientation = new DisplayOrientationProperty(User32.GetCurrentOrientation(), this);
-
-            sdrWhiteLevelSyncMode = new SdrWhiteLevelSyncModeProperty(this);
-            sdrWhiteLevelSyncManager.SetHdrEnabled(hdrStatus.Enabled);
-            sdrWhiteLevelSyncManager.SetMode(sdrWhiteLevelSyncMode.Mode);
 
             adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(this);
             // Master AB toggle lives inside the OSD/Display bundle and is only re-sent on
@@ -392,7 +380,6 @@ namespace XboxGamingBarHelper.Systems
                 Logger.Info($"HDR status: Supported={hdrStatus.Supported}, Enabled={hdrStatus.Enabled}");
                 hdrSupported.SetValue(hdrStatus.Supported);
                 hdrEnabled.SetValue(hdrStatus.Enabled);
-                sdrWhiteLevelSyncManager.SetHdrEnabled(hdrStatus.Enabled);
 
                 // Refresh display orientation
                 var currentOrientation = User32.GetCurrentOrientation();
@@ -897,9 +884,35 @@ namespace XboxGamingBarHelper.Systems
             }
         }
 
+        // Idle-throttling state for game detection. EnumWindows + per-window
+        // Process.MainModule lookups are the second-largest contributor to helper
+        // idle CPU. When nothing is running and Xbox Game Bar doesn't have a
+        // TrackedGame either, only sample every IdleThrottleTicks (5s) instead of
+        // every tick (1s). Resumes 1Hz immediately on TrackedGame becoming valid.
+        private int idleTickCount;
+        private const int IdleEnterThreshold = 5;   // after 5s of no-game, start skipping
+        private const int IdleThrottleTicks = 5;    // sample once every 5 ticks while idle
+
         public override void Update()
         {
             base.Update();
+
+            bool isIdleCandidate = !RunningGame.Value.GameId.IsValid() && !trackedGame.IsValid();
+            if (isIdleCandidate)
+            {
+                idleTickCount++;
+                if (idleTickCount > IdleEnterThreshold && (idleTickCount % IdleThrottleTicks) != 0)
+                {
+                    // Throttled tick — skip the expensive EnumWindows walk. State is
+                    // already "no game"; if a game appears we'll catch it on the next
+                    // un-skipped tick (≤5s lag), or instantly when TrackedGame fires.
+                    return;
+                }
+            }
+            else
+            {
+                idleTickCount = 0;
+            }
 
             var currentRunningGame = GetRunningGame();
             var previousRunningGame = RunningGame.Value;
@@ -1441,16 +1454,6 @@ namespace XboxGamingBarHelper.Systems
             var mode = adaptiveBrightnessMode != null ? adaptiveBrightnessMode.Mode : Shared.Enums.AdaptiveBrightnessMode.Windows;
             Logger.Info($"SetAdaptiveBrightness requested={enabled} mode={mode}");
             ApplyAdaptiveBrightnessBackend(enabled, mode);
-        }
-
-        public void OnSdrWhiteLevelSyncModeChanged(Shared.Enums.SdrWhiteLevelSyncMode mode)
-        {
-            sdrWhiteLevelSyncManager.SetMode(mode);
-        }
-
-        public void OnHdrEnabledChanged(bool enabled)
-        {
-            sdrWhiteLevelSyncManager.SetHdrEnabled(enabled);
         }
 
         public void OnAdaptiveBrightnessModeChanged(Shared.Enums.AdaptiveBrightnessMode mode)

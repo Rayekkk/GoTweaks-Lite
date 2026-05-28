@@ -15,7 +15,6 @@ namespace XboxGamingBarHelper.Systems
             base.NotifyPropertyChanged(propertyName);
 
             User32.SetHDREnabled(Value);
-            Manager?.OnHdrEnabledChanged(Value);
         }
     }
 }

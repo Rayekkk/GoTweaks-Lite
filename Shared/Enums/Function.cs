@@ -435,13 +435,6 @@
         Viiper_StickTriggerPreviewEnabled,         // bool - widget sets true while the Sticks & Triggers panel is expanded; helper pumps live samples only when this is on.
         Viiper_StickTriggerLiveSample,             // string "LX,LY,RX,RY,LT,RT" - helper streams raw values at ~30 Hz while preview is enabled. Widget runs StickTriggerProcessor locally to compute shaped values for the canvas.
 
-        // SDR White Level Sync (Display tab, under HDR toggle)
-        // Windows exposes a static "SDR content brightness" slider in HDR mode but never ties it
-        // to the hardware backlight. When backlight changes, SDR content blows out or looks gray.
-        // Helper listens to WmiMonitorBrightnessEvent and re-writes SDR white level via
-        // DISPLAYCONFIG_SET_SDR_WHITE_LEVEL on each change.
-        SdrWhiteLevelSyncMode,                     // int (SdrWhiteLevelSyncMode enum) - 0=Off, 1=Auto (EDID + gamma), 2=Legion Go 2 preset
-
         // Adaptive Brightness backend selector. The existing Adaptive Brightness toggle is
         // the master on/off; this picks which loop runs underneath. Helper mode subscribes to
         // Windows.Devices.Sensors.LightSensor, log-scales lux into a brightness target with

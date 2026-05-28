@@ -2465,51 +2465,6 @@
                                                   Style="{StaticResource ModernToggleStyle}"
                                                   IsEnabled="False"/>
                                 </Grid>
-
-                                <!-- Collapsed by default to keep the card compact. SDR sync UI + its
-                                     description live inside the expander; users opening it see the
-                                     combo and the explanation together, and the card stays clean
-                                     when the user only cares about the HDR toggle. -->
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="SDR Brightness Sync"
-                                               FontSize="12" Foreground="#AAAAAA"
-                                               VerticalAlignment="Center"/>
-                                    <ToggleButton x:Name="SdrWhiteLevelSyncExpanderToggle"
-                                                  Grid.Column="1" IsChecked="False"
-                                                  VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
-                                                  Padding="8,4" Click="SdrWhiteLevelSyncExpanderToggle_Click">
-                                        <FontIcon x:Name="SdrWhiteLevelSyncExpanderIcon" Glyph="&#xE70D;" FontSize="12"/>
-                                    </ToggleButton>
-                                </Grid>
-                                <StackPanel x:Name="SdrWhiteLevelSyncPanel"
-                                            Margin="0,8,0,0" Visibility="Collapsed">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Mode"
-                                                   FontSize="13" Foreground="#FFFFFF"
-                                                   VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="SdrWhiteLevelSyncModeComboBox"
-                                                  Grid.Column="1"
-                                                  Width="170"
-                                                  Style="{StaticResource ModernComboBoxStyle}">
-                                            <x:String>Off</x:String>
-                                            <x:String>Auto (recommended)</x:String>
-                                            <x:String>Legion Go 2 preset</x:String>
-                                        </ComboBox>
-                                    </Grid>
-                                    <TextBlock Margin="0,8,0,0"
-                                               TextWrapping="Wrap"
-                                               FontSize="11"
-                                               Foreground="#9AA0A6"
-                                               Text="Windows leaves SDR White Level static in HDR mode, so SDR apps blow out at high backlight and look gray when dimmed. This setting listens for backlight changes and rewrites the SDR White Level (the same value Windows Settings → HDR → SDR content brightness controls) on each change. Auto uses a generic 80–480 nit gamma curve; Legion Go 2 preset uses a panel-specific empirical curve."/>
-                                </StackPanel>
                             </StackPanel>
                         </Border>
 

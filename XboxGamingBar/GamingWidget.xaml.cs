@@ -724,7 +724,6 @@ namespace XboxGamingBar
         private readonly DisplayOrientationProperty displayOrientation;
         private readonly HDRSupportedProperty hdrSupported;
         private readonly HDREnabledProperty hdrEnabled;
-        private readonly SdrWhiteLevelSyncModeProperty sdrWhiteLevelSyncMode;
         private readonly AdaptiveBrightnessModeProperty adaptiveBrightnessMode;
         private readonly TrackedGameProperty trackedGame;
         private readonly RTSSInstalledProperty rtssInstalled;
@@ -1410,7 +1409,6 @@ namespace XboxGamingBar
             displayOrientation = new DisplayOrientationProperty();
             hdrSupported = new HDRSupportedProperty(HDRToggle, this);
             hdrEnabled = new HDREnabledProperty(HDRToggle, this);
-            sdrWhiteLevelSyncMode = new SdrWhiteLevelSyncModeProperty(SdrWhiteLevelSyncModeComboBox, this);
             adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(AdaptiveBrightnessModeComboBox, this);
             trackedGame = new TrackedGameProperty(new TrackedGame());
             rtssInstalled = new RTSSInstalledProperty(PerformanceOverlaySlider, this);
@@ -1827,7 +1825,6 @@ namespace XboxGamingBar
                 displayOrientation,
                 hdrSupported,
                 hdrEnabled,
-                sdrWhiteLevelSyncMode,
                 adaptiveBrightnessMode,
                 trackedGame,
                 rtssInstalled,

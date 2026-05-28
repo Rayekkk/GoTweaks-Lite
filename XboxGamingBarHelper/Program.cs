@@ -1305,7 +1305,6 @@ namespace XboxGamingBarHelper
                 systemManager.DisplayOrientation,
                 systemManager.HDRSupported,
                 systemManager.HDREnabled,
-                systemManager.SdrWhiteLevelSyncMode,
                 systemManager.AdaptiveBrightnessMode,
                 systemManager.CPUCoreConfig,
                 systemManager.CPUCoreActiveConfig,
