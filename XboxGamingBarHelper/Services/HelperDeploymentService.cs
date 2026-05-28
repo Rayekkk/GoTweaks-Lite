@@ -271,6 +271,22 @@ namespace XboxGamingBarHelper.Services
 
                 Logger.Info($"Deploying helper from {sourceDir} to {HelperFolder}");
 
+                // CRITICAL: never deploy onto ourselves. When the *deployed* exe (the one
+                // already living in HelperFolder) is the process invoking a deploy/--setup,
+                // GetSourceDirectory() resolves to HelperFolder, making source == target.
+                // CopyFileWithRetry deletes the target before copying, and with source==target
+                // that delete removes the only copy — then File.Copy fails with "Could not find
+                // file", permanently destroying the deployed install (observed 2026-05-26:
+                // 24/24 files lost, leaving only .old backups + a stale .version, which then
+                // makes IsDeploymentNeeded believe the install is fine forever → widget stuck
+                // on "Initial Setup in progress"). If we're already running from HelperFolder,
+                // the files are by definition present — treat as a successful no-op.
+                if (PathsAreSame(sourceDir, HelperFolder))
+                {
+                    Logger.Warn($"Deploy source equals deployed folder ({HelperFolder}); skipping self-copy (files already in place).");
+                    return File.Exists(DeployedExePath);
+                }
+
                 // Create target directory
                 Directory.CreateDirectory(HelperFolder);
 
@@ -330,16 +346,29 @@ namespace XboxGamingBarHelper.Services
                     Logger.Debug($"Error scanning for additional DLLs: {ex.Message}");
                 }
 
-                // Write version file
-                var currentVersion = GetCurrentPackageVersion();
-                try
+                // Only stamp the .version file when the deploy actually succeeded — the
+                // exe is present and nothing failed to copy. Writing it on a partial/failed
+                // deploy is what let a half-wiped folder masquerade as "up to date" and
+                // blocked the self-healing redeploy path. With this guard, a broken deploy
+                // leaves no (or a stale-mismatched) version stamp, so IsDeploymentNeeded
+                // returns true next launch and we recover automatically.
+                bool deployOk = failCount == 0 && File.Exists(DeployedExePath);
+                if (deployOk)
                 {
-                    File.WriteAllText(VersionFilePath, currentVersion);
-                    Logger.Info($"Version file written: {currentVersion}");
+                    var currentVersion = GetCurrentPackageVersion();
+                    try
+                    {
+                        File.WriteAllText(VersionFilePath, currentVersion);
+                        Logger.Info($"Version file written: {currentVersion}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Could not write version file: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Logger.Warn($"Could not write version file: {ex.Message}");
+                    Logger.Warn($"Skipping .version stamp — deploy incomplete (failCount={failCount}, exePresent={File.Exists(DeployedExePath)}); next launch will retry.");
                 }
 
                 Logger.Info($"Deployment complete: {successCount} files copied, {failCount} failures");
@@ -353,10 +382,36 @@ namespace XboxGamingBarHelper.Services
         }
 
         /// <summary>
+        /// True when two paths resolve to the same filesystem location (case-insensitive,
+        /// separator- and trailing-slash-normalized). Used to refuse self-deploys.
+        /// </summary>
+        private static bool PathsAreSame(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            try
+            {
+                string na = Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string nb = Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Copies a file with retry logic for locked files
         /// </summary>
         private static void CopyFileWithRetry(string sourcePath, string targetPath, int maxRetries = 3)
         {
+            // Defense-in-depth against the destructive self-copy: if source and target are
+            // the same file, the delete-then-copy below would wipe it. Nothing to do.
+            if (PathsAreSame(sourcePath, targetPath))
+            {
+                return;
+            }
+
             Exception lastException = null;
 
             for (int i = 0; i < maxRetries; i++)
