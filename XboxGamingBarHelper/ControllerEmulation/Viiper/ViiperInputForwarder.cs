@@ -1806,8 +1806,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             if ((gp.Buttons & ViiperXInput.Back) != 0) buttons |= 1u << 14;       // Minus
             if ((gp.Buttons & ViiperXInput.LeftThumb) != 0) buttons |= 1u << 15;  // LeftStick
             if ((gp.Buttons & ViiperXInput.Guide) != 0) buttons |= 1u << 16;      // Home
-            // Bits 17 (Capture), 18 (GR), 19 (GL), 20 (C), 21 (Headset) require
-            // XInput mappings we don't expose yet — left off.
+            // Map the Legion Go back paddles to the Switch 2 Pro grip buttons, grouped by
+            // side (Y1/Y2 = left back, Y3/M3 = right back) since the Pro 2 exposes only two
+            // grips. Bits 17 (Capture), 20 (C), 21 (Headset) need sources we don't expose.
+            ushort aux = currentAuxButtons;
+            if ((aux & (LegionAux.Y1 | LegionAux.Y2)) != 0) buttons |= 1u << 19;  // GL <- left back paddles
+            if ((aux & (LegionAux.Y3 | LegionAux.M3)) != 0) buttons |= 1u << 18;  // GR <- right back paddles
 
             WriteU32(data, 0, buttons);
 
