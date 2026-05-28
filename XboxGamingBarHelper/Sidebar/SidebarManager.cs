@@ -30,6 +30,11 @@ namespace XboxGamingBarHelper.Sidebar
         private SidebarWindow _window;
         private SidebarInputHandler _inputHandler;
 
+        // Cached visibility — flipped from Show/Hide paths and Window.IsVisibleChanged.
+        // Callers on hot loops (e.g. PerformanceManager.Update) read this instead of
+        // doing a Dispatcher.Invoke every tick.
+        private volatile bool _isVisibleCached;
+
         // Audio manager (created on WPF thread)
         private AudioManager _audioMgr;
 
@@ -78,7 +83,11 @@ namespace XboxGamingBarHelper.Sidebar
             _wpfThread.SetApartmentState(ApartmentState.STA);
             _wpfThread.Start();
 
-            if (!_startupSignal.Wait(5000))
+            // Cold WPF init right after an MSIX upgrade can take 10–15s as the
+            // WindowsApps directory is still being prepared and XAML compiles fresh.
+            // 5s was producing a "failed to start" log even though the WPF thread
+            // would finish ~12s later and the sidebar then worked normally.
+            if (!_startupSignal.Wait(15000))
             {
                 _startupException = new TimeoutException("Timed out waiting for sidebar WPF thread to initialize.");
             }
@@ -102,6 +111,11 @@ namespace XboxGamingBarHelper.Sidebar
                 _window = new SidebarWindow();
                 _inputHandler = new SidebarInputHandler();
                 _audioMgr = new AudioManager();
+
+                // Keep _isVisibleCached in sync with every visibility transition,
+                // including dismissals routed through SidebarWindow.Dismiss() / B-button
+                // that don't pass through Toggle().
+                _window.IsVisibleChanged += (s, e) => _isVisibleCached = _window.IsVisible;
 
                 // ══════════════════════════════════════════
                 // Wire QuickTab events
@@ -386,6 +400,13 @@ namespace XboxGamingBarHelper.Sidebar
             }
         }
 
+        /// <summary>
+        /// Lock-free, thread-safe view of the sidebar's current visibility. Hot-loop
+        /// callers (PerformanceManager.Update etc.) should prefer this over IsVisible
+        /// which marshals onto the WPF dispatcher.
+        /// </summary>
+        internal bool IsVisibleCached => _isVisibleCached;
+
         internal void Toggle()
         {
             if (_window == null || _dispatcher == null) return;
@@ -397,6 +418,7 @@ namespace XboxGamingBarHelper.Sidebar
                     _window.HideSidebar();
                     _inputHandler?.Stop();
                     _metricsTimer?.Stop();
+                    _isVisibleCached = false;
                 }
                 else
                 {
@@ -404,6 +426,7 @@ namespace XboxGamingBarHelper.Sidebar
                     _window.ShowSidebar();
                     _inputHandler?.Start();
                     _metricsTimer?.Start();
+                    _isVisibleCached = true;
                 }
             }));
         }

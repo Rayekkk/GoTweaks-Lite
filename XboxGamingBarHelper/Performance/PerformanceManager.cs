@@ -305,13 +305,16 @@ namespace XboxGamingBarHelper.Performance
             }
         }
 
-        // Quick Metrics push timer (pushes bundled sensor data to widget when enabled)
-        private System.Timers.Timer quickMetricsTimer;
+        // Quick Metrics push (bundled sensor data sent to widget when enabled).
+        // Previously driven by a dedicated 1Hz timer which duplicated the main-loop
+        // sensor refresh — now piggy-backs on the main loop's Update() tick so we only
+        // walk LibreHardwareMonitor once per second.
         private bool quickMetricsEnabled;
 
         /// <summary>
         /// Gets or sets whether Quick Metrics push is enabled.
-        /// When enabled, pushes bundled sensor data (battery, CPU, GPU usage) to the widget every second.
+        /// When enabled, the main-loop Update() tick pushes bundled sensor data
+        /// (battery, CPU, GPU usage) to the widget every second.
         /// </summary>
         public bool QuickMetricsEnabled
         {
@@ -320,7 +323,7 @@ namespace XboxGamingBarHelper.Performance
             {
                 if (quickMetricsEnabled == value) return;
                 quickMetricsEnabled = value;
-                UpdateQuickMetricsTimerState();
+                Logger.Info($"Quick Metrics push {(value ? "enabled" : "disabled")}");
             }
         }
 
@@ -505,6 +508,44 @@ namespace XboxGamingBarHelper.Performance
             amdManager = manager;
             Logger.Info($"AMDManager reference set on PerformanceManager. ADLX GPU-metric fallback {(manager != null ? "enabled" : "disabled")}.");
         }
+
+        // Returns true when any in-process consumer wants fresh sensors (sidebar visible,
+        // OSD/QuickMetrics on, game running, AutoTDP active, fan-curve UI open, etc.).
+        // Set from Program.cs once all managers are wired. When null we behave as before
+        // (always refresh) so init-order can't accidentally freeze the OSD.
+        private Func<bool> metricsConsumerCheck;
+
+        /// <summary>
+        /// Registers a predicate the Update() loop uses to decide whether anyone needs
+        /// fresh sensor data this tick. When the predicate returns false the expensive
+        /// LibreHardwareMonitor walk and ADLX fallback are skipped — sensors retain
+        /// their previous value until the next tick where a consumer is active.
+        /// </summary>
+        public void SetMetricsConsumerCheck(Func<bool> check)
+        {
+            metricsConsumerCheck = check;
+            Logger.Info($"PerformanceManager metrics consumer-check {(check != null ? "registered" : "cleared")}");
+        }
+
+        private bool AnyMetricsConsumerActive()
+        {
+            if (quickMetricsEnabled) return true;
+            var check = metricsConsumerCheck;
+            if (check == null) return true; // fail-open until wired
+            try { return check(); }
+            catch (Exception ex)
+            {
+                Logger.Warn($"metricsConsumerCheck threw — refreshing anyway: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Public view of the consumer check — used by other managers (e.g. LegionManager
+        /// fan-speed WMI throttle) to align their refresh cadence with whether anyone
+        /// in the helper actually needs the data.
+        /// </summary>
+        public bool IsAnyMetricsConsumerActive => AnyMetricsConsumerActive();
 
         /// <summary>
         /// Initializes PawnIO/RyzenSMU for anti-cheat compatible TDP control.
@@ -962,6 +1003,13 @@ namespace XboxGamingBarHelper.Performance
             }
         }
 
+        // Tick counter for fast/slow tier split. CPU/Memory/Battery hardware refresh
+        // every tick (cheap MSR + perfcounter reads, drives "live" CPU% / RAM / battery
+        // line). GPU hardware + ADLX fallback refresh only every SlowTickEvery-th tick
+        // because ADL/NVML queries are the expensive part of the walk (~10–30ms each).
+        private long sensorTickCounter;
+        private const int SlowTickEvery = 3;
+
         public override void Update()
         {
             base.Update();
@@ -980,33 +1028,52 @@ namespace XboxGamingBarHelper.Performance
             if (computer == null)
                 return;
 
-            // Reset sensors to -1 in a local set, then swap atomically after processing.
-            // This prevents PushQuickMetrics (on a separate timer) from reading -1 mid-update.
+            // When nobody is consuming metrics (sidebar closed, OSD off, no game, AutoTDP
+            // off, fan-curve UI closed), skip the LibreHardwareMonitor walk + ADLX fallback
+            // entirely. Sensors keep their last value; the next consumer-active tick
+            // repopulates them. This is the dominant idle-CPU cost in the helper.
+            if (!AnyMetricsConsumerActive())
+                return;
+
+            sensorTickCounter++;
+            // First active tick always does a full refresh so the OSD/widget aren't
+            // stuck showing "—" for GPU sensors during the first 1–2 seconds.
+            bool slowTick = (sensorTickCounter == 1) || (sensorTickCounter % SlowTickEvery == 0);
+
+            // Pre-load with current sensor values. Hardware we refresh this tick will
+            // overwrite via ProcessHardwareSensors; hardware we skip this tick keeps
+            // its last reading rather than reverting to -1.
             var pendingValues = new Dictionary<HardwareSensor, float>();
             foreach (var hardwareSensor in hardwareSensors)
             {
-                pendingValues[hardwareSensor] = -1.0f;
+                pendingValues[hardwareSensor] = hardwareSensor.Value;
             }
 
-            computer.Accept(updateVisitor);
             foreach (IHardware hardware in computer.Hardware)
             {
-                // Process sensors for this hardware
-                ProcessHardwareSensors(hardware, pendingValues);
+                if (!ShouldRefreshHardwareThisTick(hardware.HardwareType, slowTick))
+                    continue;
 
-                // Also process sub-hardware sensors (some sensors like GPU temp are nested)
+                // Reset just the sensors we're about to refresh to -1, so a sensor
+                // that has *now* gone missing reports as no-data instead of stale.
+                // (Matches the original semantics for hardware we're walking.)
+                ResetSensorsForHardwareType(pendingValues, hardware.HardwareType);
+
+                hardware.Update();
                 foreach (IHardware subHardware in hardware.SubHardware)
-                {
+                    subHardware.Update();
+
+                ProcessHardwareSensors(hardware, pendingValues);
+                foreach (IHardware subHardware in hardware.SubHardware)
                     ProcessHardwareSensors(subHardware, pendingValues);
-                }
             }
 
-            // ADLX fallback for GPU metrics that LibreHardwareMonitor didn't fill.
-            // On AMD APUs where LHM doesn't expose Power/Temperature/Clock sensor
-            // names (Z2 series, observed on Mute's Legion Go 2), ADLX still provides
-            // the values via IADLXGPUMetrics. Fill any -1 GPU/VRAM slot from ADLX
-            // before we commit pendingValues to the public sensor.Value fields.
-            FillGpuSensorsFromAdlxFallback(pendingValues);
+            // ADLX fallback is itself a GPU query (IADLXGPUMetrics), so it pairs with
+            // the slow tier. On fast ticks the cached GPU sensor values stand.
+            if (slowTick)
+            {
+                FillGpuSensorsFromAdlxFallback(pendingValues);
+            }
 
             // Apply all values at once so PushQuickMetrics never sees partially-reset state
             foreach (var kvp in pendingValues)
@@ -1036,6 +1103,43 @@ namespace XboxGamingBarHelper.Performance
             if (calculatedTimeRemaining >= 0)
             {
                 BatteryRemainingTime.Value = calculatedTimeRemaining;
+            }
+
+            // Piggy-back the widget metrics push on this tick. Previously a separate
+            // 1Hz Timer fired ~halfway between Update() calls and read the same fields;
+            // bundling here gives the widget the freshest values and removes a thread.
+            if (quickMetricsEnabled)
+            {
+                PushQuickMetrics();
+            }
+        }
+
+        // Map hardware type → refresh tier. Cheap hardware refreshes every tick; GPU
+        // hardware (and anything we don't explicitly classify) defers to the slow tier
+        // because ADL/NVML round-trips dominate the per-tick budget.
+        private static bool ShouldRefreshHardwareThisTick(HardwareType type, bool slowTick)
+        {
+            switch (type)
+            {
+                case HardwareType.Cpu:
+                case HardwareType.Memory:
+                case HardwareType.Battery:
+                    return true;
+                case HardwareType.GpuAmd:
+                case HardwareType.GpuNvidia:
+                case HardwareType.GpuIntel:
+                    return slowTick;
+                default:
+                    return slowTick;
+            }
+        }
+
+        private void ResetSensorsForHardwareType(Dictionary<HardwareSensor, float> pendingValues, HardwareType type)
+        {
+            foreach (var hardwareSensor in hardwareSensors)
+            {
+                if (hardwareSensor.MatchesHardwareType(type))
+                    pendingValues[hardwareSensor] = -1.0f;
             }
         }
 
@@ -1613,35 +1717,11 @@ namespace XboxGamingBarHelper.Performance
         }
 
         /// <summary>
-        /// Updates the Quick Metrics timer state based on QuickMetricsEnabled.
+        /// Pushes bundled metrics data to the widget. Called from Update() each tick
+        /// when QuickMetricsEnabled is true so we reuse the same sensor refresh that
+        /// fed local state instead of doing a second pass on a separate timer.
         /// </summary>
-        private void UpdateQuickMetricsTimerState()
-        {
-            if (quickMetricsEnabled)
-            {
-                if (quickMetricsTimer == null)
-                {
-                    quickMetricsTimer = new System.Timers.Timer(1000); // 1 second interval
-                    quickMetricsTimer.Elapsed += PushQuickMetrics;
-                    quickMetricsTimer.AutoReset = true;
-                }
-                quickMetricsTimer.Start();
-                Logger.Info("Quick Metrics push timer started");
-            }
-            else
-            {
-                if (quickMetricsTimer != null)
-                {
-                    quickMetricsTimer.Stop();
-                    Logger.Info("Quick Metrics push timer stopped");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Pushes bundled metrics data to the widget.
-        /// </summary>
-        private void PushQuickMetrics(object sender, System.Timers.ElapsedEventArgs e)
+        private void PushQuickMetrics()
         {
             try
             {
@@ -1695,16 +1775,6 @@ namespace XboxGamingBarHelper.Performance
             if (disposing)
             {
                 Logger.Info("PerformanceManager: Disposing resources");
-
-                // Stop and dispose Quick Metrics timer
-                if (quickMetricsTimer != null)
-                {
-                    quickMetricsTimer.Stop();
-                    quickMetricsTimer.Elapsed -= PushQuickMetrics;
-                    quickMetricsTimer.Dispose();
-                    quickMetricsTimer = null;
-                    Logger.Info("PerformanceManager: Quick Metrics timer disposed");
-                }
 
                 // Stop and dispose the timer
                 if (currentTdpTimer != null)

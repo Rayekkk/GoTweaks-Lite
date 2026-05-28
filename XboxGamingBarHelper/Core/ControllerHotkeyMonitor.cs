@@ -100,6 +100,20 @@ namespace XboxGamingBarHelper.Core
         public bool ViewXEnabled { get; set; }
         public bool ViewYEnabled { get; set; }
 
+        /// <summary>
+        /// True when at least one of the 8 combo bindings is enabled. When false the
+        /// monitor's 60Hz XInput polling thread can be left stopped — it would only
+        /// be burning CPU sampling state nothing would react to.
+        /// </summary>
+        public bool AnyComboEnabled =>
+            MenuDPadUpEnabled || MenuDPadDownEnabled || MenuDPadLeftEnabled || MenuDPadRightEnabled ||
+            ViewAEnabled || ViewBEnabled || ViewXEnabled || ViewYEnabled;
+
+        /// <summary>
+        /// True when the polling thread is currently running.
+        /// </summary>
+        public bool IsRunning => _running;
+
         public ControllerHotkeyMonitor()
         {
             // Try to load XInput - prefer 1.4 (Windows 8+), fall back to 9.1.0 (Vista+)

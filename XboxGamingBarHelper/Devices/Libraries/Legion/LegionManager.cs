@@ -139,9 +139,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private DateTime lastTdpSetTime = DateTime.MinValue;
         private const int TDP_REFRESH_COOLDOWN_MS = 3000; // 3 seconds cooldown after setting TDP
 
-        // Rate-limiting for fan speed refresh (WMI calls are CPU-expensive)
+        // Rate-limiting for fan speed refresh (WMI calls are CPU-expensive).
+        // We refresh every FAN_SPEED_REFRESH_INTERVAL_MS when someone needs live fan
+        // data (fan-curve UI open, OSD fan item visible, game running, sidebar open),
+        // and back off to FAN_SPEED_IDLE_INTERVAL_MS when the helper is otherwise idle.
         private DateTime lastFanSpeedRefresh = DateTime.MinValue;
-        private const int FAN_SPEED_REFRESH_INTERVAL_MS = 2000; // Refresh fan speed every 2 seconds
+        private const int FAN_SPEED_REFRESH_INTERVAL_MS = 2000;
+        private const int FAN_SPEED_IDLE_INTERVAL_MS = 10000;
 
         // Startup grace period to ignore LegionCustomTDP slider sync during widget startup
         // The main TDP slider calls SetCustomTDP which syncs all 3 values, so we don't want
@@ -2840,12 +2844,17 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 }
             }
 
-            // Rate-limit fan speed refresh to reduce WMI call overhead (every 2 seconds instead of every update)
+            // Rate-limit fan speed refresh to reduce WMI call overhead. The active
+            // cadence is 2s when someone needs the data (fan-curve UI open, sidebar/OSD
+            // showing, game running); otherwise back off to 10s so an idle helper isn't
+            // spending ~30ms of WMI every two seconds for nobody.
             // Note: TDP refresh is disabled to prevent conflicts with user-set values
             if (isLegionGoDetected && wmiService != null)
             {
+                bool active = fanCurveVisible || (performanceManager?.IsAnyMetricsConsumerActive ?? true);
+                int intervalMs = active ? FAN_SPEED_REFRESH_INTERVAL_MS : FAN_SPEED_IDLE_INTERVAL_MS;
                 var now = DateTime.Now;
-                if ((now - lastFanSpeedRefresh).TotalMilliseconds >= FAN_SPEED_REFRESH_INTERVAL_MS)
+                if ((now - lastFanSpeedRefresh).TotalMilliseconds >= intervalMs)
                 {
                     RefreshFanSpeed();
                     lastFanSpeedRefresh = now;

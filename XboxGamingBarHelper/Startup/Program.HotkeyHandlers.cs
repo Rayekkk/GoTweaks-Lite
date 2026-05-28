@@ -96,12 +96,43 @@ namespace XboxGamingBarHelper
                 controllerHotkeyMonitor.OnViewX = () => ExecuteControllerHotkeyAction("MenuX");
                 controllerHotkeyMonitor.OnViewY = () => ExecuteControllerHotkeyAction("MenuY");
 
-                controllerHotkeyMonitor.Start();
-                Logger.Info("Controller hotkey monitor initialized for XInput-based button combos");
+                // Skip the 60Hz XInput polling thread until at least one combo is bound.
+                // ApplyControllerHotkeyConfig will call SyncControllerHotkeyMonitorRunState
+                // to start it when the widget enables any binding.
+                if (controllerHotkeyMonitor.AnyComboEnabled)
+                {
+                    controllerHotkeyMonitor.Start();
+                    Logger.Info("Controller hotkey monitor initialized and started (combos enabled)");
+                }
+                else
+                {
+                    Logger.Info("Controller hotkey monitor initialized but not started (no combos enabled)");
+                }
             }
             catch (Exception ex)
             {
                 Logger.Error($"Failed to initialize controller hotkey monitor: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Start or stop the XInput polling thread to match current binding state.
+        /// Idempotent — safe to call after every config apply or settings reload.
+        /// </summary>
+        private static void SyncControllerHotkeyMonitorRunState()
+        {
+            if (controllerHotkeyMonitor == null) return;
+            bool shouldRun = controllerHotkeyMonitor.AnyComboEnabled;
+            bool isRunning = controllerHotkeyMonitor.IsRunning;
+            if (shouldRun && !isRunning)
+            {
+                controllerHotkeyMonitor.Start();
+                Logger.Info("Controller hotkey monitor started (a combo became enabled)");
+            }
+            else if (!shouldRun && isRunning)
+            {
+                controllerHotkeyMonitor.Stop();
+                Logger.Info("Controller hotkey monitor stopped (no combos enabled)");
             }
         }
 
@@ -301,6 +332,8 @@ namespace XboxGamingBarHelper
 
                 Logger.Info($"Controller hotkey config applied - Menu+DPad: Up={controllerHotkeyMonitor.MenuDPadUpEnabled}, Down={controllerHotkeyMonitor.MenuDPadDownEnabled}, Left={controllerHotkeyMonitor.MenuDPadLeftEnabled}, Right={controllerHotkeyMonitor.MenuDPadRightEnabled}");
                 Logger.Info($"Controller hotkey config applied - View+ABXY: A={controllerHotkeyMonitor.ViewAEnabled}, B={controllerHotkeyMonitor.ViewBEnabled}, X={controllerHotkeyMonitor.ViewXEnabled}, Y={controllerHotkeyMonitor.ViewYEnabled}");
+
+                SyncControllerHotkeyMonitorRunState();
             }
             catch (Exception ex)
             {
