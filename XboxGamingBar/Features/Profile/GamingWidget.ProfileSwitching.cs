@@ -438,8 +438,10 @@ namespace XboxGamingBar
                         maxCPUState?.SetValue(profile.MaxCPUState);
                         minCPUState?.SetValue(profile.MinCPUState);
                     }
-                    // Update CPU Boost enabled state based on Max CPU State
-                    UpdateCPUBoostEnabledState();
+                    // Update CPU Boost enabled state based on Max CPU State.
+                    // allowAutoDisable:false — don't let a transient/stale combo value stomp the
+                    // CPUBoost we just loaded from the profile or push false to the helper (#88 bug #4).
+                    UpdateCPUBoostEnabledState(allowAutoDisable: false);
                 }
                 if (SaveAMDFeatures)
                 {

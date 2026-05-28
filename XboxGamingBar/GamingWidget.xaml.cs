@@ -2260,6 +2260,9 @@ namespace XboxGamingBar
             // Load Force Default Game Profile setting
             LoadForceDefaultGameProfileSetting();
 
+            // Restore Auto Hibernate AC/DC power-source choice (issue #88 bug #3)
+            LoadAutoHibernateModeSetting();
+
             // Send OSD config to helper on startup
             SendOSDConfigToHelper();
             _ = SendDisplayOSDConfigToHelper();

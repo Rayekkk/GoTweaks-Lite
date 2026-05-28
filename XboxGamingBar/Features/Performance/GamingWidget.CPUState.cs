@@ -163,7 +163,15 @@ namespace XboxGamingBar
         /// Updates the CPU Boost toggle enabled state based on Max CPU State.
         /// When Max CPU State is below 100%, CPU Boost cannot work (Windows prevents boosting beyond the limit).
         /// </summary>
-        private void UpdateCPUBoostEnabledState()
+        /// <param name="allowAutoDisable">
+        /// When true (genuine user change of Max CPU State), force CPU Boost off and notify the
+        /// helper if boost is no longer possible. When false (profile load/switch), only update the
+        /// greyed-out state — never stomp the just-loaded CPUBoost value nor push to the helper.
+        /// During a profile load the combo can momentarily read a stale value (e.g. 95% before the
+        /// profile's 100% settles), which previously force-disabled boost and corrupted the
+        /// profile by pushing false to the helper. (Issue #88 bug #4)
+        /// </param>
+        private void UpdateCPUBoostEnabledState(bool allowAutoDisable = true)
         {
             if (CPUBoostToggle == null || MaxCPUStateComboBox == null) return;
 
@@ -172,8 +180,9 @@ namespace XboxGamingBar
 
             CPUBoostToggle.IsEnabled = canBoost;
 
-            // If boost is now disabled and was on, turn it off and notify helper
-            if (!canBoost && CPUBoostToggle.IsOn)
+            // If boost is now disabled and was on, turn it off and notify helper.
+            // Skipped during profile load so a transient/stale combo value can't stomp the profile.
+            if (allowAutoDisable && !canBoost && CPUBoostToggle.IsOn)
             {
                 CPUBoostToggle.IsOn = false;
                 cpuBoost?.SetValue(false);

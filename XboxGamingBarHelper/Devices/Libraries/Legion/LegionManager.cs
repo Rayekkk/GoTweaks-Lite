@@ -428,12 +428,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             LegionVibration = new LegionVibrationProperty(vibrationLevel, this);
             LegionPowerLight = new LegionPowerLightProperty(powerLightEnabled, this);
 
-            // Battery charge limit lives in the EC and persists across reboots, so we
-            // need to read the current hardware state — without this the helper always
-            // initializes with chargeLimitEnabled=false, the widget syncs false, and
-            // the toggle shows Off even when the limit is actually applied. Users see
-            // that as "the toggle never saves" because re-enabling is a no-op (the EC
-            // already has it set), and the same Off-on-restart loop repeats.
+            // Battery charge limit: read the current EC/WMI state at startup. On some Legion
+            // hardware the EC retains it across reboot; on the Legion Go 2 (Z2E) it does NOT —
+            // the EC reads back "off" every boot, so the toggle appears to never save (issue
+            // #88 bug #5). We therefore reconcile the EC state against the user's persisted
+            // preference below and re-apply if the firmware dropped it.
             try
             {
                 const int chargeLimitTimeoutMs = 2000;
@@ -469,6 +468,33 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Warn($"Charge limit startup read threw: {ex.Message}");
             }
+
+            // Reconcile against the user's persisted preference. If they previously turned the
+            // limit ON but the firmware dropped it across reboot (EC now reads off), re-apply it
+            // so the setting actually sticks instead of silently reverting (issue #88 bug #5).
+            try
+            {
+                if (Settings.LocalSettingsHelper.TryGetValue("LegionChargeLimit", out bool desiredChargeLimit)
+                    && desiredChargeLimit && !chargeLimitEnabled && wmiService != null)
+                {
+                    Logger.Info("Battery charge limit: persisted preference is ON but EC reads off — re-applying.");
+                    var reapply = wmiService.SetBatteryChargeLimit(true);
+                    if (reapply.Success)
+                    {
+                        chargeLimitEnabled = true;
+                        Logger.Info("Battery charge limit (80%) re-applied from saved preference on startup.");
+                    }
+                    else
+                    {
+                        Logger.Warn($"Battery charge limit re-apply failed: {reapply.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Charge limit preference reconcile threw: {ex.Message}");
+            }
+
             LegionChargeLimit = new LegionChargeLimitProperty(chargeLimitEnabled, this);
 
             // Initialize controller remapping properties (JSON ButtonMapping format)
@@ -2591,6 +2617,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 if (result.Success)
                 {
                     chargeLimitEnabled = enabled;
+                    // Persist the user's preference so we can re-apply it on boot. On the Legion Go 2
+                    // (Z2E) the EC does NOT retain the 80% limit across reboot, so reading the EC at
+                    // startup yields "off" and the toggle appears to never save (issue #88 bug #5).
+                    try { Settings.LocalSettingsHelper.SetValue("LegionChargeLimit", enabled); }
+                    catch (Exception persistEx) { Logger.Debug($"Failed to persist LegionChargeLimit: {persistEx.Message}"); }
                     Logger.Info($"Battery charge limit (80%) {(enabled ? "enabled" : "disabled")}");
                 }
                 else

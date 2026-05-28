@@ -1205,6 +1205,11 @@ namespace XboxGamingBar
             if (selected?.Tag == null) return;
 
             int mode = int.Parse(selected.Tag.ToString());
+
+            // Persist locally so the AC/DC choice survives reboot (helper does not persist it)
+            try { ApplicationData.Current.LocalSettings.Values["AutoHibernateMode"] = mode; }
+            catch (Exception ex) { Logger.Warn($"Could not persist AutoHibernateMode: {ex.Message}"); }
+
             try
             {
                 if (App.IsConnected)
@@ -1222,6 +1227,32 @@ namespace XboxGamingBar
             catch (Exception ex)
             {
                 Logger.Error($"Error sending Auto Hibernate mode: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Restores the saved Auto Hibernate power-source mode (Always/AC/DC) on startup and
+        /// re-sends it to the helper. The helper keeps this only in a volatile field, so without
+        /// this the choice silently reverts to "Always" after every reboot. (Issue #88 bug #3)
+        /// </summary>
+        private void LoadAutoHibernateModeSetting()
+        {
+            try
+            {
+                var settings = ApplicationData.Current.LocalSettings;
+                if (!settings.Values.TryGetValue("AutoHibernateMode", out object val)) return;
+
+                int mode = Convert.ToInt32(val);
+                if (AutoHibernateModeComboBox != null)
+                {
+                    // Setting SelectedIndex fires SelectionChanged, which forwards the value to the helper.
+                    AutoHibernateModeComboBox.SelectedIndex = mode;
+                }
+                Logger.Info($"Loaded Auto Hibernate mode setting: {mode}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error loading Auto Hibernate mode setting: {ex.Message}");
             }
         }
 

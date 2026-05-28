@@ -977,6 +977,9 @@ namespace XboxGamingBarHelper
                     if (request.Content != null && int.TryParse(request.Content.ToString(), out int mode))
                     {
                         autoHibernateMode = mode;
+                        // Persist so the AC/DC choice survives reboot even if the widget never opens (issue #88 bug #3)
+                        Properties.Settings.Default.AutoHibernateMode = mode;
+                        Properties.Settings.Default.Save();
                         Logger.Info($"Pipe: Auto Hibernate mode set to: {mode} ({(mode == 0 ? "Always" : mode == 1 ? "AC Only" : "DC Only")})");
                     }
                 }

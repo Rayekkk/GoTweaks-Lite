@@ -44,6 +44,12 @@ namespace XboxGamingBarHelper
             autoHibernateEnabled = enabled;
             if (enabled)
             {
+                // Restore the persisted AC/DC power-source choice before the timer can fire.
+                // The widget re-sends it on connect, but this covers the widget-never-opened
+                // case so we don't hibernate on AC when the user picked "DC Only" (issue #88 bug #3).
+                try { autoHibernateMode = Properties.Settings.Default.AutoHibernateMode; }
+                catch (Exception ex) { Logger.Warn($"Could not load persisted AutoHibernateMode: {ex.Message}"); }
+
                 if (autoHibernateTimer == null)
                 {
                     autoHibernateTimer = new System.Threading.Timer(AutoHibernateIdleCheck, null, AutoHibernateCheckIntervalMs, AutoHibernateCheckIntervalMs);
