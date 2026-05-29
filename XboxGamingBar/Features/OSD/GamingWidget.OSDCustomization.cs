@@ -1231,6 +1231,31 @@ namespace XboxGamingBar
         }
 
         /// <summary>
+        /// Sends the currently-selected Auto Hibernate AC/DC mode to the helper. Safe to call any
+        /// time; no-op if not connected. Used on pipe-connect to guarantee the helper matches the
+        /// widget's persisted choice (the Loaded-time send happens before the pipe is up). (#88 #3)
+        /// </summary>
+        private async void SendAutoHibernateModeToHelper()
+        {
+            try
+            {
+                if (!App.IsConnected) return;
+                var selected = AutoHibernateModeComboBox?.SelectedItem as ComboBoxItem;
+                if (selected?.Tag == null) return;
+                if (!int.TryParse(selected.Tag.ToString(), out int mode)) return;
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.AutoHibernateMode },
+                    { "Content", mode }
+                };
+                await App.SendMessageAsync(request);
+                Logger.Info($"Re-sent Auto Hibernate mode on connect: {mode}");
+            }
+            catch (Exception ex) { Logger.Warn($"SendAutoHibernateModeToHelper failed: {ex.Message}"); }
+        }
+
+        /// <summary>
         /// Restores the saved Auto Hibernate power-source mode (Always/AC/DC) on startup and
         /// re-sends it to the helper. The helper keeps this only in a volatile field, so without
         /// this the choice silently reverts to "Always" after every reboot. (Issue #88 bug #3)

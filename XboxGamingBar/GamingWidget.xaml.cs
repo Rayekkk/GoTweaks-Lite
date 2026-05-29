@@ -3772,6 +3772,12 @@ namespace XboxGamingBar
                 // and only the helper is polling XInput. Issue #79 (kingvall).
                 SendControllerHotkeyConfigToHelper();
 
+                // Re-send the persisted Auto Hibernate AC/DC mode now that the pipe is up. At
+                // Loaded time (when LoadAutoHibernateModeSetting first runs) the pipe isn't
+                // connected, so that send is dropped; this guarantees the helper agrees with the
+                // widget's saved choice. (Issue #88 bug #3)
+                SendAutoHibernateModeToHelper();
+
                 await Task.Delay(200);
                 isInitialSync = false;
                 App.HasEverConnectedToHelper = true;

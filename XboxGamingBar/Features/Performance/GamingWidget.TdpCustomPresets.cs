@@ -411,10 +411,30 @@ namespace XboxGamingBar
 
             var newPreset = new Shared.Data.TdpPreset(name, tdpWatts, null, false, tdpBoostEnabled);
             tdpPresets.Add(newPreset);
+            int newPresetIndex = tdpPresets.Count - 1;
 
             SaveTdpPresetsSettings();
             RefreshTdpPresetsList();
             PopulateTdpModeComboBox();
+
+            // Select the newly-added preset so its TDP is applied to hardware immediately.
+            // Previously the preset was only added to the list — its TDP didn't take effect
+            // until the user manually selected it in the mode combo (issue #88, kayti). Selecting
+            // it here routes through TDPModeComboBox_SelectionChanged, which applies the TDP.
+            // PopulateTdpModeComboBox restores selection by name; force the index + reset the
+            // de-dupe guard so the apply fires even if the index happens to match.
+            if (TDPModeComboBox != null && newPresetIndex >= 0 && newPresetIndex < TDPModeComboBox.Items.Count)
+            {
+                lastTDPModeIndex = -1;
+                if (TDPModeComboBox.SelectedIndex != newPresetIndex)
+                {
+                    TDPModeComboBox.SelectedIndex = newPresetIndex; // fires the handler
+                }
+                else
+                {
+                    TDPModeComboBox_SelectionChanged(TDPModeComboBox, null); // already selected -> apply directly
+                }
+            }
 
             // Clear the input fields
             NewPresetNameTextBox.Text = "";
@@ -424,7 +444,7 @@ namespace XboxGamingBar
                 NewPresetTDPBoostCheckBox.IsChecked = false;
             }
 
-            Logger.Info($"Added new preset: {name} ({tdpWatts}W, Boost={tdpBoostEnabled})");
+            Logger.Info($"Added new preset: {name} ({tdpWatts}W, Boost={tdpBoostEnabled}) — selected at index {newPresetIndex}");
         }
 
         private void EditPresetCancelButton_Click(object sender, RoutedEventArgs e)
@@ -470,11 +490,36 @@ namespace XboxGamingBar
 
             tdpPresets[editingPresetIndex] = updatedPreset;
 
+            // If the preset being edited is the one currently active, re-apply its new TDP now.
+            // TDPModeComboBox_SelectionChanged early-returns when the index is unchanged, so an
+            // in-place edit of the active preset wouldn't otherwise reach hardware until the user
+            // re-selected it (issue #88, kayti). Reset the de-dupe guard so the re-select applies.
+            bool editingActivePreset = TDPModeComboBox != null
+                && TDPModeComboBox.SelectedIndex == editingPresetIndex;
+
             SaveTdpPresetsSettings();
             RefreshTdpPresetsList();
             PopulateTdpModeComboBox();
 
-            Logger.Info($"Updated preset: {updatedPreset.Name} ({updatedPreset.TdpWatts}W, Boost={updatedPreset.TdpBoostEnabled})");
+            if (editingActivePreset && TDPModeComboBox != null
+                && editingPresetIndex >= 0 && editingPresetIndex < TDPModeComboBox.Items.Count)
+            {
+                // PopulateTdpModeComboBox already restored the selection to this index, so setting
+                // SelectedIndex again is a no-op and won't fire SelectionChanged (the value didn't
+                // change). Reset the de-dupe guard and CALL the apply handler directly so the new
+                // TDP actually reaches hardware. (issue #88 — editing the active preset's TDP.)
+                lastTDPModeIndex = -1;
+                if (TDPModeComboBox.SelectedIndex != editingPresetIndex)
+                {
+                    TDPModeComboBox.SelectedIndex = editingPresetIndex; // fires the handler
+                }
+                else
+                {
+                    TDPModeComboBox_SelectionChanged(TDPModeComboBox, null);
+                }
+            }
+
+            Logger.Info($"Updated preset: {updatedPreset.Name} ({updatedPreset.TdpWatts}W, Boost={updatedPreset.TdpBoostEnabled}){(editingActivePreset ? " — re-applied (active)" : "")}");
 
             // Close dialog
             EditPresetCancelButton_Click(sender, e);

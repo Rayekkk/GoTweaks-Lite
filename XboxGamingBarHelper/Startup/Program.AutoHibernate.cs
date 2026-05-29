@@ -47,7 +47,18 @@ namespace XboxGamingBarHelper
                 // Restore the persisted AC/DC power-source choice before the timer can fire.
                 // The widget re-sends it on connect, but this covers the widget-never-opened
                 // case so we don't hibernate on AC when the user picked "DC Only" (issue #88 bug #3).
-                try { autoHibernateMode = Properties.Settings.Default.AutoHibernateMode; }
+                // Use LocalSettingsHelper (UWP LocalSettings + JSON fallback) rather than
+                // Properties.Settings.Default — the legacy app.config store doesn't round-trip in
+                // the MSIX-deployed helper across reboots/updates (the value read back as the
+                // default 0=Always, the actual bug kayti reported).
+                try
+                {
+                    if (Settings.LocalSettingsHelper.TryGetValue<int>("AutoHibernateMode", out int savedMode))
+                    {
+                        autoHibernateMode = savedMode;
+                        Logger.Info($"Auto Hibernate: restored persisted mode {savedMode} from LocalSettings");
+                    }
+                }
                 catch (Exception ex) { Logger.Warn($"Could not load persisted AutoHibernateMode: {ex.Message}"); }
 
                 if (autoHibernateTimer == null)
