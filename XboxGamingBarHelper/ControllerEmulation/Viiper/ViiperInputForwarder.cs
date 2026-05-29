@@ -129,6 +129,14 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // forces a zero SetState when they pass. Value 0 = no pending pulse.
         private long steamDeckMotorLeftExpiresTicks;
         private long steamDeckMotorRightExpiresTicks;
+        // Minimum on-time (µs) for a Steam Deck haptic pulse. Steam's trigger click is
+        // ~400µs — far shorter than the LRA's spin-up-from-rest time, so short floors produced
+        // weak/inconsistent clicks (felt as "missed"): same-side pulses arrive 80-180ms apart,
+        // so each starts from a fully-stopped motor and needs enough drive to reach perceptible
+        // amplitude before the decay brakes it. Measured: 12µs floor -> ~12-21ms on-time felt
+        // missed; 40ms floor merged dense bursts into sustained buzz. 20ms is the midpoint —
+        // reliable LRA spin-up for a uniform click, still short enough that bursts stay crisp.
+        private const long SteamDeckHapticMinPlayUs = 20000;
 
         // Same auto-decay machinery for the Switch 2 Pro (ns2pro) target.
         // Steam Input's Switch 2 Pro driver doesn't currently send an explicit
@@ -304,12 +312,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             bool changed = false;
             if (steamDeckMotorLeft != 0 && now >= steamDeckMotorLeftExpiresTicks)
             {
+                // TEMP DIAG (haptic skip): how long the left motor actually ran before decay.
+                Logger.Info($"SDDECAY side=L str={steamDeckMotorLeft} lateMs={((now - steamDeckMotorLeftExpiresTicks)/(double)TimeSpan.TicksPerMillisecond):F1}");
                 steamDeckMotorLeft = 0;
                 steamDeckMotorLeftExpiresTicks = 0;
                 changed = true;
             }
             if (steamDeckMotorRight != 0 && now >= steamDeckMotorRightExpiresTicks)
             {
+                Logger.Info($"SDDECAY side=R str={steamDeckMotorRight} lateMs={((now - steamDeckMotorRightExpiresTicks)/(double)TimeSpan.TicksPerMillisecond):F1}");
                 steamDeckMotorRight = 0;
                 steamDeckMotorRightExpiresTicks = 0;
                 changed = true;
@@ -568,12 +579,24 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         // Count * (Duration + Interval) microseconds; convert
                         // to .NET ticks (1µs = 10 ticks). PollLoop zeros the
                         // motor + sends XInput SetState(0,0) once we pass it.
+                        // Steam's trigger haptic is a single ~0.4ms click (dur=400us, cnt=1).
+                        // That is far shorter than both our ~8ms poll-decay tick AND the LRA's
+                        // physical spin-up time, so the motor was often zeroed before (or on)
+                        // the same tick it was set — felt as "sometimes no buzz" on rapid
+                        // pulls. Floor the on-time to SteamDeckHapticMinPlayUs so every pulse
+                        // survives a few ticks and the LRA actually registers the click.
                         long totalPlayUs = (long)count * ((long)duration + interval);
+                        if (totalPlayUs < SteamDeckHapticMinPlayUs) totalPlayUs = SteamDeckHapticMinPlayUs;
                         long stopTicks = DateTime.UtcNow.Ticks + totalPlayUs * 10;
                         if (side == 0)      { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = stopTicks; }
                         else if (side == 1) { steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
                         else                { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = stopTicks;
                                               steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
+                        // TEMP DIAG (haptic skip): every 0x8F decode. side, raw pulse params,
+                        // computed strength, and play-window ms. A "skipped" buzz should show
+                        // as strength=0 or a sub-poll-tick (<8ms) play window that decays
+                        // before the LRA spins up.
+                        Logger.Info($"SDHAP side={side} dur={duration} int={interval} cnt={count} gain={gainDb} -> str={strength} playMs={(totalPlayUs/1000.0):F1}");
                     }
                     else if (data.Length >= 9 && data[0] == 0xEB)
                     {
@@ -711,6 +734,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     RightMotorSpeed = (ushort)rightSpeed,
                 };
                 uint rc = ViiperXInput.SetState(physicalIndex, ref vib);
+                // TEMP DIAG (haptic skip): every emit to the physical motors. If a 0x8F
+                // decoded to str>0 but this shows L=0/R=0 (or a non-zero rc), the cycle was
+                // lost between decode and the motor.
+                Logger.Info($"SDEMIT L={leftSpeed} R={rightSpeed} rc={rc} (motorL={steamDeckMotorLeft} motorR={steamDeckMotorRight})");
                 if (rc == ViiperXInput.ErrorSuccess)
                 {
                     System.Threading.Interlocked.Increment(ref statsRumbleForwardedOk);
@@ -2683,10 +2710,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 }
             }
 
-            // Triggers — XInput is 0..255, steamdeck wire is u16. ×257 spans the
-            // full 0..65535 range without rounding loss (255*257 == 65535).
-            WriteU16(data, 44, (ushort)(gp.LeftTrigger * 257));
-            WriteU16(data, 46, (ushort)(gp.RightTrigger * 257));
+            // Triggers — XInput is 0..255; the Steam Deck wire trigger field is a SIGNED
+            // i16 with full-scale 32767 (matches HHD's "rt"/"lt" AM(i16) encode: 32767*val).
+            // The old ×257 produced 0..65535: anything past raw 127 (~half press) exceeded
+            // 32767 and wrapped NEGATIVE when Steam read it as signed (full press = 0xFFFF =
+            // -1 -> clamped to 0), so a full pull registered as released and only ~half read
+            // as max. Scale to 0..32767 instead. (Live capture 2026-05-28 confirmed raw hits
+            // a clean 255.)
+            WriteU16(data, 44, (ushort)(gp.LeftTrigger * 32767 / 255));
+            WriteU16(data, 46, (ushort)(gp.RightTrigger * 32767 / 255));
 
             // Sticks — XInput int16 -> wire int16 passthrough.
             WriteI16(data, 48, gp.ThumbLX);
