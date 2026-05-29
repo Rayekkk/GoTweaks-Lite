@@ -457,10 +457,38 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public const float RightAccelYSign = +1f;
         public const float RightAccelZSign = -1f;
 
+        // Redundant-sensor outlier rejection. Angular velocity is identical at every point on
+        // a rigid body, so after the mirror correction both chips MUST read the same gyro.
+        // When they agree (within this threshold) we average — halving noise. When they
+        // disagree by more than the threshold, one chip is glitching (a spike): we discard the
+        // average (which would blend half the spike in) and instead take whichever sample is
+        // closer to the PREVIOUS merged output, since real motion is continuous and a spike is
+        // a sudden jump. The threshold is generous enough not to reject genuine fast motion:
+        // the two chips sample up to ~8ms apart (separate 125Hz HID reports), so during a flick
+        // they legitimately differ by angular_accel * timing_skew (tens of deg/s). Even if a
+        // fast frame is misclassified, the continuity pick still returns a sample on the real
+        // trajectory, so the cost of a false positive is negligible.
+        private const float GyroAgreeThresholdDps = 60f;
+
+        private static readonly object _mergeStateLock = new object();
+        private static bool _hasPrevGyro;
+        private static float _prevGyroX, _prevGyroY, _prevGyroZ;
+
+        private static float MergeGyroAxis(float l, float rFlipped, float prev, bool hasPrev)
+        {
+            if (!hasPrev || Math.Abs(l - rFlipped) <= GyroAgreeThresholdDps)
+            {
+                return (l + rFlipped) * 0.5f;   // agree → average (noise reduction)
+            }
+            // disagree → one chip spiked; take the sample nearer the previous output
+            return Math.Abs(l - prev) <= Math.Abs(rFlipped - prev) ? l : rFlipped;
+        }
+
         /// <summary>
-        /// Average left and right gyro samples after pre-flipping the right side
-        /// into the left's reference frame. Caller is responsible for handling
-        /// the single-side-only fallback.
+        /// Merge left and right gyro samples after pre-flipping the right side into the left's
+        /// reference frame. Gyro uses agree-average / disagree-continuity-pick outlier rejection
+        /// (see GyroAgreeThresholdDps); accel is straight-averaged (used only for gravity fusion,
+        /// where per-chip spikes matter far less). Caller handles the single-side-only fallback.
         /// </summary>
         public static GyroSample Merge(LegionGyroSample left, LegionGyroSample right)
         {
@@ -471,10 +499,23 @@ namespace XboxGamingBarHelper.ControllerEmulation
             float rAccelY = right.AccelYG * RightAccelYSign;
             float rAccelZ = right.AccelZG * RightAccelZSign;
 
+            float mGyroX, mGyroY, mGyroZ;
+            lock (_mergeStateLock)
+            {
+                bool hasPrev = _hasPrevGyro;
+                mGyroX = MergeGyroAxis(left.GyroXDegPerSecond, rGyroX, _prevGyroX, hasPrev);
+                mGyroY = MergeGyroAxis(left.GyroYDegPerSecond, rGyroY, _prevGyroY, hasPrev);
+                mGyroZ = MergeGyroAxis(left.GyroZDegPerSecond, rGyroZ, _prevGyroZ, hasPrev);
+                _prevGyroX = mGyroX;
+                _prevGyroY = mGyroY;
+                _prevGyroZ = mGyroZ;
+                _hasPrevGyro = true;
+            }
+
             return new GyroSample(
-                (left.GyroXDegPerSecond + rGyroX) * 0.5f,
-                (left.GyroYDegPerSecond + rGyroY) * 0.5f,
-                (left.GyroZDegPerSecond + rGyroZ) * 0.5f,
+                mGyroX,
+                mGyroY,
+                mGyroZ,
                 (left.AccelXG + rAccelX) * 0.5f,
                 (left.AccelYG + rAccelY) * 0.5f,
                 (left.AccelZG + rAccelZ) * 0.5f,

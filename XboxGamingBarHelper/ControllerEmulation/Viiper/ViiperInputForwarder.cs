@@ -84,10 +84,21 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // 24-byte switchpro frame to the left/right half, so a single wire
         // build serves both halves correctly.
         private volatile uint secondaryDeviceId;
-        // Monotonic frame counter written into the steamdeck wire format's frame
-        // field (bytes 4-7). libviiper's steamdeck device tracks it for sequence/
-        // deduplication purposes — we just need it to advance per call.
-        private uint steamDeckFrameCounter;
+        // SteamDeck wire frame field (bytes 4-7). This is Steam's gyro TIMEBASE, not a
+        // sequence number: Steam integrates gyro angle as velocity * (deltaFrame * tick),
+        // where tick is the advertised ConnectionIntervalUs (4000us = 4ms; see
+        // device.go AttributeConnectionIntervalUs). The real Deck puts a hardware
+        // microsecond-ish timestamp here. We must therefore derive the frame from REAL
+        // elapsed wall-clock in 4ms units — NOT increment by 1 per report. Our Legion HID
+        // delivers ~125Hz (not the Deck's ~250Hz), so a per-report ++ would advance the
+        // timebase at half real-time and Steam would integrate gyro at half speed. A
+        // time-based frame keeps gyro speed correct at any send rate and is robust to the
+        // 124-126Hz HID jitter (that jitter, against a per-report counter, is what caused
+        // the gyro-to-mouse lag/overshoot). Anchor set on first SteamDeck report.
+        private long steamDeckFrameAnchorTicks;
+        private bool steamDeckFrameAnchored;
+        // 4ms per Deck frame tick = advertised ConnectionIntervalUs (4000us).
+        private const long SteamDeckFrameTickTicks = System.TimeSpan.TicksPerMillisecond * 4;
 
         // Monotonic frame counter for the steamcontroller (Gordon V1) wire format.
         // Same role as steamDeckFrameCounter — Gordon uses its own per-device
@@ -145,6 +156,25 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // controller IMU and the right half by the right controller IMU. When false,
         // both halves share `gyroSource`.
         private volatile bool joyconGyroPerHalf;
+
+        // SteamDeck gyro pacing: Steam Input integrates gyro velocity over the report frame
+        // counter (bytes 4-7), so that field is Steam's timebase. We advance it once per report
+        // sent, and we send one report per FRESH Legion HID sample (~125Hz HQ gyro). An earlier
+        // fixed 250Hz steady-send (zero-order hold on stale samples) advanced the timebase on
+        // duplicate frames, making Steam under-integrate then overshoot — visible as gyro
+        // lag-then-snap. HHD sends one report per IMU timestamp for the same reason. 1ms system
+        // timer resolution is still raised below so the loop's short waits/sleeps stay accurate.
+        private bool _timerResolutionRaised;
+        // Legion BMI accel is +/-8g (4096 counts/g); the Steam Deck wire format is +/-2g
+        // (16384 counts/g). Scale accel up by this factor so the gravity vector reaches full
+        // strength for Steam's gyro sensor fusion. See BuildSteamDeckInput for the derivation.
+        private const int SteamDeckAccelScale = 4;
+        // TEMP DIAG (SteamDeck gyro verify): throttle for post-scale wire IMU logging.
+        private int _sdImuDiagLastMs;
+        [System.Runtime.InteropServices.DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+        private static extern uint NativeTimeBeginPeriod(uint uMilliseconds);
+        [System.Runtime.InteropServices.DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+        private static extern uint NativeTimeEndPeriod(uint uMilliseconds);
         private volatile ViiperGuideButtonMode guideMode = ViiperGuideButtonMode.Native;
         private volatile bool swapRumbleMotors;
         // Percent ×10 so we can apply it with integer math (1000 == unity). Range 0..2000.
@@ -1077,29 +1107,15 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// <summary>Sets the IMU axis remap. Each arg is "X", "Y", "Z", "-X", "-Y", or "-Z".</summary>
         public void SetGyroAxisMapping(string mapX, string mapY, string mapZ)
         {
-            int sx, sgnX, sy, sgnY, sz, sgnZ;
-            ParseAxisMap(mapX, out sx, out sgnX);
-            ParseAxisMap(mapY, out sy, out sgnY);
-            ParseAxisMap(mapZ, out sz, out sgnZ);
-            axisMapXSrc = sx; axisMapXSign = sgnX;
-            axisMapYSrc = sy; axisMapYSign = sgnY;
-            axisMapZSrc = sz; axisMapZSign = sgnZ;
-            Logger.Info($"VIIPER forwarder gyro-axis-map -> X={mapX}, Y={mapY}, Z={mapZ}");
+            // The per-target gyro/accel frame is now hardcoded in the wire builders
+            // (SteamDeck + all Sony targets, verified 2026-05-28), and the manual IMU
+            // axis-mapping UI is hidden. Force identity here so any value persisted by an
+            // older build can't silently compound with the hardcoded frame and re-break axes.
+            axisMapXSrc = 0; axisMapXSign = 1;
+            axisMapYSrc = 1; axisMapYSign = 1;
+            axisMapZSrc = 2; axisMapZSign = 1;
         }
 
-        private static void ParseAxisMap(string value, out int src, out int sign)
-        {
-            switch (value)
-            {
-                case "X":  src = 0; sign =  1; return;
-                case "Y":  src = 1; sign =  1; return;
-                case "Z":  src = 2; sign =  1; return;
-                case "-X": src = 0; sign = -1; return;
-                case "-Y": src = 1; sign = -1; return;
-                case "-Z": src = 2; sign = -1; return;
-                default:   src = 0; sign =  1; return;
-            }
-        }
 
         /// <summary>
         /// Called from the Labs Legion-button action path when a user-mapped "Xbox Guide"
@@ -1226,8 +1242,27 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// </summary>
         private bool TryBuildImuCounts(out short gyroXRaw, out short gyroYRaw, out short gyroZRaw,
                                         out short accelXRaw, out short accelYRaw, out short accelZRaw)
-            => TryBuildImuCounts(gyroSource, out gyroXRaw, out gyroYRaw, out gyroZRaw,
-                                 out accelXRaw, out accelYRaw, out accelZRaw);
+        {
+            bool ok = TryBuildImuCounts(gyroSource, out gyroXRaw, out gyroYRaw, out gyroZRaw,
+                                        out accelXRaw, out accelYRaw, out accelZRaw);
+            // Single-source "Right" is the mirror of "Left" (the right Legion IMU is
+            // mounted mirrored): pitch/yaw are sign-opposed, accel Z too. Bring it into
+            // the Left/Mixed frame using the SAME constants the Mixed merge applies to the
+            // right side, so Left, Right, and Mixed all agree on direction. Only the
+            // gyroSource==Right standard path is touched — Mixed has its own merge, and the
+            // joycon-pair per-half path calls the explicit-source overload (raw), so neither
+            // is affected.
+            if (ok && gyroSource == ViiperGyroSourceKind.Right)
+            {
+                gyroXRaw = SignedClampToShort((int)(gyroXRaw * LegionMixedGyroMerge.RightGyroXSign));
+                gyroYRaw = SignedClampToShort((int)(gyroYRaw * LegionMixedGyroMerge.RightGyroYSign));
+                gyroZRaw = SignedClampToShort((int)(gyroZRaw * LegionMixedGyroMerge.RightGyroZSign));
+                accelXRaw = SignedClampToShort((int)(accelXRaw * LegionMixedGyroMerge.RightAccelXSign));
+                accelYRaw = SignedClampToShort((int)(accelYRaw * LegionMixedGyroMerge.RightAccelYSign));
+                accelZRaw = SignedClampToShort((int)(accelZRaw * LegionMixedGyroMerge.RightAccelZSign));
+            }
+            return ok;
+        }
 
         /// <summary>
         /// Variant that reads an explicit source (used by joycon-pair per-half routing to
@@ -1334,6 +1369,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
         private static short SaturateToShort(float value)
         {
+            // Round to NEAREST, not truncate-toward-zero. A plain (short) cast drops the
+            // fractional part every sample; since Steam integrates these counts over time,
+            // the dropped fractions accumulate and a gesture (e.g. pitch up then back down)
+            // doesn't return to its start — visible as lost precision / cursor drift. Rounding
+            // is symmetric and unbiased, so up- and down-swings cancel cleanly.
+            value = (float)Math.Round(value, MidpointRounding.AwayFromZero);
             if (value > short.MaxValue) return short.MaxValue;
             if (value < short.MinValue) return short.MinValue;
             return (short)value;
@@ -1392,6 +1433,13 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             uint lastPacket = unchecked((uint)-1);
             long lastLegionTicks = 0;
             int errorCount = 0;
+
+            // Raise the system timer resolution to 1ms so the SteamDeck 4ms paced send is
+            // accurate (default Windows granularity is ~15.6ms). Balanced in finally below.
+            try { if (NativeTimeBeginPeriod(1) == 0) _timerResolutionRaised = true; }
+            catch (Exception ex) { Logger.Debug($"timeBeginPeriod(1) failed: {ex.Message}"); }
+            try
+            {
 
             // Diagnostic counters: emit a periodic stats line so we can tell the
             // difference between "no input arriving" (legion sample stale / XInput
@@ -1499,11 +1547,25 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         if (sample.TimestampTicksUtc == lastLegionTicks)
                         {
                             statsLegionStaleSamples++;
+                            // Skip stale samples for ALL targets, SteamDeck included. Steam
+                            // integrates gyro velocity over the report frame counter (bytes 4-7),
+                            // so the frame field is Steam's timebase. The frame counter only
+                            // advances inside BuildSteamDeckInput, i.e. once per report we send —
+                            // so sending duplicate (zero-order-hold) reports on stale samples
+                            // would advance the timebase without new motion, making Steam under-
+                            // integrate on the dupes and overshoot on the next real delta
+                            // (visible as gyro lag-then-snap). HHD avoids this by sending one
+                            // report per fresh IMU sample only ("send only when gyro sends a
+                            // timestamp"). Match that: event-driven at the true ~125Hz HID rate,
+                            // one frame-counter tick per real sample.
                             Thread.Sleep(4);
                             continue;
                         }
-                        lastLegionTicks = sample.TimestampTicksUtc;
-                        statsLegionFreshSamples++;
+                        else
+                        {
+                            lastLegionTicks = sample.TimestampTicksUtc;
+                            statsLegionFreshSamples++;
+                        }
                         // LegionButtonMonitor uses its own AuxButtons bitmap — translate into
                         // the reference LegionAux layout so downstream wire builders see the
                         // correct paddle/Mode/Share bits.
@@ -1680,11 +1742,25 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 // every HID report at its arrival.
                 if (inputSource == ViiperInputSourceKind.LegionHid)
                 {
+                    // Event-driven: block until the next fresh Legion HID sample (~125Hz HQ
+                    // gyro rate) or a short timeout. SteamDeck targets use this same path so
+                    // each report maps 1:1 to a real IMU sample and the frame counter advances
+                    // once per fresh sample — the timebase Steam integrates gyro against. See
+                    // the stale-sample skip above for why duplicate sends cause lag/overshoot.
                     LegionButtonMonitor.WaitForNewSample(16);
                 }
                 else
                 {
                     Thread.Sleep(4);
+                }
+                }
+            }
+            finally
+            {
+                if (_timerResolutionRaised)
+                {
+                    try { NativeTimeEndPeriod(1); } catch { }
+                    _timerResolutionRaised = false;
                 }
             }
         }
@@ -2012,15 +2088,24 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
 
             // IMU bytes at offsets 19-30 (gyroX,Y,Z then accelX,Y,Z as int16).
+            // Sony gyro frame: the DS4 wire gyro slots are pitch/yaw/roll, but the raw Legion
+            // frame is gx=pitch, gy=roll, gz=yaw. So yaw and roll must be swapped (gy<->gz) —
+            // the same swap the SteamDeck path needs. Without it, physical yaw lands in the
+            // roll slot (no lateral camera movement) and physical roll lands in the yaw slot.
+            // Accel is swapped to match so the gyro/accel frames stay coherent for fusion.
             short gx, gy, gz, ax, ay, az;
             if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
             {
-                WriteI16(data, 19, gx);
-                WriteI16(data, 21, gy);
-                WriteI16(data, 23, gz);
+                // Sony gyro frame = the exact routing the SteamDeck path proved correct for
+                // Steam (pitch=+X, yaw=-Z, roll=+Y). Steam is the common consumer, so the same
+                // mapping applies; verified on DS4 + DualSense gyro-to-mouse 2026-05-28. Accel
+                // gets the same transform so the gyro/accel frames stay coherent for fusion.
+                WriteI16(data, 19, gx);                              // gyro pitch (X)
+                WriteI16(data, 21, SignedClampToShort(-(int)gz));    // gyro yaw  <- -Z
+                WriteI16(data, 23, gy);                              // gyro roll <- +Y
                 WriteI16(data, 25, ScaleDs4Accel(ax));
-                WriteI16(data, 27, ScaleDs4Accel(ay));
-                WriteI16(data, 29, ScaleDs4Accel(az));
+                WriteI16(data, 27, ScaleDs4Accel(SignedClampToShort(-(int)az)));  // accel Y-slot <- -Z
+                WriteI16(data, 29, ScaleDs4Accel(ay));               // accel Z-slot <- +Y
             }
             return data;
         }
@@ -2078,16 +2163,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 data[15] = 1;
             }
 
-            // DSE IMU bytes at offsets 21..32.
+            // DSE IMU bytes at offsets 21..32. Same yaw/roll (gy<->gz) frame swap as DS4/DS5.
             short gx, gy, gz, ax, ay, az;
             if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
             {
-                WriteI16(data, 21, gx);
-                WriteI16(data, 23, gy);
-                WriteI16(data, 25, gz);
+                // Same SteamDeck-verified Sony gyro frame as DS4 (pitch=+X, yaw=-Z, roll=+Y).
+                WriteI16(data, 21, gx);                              // gyro pitch (X)
+                WriteI16(data, 23, SignedClampToShort(-(int)gz));    // gyro yaw  <- -Z
+                WriteI16(data, 25, gy);                              // gyro roll <- +Y
                 WriteI16(data, 27, ScaleDs4Accel(ax));
-                WriteI16(data, 29, ScaleDs4Accel(ay));
-                WriteI16(data, 31, ScaleDs4Accel(az));
+                WriteI16(data, 29, ScaleDs4Accel(SignedClampToShort(-(int)az)));  // accel Y-slot <- -Z
+                WriteI16(data, 31, ScaleDs4Accel(ay));               // accel Z-slot <- +Y
             }
             return data;
         }
@@ -2278,16 +2364,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             }
             // Offsets 16..20 stay zero — reserved bytes on DS5 wire.
 
-            // IMU at 21..32, same scaling as DSE/DS4 builders.
+            // IMU at 21..32, same scaling and yaw/roll (gy<->gz) frame swap as DSE/DS4.
             short gx, gy, gz, ax, ay, az;
             if (TryBuildImuCounts(out gx, out gy, out gz, out ax, out ay, out az))
             {
-                WriteI16(data, 21, gx);
-                WriteI16(data, 23, gy);
-                WriteI16(data, 25, gz);
+                // Same SteamDeck-verified Sony gyro frame as DS4 (pitch=+X, yaw=-Z, roll=+Y).
+                WriteI16(data, 21, gx);                              // gyro pitch (X)
+                WriteI16(data, 23, SignedClampToShort(-(int)gz));    // gyro yaw  <- -Z
+                WriteI16(data, 25, gy);                              // gyro roll <- +Y
                 WriteI16(data, 27, ScaleDs4Accel(ax));
-                WriteI16(data, 29, ScaleDs4Accel(ay));
-                WriteI16(data, 31, ScaleDs4Accel(az));
+                WriteI16(data, 29, ScaleDs4Accel(SignedClampToShort(-(int)az)));  // accel Y-slot <- -Z
+                WriteI16(data, 31, ScaleDs4Accel(ay));               // accel Z-slot <- +Y
             }
             return data;
         }
@@ -2457,8 +2544,17 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             data[1] = 0x00;
             data[2] = 0x09;
             data[3] = 0x38;
-            unchecked { steamDeckFrameCounter++; }
-            WriteU32(data, 4, steamDeckFrameCounter);
+            // Time-based frame: real elapsed wall-clock in 4ms (Deck tick) units so Steam
+            // integrates gyro against true time regardless of our send rate. See the field
+            // declaration for why a per-report ++ halves gyro speed on our 125Hz HID.
+            long nowFrameTicks = DateTime.UtcNow.Ticks;
+            if (!steamDeckFrameAnchored)
+            {
+                steamDeckFrameAnchorTicks = nowFrameTicks;
+                steamDeckFrameAnchored = true;
+            }
+            uint deckFrame = unchecked((uint)((nowFrameTicks - steamDeckFrameAnchorTicks) / SteamDeckFrameTickTicks));
+            WriteU32(data, 4, deckFrame);
 
             ushort aux = currentAuxButtons;
 
@@ -2547,15 +2643,44 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 // convention is the held-vertical gameplay frame — a ~90deg rotation about the
                 // pitch (X) axis that maps (Y,Z) -> (-Z,+Y). Without it, physical roll lands in
                 // Steam's yaw slot. Applied to gyro AND accel together so the IMU vector stays
-                // coherent. Pitch (X) is unchanged. NOTE: handedness is the +90 variant; if yaw
-                // and roll come out inverted in Steam, switch to the -90 variant: (Y,Z)->(+Z,-Y).
-                // gyro: (Y,Z) -> (-Z,+Y); accel: same rotation
-                WriteI16(data, 24, ax);                              // accel X
-                WriteI16(data, 26, SignedClampToShort(-(int)az));    // accel Y <- -Z
-                WriteI16(data, 28, ay);                              // accel Z <- +Y
-                WriteI16(data, 30, gx);                              // gyro Pitch (X)
-                WriteI16(data, 32, SignedClampToShort(-(int)gz));    // gyro Yaw   <- -Z
-                WriteI16(data, 34, gy);                              // gyro Roll  <- +Y
+                // coherent. Pitch (X) is unchanged.
+                // Accel frame alignment for sensor fusion: the Legion parser negates the GYRO
+                // X/Y (per-side mirror correction) but leaves the ACCEL in raw BMI convention
+                // ("Accel passes through untouched" — LegionButtonMonitor). Steam's Gyro→Joystick
+                // (Deflection) mode FUSES gyro+accel to find gravity, so a mismatched gyro/accel
+                // frame yields a wrong gravity reference → canted/heavy/fast-recentering deflection.
+                // Negate accel X/Y so it shares the gyro's frame.
+                //
+                // Accel magnitude: the Legion BMI runs at +/-8g (4096 counts/g), but the Steam
+                // Deck wire format is +/-2g (16384 counts/g — HHD virtual/sd/const.py uses
+                // scale=16384/9.80665, InputPlumber's Deck driver uses ACCEL_SCALE=0.0006125 m/s2
+                // ~= 16016 counts/g). A live SDIMU capture (2026-05-28) showed gravity at rest at
+                // ~4017 counts = 0.245g = exactly 1/4 strength. Steam's gyro fusion derives "down"
+                // from this vector, so a quarter-strength gravity made deflection/camera recenter
+                // too fast and feel heavy. Multiply accel by 4 to reach Deck's +/-2g scale.
+                // Gyro is already Deck-native (~16 counts/dps) so it is left unscaled.
+                short wAx = SignedClampToShort(-(int)ax * SteamDeckAccelScale);   // accel X (gyro-frame aligned: -X)
+                short wAy = SignedClampToShort(-(int)az * SteamDeckAccelScale);   // accel Y <- -Z
+                short wAz = SignedClampToShort(-(int)ay * SteamDeckAccelScale);   // accel Z <- +Y, negated to match gyro frame
+                short wGx = gx;                                       // gyro Pitch (X)
+                short wGy = SignedClampToShort(-(int)gz);             // gyro Yaw <- -Z (shares accel Y's -Z frame; verified gyro->mouse 2026-05-28)
+                short wGz = gy;                                       // gyro Roll <- +Y
+                WriteI16(data, 24, wAx);
+                WriteI16(data, 26, wAy);
+                WriteI16(data, 28, wAz);
+                WriteI16(data, 30, wGx);
+                WriteI16(data, 32, wGy);
+                WriteI16(data, 34, wGz);
+
+                // TEMP DIAG: post-scale wire IMU values (exactly what the SteamDeck report carries).
+                // At rest, sqrt(wAx^2 + wAy^2 + wAz^2) should be ~16000 (1g at the Deck's +/-2g
+                // scale), confirming the x4 accel fix. ~5 Hz.
+                int sdNow = Environment.TickCount;
+                if (sdNow - _sdImuDiagLastMs >= 200)
+                {
+                    _sdImuDiagLastMs = sdNow;
+                    Logger.Info($"SDIMU wire gyro=({wGx},{wGy},{wGz}) accel=({wAx},{wAy},{wAz})");
+                }
             }
 
             // Triggers — XInput is 0..255, steamdeck wire is u16. ×257 spans the
