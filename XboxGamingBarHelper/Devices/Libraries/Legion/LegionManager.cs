@@ -39,6 +39,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private int lightSpeed = 50; // 0-100, default 50%
         private int performanceMode = 2; // Balanced
 
+        // True hardware light state from the b0:01 readback (LegionManager.ControllerBattery.cs).
+        // Preferred by the reactive-lighting getters over the stale lightBrightness/lightColor
+        // defaults so reactive effects don't blast 100% before the widget reconnects after a restart.
+        private bool _hasHwLightState;
+        private int _hwLightBrightness;
+        private byte _hwLightColorR, _hwLightColorG, _hwLightColorB;
+
         /// <summary>
         /// Gets the current performance mode (Quiet=1, Balanced=2, Performance=3, Custom=255).
         /// </summary>
@@ -1074,6 +1081,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Error($"Error setting light mode: {ex.Message}");
             }
+            // Re-read hardware state so the Info card reflects the new mode promptly.
+            RequestDeviceStatusRefresh();
         }
 
         public void RestoreLightSettings()
@@ -1090,6 +1099,76 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
             Logger.Info($"Restoring light settings: mode={lightMode}, color={lightColor}, brightness={lightBrightness}");
             SetLightMode(lightMode);
+        }
+
+        /// <summary>
+        /// Set both controllers to a SOLID color immediately, used by the reactive-lighting
+        /// effect loop (flash on press, etc). Routes through the same LegionControllerService /
+        /// Go S path as the static lighting so there's a single RGB writer. Does NOT touch the
+        /// persisted lightMode/lightColor — call <see cref="ReleaseReactiveLighting"/> to return
+        /// to the user's static setting. Keep callers throttled (~60Hz); the service serializes
+        /// HID writes internally.
+        /// </summary>
+        public void SetReactiveStickColor(byte r, byte g, byte b, int brightnessPercent)
+        {
+            bool hasGoSController = isGoSControllerConnected && goSController != null;
+            bool hasStandardController = isControllerConnected && controllerService != null;
+            if (!hasGoSController && !hasStandardController) return;
+
+            int bright = Math.Max(0, Math.Min(100, brightnessPercent));
+            // Preserve the user's configured speed in the profile. For a Solid reactive frame
+            // speed has no visible effect (no animation), but it's still written to the profile
+            // and read back by b0:01 — hardcoding 0.5 made the Info card report speed 50%.
+            float speed = Math.Max(0, Math.Min(100, lightSpeed)) / 100f;
+            try
+            {
+                if (hasGoSController)
+                {
+                    // SetSolidColor re-enables the Go S RGB as part of the write.
+                    goSController.SetSolidColor(r, g, b, bright);
+                }
+                else
+                {
+                    // The static light may be Off (RGB disabled at firmware level); writing a
+                    // profile alone won't re-enable it. Enable first so reactive flashes show
+                    // even when the user's static mode is Off. ReleaseReactiveLighting ->
+                    // RestoreLightSettings will disable it again when the effect ends if Off.
+                    if (lightMode == 0)
+                    {
+                        controllerService.SetRgbEnabled(Controller.Left, true);
+                        controllerService.SetRgbEnabled(Controller.Right, true);
+                    }
+                    controllerService.SetStickLightMode(RgbMode.Solid, r, g, b, bright / 100f, speed);
+                }
+            }
+            catch (Exception ex) { Logger.Debug($"SetReactiveStickColor failed: {ex.Message}"); }
+        }
+
+        /// <summary>Return the controllers to the user's persisted static lighting after a
+        /// reactive effect ends (or when reactive lighting is disabled).</summary>
+        public void ReleaseReactiveLighting()
+        {
+            try { RestoreLightSettings(); }
+            catch (Exception ex) { Logger.Debug($"ReleaseReactiveLighting failed: {ex.Message}"); }
+        }
+
+        /// <summary>Brightness (0-100) for the reactive loop. Prefers the true hardware value from
+        /// the b0:01 readback over the helper's stale default (which is 100 after a restart and
+        /// would make reactive effects peak at full brightness before the widget reconnects).</summary>
+        public int CurrentLightBrightness => _hasHwLightState ? _hwLightBrightness : lightBrightness;
+
+        /// <summary>Current static color (parsed RGB), so the reactive fade can blend toward it
+        /// instead of toward black — avoids a visible snap back at the end of a flash. Prefers the
+        /// hardware readback color; when static mode is Off, returns black so flashes fade fully out.</summary>
+        public (byte r, byte g, byte b) CurrentLightColorRgb
+        {
+            get
+            {
+                if (lightMode == 0) return (0, 0, 0);
+                if (_hasHwLightState) return (_hwLightColorR, _hwLightColorG, _hwLightColorB);
+                try { ParseHexColor(lightColor, out byte r, out byte g, out byte b); return (r, g, b); }
+                catch { return (0, 0, 0); }
+            }
         }
 
 
@@ -1163,6 +1242,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Error($"Error setting light color: {ex.Message}");
             }
+            // Re-read hardware state so the Info card reflects the new color/mode promptly.
+            RequestDeviceStatusRefresh();
         }
 
         private void ParseHexColor(string hexColor, out byte r, out byte g, out byte b)

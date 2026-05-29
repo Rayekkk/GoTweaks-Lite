@@ -2601,9 +2601,9 @@ namespace XboxGamingBar
             }
         }
 
-        // Map raw firmware light-mode byte to a label for the Info card.
-        // Readback enum is 1-less than the setter's StickLightMode enum
-        // (Solid=1, Pulse=2, Dynamic=3, Spiral=4 on the write side).
+        // Map raw firmware light-mode byte (b0:01 byte 12) to a label for the Info card.
+        // Readback enum is 1-less than the setter's StickLightMode enum:
+        // 0=Solid, 1=Pulse, 2=Dynamic, 3=Spiral. Off is signalled separately (see "le").
         private static string LightModeLabel(int raw)
         {
             switch (raw)
@@ -3776,6 +3776,10 @@ namespace XboxGamingBar
                 isInitialSync = false;
                 App.HasEverConnectedToHelper = true;
                 Logger.Info("Initial sync via pipe complete - profile saves are now enabled");
+
+                // Populate the GoTweaks lighting + haptics controls from the helper's persisted
+                // config (fire-and-forget; guards its own sends during the programmatic fill).
+                SyncGoTweaksFeaturesFromHelper();
 
                 Logger.Info("[PIPE] About to hide connection banner and update profile display...");
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>

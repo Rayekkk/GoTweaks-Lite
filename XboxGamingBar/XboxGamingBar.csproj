@@ -385,6 +385,9 @@
     <Compile Include="Features\Debug\GamingWidget.ViiperStickGyro.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Features\Debug\GamingWidget.GoTweaksLighting.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Features\Debug\GamingWidget.DebugPanel.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>

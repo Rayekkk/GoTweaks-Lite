@@ -655,6 +655,76 @@ namespace XboxGamingBarHelper
             return (summary.ToString(), widgetSettings);
         }
 
+        /// <summary>
+        /// Instantiate the GoTweaks lighting + standalone haptic managers (idempotent) and
+        /// apply current settings. Subscribes to the two config properties so widget edits
+        /// reconfigure the managers live. Called once the LegionButtonMonitor is running.
+        /// </summary>
+        private static void InitGoTweaksLightingAndHaptics(LegionButtonMonitor monitor)
+        {
+            try
+            {
+                if (legionLightingManager == null && legionManager != null)
+                {
+                    legionLightingManager = new XboxGamingBarHelper.Labs.LegionLightingManager(legionManager);
+                }
+                if (goTweaksHapticManager == null)
+                {
+                    goTweaksHapticManager = new XboxGamingBarHelper.Labs.GoTweaksHapticManager();
+                }
+
+                // Apply persisted config now.
+                legionLightingManager?.ApplyConfigString(settingsManager?.GoTweaksLightingConfig?.Value);
+                goTweaksHapticManager?.ApplyConfigString(settingsManager?.GoTweaksHapticsConfig?.Value);
+                if (settingsManager?.LegionControllerSleepMinutes != null)
+                {
+                    try { monitor.SetAutoSleepTime(settingsManager.LegionControllerSleepMinutes.Value); }
+                    catch (Exception ex) { Logger.Warn($"Apply sleep time at init threw: {ex.Message}"); }
+                }
+
+                if (!goTweaksFeaturesHooked)
+                {
+                    if (settingsManager?.GoTweaksLightingConfig != null)
+                    {
+                        settingsManager.GoTweaksLightingConfig.PropertyChanged += OnGoTweaksLightingConfigChanged;
+                    }
+                    if (settingsManager?.GoTweaksHapticsConfig != null)
+                    {
+                        settingsManager.GoTweaksHapticsConfig.PropertyChanged += OnGoTweaksHapticsConfigChanged;
+                    }
+                    if (settingsManager?.LegionControllerSleepMinutes != null)
+                    {
+                        settingsManager.LegionControllerSleepMinutes.PropertyChanged += OnLegionControllerSleepMinutesChanged;
+                    }
+                    goTweaksFeaturesHooked = true;
+                }
+
+                Logger.Info("GoTweaks lighting + haptics initialized");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"InitGoTweaksLightingAndHaptics threw: {ex.Message}");
+            }
+        }
+
+        private static void OnGoTweaksLightingConfigChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try { legionLightingManager?.ApplyConfigString(settingsManager?.GoTweaksLightingConfig?.Value); }
+            catch (Exception ex) { Logger.Warn($"OnGoTweaksLightingConfigChanged threw: {ex.Message}"); }
+        }
+
+        private static void OnLegionControllerSleepMinutesChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try { legionButtonMonitor?.SetAutoSleepTime(settingsManager?.LegionControllerSleepMinutes?.Value ?? 15); }
+            catch (Exception ex) { Logger.Warn($"OnLegionControllerSleepMinutesChanged threw: {ex.Message}"); }
+        }
+
+        private static void OnGoTweaksHapticsConfigChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            try { goTweaksHapticManager?.ApplyConfigString(settingsManager?.GoTweaksHapticsConfig?.Value); }
+            catch (Exception ex) { Logger.Warn($"OnGoTweaksHapticsConfigChanged threw: {ex.Message}"); }
+        }
+
         private static LegionButtonMonitor EnsureLegionButtonMonitor()
         {
             lock (legionButtonMonitorLock)
@@ -668,6 +738,11 @@ namespace XboxGamingBarHelper
                 if (!legionButtonMonitorBatteryHooked)
                 {
                     legionButtonMonitor.BatteryUpdated += LegionButtonMonitor_BatteryUpdated;
+                    // Route b0:01 light/device status (parsed on the button monitor's handle) into
+                    // the LegionManager Info-card pipeline. Needed because on devices where the
+                    // button monitor owns the HID device, LegionControllerService's own status
+                    // read loop never runs, leaving the card showing stale defaults.
+                    legionButtonMonitor.DeviceStatusUpdated += LegionButtonMonitor_DeviceStatusUpdated;
                     legionButtonMonitorBatteryHooked = true;
                 }
 
@@ -724,6 +799,18 @@ namespace XboxGamingBarHelper
             catch (Exception ex)
             {
                 Logger.Error($"BatteryUpdated handler exception: {ex.Message}");
+            }
+        }
+
+        private static void LegionButtonMonitor_DeviceStatusUpdated(object sender, XboxGamingBarHelper.Devices.Libraries.Legion.LegionGoStatus status)
+        {
+            try
+            {
+                legionManager?.IngestDeviceStatus(status);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"DeviceStatusUpdated handler exception: {ex.Message}");
             }
         }
 

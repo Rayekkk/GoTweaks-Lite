@@ -138,6 +138,24 @@ namespace XboxGamingBarHelper.Settings
             get { return viiperRumbleIntensity; }
         }
 
+        private readonly GoTweaksLightingConfigProperty goTweaksLightingConfig;
+        public GoTweaksLightingConfigProperty GoTweaksLightingConfig
+        {
+            get { return goTweaksLightingConfig; }
+        }
+
+        private readonly GoTweaksHapticsConfigProperty goTweaksHapticsConfig;
+        public GoTweaksHapticsConfigProperty GoTweaksHapticsConfig
+        {
+            get { return goTweaksHapticsConfig; }
+        }
+
+        private readonly LegionControllerSleepMinutesProperty legionControllerSleepMinutes;
+        public LegionControllerSleepMinutesProperty LegionControllerSleepMinutes
+        {
+            get { return legionControllerSleepMinutes; }
+        }
+
         private readonly ViiperMirrorLightbarToStickProperty viiperMirrorLightbarToStick;
         public ViiperMirrorLightbarToStickProperty ViiperMirrorLightbarToStick
         {
@@ -226,6 +244,9 @@ namespace XboxGamingBarHelper.Settings
             viiperGuideButtonMode = new ViiperGuideButtonModeProperty(this);
             viiperSwapRumbleMotors = new ViiperSwapRumbleMotorsProperty(this);
             viiperRumbleIntensity = new ViiperRumbleIntensityProperty(this);
+            goTweaksLightingConfig = new GoTweaksLightingConfigProperty(this);
+            goTweaksHapticsConfig = new GoTweaksHapticsConfigProperty(this);
+            legionControllerSleepMinutes = new LegionControllerSleepMinutesProperty(this);
             viiperMirrorLightbarToStick = new ViiperMirrorLightbarToStickProperty(this);
             viiperStickGyroEnabled = new ViiperStickGyroEnabledProperty(this);
             viiperStickTriggerConfig = new ViiperStickTriggerConfigProperty(this);

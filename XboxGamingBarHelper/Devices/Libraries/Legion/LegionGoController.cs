@@ -1373,8 +1373,15 @@ public sealed class LegionGoStatus
     /// (setter Solid=1, Pulse=2, Dynamic=3, Spiral=4).
     /// </summary>
     public byte LightModeRaw { get; set; }
-    /// <summary>True when the stick light is enabled (i.e. LightModeRaw != 0xFF).</summary>
-    public bool LightEnabled => LightModeRaw != 0xFF;
+    /// <summary>
+    /// Whether the stick light is on. On the button-monitor b0:01 stream the on/off flag is a
+    /// dedicated byte (byte 6: 0x01=on, 0x02=off), independent of the animation mode (byte 12).
+    /// When a parser knows that flag it sets this explicitly; otherwise it falls back to the
+    /// legacy heuristic (mode != 0xFF). Verified via live capture 2026-05-29.
+    /// </summary>
+    public bool? LightOnFlag { get; set; }
+    /// <summary>True when the stick light is enabled.</summary>
+    public bool LightEnabled => LightOnFlag ?? (LightModeRaw != 0xFF);
     /// <summary>
     /// Animation speed, 0–100 (already inverted from the firmware's raw byte
     /// which stores 100 − percent; 0 = slowest, 100 = fastest).

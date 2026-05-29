@@ -6957,6 +6957,25 @@
                                                    Text="—" FontSize="11" Foreground="#FFFFFF"
                                                    HorizontalAlignment="Right"/>
                                     </Grid>
+
+                                    <!-- Controller auto-sleep (idle power-off) timeout -->
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Controller sleep" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
+                                        <ComboBox x:Name="LegionControllerSleepComboBox" Grid.Column="1" Width="110"
+                                                  Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="3"
+                                                  SelectionChanged="LegionControllerSleepComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Never" Tag="0"/>
+                                            <ComboBoxItem Content="5 min" Tag="5"/>
+                                            <ComboBoxItem Content="10 min" Tag="10"/>
+                                            <ComboBoxItem Content="15 min" Tag="15"/>
+                                            <ComboBoxItem Content="20 min" Tag="20"/>
+                                            <ComboBoxItem Content="30 min" Tag="30"/>
+                                        </ComboBox>
+                                    </Grid>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -7060,10 +7079,347 @@
                                             <x:String>High</x:String>
                                         </ComboBox>
                                     </Grid>
+
+                                    <!-- GoTweaks Haptics: standalone per-button LRA clicks (works outside emulation) -->
+                                    <Border Height="1" Background="#22FFFFFF" Margin="0,4,0,4"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="GoTweaks Haptics" Foreground="#DDDDDD" FontSize="14"/>
+                                            <TextBlock Text="Tactile click on inputs, system-wide via the controller motors"
+                                                       Foreground="#888888" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="GoTweaksHapticsMasterToggle"
+                                                      Grid.Column="1"
+                                                      Style="{StaticResource ModernToggleStyle}"
+                                                      IsOn="False"
+                                                      Toggled="GoTweaksHaptics_Changed"/>
+                                    </Grid>
+
+                                    <StackPanel x:Name="GoTweaksHapticsGroupsPanel" Spacing="10" Margin="0,4,0,0" Visibility="Collapsed">
+                                        <!-- Pulse length (tap duration) -->
+                                        <StackPanel>
+                                            <Grid>
+                                                <TextBlock Text="Pulse Length" FontSize="13" Foreground="#AAAAAA"/>
+                                                <TextBlock x:Name="GoTweaksHapticsPulseValue" Text="10 ms" Style="{StaticResource CardValueStyle}"/>
+                                            </Grid>
+                                            <Slider x:Name="GoTweaksHapticsPulseSlider"
+                                                    Style="{StaticResource ModernSliderStyle}"
+                                                    Minimum="4" Maximum="40" Value="10"
+                                                    StepFrequency="1"
+                                                    ValueChanged="GoTweaksHaptics_Changed"/>
+                                        </StackPanel>
+                                        <!-- Also click on release -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Click on release too" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
+                                            <ToggleSwitch x:Name="GoTweaksHapticsReleaseToggle" Grid.Column="1" MinWidth="0"
+                                                          Style="{StaticResource ModernToggleStyle}" IsOn="False" Toggled="GoTweaksHaptics_Changed"/>
+                                        </Grid>
+                                        <!-- ABXY -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ToggleSwitch x:Name="GoTweaksHapticsFaceToggle" Grid.Column="0" MinWidth="0"
+                                                          Style="{StaticResource ModernToggleStyle}" IsOn="True" Toggled="GoTweaksHaptics_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="ABXY buttons" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13" Margin="8,0,0,0"/>
+                                            <Slider x:Name="GoTweaksHapticsFaceSlider" Grid.Column="2" Width="110" Minimum="0" Maximum="100" Value="100"
+                                                    StepFrequency="5" VerticalAlignment="Center" ValueChanged="GoTweaksHaptics_Changed"/>
+                                        </Grid>
+                                        <!-- Front -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ToggleSwitch x:Name="GoTweaksHapticsFrontToggle" Grid.Column="0" MinWidth="0"
+                                                          Style="{StaticResource ModernToggleStyle}" IsOn="True" Toggled="GoTweaksHaptics_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="Front buttons (d-pad, start, bumpers)" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13" Margin="8,0,0,0"/>
+                                            <Slider x:Name="GoTweaksHapticsFrontSlider" Grid.Column="2" Width="110" Minimum="0" Maximum="100" Value="100"
+                                                    StepFrequency="5" VerticalAlignment="Center" ValueChanged="GoTweaksHaptics_Changed"/>
+                                        </Grid>
+                                        <!-- Back -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ToggleSwitch x:Name="GoTweaksHapticsBackToggle" Grid.Column="0" MinWidth="0"
+                                                          Style="{StaticResource ModernToggleStyle}" IsOn="True" Toggled="GoTweaksHaptics_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="Back buttons / paddles" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13" Margin="8,0,0,0"/>
+                                            <Slider x:Name="GoTweaksHapticsBackSlider" Grid.Column="2" Width="110" Minimum="0" Maximum="100" Value="100"
+                                                    StepFrequency="5" VerticalAlignment="Center" ValueChanged="GoTweaksHaptics_Changed"/>
+                                        </Grid>
+                                        <!-- Triggers -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ToggleSwitch x:Name="GoTweaksHapticsTriggerToggle" Grid.Column="0" MinWidth="0"
+                                                          Style="{StaticResource ModernToggleStyle}" IsOn="True" Toggled="GoTweaksHaptics_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="Triggers (LT / RT)" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13" Margin="8,0,0,0"/>
+                                            <Slider x:Name="GoTweaksHapticsTriggerSlider" Grid.Column="2" Width="110" Minimum="0" Maximum="100" Value="100"
+                                                    StepFrequency="5" VerticalAlignment="Center" ValueChanged="GoTweaksHaptics_Changed"/>
+                                        </Grid>
+                                    </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
+
+                        <!-- Lighting Section (hidden on devices without HID RGB lighting support) -->
+                        <StackPanel x:Name="LightingSection">
+                        <!-- Lighting Section Header -->
+                        <TextBlock Text="LIGHTING" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <!-- Lighting Card -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Lighting" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Controller RGB and power button lighting"
+                                                   Style="{StaticResource CardCaptionStyle}"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="LightingExpandToggle"
+                                                  Grid.Column="1"
+                                                  IsChecked="False"
+                                                  VerticalAlignment="Center"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  Padding="8,4"
+                                                  Click="LightingExpandToggle_Click">
+                                        <FontIcon x:Name="LightingExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                    </ToggleButton>
+                                </Grid>
+                                <StackPanel x:Name="LightingContent" Spacing="12" Margin="0,12,0,0" Visibility="Collapsed">
+                                    <!-- Light Mode -->
+                                    <StackPanel>
+                                        <TextBlock Text="Light Mode" FontSize="13" Foreground="#AAAAAA" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="LegionLightModeComboBox"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  HorizontalAlignment="Stretch"
+                                                  SelectedIndex="1"
+                                                  SelectionChanged="LegionLightModeComboBox_SelectionChanged">
+                                            <x:String>Off</x:String>
+                                            <x:String>Solid</x:String>
+                                            <x:String>Pulse</x:String>
+                                            <x:String>Dynamic</x:String>
+                                            <x:String>Spiral</x:String>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Light Color (Solid, Pulse only) -->
+                                    <StackPanel x:Name="LegionColorCard">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Light Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border x:Name="LegionColorPreview"
+                                                        Width="24" Height="24"
+                                                        CornerRadius="4"
+                                                        Background="White"
+                                                        BorderBrush="#50555C"
+                                                        BorderThickness="1"
+                                                        Margin="0,0,8,0"/>
+                                                <Button x:Name="LegionColorExpandButton"
+                                                        Content="&#xE70D;"
+                                                        FontFamily="Segoe MDL2 Assets"
+                                                        FontSize="12"
+                                                        Padding="8,4"
+                                                        Background="Transparent"
+                                                        Click="LegionColorExpandButton_Click"
+                                                        UseSystemFocusVisuals="True"
+                                                        FocusVisualPrimaryBrush="White"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <muxc:ColorPicker x:Name="LegionColorPicker"
+                                                     Visibility="Collapsed"
+                                                     Margin="0,12,0,0"
+                                                     Color="White"
+                                                     ColorSpectrumShape="Box"
+                                                     IsMoreButtonVisible="False"
+                                                     IsColorSliderVisible="False"
+                                                     IsColorChannelTextInputVisible="False"
+                                                     IsHexInputVisible="False"
+                                                     IsAlphaEnabled="False"
+                                                     IsAlphaSliderVisible="False"
+                                                     IsAlphaTextInputVisible="False"
+                                                     ColorChanged="LegionColorPicker_ColorChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Brightness (all modes except Off) -->
+                                    <StackPanel x:Name="LegionBrightnessCard">
+                                        <Grid>
+                                            <TextBlock Text="Brightness" FontSize="13" Foreground="#AAAAAA"/>
+                                            <TextBlock x:Name="LegionBrightnessValue"
+                                                       Text="100%"
+                                                       Style="{StaticResource CardValueStyle}"/>
+                                        </Grid>
+                                        <Slider x:Name="LegionBrightnessSlider"
+                                                Style="{StaticResource ModernSliderStyle}"
+                                                Minimum="0" Maximum="100"
+                                                Value="100"
+                                                ValueChanged="LegionBrightnessSlider_ValueChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Speed (Pulse, Dynamic, Spiral only) -->
+                                    <StackPanel x:Name="LegionSpeedCard" Visibility="Collapsed">
+                                        <Grid>
+                                            <TextBlock Text="Speed" FontSize="13" Foreground="#AAAAAA"/>
+                                            <TextBlock x:Name="LegionSpeedValue"
+                                                       Text="50%"
+                                                       Style="{StaticResource CardValueStyle}"/>
+                                        </Grid>
+                                        <Slider x:Name="LegionSpeedSlider"
+                                                Style="{StaticResource ModernSliderStyle}"
+                                                Minimum="0" Maximum="100"
+                                                Value="50"
+                                                ValueChanged="LegionSpeedSlider_ValueChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Power Light Toggle -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Power Light" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="14"/>
+                                        <ToggleSwitch x:Name="LegionPowerLightToggle"
+                                                      Grid.Column="1"
+                                                      Style="{StaticResource ModernToggleStyle}"
+                                                      IsOn="True"/>
+                                    </Grid>
+
+                                    <!-- GoTweaks reactive lighting (input-driven; layers on top of the static mode above) -->
+                                    <Border Height="1" Background="#22FFFFFF" Margin="0,4,0,4"/>
+                                    <StackPanel>
+                                        <TextBlock Text="Reactive Effect" FontSize="13" Foreground="#AAAAAA" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="GoTweaksReactiveModeComboBox"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  HorizontalAlignment="Stretch"
+                                                  SelectedIndex="0"
+                                                  SelectionChanged="GoTweaksReactive_Changed">
+                                            <ComboBoxItem Content="Off" Tag="disabled"/>
+                                            <ComboBoxItem Content="Flash on press" Tag="flash"/>
+                                            <ComboBoxItem Content="Cycle palette" Tag="cycle"/>
+                                            <ComboBoxItem Content="Per-button color" Tag="perbutton"/>
+                                            <ComboBoxItem Content="Hue advance on press" Tag="hue"/>
+                                            <ComboBoxItem Content="Trigger pressure" Tag="trigger"/>
+                                            <ComboBoxItem Content="Battery indicator" Tag="battery"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Flash color (Flash on press only) -->
+                                    <StackPanel x:Name="GoTweaksReactiveFlashColorCard">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Flash Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border x:Name="GoTweaksReactiveFlashPreview"
+                                                        Width="24" Height="24" CornerRadius="4"
+                                                        Background="White" BorderBrush="#50555C" BorderThickness="1"
+                                                        Margin="0,0,8,0"/>
+                                                <Button x:Name="GoTweaksReactiveFlashExpandButton"
+                                                        Content="&#xE70D;"
+                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
+                                                        Background="Transparent"
+                                                        Click="GoTweaksReactiveFlashExpandButton_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <muxc:ColorPicker x:Name="GoTweaksReactiveFlashColorPicker"
+                                                     Visibility="Collapsed" Margin="0,12,0,0" Color="White"
+                                                     ColorSpectrumShape="Box"
+                                                     IsMoreButtonVisible="False"
+                                                     IsColorSliderVisible="False"
+                                                     IsColorChannelTextInputVisible="False"
+                                                     IsHexInputVisible="False"
+                                                     IsAlphaEnabled="False"
+                                                     IsAlphaSliderVisible="False"
+                                                     IsAlphaTextInputVisible="False"
+                                                     ColorChanged="GoTweaksReactiveFlashColorPicker_ColorChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Palette editor (Cycle palette only) -->
+                                    <StackPanel x:Name="GoTweaksPaletteCard" Visibility="Collapsed">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Palette" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                                <Button x:Name="GoTweaksPaletteAddButton" Content="&#xE710;"
+                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
+                                                        Background="Transparent" ToolTipService.ToolTip="Add color"
+                                                        Click="GoTweaksPaletteAddButton_Click"/>
+                                                <Button x:Name="GoTweaksPaletteRemoveButton" Content="&#xE738;"
+                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
+                                                        Background="Transparent" ToolTipService.ToolTip="Remove selected"
+                                                        Click="GoTweaksPaletteRemoveButton_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <!-- Swatch strip (built in code-behind) -->
+                                        <ItemsControl x:Name="GoTweaksPaletteSwatches" Margin="0,8,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                        <muxc:ColorPicker x:Name="GoTweaksPaletteColorPicker"
+                                                     Visibility="Collapsed" Margin="0,12,0,0" Color="White"
+                                                     ColorSpectrumShape="Box"
+                                                     IsMoreButtonVisible="False"
+                                                     IsColorSliderVisible="False"
+                                                     IsColorChannelTextInputVisible="False"
+                                                     IsHexInputVisible="False"
+                                                     IsAlphaEnabled="False"
+                                                     IsAlphaSliderVisible="False"
+                                                     IsAlphaTextInputVisible="False"
+                                                     ColorChanged="GoTweaksPaletteColorPicker_ColorChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Flash decay -->
+                                    <StackPanel x:Name="GoTweaksReactiveDecayCard">
+                                        <Grid>
+                                            <TextBlock Text="Flash Decay" FontSize="13" Foreground="#AAAAAA"/>
+                                            <TextBlock x:Name="GoTweaksReactiveDecayValue" Text="500 ms" Style="{StaticResource CardValueStyle}"/>
+                                        </Grid>
+                                        <Slider x:Name="GoTweaksReactiveDecaySlider"
+                                                Style="{StaticResource ModernSliderStyle}"
+                                                Minimum="100" Maximum="2000" Value="500"
+                                                StepFrequency="50"
+                                                ValueChanged="GoTweaksReactive_Changed"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        </StackPanel>
+                        <!-- End Lighting Section -->
 
                         <!-- Controller Remapping Section (hidden on devices without HID controller remap support) -->
                         <StackPanel x:Name="ControllerRemappingSection">
@@ -8353,142 +8709,6 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-
-                        <!-- Lighting Section (hidden on devices without HID RGB lighting support) -->
-                        <StackPanel x:Name="LightingSection">
-                        <!-- Lighting Section Header -->
-                        <TextBlock Text="LIGHTING" Style="{StaticResource SectionHeaderStyle}"/>
-
-                        <!-- Lighting Card -->
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Lighting" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Controller RGB and power button lighting"
-                                                   Style="{StaticResource CardCaptionStyle}"/>
-                                    </StackPanel>
-                                    <ToggleButton x:Name="LightingExpandToggle"
-                                                  Grid.Column="1"
-                                                  IsChecked="False"
-                                                  VerticalAlignment="Center"
-                                                  Background="Transparent"
-                                                  BorderThickness="0"
-                                                  Padding="8,4"
-                                                  Click="LightingExpandToggle_Click">
-                                        <FontIcon x:Name="LightingExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
-                                    </ToggleButton>
-                                </Grid>
-                                <StackPanel x:Name="LightingContent" Spacing="12" Margin="0,12,0,0" Visibility="Collapsed">
-                                    <!-- Light Mode -->
-                                    <StackPanel>
-                                        <TextBlock Text="Light Mode" FontSize="13" Foreground="#AAAAAA" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="LegionLightModeComboBox"
-                                                  Style="{StaticResource ModernComboBoxStyle}"
-                                                  HorizontalAlignment="Stretch"
-                                                  SelectedIndex="1"
-                                                  SelectionChanged="LegionLightModeComboBox_SelectionChanged">
-                                            <x:String>Off</x:String>
-                                            <x:String>Solid</x:String>
-                                            <x:String>Pulse</x:String>
-                                            <x:String>Dynamic</x:String>
-                                            <x:String>Spiral</x:String>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <!-- Light Color (Solid, Pulse only) -->
-                                    <StackPanel x:Name="LegionColorCard">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Light Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="13"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border x:Name="LegionColorPreview"
-                                                        Width="24" Height="24"
-                                                        CornerRadius="4"
-                                                        Background="White"
-                                                        BorderBrush="#50555C"
-                                                        BorderThickness="1"
-                                                        Margin="0,0,8,0"/>
-                                                <Button x:Name="LegionColorExpandButton"
-                                                        Content="&#xE70D;"
-                                                        FontFamily="Segoe MDL2 Assets"
-                                                        FontSize="12"
-                                                        Padding="8,4"
-                                                        Background="Transparent"
-                                                        Click="LegionColorExpandButton_Click"
-                                                        UseSystemFocusVisuals="True"
-                                                        FocusVisualPrimaryBrush="White"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <muxc:ColorPicker x:Name="LegionColorPicker"
-                                                     Visibility="Collapsed"
-                                                     Margin="0,12,0,0"
-                                                     Color="White"
-                                                     ColorSpectrumShape="Box"
-                                                     IsMoreButtonVisible="False"
-                                                     IsColorSliderVisible="False"
-                                                     IsColorChannelTextInputVisible="False"
-                                                     IsHexInputVisible="False"
-                                                     IsAlphaEnabled="False"
-                                                     IsAlphaSliderVisible="False"
-                                                     IsAlphaTextInputVisible="False"
-                                                     ColorChanged="LegionColorPicker_ColorChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Brightness (all modes except Off) -->
-                                    <StackPanel x:Name="LegionBrightnessCard">
-                                        <Grid>
-                                            <TextBlock Text="Brightness" FontSize="13" Foreground="#AAAAAA"/>
-                                            <TextBlock x:Name="LegionBrightnessValue"
-                                                       Text="100%"
-                                                       Style="{StaticResource CardValueStyle}"/>
-                                        </Grid>
-                                        <Slider x:Name="LegionBrightnessSlider"
-                                                Style="{StaticResource ModernSliderStyle}"
-                                                Minimum="0" Maximum="100"
-                                                Value="100"
-                                                ValueChanged="LegionBrightnessSlider_ValueChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Speed (Pulse, Dynamic, Spiral only) -->
-                                    <StackPanel x:Name="LegionSpeedCard" Visibility="Collapsed">
-                                        <Grid>
-                                            <TextBlock Text="Speed" FontSize="13" Foreground="#AAAAAA"/>
-                                            <TextBlock x:Name="LegionSpeedValue"
-                                                       Text="50%"
-                                                       Style="{StaticResource CardValueStyle}"/>
-                                        </Grid>
-                                        <Slider x:Name="LegionSpeedSlider"
-                                                Style="{StaticResource ModernSliderStyle}"
-                                                Minimum="0" Maximum="100"
-                                                Value="50"
-                                                ValueChanged="LegionSpeedSlider_ValueChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Power Light Toggle -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Power Light" Grid.Column="0" VerticalAlignment="Center" Foreground="#AAAAAA" FontSize="14"/>
-                                        <ToggleSwitch x:Name="LegionPowerLightToggle"
-                                                      Grid.Column="1"
-                                                      Style="{StaticResource ModernToggleStyle}"
-                                                      IsOn="True"/>
-                                    </Grid>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        </StackPanel>
-                        <!-- End Lighting Section -->
 
                         <!-- Performance Mode Section Header -->
                         <TextBlock Text="PERFORMANCE MODE" Style="{StaticResource SectionHeaderStyle}"/>

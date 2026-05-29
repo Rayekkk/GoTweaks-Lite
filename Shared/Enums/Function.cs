@@ -480,5 +480,20 @@
         // visible jitter from BMI260 noise). 90 = heavy smoothing (90%
         // historical weight, adds noticeable lag). Default 30 = light smoother.
         ControllerEmulationStickGyroSmoothing,              // int 0-90
+
+        // GoTweaks Legion lighting (helper-driven RGB on Legion Go controllers).
+        // Config is a single delimited string to keep the property/pipe surface small:
+        //   "<mode>|<baseHex>|<flashHex>|<decayMs>|<brightness0-100>|<speed0-100>"
+        // mode: disabled|solid|pulse|rainbow|spiral|flash|cycle|perbutton. Colors are RRGGBB hex.
+        GoTweaksLightingConfig,                             // string - see format above
+
+        // GoTweaks Haptics (standalone physical-controller button haptics).
+        // Config is a single delimited string:
+        //   "<masterOn0/1>|face:<on>,<intensity0-100>|front:<on>,<i>|back:<on>,<i>|trigger:<on>,<i>"
+        GoTweaksHapticsConfig,                              // string - see format above
+
+        // Legion controller auto-sleep (idle power-off) timeout, in minutes. 0 = never.
+        // Written via HID sub-command 0x09. Common values: 0, 5, 10, 15, 20, 30.
+        LegionControllerSleepMinutes,                       // int - minutes, 0 = never
     }
 }

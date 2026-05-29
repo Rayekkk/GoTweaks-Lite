@@ -599,6 +599,9 @@
     <Compile Include="Settings\ViiperGuideButtonModeProperty.cs" />
     <Compile Include="Settings\ViiperSwapRumbleMotorsProperty.cs" />
     <Compile Include="Settings\ViiperRumbleIntensityProperty.cs" />
+    <Compile Include="Settings\GoTweaksLightingConfigProperty.cs" />
+    <Compile Include="Settings\GoTweaksHapticsConfigProperty.cs" />
+    <Compile Include="Settings\LegionControllerSleepMinutesProperty.cs" />
     <Compile Include="Settings\ViiperMirrorLightbarToStickProperty.cs" />
     <Compile Include="Settings\ViiperStickGyroEnabledProperty.cs" />
     <Compile Include="Settings\ViiperStickTriggerConfigProperty.cs" />
@@ -689,6 +692,9 @@
     <Compile Include="DefaultGameProfiles\DefaultGameProfileManager.cs" />
     <Compile Include="Labs\ViGEmController.cs" />
     <Compile Include="Labs\LegionButtonMonitor.cs" />
+    <Compile Include="Labs\LegionInputButtons.cs" />
+    <Compile Include="Labs\LegionLightingManager.cs" />
+    <Compile Include="Labs\GoTweaksHapticManager.cs" />
     <Compile Include="Labs\ViGEmBusProperties.cs" />
     <Compile Include="Labs\HidHideProperties.cs" />
     <Compile Include="Icons\GameIconHelper.cs" />

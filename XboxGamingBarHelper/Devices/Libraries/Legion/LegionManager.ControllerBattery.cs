@@ -109,6 +109,31 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
         }
 
+        // One-shot timer for an out-of-band status re-read after a light/touchpad change, so the
+        // Controller Info card reflects true hardware state without waiting up to 5s for the
+        // periodic poll. Fires after a short settle delay (the firmware needs a moment to apply
+        // the write before b0:01 reports the new mode).
+        private Timer _statusRefreshTimer;
+        private const int StatusRefreshDelayMs = 300;
+
+        /// <summary>
+        /// Schedule a single b0:01 re-read shortly after a controller state change (light mode,
+        /// color, touchpad) so the Info card shows the real hardware state promptly.
+        /// </summary>
+        public void RequestDeviceStatusRefresh()
+        {
+            try
+            {
+                if (controllerService == null || !isControllerConnected) return;
+                _statusRefreshTimer?.Dispose();
+                _statusRefreshTimer = new Timer(_ => PollDeviceStatus(), null, StatusRefreshDelayMs, Timeout.Infinite);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"RequestDeviceStatusRefresh error: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Handler for stick-light drift events. Logs WARN on a new mismatch and INFO
         /// on recovery. Source distinguishes the debounced post-write verifier from
@@ -130,11 +155,32 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// Handler for b0:01 device status responses. Serializes the snapshot to JSON
         /// and ships it to the widget via the ControllerDeviceStatus property.
         /// </summary>
+        /// <summary>
+        /// Feed a device-status snapshot parsed elsewhere (e.g. by LegionButtonMonitor, which
+        /// owns the HID handle on devices where LegionControllerService can't run its own b0:01
+        /// read loop) into the same Info-card pipeline used by the controllerService path.
+        /// </summary>
+        public void IngestDeviceStatus(LegionGoStatus status)
+        {
+            OnControllerDeviceStatusUpdated(this, status);
+        }
+
         private void OnControllerDeviceStatusUpdated(object sender, LegionGoStatus status)
         {
             if (status == null) return;
             try
             {
+                // Cache the true hardware light brightness/color/speed from the readback so the
+                // reactive-lighting loop matches real state instead of the helper's stale defaults
+                // (brightness defaults to 100 after a restart, which made reactive effects blast
+                // full brightness until the widget reconnected — the "brightness peaked" bug).
+                if (status.LightEnabled)
+                {
+                    _hwLightBrightness = status.Brightness;
+                    _hwLightColorR = status.Red; _hwLightColorG = status.Green; _hwLightColorB = status.Blue;
+                    _hasHwLightState = true;
+                }
+
                 // Stable; demoted to Debug. The b0:01 service emits one event per
                 // data slot, which on Legion Go 2 fired ~5x per 5s polling cycle
                 // and dominated user logs. Re-promote to Info during triage if
@@ -248,6 +294,32 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// Gets whether the right controller is charging.
         /// </summary>
         public bool IsRightControllerCharging() => rightControllerCharging;
+
+        /// <summary>
+        /// Charge percentage (0-100) for the battery-indicator lighting effect. Uses the lower
+        /// controller battery normally, but falls back to the SYSTEM battery when the controllers
+        /// are charging/attached (in that state the controllers report ~100/charging, which isn't
+        /// a useful indicator). Returns 100 if no battery info is available.
+        /// </summary>
+        public int GetIndicatorBatteryPercent()
+        {
+            bool controllersCharging = leftControllerCharging || rightControllerCharging;
+            if (!controllersCharging)
+            {
+                int l = leftControllerBattery, r = rightControllerBattery;
+                int lo = Math.Min(l < 0 ? 100 : l, r < 0 ? 100 : r);
+                if (l > 0 || r > 0) return Math.Max(0, Math.Min(100, lo));
+            }
+
+            // Controllers charging/attached, or no controller battery → system battery.
+            try
+            {
+                int pct = global::Windows.System.Power.PowerManager.RemainingChargePercent;
+                if (pct >= 0) return Math.Max(0, Math.Min(100, pct));
+            }
+            catch { }
+            return 100;
+        }
 
         /// <summary>
         /// Updates controller battery values from the LegionButtonMonitor.

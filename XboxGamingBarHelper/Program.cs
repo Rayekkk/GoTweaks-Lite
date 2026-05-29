@@ -173,6 +173,12 @@ namespace XboxGamingBarHelper
         private static readonly object legionButtonMonitorLock = new object();
         private static bool legionButtonMonitorBatteryHooked;
 
+        // GoTweaks lighting + standalone haptics. Both consume the shared LegionButtonMonitor
+        // press-edge stream; lighting also needs the monitor's HID handle to write RGB.
+        internal static XboxGamingBarHelper.Labs.LegionLightingManager legionLightingManager;
+        internal static XboxGamingBarHelper.Labs.GoTweaksHapticManager goTweaksHapticManager;
+        private static bool goTweaksFeaturesHooked;
+
         /// <summary>
         /// Hotkey manager for global keyboard shortcuts (Ctrl+Shift+D for Desktop Controls)
         /// </summary>
@@ -1210,6 +1216,10 @@ namespace XboxGamingBarHelper
                             {
                                 Logger.Warn("Legion button monitor VID:PID is empty after start");
                             }
+
+                            // GoTweaks lighting + standalone haptics — both ride the monitor's
+                            // press-edge stream, so wire them up once the monitor is live.
+                            InitGoTweaksLightingAndHaptics(monitor);
                         }
                         else
                         {
@@ -1380,6 +1390,9 @@ namespace XboxGamingBarHelper
                 settingsManager.ViiperGuideButtonMode,
                 settingsManager.ViiperSwapRumbleMotors,
                 settingsManager.ViiperRumbleIntensity,
+                settingsManager.GoTweaksLightingConfig,
+                settingsManager.GoTweaksHapticsConfig,
+                settingsManager.LegionControllerSleepMinutes,
                 settingsManager.ViiperMirrorLightbarToStick,
                 settingsManager.ViiperStickGyroEnabled,
                 settingsManager.ViiperJoyconGyroPerHalf,

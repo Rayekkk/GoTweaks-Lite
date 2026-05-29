@@ -220,6 +220,14 @@ namespace XboxGamingBarHelper.Labs
         private byte _lastRightChargingByte = 0;
         private DateTime _lastBatteryUpdateTime = DateTime.MinValue;
         private const int BATTERY_UPDATE_THROTTLE_MS = 2000;  // Only update battery every 2 seconds
+        // Light/device status (b0:01, header 04:00:B0) read via this monitor's HID handle so the
+        // Info card reflects true hardware even when LegionControllerService doesn't own the device.
+        private long _statusReqLastTicks;
+        private static readonly long StatusReqIntervalTicks = TimeSpan.TicksPerSecond * 2;
+        /// <summary>Raised when a b0:01 device-status report (header 04:00:B0) is parsed on this
+        /// monitor's handle. Carries the full LegionGoStatus so LegionManager can drive the
+        /// Controller Info card even when LegionControllerService doesn't own the device.</summary>
+        public event EventHandler<Devices.Libraries.Legion.LegionGoStatus> DeviceStatusUpdated;
 
         // Track when output reports are sent to skip button detection (prevents false triggers)
         private DateTime _lastOutputReportTime = DateTime.MinValue;
@@ -318,6 +326,19 @@ namespace XboxGamingBarHelper.Labs
         private static bool _hasRightGyroSample = false;
         private static bool _hasRightTouchpadSample = false;
         private static bool _hasGamepadSample = false;
+
+        // Press-edge detection. Shared event stream consumed by reactive lighting and the
+        // GoTweaks haptics feature. Raised on the HID poll thread immediately after each
+        // gamepad sample is stored — keep handlers fast and non-blocking. Previous button
+        // state is tracked so we emit one event per rising/falling edge, not per sample.
+        public static event EventHandler<LegionButtonEdgeEventArgs> ButtonEdge;
+        private static ushort _prevEdgeButtons;
+        private static ushort _prevEdgeAux;
+        private static bool _prevEdgeLeftTrigger;
+        private static bool _prevEdgeRightTrigger;
+        private static bool _hasPrevEdgeState;
+        // Analog trigger digital threshold for edge purposes (matches XInput's ~30/255 deadzone feel).
+        private const byte EdgeTriggerThreshold = 64;
 
         /// <summary>
         /// Notify that an external HID output report was sent to the Legion controller.
@@ -2041,6 +2062,32 @@ namespace XboxGamingBarHelper.Labs
             return ok;
         }
 
+        /// <summary>
+        /// Set the controllers' auto-sleep (idle power-off) time. minutes==0 requests "never".
+        /// Protocol (RE doc legion_go_hid_protocol_complete): SET = 05 00 04 09 [min] 01, where
+        /// [min] is the timeout as a raw byte (0x05=5, 0x0A=10, 0x0F=15, 0x14=20, 0x1E=30).
+        /// Global command (not per-controller). Verified accepted (ok=True) on Legion Go 2.
+        /// </summary>
+        public bool SetAutoSleepTime(int minutes)
+        {
+            var handle = hidHandle;
+            if (handle == null || handle.IsInvalid)
+            {
+                Logger.Warn("SetAutoSleepTime: no open HID handle");
+                return false;
+            }
+            if (minutes < 0) minutes = 0;
+            if (minutes > 255) minutes = 255;
+            byte min = (byte)minutes;
+
+            lock (_hidLock)
+            {
+                bool ok = SendOutputReport(handle, new byte[] { 0x05, 0x00, 0x04, 0x09, min, 0x01 }, $"auto-sleep set {minutes}min");
+                Logger.Info($"LegionButtonMonitor.SetAutoSleepTime minutes={minutes} ok={ok}");
+                return ok;
+            }
+        }
+
         private void DisableHighQualityGyroReports(SafeFileHandle handle)
         {
             if (handle == null || handle.IsInvalid || !_hasWriteAccess || !IsTabletControllerDevice())
@@ -2054,6 +2101,40 @@ namespace XboxGamingBarHelper.Labs
             SendOutputReport(handle, leftDisableHighQuality, "left gyro high-quality disable");
             SendOutputReport(handle, rightDisableHighQuality, "right gyro high-quality disable");
             _highQualityGyroConfigured = false;
+        }
+
+        /// <summary>
+        /// Parse a b0:01 device-status report (header 04:00:B0) and raise DeviceStatusUpdated.
+        /// Byte layout verified from live capture 2026-05-29 on the button-monitor stream — note
+        /// this differs from LegionGoController.TryParseDeviceStatus (which reads mode at byte 12;
+        /// on this stream byte 12 is always 0 and the real mode is byte 6):
+        ///   [6]=mode (1=Solid,2=Pulse,3=Dynamic,4=Spiral; 0/0xFF=off),
+        ///   [8..10]=R,G,B, [11]=brightness%, [13]=speed-raw, [15]=vibration, [18]=touchpad,
+        ///   [21,22]=L/R battery, [28..31]=firmware.
+        /// </summary>
+        private void RaiseDeviceStatus(byte[] buffer)
+        {
+            var handler = DeviceStatusUpdated;
+            if (handler == null) return;
+            try
+            {
+                var copy = new byte[Math.Min(buffer.Length, 64)];
+                Array.Copy(buffer, copy, copy.Length);
+
+                var status = Devices.Libraries.Legion.LegionGoController.TryParseDeviceStatus(copy);
+                if (status == null) return;
+
+                // Byte 6 is the dedicated on/off flag (0x01=on, 0x02=off), independent of the
+                // animation mode at byte 12. Verified via live capture 2026-05-29 — the canonical
+                // parser's mode!=0xFF heuristic can't tell Off from Solid here (both leave byte 12
+                // at 0x00), so set the explicit flag.
+                if (copy.Length > 6) status.LightOnFlag = copy[6] == 0x01;
+                handler(this, status);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"RaiseDeviceStatus threw: {ex.Message}");
+            }
         }
 
         private bool SendOutputReport(SafeFileHandle handle, byte[] commandPrefix, string commandName)
@@ -2518,6 +2599,27 @@ namespace XboxGamingBarHelper.Labs
                                 _hidReportRateCount = 0;
                                 _hidReportRateLastEmitTicks = _rateNow;
                                 _hidReportHeaderCounts.Clear();
+                            }
+
+                            // Light/status report (b0:01 response, header 04:00:B0) arrives on
+                            // this handle. Request it periodically and parse the light state so
+                            // the Controller Info card reflects true hardware even when this
+                            // monitor (not LegionControllerService) owns the device.
+                            {
+                                long _now = DateTime.UtcNow.Ticks;
+                                if (_now - _statusReqLastTicks >= StatusReqIntervalTicks)
+                                {
+                                    _statusReqLastTicks = _now;
+                                    var h = hidHandle;
+                                    if (h != null && !h.IsInvalid)
+                                    {
+                                        SendOutputReport(h, new byte[] { 0x05, 0x00, 0xB0, 0x01, 0x00 }, "b0:01 status req");
+                                    }
+                                }
+                                if (bytesRead >= 32 && buffer[0] == 0x04 && buffer[1] == 0x00 && buffer[2] == 0xB0)
+                                {
+                                    RaiseDeviceStatus(buffer);
+                                }
                             }
 
                             // Note: Scroll wheel reports (0x07) are now handled by the dedicated ScrollWheelThreadProc
@@ -3041,6 +3143,99 @@ namespace XboxGamingBarHelper.Labs
             // CE forwarders are waiting only one wakes per HID report — fine,
             // they both share the cache and either can advance the pipeline.
             _newSampleEvent.Set();
+
+            // Emit button press-edge events (outside the sample lock so handlers can't
+            // stall the parse path). Only when a fresh gamepad sample was parsed.
+            if (hasGamepadSample)
+            {
+                DetectButtonEdges(gamepadSample);
+            }
+        }
+
+        /// <summary>
+        /// Diff the current gamepad sample against the previous one and raise a
+        /// <see cref="ButtonEdge"/> event for every button that changed state. Runs on the
+        /// HID poll thread; handlers must be fast. Triggers are edge-detected against a
+        /// digital threshold so a full pull fires exactly one press event.
+        /// </summary>
+        private static void DetectButtonEdges(LegionGamepadSample sample)
+        {
+            var handler = ButtonEdge;
+
+            ushort buttons = sample.Buttons;
+            ushort aux = sample.AuxButtons;
+            bool lt = sample.LeftTrigger >= EdgeTriggerThreshold;
+            bool rt = sample.RightTrigger >= EdgeTriggerThreshold;
+
+            if (!_hasPrevEdgeState)
+            {
+                // First sample: seed state without emitting (avoid a burst of phantom
+                // presses for whatever happens to be held at startup).
+                _prevEdgeButtons = buttons;
+                _prevEdgeAux = aux;
+                _prevEdgeLeftTrigger = lt;
+                _prevEdgeRightTrigger = rt;
+                _hasPrevEdgeState = true;
+                return;
+            }
+
+            if (handler != null)
+            {
+                ushort bChanged = (ushort)(buttons ^ _prevEdgeButtons);
+                if (bChanged != 0)
+                {
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_A, LegionInputButton.A);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_B, LegionInputButton.B);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_X, LegionInputButton.X);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_Y, LegionInputButton.Y);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_DPAD_UP, LegionInputButton.DpadUp);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_DPAD_DOWN, LegionInputButton.DpadDown);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_DPAD_LEFT, LegionInputButton.DpadLeft);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_DPAD_RIGHT, LegionInputButton.DpadRight);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_START, LegionInputButton.Start);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_BACK, LegionInputButton.Back);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_LEFT_THUMB, LegionInputButton.LeftThumb);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_RIGHT_THUMB, LegionInputButton.RightThumb);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_LEFT_SHOULDER, LegionInputButton.LeftShoulder);
+                    EmitEdge(handler, bChanged, buttons, XINPUT_GAMEPAD_RIGHT_SHOULDER, LegionInputButton.RightShoulder);
+                }
+
+                ushort aChanged = (ushort)(aux ^ _prevEdgeAux);
+                if (aChanged != 0)
+                {
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_MODE, LegionInputButton.Mode);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_SHARE, LegionInputButton.Share);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_L1, LegionInputButton.ExtraL1);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_L2, LegionInputButton.ExtraL2);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_R1, LegionInputButton.ExtraR1);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_RM1, LegionInputButton.ExtraRM1);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_R2, LegionInputButton.ExtraR2);
+                    EmitEdge(handler, aChanged, aux, LEGION_AUX_EXTRA_R3, LegionInputButton.ExtraR3);
+                }
+
+                if (lt != _prevEdgeLeftTrigger)
+                {
+                    handler(null, new LegionButtonEdgeEventArgs(LegionInputButton.LeftTrigger, LegionButtonGroup.Trigger, lt));
+                }
+                if (rt != _prevEdgeRightTrigger)
+                {
+                    handler(null, new LegionButtonEdgeEventArgs(LegionInputButton.RightTrigger, LegionButtonGroup.Trigger, rt));
+                }
+            }
+
+            _prevEdgeButtons = buttons;
+            _prevEdgeAux = aux;
+            _prevEdgeLeftTrigger = lt;
+            _prevEdgeRightTrigger = rt;
+        }
+
+        private static void EmitEdge(EventHandler<LegionButtonEdgeEventArgs> handler,
+                                     ushort changedMask, ushort currentMask,
+                                     ushort bit, LegionInputButton button)
+        {
+            if ((changedMask & bit) == 0) return;
+            bool pressed = (currentMask & bit) != 0;
+            handler(null, new LegionButtonEdgeEventArgs(button, LegionButtonClassifier.GroupOf(button), pressed));
         }
 
         private static bool TryParseGamepadSample(
@@ -3458,6 +3653,7 @@ namespace XboxGamingBarHelper.Labs
             RightConnected = rightConnected;
         }
     }
+
 
     /// <summary>
     /// Latest parsed Legion controller IMU sample from HID reports.
