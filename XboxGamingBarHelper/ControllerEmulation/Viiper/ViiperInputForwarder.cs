@@ -177,8 +177,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         // (16384 counts/g). Scale accel up by this factor so the gravity vector reaches full
         // strength for Steam's gyro sensor fusion. See BuildSteamDeckInput for the derivation.
         private const int SteamDeckAccelScale = 4;
-        // TEMP DIAG (SteamDeck gyro verify): throttle for post-scale wire IMU logging.
-        private int _sdImuDiagLastMs;
         [System.Runtime.InteropServices.DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
         private static extern uint NativeTimeBeginPeriod(uint uMilliseconds);
         [System.Runtime.InteropServices.DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
@@ -312,15 +310,12 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             bool changed = false;
             if (steamDeckMotorLeft != 0 && now >= steamDeckMotorLeftExpiresTicks)
             {
-                // TEMP DIAG (haptic skip): how long the left motor actually ran before decay.
-                Logger.Info($"SDDECAY side=L str={steamDeckMotorLeft} lateMs={((now - steamDeckMotorLeftExpiresTicks)/(double)TimeSpan.TicksPerMillisecond):F1}");
                 steamDeckMotorLeft = 0;
                 steamDeckMotorLeftExpiresTicks = 0;
                 changed = true;
             }
             if (steamDeckMotorRight != 0 && now >= steamDeckMotorRightExpiresTicks)
             {
-                Logger.Info($"SDDECAY side=R str={steamDeckMotorRight} lateMs={((now - steamDeckMotorRightExpiresTicks)/(double)TimeSpan.TicksPerMillisecond):F1}");
                 steamDeckMotorRight = 0;
                 steamDeckMotorRightExpiresTicks = 0;
                 changed = true;
@@ -592,11 +587,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                         else if (side == 1) { steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
                         else                { steamDeckMotorLeft  = strength; steamDeckMotorLeftExpiresTicks  = stopTicks;
                                               steamDeckMotorRight = strength; steamDeckMotorRightExpiresTicks = stopTicks; }
-                        // TEMP DIAG (haptic skip): every 0x8F decode. side, raw pulse params,
-                        // computed strength, and play-window ms. A "skipped" buzz should show
-                        // as strength=0 or a sub-poll-tick (<8ms) play window that decays
-                        // before the LRA spins up.
-                        Logger.Info($"SDHAP side={side} dur={duration} int={interval} cnt={count} gain={gainDb} -> str={strength} playMs={(totalPlayUs/1000.0):F1}");
                     }
                     else if (data.Length >= 9 && data[0] == 0xEB)
                     {
@@ -734,10 +724,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                     RightMotorSpeed = (ushort)rightSpeed,
                 };
                 uint rc = ViiperXInput.SetState(physicalIndex, ref vib);
-                // TEMP DIAG (haptic skip): every emit to the physical motors. If a 0x8F
-                // decoded to str>0 but this shows L=0/R=0 (or a non-zero rc), the cycle was
-                // lost between decode and the motor.
-                Logger.Info($"SDEMIT L={leftSpeed} R={rightSpeed} rc={rc} (motorL={steamDeckMotorLeft} motorR={steamDeckMotorRight})");
                 if (rc == ViiperXInput.ErrorSuccess)
                 {
                     System.Threading.Interlocked.Increment(ref statsRumbleForwardedOk);
@@ -2698,16 +2684,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 WriteI16(data, 30, wGx);
                 WriteI16(data, 32, wGy);
                 WriteI16(data, 34, wGz);
-
-                // TEMP DIAG: post-scale wire IMU values (exactly what the SteamDeck report carries).
-                // At rest, sqrt(wAx^2 + wAy^2 + wAz^2) should be ~16000 (1g at the Deck's +/-2g
-                // scale), confirming the x4 accel fix. ~5 Hz.
-                int sdNow = Environment.TickCount;
-                if (sdNow - _sdImuDiagLastMs >= 200)
-                {
-                    _sdImuDiagLastMs = sdNow;
-                    Logger.Info($"SDIMU wire gyro=({wGx},{wGy},{wGz}) accel=({wAx},{wAy},{wAz})");
-                }
             }
 
             // Triggers — XInput is 0..255; the Steam Deck wire trigger field is a SIGNED
