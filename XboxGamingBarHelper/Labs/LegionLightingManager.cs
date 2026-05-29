@@ -176,7 +176,12 @@ namespace XboxGamingBarHelper.Labs
             if (IsPressDriven(mode)) EnsureEdgeHooked();
             else EnsureEdgeUnhooked();
             StartEffectThread();
-            lock (_stateLock) { _flashLevel = 0; _heldCount = 0; _releasedSinceFlash = false; }
+            // _releasedSinceFlash starts true: there's no pending flash to hand back to static on
+            // startup. Initializing it false made the effect loop's first idle tick immediately
+            // call ReleaseReactiveLighting -> RestoreLightSettings, which applied the helper's
+            // default mode=Solid/brightness=100 = a white 100% flash before the widget synced the
+            // user's real values (#81 brightness flash, confirmed via SDBright capture).
+            lock (_stateLock) { _flashLevel = 0; _heldCount = 0; _releasedSinceFlash = true; }
         }
 
         // Press-driven: flash level set on button edges and decays. Continuous: color computed

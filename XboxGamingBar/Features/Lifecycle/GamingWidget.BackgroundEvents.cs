@@ -43,6 +43,13 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        // Debounce for the heavy LeavingBackground sync. Game Bar can flip the overlay's display
+        // mode (PinnedOnly <-> Foreground) ~10x in 30s while the widget tab isn't even visible
+        // (issue #81, IPHANT0MI). Each Foreground transition was running a full 266-property
+        // sync + profile reload that re-applies TDP, flashing the Syncing banner and churning TDP
+        // on desktop. Coalesce rapid cycles so we sync at most once per this window.
+        private DateTime _lastLeavingBackgroundSyncUtc = DateTime.MinValue;
+        private const int LeavingBackgroundSyncDebounceMs = 2000;
 
         public async Task GamingWidget_LeavingBackground(object sender, LeavingBackgroundEventArgs e)
         {
@@ -53,8 +60,18 @@ namespace XboxGamingBar
                 await widget.CenterWindowAsync();
             }
 
-            if (App.IsConnected)
+            // Visibility gate + debounce: skip the expensive sync + profile/TDP reapply when this
+            // transition isn't a real user-facing open. Game Bar flips the overlay display mode
+            // rapidly while the widget tab is hidden (issue #81); doing a full sync + LoadProfileSettings
+            // (which re-applies TDP) on each of those is the churn the user saw on desktop. Only the
+            // foreground signal update at the end of this method still runs in the skipped case.
+            bool widgetVisible = widget?.Visible ?? false;
+            double sinceLastSyncMs = (DateTime.UtcNow - _lastLeavingBackgroundSyncUtc).TotalMilliseconds;
+            bool debounced = sinceLastSyncMs < LeavingBackgroundSyncDebounceMs;
+
+            if (App.IsConnected && widgetVisible && !debounced)
             {
+                _lastLeavingBackgroundSyncUtc = DateTime.UtcNow;
                 Logger.Info("GamingWidget LeavingBackground, syncing UI properties with helper.");
 
                 // Show syncing banner while attempting sync (handles stale connections after sleep)
@@ -152,7 +169,8 @@ namespace XboxGamingBar
             }
             else
             {
-                Logger.Info("GamingWidget LeavingBackground but not connected to the full trust process.");
+                // Explain why the heavy sync was skipped (helps triage future churn reports).
+                Logger.Info($"GamingWidget LeavingBackground: skipped sync (connected={App.IsConnected}, widgetVisible={widgetVisible}, debounced={debounced}, sinceLastSyncMs={sinceLastSyncMs:F0}).");
             }
 
             appIsInBackground = false;

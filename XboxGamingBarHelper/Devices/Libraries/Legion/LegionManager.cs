@@ -1097,6 +1097,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 lightColor = propertyColor;
             }
 
+            // If the widget hasn't synced yet but the b0:01 readback knows the true hardware
+            // brightness/color, prefer those over the stale defaults (mode=Solid/100/#FFFFFF) so a
+            // restore can't flash full-brightness white before sync (#81 brightness flash).
+            if (_hasHwLightState)
+            {
+                if (lightBrightness == 100 && _hwLightBrightness != 100) lightBrightness = _hwLightBrightness;
+                if (lightColor == "#FFFFFF")
+                {
+                    lightColor = $"#{_hwLightColorR:X2}{_hwLightColorG:X2}{_hwLightColorB:X2}";
+                }
+            }
+
             Logger.Info($"Restoring light settings: mode={lightMode}, color={lightColor}, brightness={lightBrightness}");
             SetLightMode(lightMode);
         }
