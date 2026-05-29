@@ -5,12 +5,14 @@ namespace XboxGamingBarHelper.Settings
 {
     /// <summary>
     /// Sub-device PID selector used when the VIIPER device type is set to a Steam controller.
-    /// Valid values: "generic", "steam-deck", "legion-go", "legion-go-s", "legion-go-2",
-    /// "rog-ally", "msi-claw", "zotac-zone".
+    /// Valid values: "steam-deck", "legion-go", "legion-go-s", "legion-go-2",
+    /// "rog-ally", "msi-claw", "zotac-zone", "gordon". ("generic" is still accepted by
+    /// TryGetSteamVidPid for compatibility but is no longer offered in the UI — it lacks
+    /// Steam Input gyro support.)
     /// </summary>
     internal class ViiperSteamSubDeviceProperty : HelperProperty<string, SettingsManager>
     {
-        public const string Default = "legion-go";
+        public const string Default = "steam-deck";
         private const string SettingsKey = "ViiperSteamSubDevice";
 
         public ViiperSteamSubDeviceProperty(SettingsManager inManager)
@@ -23,6 +25,13 @@ namespace XboxGamingBarHelper.Settings
         {
             if (LocalSettingsHelper.TryGetValue<string>(SettingsKey, out var value) && !string.IsNullOrEmpty(value))
             {
+                // The "generic" Steam PID (0x12F0) does not expose gyro sliders in Steam Input,
+                // so it was removed from the UI in favor of the Steam Deck preset. Migrate any
+                // previously-saved "generic" value so existing users land on a gyro-capable PID.
+                if (value == "generic")
+                {
+                    return Default;
+                }
                 return value;
             }
             return Default;

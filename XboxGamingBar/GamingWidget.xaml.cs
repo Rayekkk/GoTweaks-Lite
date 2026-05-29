@@ -1676,7 +1676,7 @@ namespace XboxGamingBar
             viiperDeviceType = new ViiperStringComboProperty("xbox360", Shared.Enums.Function.Viiper_DeviceType, ViiperDeviceTypeComboBox, this);
             viiperInputSource = new ViiperStringComboProperty("XInput", Shared.Enums.Function.Viiper_InputSource, ViiperInputSourceComboBox, this);
             viiperGyroSource = new ViiperStringComboProperty("Left", Shared.Enums.Function.Viiper_GyroSource, ViiperGyroSourceComboBox, this);
-            viiperSteamSubDevice = new ViiperStringComboProperty("legion-go", Shared.Enums.Function.Viiper_SteamSubDevice, ViiperSteamSubDeviceComboBox, this);
+            viiperSteamSubDevice = new ViiperStringComboProperty("steam-deck", Shared.Enums.Function.Viiper_SteamSubDevice, ViiperSteamSubDeviceComboBox, this);
             viiperSonySubDevice = new ViiperStringComboProperty("dualsense-edge", Shared.Enums.Function.Viiper_SonySubDevice, ViiperSonySubDeviceComboBox, this);
             viiperNintendoSubDevice = new ViiperStringComboProperty("switchpro", Shared.Enums.Function.Viiper_NintendoSubDevice, ViiperNintendoSubDeviceComboBox, this);
             viiperGuideButtonMode = new ViiperStringComboProperty("Native", Shared.Enums.Function.Viiper_GuideButtonMode, ViiperGuideButtonModeComboBox, this);

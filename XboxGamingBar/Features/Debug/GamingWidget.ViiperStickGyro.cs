@@ -881,13 +881,14 @@ namespace XboxGamingBar
                     ViiperStickGyroSection.Visibility = applicable ? Visibility.Visible : Visibility.Collapsed;
                 }
 
-                // IMU axis mapping is the inverse case — only relevant for
-                // native-motion target types where games read the emulated
-                // device's IMU channels directly. Hidden for the stick-gyro
-                // targets where the channel-mapping does nothing.
+                // IMU axis mapping is now always hidden. The correct per-target gyro/accel
+                // frame is hardcoded in the helper's wire builders (SteamDeck + all Sony
+                // targets verified against live capture 2026-05-28), so exposing a manual
+                // axis remap only invites confusion / misconfiguration. Kept Collapsed
+                // regardless of target.
                 if (ViiperGyroAxisMappingSection != null)
                 {
-                    ViiperGyroAxisMappingSection.Visibility = applicable ? Visibility.Collapsed : Visibility.Visible;
+                    ViiperGyroAxisMappingSection.Visibility = Visibility.Collapsed;
                 }
 
                 if (applicable)

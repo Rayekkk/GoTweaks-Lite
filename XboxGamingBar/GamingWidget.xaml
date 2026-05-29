@@ -4758,7 +4758,6 @@
                                         <StackPanel x:Name="ViiperSteamSubDevicePanel" Visibility="Collapsed" Margin="0,12,0,0">
                                             <TextBlock Text="Steam sub-device" FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="ViiperSteamSubDeviceComboBox" HorizontalAlignment="Stretch">
-                                                <ComboBoxItem Content="Generic" Tag="generic"/>
                                                 <ComboBoxItem Content="Steam Deck" Tag="steam-deck"/>
                                                 <ComboBoxItem Content="Legion Go" Tag="legion-go"/>
                                                 <ComboBoxItem Content="Legion Go S" Tag="legion-go-s"/>
