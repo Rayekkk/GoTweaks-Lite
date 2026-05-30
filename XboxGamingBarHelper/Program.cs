@@ -1305,6 +1305,13 @@ namespace XboxGamingBarHelper
                     if (sidebarManager?.IsVisibleCached == true) return true;
                     if (autoTDPManager?.Enabled?.Value == true) return true;
                     if (legionManager?.IsFanCurveVisible == true) return true;
+                    // EC fan override loop reads CPUTemperature every tick to drive 0xC6C8. If
+                    // the sensor walk is gated off when no one else needs sensors, the cached
+                    // temperature stays at the last reading (e.g. 68°C from gameplay) while the
+                    // device idles or sleeps, and the loop keeps writing the matching high-RPM
+                    // target until something else wakes the sensor walk up. Treating the EC
+                    // override as a metrics consumer keeps the temperature fresh. (#88 kayti.)
+                    if (legionManager?.IsEcFanOverrideActive == true) return true;
                     var runningGameProp = systemManager?.RunningGame;
                     if (runningGameProp != null && runningGameProp.Value.GameId.IsValid()) return true;
                 }
