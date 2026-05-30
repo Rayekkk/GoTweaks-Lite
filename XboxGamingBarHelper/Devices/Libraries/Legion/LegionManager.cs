@@ -1634,15 +1634,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 // Set cooldown to prevent RefreshTDPValuesFromDevice from overwriting these values
                 lastTdpSetTime = DateTime.Now;
 
-                // Sync the Legion Custom TDP sliders to match the applied values
-                // This ensures the Legion tab sliders reflect what was set (especially when using main TDP slider)
+                // Keep the helper's internal cache in sync with the applied values, but no longer
+                // SyncToRemote — the Legion-tab Slow/Fast/Peak sliders were removed in the per-
+                // profile TDP Boost refactor, so the widget has no handler for these property
+                // pushes and just logs "Property LegionCustomTDP... not found for pipe message"
+                // 60+ times per minute. The helper still uses the cached fields internally for
+                // WMI bookkeeping / OSD current-TDP display.
                 LegionCustomTDPSlow.SetValueSilent(slow);
-                LegionCustomTDPSlow.SyncToRemote();
                 LegionCustomTDPFast.SetValueSilent(fast);
-                LegionCustomTDPFast.SyncToRemote();
                 LegionCustomTDPPeak.SetValueSilent(peak);
-                LegionCustomTDPPeak.SyncToRemote();
-                Logger.Info($"Synced Legion Custom TDP sliders: Slow={slow}W, Fast={fast}W, Peak={peak}W");
+                Logger.Info($"Synced Legion Custom TDP cache (internal): Slow={slow}W, Fast={fast}W, Peak={peak}W");
             }
             catch (Exception ex)
             {
@@ -3141,12 +3142,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
             try
             {
+                // Skip SyncToRemote — the Legion-tab SPL/SPPL/FPPT sliders were removed in the
+                // per-profile TDP Boost refactor, so pushing these properties produces only
+                // "Property LegionCustomTDP... not found for pipe message" widget warns.
+                // The helper cache (customTDPSlow / Fast / Peak fields) is still updated for
+                // internal bookkeeping and OSD display via CurrentTDP.
                 var slowResult = wmiService.GetCPUShortTermPowerLimit();
                 if (slowResult.Success && slowResult.Result.HasValue && slowResult.Result.Value != customTDPSlow)
                 {
                     customTDPSlow = slowResult.Result.Value;
                     LegionCustomTDPSlow.SetValueSilent(customTDPSlow);
-                    LegionCustomTDPSlow.SyncToRemote();
                     Logger.Debug($"Refreshed Slow TDP (SPL): {customTDPSlow}W");
                 }
 
@@ -3155,7 +3160,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPFast = fastResult.Result.Value;
                     LegionCustomTDPFast.SetValueSilent(customTDPFast);
-                    LegionCustomTDPFast.SyncToRemote();
                     Logger.Debug($"Refreshed Fast TDP (SPPL): {customTDPFast}W");
                 }
 
@@ -3164,7 +3168,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPPeak = peakResult.Result.Value;
                     LegionCustomTDPPeak.SetValueSilent(customTDPPeak);
-                    LegionCustomTDPPeak.SyncToRemote();
                     Logger.Debug($"Refreshed Peak TDP (FPPT): {customTDPPeak}W");
                 }
             }
