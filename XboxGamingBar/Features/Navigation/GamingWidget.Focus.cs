@@ -340,13 +340,7 @@ namespace XboxGamingBar
             LegionPerformanceModeComboBox.GotFocus += Control_GotFocus;
             LegionPerformanceModeComboBox.LostFocus += Control_LostFocus;
 
-            // Legion tab - Custom TDP card
-            LegionCustomTDPSlowSlider.GotFocus += Control_GotFocus;
-            LegionCustomTDPSlowSlider.LostFocus += Control_LostFocus;
-            LegionCustomTDPFastSlider.GotFocus += Control_GotFocus;
-            LegionCustomTDPFastSlider.LostFocus += Control_LostFocus;
-            LegionCustomTDPPeakSlider.GotFocus += Control_GotFocus;
-            LegionCustomTDPPeakSlider.LostFocus += Control_LostFocus;
+            // Legion tab - Custom TDP card removed; SPL/SPPL/FPPT now live on Performance tab.
 
             // Legion tab - Fan Full Speed card
             LegionFanFullSpeedToggle.GotFocus += Control_GotFocus;

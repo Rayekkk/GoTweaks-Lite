@@ -83,6 +83,10 @@ namespace XboxGamingBar
         public int TDPModeIndex { get; set; } = -1;
         // TDP Boost toggle state (per-profile)
         public bool TDPBoostEnabled { get; set; } = false;
+        // TDP Boost deltas (per-profile): SPPL = TDP + TDPBoostSPPT, FPPT = TDP + TDPBoostFPPT.
+        // Replaces the previous global helper settings so each profile picks its own boost.
+        public int TDPBoostSPPT { get; set; } = 1;
+        public int TDPBoostFPPT { get; set; } = 3;
         // HDR and Resolution settings (per-profile)
         public bool HDREnabled { get; set; } = false;
         public string Resolution { get; set; } = "";
@@ -127,6 +131,8 @@ namespace XboxGamingBar
                 LegionPerformanceMode = this.LegionPerformanceMode,
                 TDPModeIndex = this.TDPModeIndex,
                 TDPBoostEnabled = this.TDPBoostEnabled,
+                TDPBoostSPPT = this.TDPBoostSPPT,
+                TDPBoostFPPT = this.TDPBoostFPPT,
                 HDREnabled = this.HDREnabled,
                 Resolution = this.Resolution,
                 RefreshRate = this.RefreshRate,
@@ -807,9 +813,9 @@ namespace XboxGamingBar
         private readonly LegionLightBrightnessProperty legionLightBrightness;
         private readonly LegionLightSpeedProperty legionLightSpeed;
         private readonly LegionPerformanceModeProperty legionPerformanceMode;
-        private readonly LegionCustomTDPSlowProperty legionCustomTDPSlow;
-        private readonly LegionCustomTDPFastProperty legionCustomTDPFast;
-        private readonly LegionCustomTDPPeakProperty legionCustomTDPPeak;
+        // Legion Custom SPL/SPPL/FPPT slider properties removed — TDP is now governed by the
+        // Performance-tab master TDP slider + per-profile TDP Boost deltas. Helper still tracks
+        // the hardware values internally for SetCustomTDP / WMI roundtrips.
         private readonly LegionFanFullSpeedProperty legionFanFullSpeed;
         private readonly LegionUnlockFanCurveProperty legionUnlockFanCurve;
         private readonly LegionFanCurveGraphProperty legionFanCurveGraph;
@@ -1495,9 +1501,6 @@ namespace XboxGamingBar
             legionLightBrightness = new LegionLightBrightnessProperty(LegionBrightnessSlider, this);
             legionLightSpeed = new LegionLightSpeedProperty(LegionSpeedSlider, this);
             legionPerformanceMode = new LegionPerformanceModeProperty(LegionPerformanceModeComboBox, this);
-            legionCustomTDPSlow = new LegionCustomTDPSlowProperty(LegionCustomTDPSlowSlider, this);
-            legionCustomTDPFast = new LegionCustomTDPFastProperty(LegionCustomTDPFastSlider, this);
-            legionCustomTDPPeak = new LegionCustomTDPPeakProperty(LegionCustomTDPPeakSlider, this);
             legionFanFullSpeed = new LegionFanFullSpeedProperty(LegionFanFullSpeedToggle, this);
             legionUnlockFanCurve = new LegionUnlockFanCurveProperty(LegionUnlockFanCurveToggle, this);
 
@@ -1900,9 +1903,6 @@ namespace XboxGamingBar
                 legionLightBrightness,
                 legionLightSpeed,
                 legionPerformanceMode,
-                legionCustomTDPSlow,
-                legionCustomTDPFast,
-                legionCustomTDPPeak,
                 legionFanFullSpeed,
                 legionUnlockFanCurve,
                 legionFanCurveGraph,

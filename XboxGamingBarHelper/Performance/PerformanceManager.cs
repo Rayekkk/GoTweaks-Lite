@@ -1341,31 +1341,6 @@ namespace XboxGamingBarHelper.Performance
                     fppt = tdp + fpptBoost;
                     Logger.Info($"TDP Boost enabled: SPL={spl}W, SPPT={sppt}W (+{spptBoost}), FPPT={fppt}W (+{fpptBoost})");
                 }
-                else if (legionDetected && (legionManager?.CurrentPerformanceMode ?? -1) == 255)
-                {
-                    // Custom mode + boost off: profile's single <TDP> value owns SPL only; SPPL and
-                    // FPPT come from the user's persisted LocalSettings (set when they moved those
-                    // sliders directly in Legion Custom). Without this, profile activation here
-                    // would write sppt = fppt = tdp, wiping the user's distinct SPPL/FPPT values
-                    // — which is exactly Rayekkk's "35/38/45 reverts to 35/15/15" symptom after a
-                    // global-profile restore on startup. #79.
-                    try
-                    {
-                        if (Settings.LocalSettingsHelper.TryGetValue<int>("LegionCustomTDPFast", out int persistedFast) && persistedFast > 0)
-                        {
-                            sppt = persistedFast;
-                        }
-                        if (Settings.LocalSettingsHelper.TryGetValue<int>("LegionCustomTDPPeak", out int persistedPeak) && persistedPeak > 0)
-                        {
-                            fppt = persistedPeak;
-                        }
-                        if (sppt != tdp || fppt != tdp)
-                        {
-                            Logger.Info($"Custom mode TDP overlay: SPL={spl}W (from profile), SPPL={sppt}W, FPPT={fppt}W (persisted from LocalSettings)");
-                        }
-                    }
-                    catch (Exception ex) { Logger.Debug($"Custom TDP overlay read failed: {ex.Message}"); }
-                }
 
                 // Note: CurrentSPL/SPPT/FPPT are now updated from actual hardware values
                 // in UpdateCurrentTDP, which is called via ScheduleVerificationRead after SetTDP

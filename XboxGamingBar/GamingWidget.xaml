@@ -1008,6 +1008,16 @@
                                                Foreground="#A0A0A0"
                                                HorizontalAlignment="Right"/>
                                 </Grid>
+                                <!-- TDP Boost Active Indicator (on main TDP card, visible regardless of TDP Extras expand state).
+                                     Text content is updated dynamically from the TDPBoostSPPT/FPPT slider value-changed
+                                     handlers; the +Xw / +Yw deltas match the per-profile values applied by the helper. -->
+                                <TextBlock x:Name="TDPBoostCardActiveText"
+                                           Text="TDP Boost active: Fast +1W, Peak +3W"
+                                           FontSize="13"
+                                           Foreground="#4CAF50"
+                                           FontWeight="SemiBold"
+                                           Margin="0,1,0,0"
+                                           Visibility="{Binding ElementName=TDPBoostToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                 <!-- Sticky TDP Active Indicator -->
                                 <TextBlock Text="Sticky TDP: Active"
                                            FontSize="13"
@@ -1064,12 +1074,59 @@
                                                       XYFocusUp="{x:Bind TDPExtrasExpandToggle}"
                                                       XYFocusDown="{x:Bind AutoTDPToggle}"/>
                                     </Grid>
-                                    <TextBlock Text="TDP Boost: Active"
-                                               FontSize="13"
-                                               Foreground="#4CAF50"
-                                               FontWeight="SemiBold"
-                                               Margin="0,-8,0,0"
-                                               Visibility="{Binding ElementName=TDPBoostToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    <!-- TDP Boost expanded panel: per-profile SPPT / FPPT deltas. Visible only
+                                         when the TDPBoostToggle is on. Replaces the global System-tab boost
+                                         sliders so each profile can configure its own boost aggressiveness. -->
+                                    <StackPanel x:Name="TDPBoostExpandedPanel"
+                                                Spacing="8"
+                                                Margin="0,-4,0,0"
+                                                Visibility="{Binding ElementName=TDPBoostToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <!-- Fast (SPPT) delta -->
+                                        <Grid Margin="0,4,0,0">
+                                            <TextBlock Text="Fast TDP boost"
+                                                       FontSize="13"
+                                                       Foreground="#FFFFFF"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TDPBoostSPPTValue"
+                                                       Text="+1W"
+                                                       FontSize="13"
+                                                       Foreground="#4CAF50"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <Slider x:Name="TDPBoostSPPTSlider"
+                                                Style="{StaticResource ModernSliderStyle}"
+                                                Minimum="0" Maximum="10"
+                                                TickFrequency="1"
+                                                SnapsTo="Ticks"
+                                                Value="1"
+                                                ValueChanged="TDPBoostSPPTSlider_ValueChanged"
+                                                XYFocusUp="{x:Bind TDPBoostToggle}"
+                                                XYFocusDown="{x:Bind TDPBoostFPPTSlider}"/>
+
+                                        <!-- Peak (FPPT) delta -->
+                                        <Grid Margin="0,4,0,0">
+                                            <TextBlock Text="Peak TDP boost"
+                                                       FontSize="13"
+                                                       Foreground="#FFFFFF"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TDPBoostFPPTValue"
+                                                       Text="+3W"
+                                                       FontSize="13"
+                                                       Foreground="#FF8A65"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <Slider x:Name="TDPBoostFPPTSlider"
+                                                Style="{StaticResource ModernSliderStyle}"
+                                                Minimum="0" Maximum="15"
+                                                TickFrequency="1"
+                                                SnapsTo="Ticks"
+                                                Value="3"
+                                                ValueChanged="TDPBoostFPPTSlider_ValueChanged"
+                                                XYFocusUp="{x:Bind TDPBoostSPPTSlider}"
+                                                XYFocusDown="{x:Bind AutoTDPToggle}"/>
+                                    </StackPanel>
 
                                     <!-- AutoTDP -->
                                     <Grid>
@@ -1816,6 +1873,11 @@
                                               Style="{StaticResource FocusableCheckBoxStyle}"
                                               Checked="ProfileSettingsCheckBox_Changed"
                                               Unchecked="ProfileSettingsCheckBox_Changed"/>
+                                    <TextBlock Text="Includes TDP Boost (on/off, Fast +W, Peak +W)"
+                                               FontSize="11"
+                                               Foreground="#888888"
+                                               Margin="28,2,0,0"
+                                               TextWrapping="Wrap"/>
                                     <CheckBox x:Name="ProfileSaveCPUBoostCheckBox"
                                               Content="CPU Boost"
                                               IsChecked="True"
@@ -2959,85 +3021,15 @@
                                             Value="35"
                                             ValueChanged="TDPLimitsMaxSlider_ValueChanged"
                                             XYFocusUp="{x:Bind TDPLimitsMinSlider}"
-                                            XYFocusDown="{x:Bind TDPBoostSPPTSlider}"
-                                            />
-
-                                    <!-- Separator -->
-                                    <Border Height="1" Background="#3A3A3A" Margin="0,16,0,16"/>
-
-                                    <!-- TDP Boost Settings Section -->
-                                    <TextBlock Text="TDP Boost Settings" FontSize="13" FontWeight="SemiBold" Foreground="#AAAAAA" Margin="0,0,0,8"/>
-
-                                    <!-- Info -->
-                                    <Border Background="#1A2A3D" CornerRadius="4" Padding="10" Margin="0,0,0,12">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="&#xE946;"
-                                                       Grid.Column="0"
-                                                       FontFamily="Segoe MDL2 Assets"
-                                                       FontSize="16"
-                                                       Foreground="#4CAF50"
-                                                       VerticalAlignment="Top"
-                                                       Margin="0,2,8,0"/>
-                                            <TextBlock Grid.Column="1"
-                                                       Text="When TDP Boost is enabled, SPPT and FPPT will be set to TDP + boost value for short bursts of higher power."
-                                                       Foreground="#A0D4A0"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- SPPT Boost -->
-                                    <Grid Margin="0,0,0,8">
-                                        <TextBlock Text="SPPT Boost"
-                                                   FontSize="14"
-                                                   Foreground="#FFFFFF"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TDPBoostSPPTValue"
-                                                   Text="1W"
-                                                   FontSize="14"
-                                                   Foreground="#4CAF50"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
-                                    <Slider x:Name="TDPBoostSPPTSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="10"
-                                            TickFrequency="1"
-                                            SnapsTo="Ticks"
-                                            ValueChanged="TDPBoostSPPTSlider_ValueChanged"
-                                            XYFocusUp="{x:Bind TDPLimitsMaxSlider}"
-                                            XYFocusDown="{x:Bind TDPBoostFPPTSlider}"
-                                            />
-
-                                    <!-- FPPT Boost -->
-                                    <Grid Margin="0,12,0,8">
-                                        <TextBlock Text="FPPT Boost"
-                                                   FontSize="14"
-                                                   Foreground="#FFFFFF"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TDPBoostFPPTValue"
-                                                   Text="3W"
-                                                   FontSize="14"
-                                                   Foreground="#4CAF50"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
-                                    <Slider x:Name="TDPBoostFPPTSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="0" Maximum="15"
-                                            TickFrequency="1"
-                                            SnapsTo="Ticks"
-                                            ValueChanged="TDPBoostFPPTSlider_ValueChanged"
-                                            XYFocusUp="{x:Bind TDPBoostSPPTSlider}"
                                             XYFocusDown="{x:Bind UseCustomTDPPresetsToggle}"
                                             />
 
                                     <!-- Separator -->
                                     <Border Height="1" Background="#3A3A3A" Margin="0,16,0,16"/>
+
+                                    <!-- TDP Boost SPPT/FPPT settings moved to Performance tab, inline under the
+                                         TDP Boost toggle — they're now per-profile (GameProfile.TDPBoostSPPT /
+                                         TDPBoostFPPT) so each game/profile picks its own boost aggressiveness. -->
 
                                     <!-- Custom TDP Presets Section -->
                                     <TextBlock Text="Custom TDP Presets" FontSize="13" FontWeight="SemiBold" Foreground="#AAAAAA" Margin="0,0,0,8"/>
@@ -8731,7 +8723,7 @@
                                           Style="{StaticResource ModernComboBoxStyle}"
                                           SelectedIndex="1"
                                           SelectionChanged="LegionPerformanceModeComboBox_SelectionChanged"
-                                          XYFocusDown="{x:Bind LegionCustomTDPSlowSlider}">
+                                          XYFocusDown="{x:Bind LegionFanFullSpeedToggle}">
                                     <ComboBoxItem Content="Quiet" Tag="1"/>
                                     <ComboBoxItem Content="Balanced" Tag="2"/>
                                     <ComboBoxItem Content="Performance" Tag="3"/>
@@ -8740,86 +8732,9 @@
                             </Grid>
                         </Border>
 
-                        <!-- Custom TDP Cards (visible when Custom mode selected) -->
-                        <StackPanel x:Name="LegionCustomTDPCard" Visibility="Collapsed">
-                            <!-- Slow TDP (SPL) Card -->
-                            <Border x:Name="LegionCustomTDPSlowCard" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="Slow TDP (SPL)"
-                                                   Style="{StaticResource CardTitleStyle}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="LegionCustomTDPSlowValue"
-                                                   Text="15W"
-                                                   FontSize="14"
-                                                   Foreground="#4CAF50"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="LegionCustomTDPSlowSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="5" Maximum="45"
-                                            Value="15"
-                                            Margin="0,4,0,0"
-                                            ValueChanged="LegionCustomTDPSlider_ValueChanged"
-                                            XYFocusUp="{x:Bind LegionPerformanceModeComboBox}"
-                                            XYFocusDown="{x:Bind LegionCustomTDPFastSlider}"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Fast TDP (SPPL) Card -->
-                            <Border x:Name="LegionCustomTDPFastCard" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="Fast TDP (SPPL)"
-                                                   Style="{StaticResource CardTitleStyle}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="LegionCustomTDPFastValue"
-                                                   Text="25W"
-                                                   FontSize="14"
-                                                   Foreground="#FFA500"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="LegionCustomTDPFastSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="5" Maximum="55"
-                                            Value="25"
-                                            Margin="0,4,0,0"
-                                            ValueChanged="LegionCustomTDPSlider_ValueChanged"
-                                            XYFocusUp="{x:Bind LegionCustomTDPSlowSlider}"
-                                            XYFocusDown="{x:Bind LegionCustomTDPPeakSlider}"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Peak TDP (FPPT) Card -->
-                            <Border x:Name="LegionCustomTDPPeakCard" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <Grid>
-                                        <TextBlock Text="Peak TDP (FPPT)"
-                                                   Style="{StaticResource CardTitleStyle}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="LegionCustomTDPPeakValue"
-                                                   Text="35W"
-                                                   FontSize="14"
-                                                   Foreground="#FF6B6B"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Slider x:Name="LegionCustomTDPPeakSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="5" Maximum="65"
-                                            Value="35"
-                                            Margin="0,4,0,0"
-                                            ValueChanged="LegionCustomTDPSlider_ValueChanged"
-                                            XYFocusUp="{x:Bind LegionCustomTDPFastSlider}"
-                                            XYFocusDown="{x:Bind LegionFanFullSpeedToggle}"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <!-- The Legion-tab Custom SPL / SPPL / FPPT sliders were removed in favor of the
+                             Performance tab's master TDP slider + per-profile TDP Boost deltas (Fast/Peak +W
+                             inline under the TDP Boost toggle). One source of truth, no two-sliders-fight. -->
 
                         <!-- Fan Full Speed Card -->
                         <Border Style="{StaticResource CardStyle}">

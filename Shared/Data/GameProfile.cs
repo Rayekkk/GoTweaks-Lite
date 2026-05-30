@@ -144,6 +144,46 @@ namespace Shared.Data
             }
         }
 
+        // TDP Boost deltas (per profile). When TDPBoostEnabled is on, the helper applies
+        // SPPL = TDP + tdpBoostSPPT and FPPT = TDP + tdpBoostFPPT in PerformanceManager.SetTDP.
+        // Replaces the previous global helper settings so each profile can configure how aggressive
+        // its boost is — and removes the Legion-tab Custom SPPL/FPPT sliders that previously
+        // fought with the boost path.
+        //
+        // GameProfile is a struct so field initializers aren't supported on C# 7.3; the getter
+        // returns the legacy defaults (1 / 3) when the backing field is 0 (also the value old
+        // profiles will deserialize to since they have no TDPBoostSPPT/FPPT XML element). A delta
+        // of 0 is meaningless (no boost) so this overload is safe.
+        [XmlElement("TDPBoostSPPT")]
+        private int tdpBoostSPPT;
+        public int TDPBoostSPPT
+        {
+            get { return tdpBoostSPPT > 0 ? tdpBoostSPPT : 1; }
+            set
+            {
+                if (tdpBoostSPPT != value)
+                {
+                    tdpBoostSPPT = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("TDPBoostFPPT")]
+        private int tdpBoostFPPT;
+        public int TDPBoostFPPT
+        {
+            get { return tdpBoostFPPT > 0 ? tdpBoostFPPT : 3; }
+            set
+            {
+                if (tdpBoostFPPT != value)
+                {
+                    tdpBoostFPPT = value;
+                    Save();
+                }
+            }
+        }
+
         // ========== DC (Battery) Overrides ==========
         // When null, the AC value (above) is used. When set, overrides for DC power.
 
@@ -1167,6 +1207,8 @@ namespace Shared.Data
             maxCPUState = inMaxCPUState;
             minCPUState = inMinCPUState;
             tdpBoostEnabled = inTDPBoostEnabled;
+            tdpBoostSPPT = 0; // 0 = property getter returns legacy default 1
+            tdpBoostFPPT = 0; // 0 = property getter returns legacy default 3
             // DC overrides (null = use AC value)
             tdpDC = null;
             cpuBoostDC = null;

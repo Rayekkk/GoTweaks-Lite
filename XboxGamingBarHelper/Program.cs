@@ -980,6 +980,17 @@ namespace XboxGamingBarHelper
             Logger.Info($"GoTweaks Helper starting v{helperVersion} — writing initial heartbeat");
             WriteHeartbeat();
 
+            // One-time migration: clear the short-lived LegionCustomTDPFast/Peak keys shipped in
+            // 0.3.2426. They were replaced by per-profile TDP Boost deltas (TDPBoostSPPT /
+            // TDPBoostFPPT on each GameProfile), and the Legion-tab Custom SPL/SPPL/FPPT sliders
+            // were removed entirely. The Remove call is a no-op when the keys aren't present.
+            try
+            {
+                Settings.LocalSettingsHelper.Remove("LegionCustomTDPFast");
+                Settings.LocalSettingsHelper.Remove("LegionCustomTDPPeak");
+            }
+            catch (Exception migEx) { Logger.Debug($"LegionCustomTDP cleanup migration threw: {migEx.Message}"); }
+
             // START PIPE SERVER EARLY - Widget can connect while managers initialize
             // BatchGet requests will return "NotReady" until _managersReady is true
             var pipeTimer = System.Diagnostics.Stopwatch.StartNew();

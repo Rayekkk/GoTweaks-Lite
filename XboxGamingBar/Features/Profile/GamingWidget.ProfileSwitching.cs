@@ -271,10 +271,20 @@ namespace XboxGamingBar
             {
                 profile.OSPowerMode = OSPowerModeComboBox.SelectedIndex;
             }
-            // TDP Boost is always saved with TDP (they go together)
+            // TDP Boost is always saved with TDP (they go together). Per-profile boost deltas
+            // (SPPT / FPPT additions) replace the previous global helper settings — they live on
+            // the same profile object so each game's boost aggressiveness is independent.
             if (SaveTDP && TDPBoostToggle != null)
             {
                 profile.TDPBoostEnabled = TDPBoostToggle.IsOn;
+                if (TDPBoostSPPTSlider != null)
+                {
+                    profile.TDPBoostSPPT = (int)Math.Round(TDPBoostSPPTSlider.Value);
+                }
+                if (TDPBoostFPPTSlider != null)
+                {
+                    profile.TDPBoostFPPT = (int)Math.Round(TDPBoostFPPTSlider.Value);
+                }
             }
             // HDR
             if (SaveHDR)
@@ -398,6 +408,25 @@ namespace XboxGamingBar
                         }
                         Logger.Info($"TDP Boost loaded from profile: {profile.TDPBoostEnabled} (deferred={legionSwitchingToCustom})");
                     }
+                    // Load per-profile TDP Boost deltas (SPPT / FPPT additions). Replaces the
+                    // previous global helper settings, so each profile can pick its own boost
+                    // aggressiveness. isLoadingTDPBoostSettings guards the slider's
+                    // ValueChanged handler from re-saving the same value back to the profile.
+                    isLoadingTDPBoostSettings = true;
+                    try
+                    {
+                        if (TDPBoostSPPTSlider != null) TDPBoostSPPTSlider.Value = profile.TDPBoostSPPT;
+                        if (TDPBoostFPPTSlider != null) TDPBoostFPPTSlider.Value = profile.TDPBoostFPPT;
+                        if (TDPBoostSPPTValue != null) TDPBoostSPPTValue.Text = $"+{profile.TDPBoostSPPT}W";
+                        if (TDPBoostFPPTValue != null) TDPBoostFPPTValue.Text = $"+{profile.TDPBoostFPPT}W";
+                        UpdateTDPBoostCardActiveText();
+                        if (!legionSwitchingToCustom && !isApplyingHelperUpdate)
+                        {
+                            tdpBoostSPPT?.SetValue(profile.TDPBoostSPPT);
+                            tdpBoostFPPT?.SetValue(profile.TDPBoostFPPT);
+                        }
+                    }
+                    finally { isLoadingTDPBoostSettings = false; }
                 }
                 if (SaveCPUBoost)
                 {

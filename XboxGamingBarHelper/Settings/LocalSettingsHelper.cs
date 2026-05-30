@@ -304,5 +304,29 @@ namespace XboxGamingBarHelper.Settings
                 SaveFallback();
             }
         }
+
+        /// <summary>
+        /// Remove a key from both UWP LocalSettings (when available) and the JSON fallback.
+        /// Used by one-time migrations that delete obsolete keys (e.g. the short-lived
+        /// LegionCustomTDPFast/Peak persistence shipped in 0.3.2426 which was replaced by
+        /// per-profile TDP Boost deltas).
+        /// </summary>
+        public static void Remove(string key)
+        {
+            if (_useLocalSettings)
+            {
+                try
+                {
+                    var settings = ApplicationData.Current.LocalSettings;
+                    settings.Values.Remove(key);
+                }
+                catch { }
+            }
+
+            if (_fallbackSettings != null && _fallbackSettings.Remove(key))
+            {
+                SaveFallback();
+            }
+        }
     }
 }

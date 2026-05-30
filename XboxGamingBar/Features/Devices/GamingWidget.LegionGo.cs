@@ -1941,43 +1941,17 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Shows or hides the Custom TDP card based on performance mode
+        /// Kept for callers that still toggle Custom-mode UI visibility — the three Legion-tab
+        /// SPL/SPPL/FPPT cards have been removed (replaced by the Performance-tab master TDP slider
+        /// + per-profile TDP Boost deltas), so this is now just a focus-chain bookkeeping shim:
+        /// PerformanceMode dropdown navigates straight to the Fan controls in every mode.
         /// </summary>
         private void SetCustomTDPVisibility(bool visible)
         {
-            if (LegionCustomTDPCard != null)
+            if (LegionPerformanceModeComboBox != null && LegionFanFullSpeedToggle != null)
             {
-                LegionCustomTDPCard.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"Custom TDP card visibility set to: {visible}");
-            }
-
-            // Update XY focus navigation for controller navigation
-            // When Custom TDP card is hidden, focus should skip directly to fan controls
-            if (LegionPerformanceModeComboBox != null)
-            {
-                if (visible && LegionCustomTDPSlowSlider != null)
-                {
-                    LegionPerformanceModeComboBox.XYFocusDown = LegionCustomTDPSlowSlider;
-                }
-                else if (LegionFanFullSpeedToggle != null)
-                {
-                    LegionPerformanceModeComboBox.XYFocusDown = LegionFanFullSpeedToggle;
-                }
-            }
-
-            // Also update XYFocusUp on fan controls for navigation back up
-            if (LegionFanFullSpeedToggle != null)
-            {
-                if (visible && LegionCustomTDPPeakSlider != null)
-                {
-                    // When Custom TDP visible, navigate up to the last slider (Peak/Sustained)
-                    LegionFanFullSpeedToggle.XYFocusUp = LegionCustomTDPPeakSlider;
-                }
-                else if (LegionPerformanceModeComboBox != null)
-                {
-                    // When Custom TDP hidden, navigate up directly to performance mode dropdown
-                    LegionFanFullSpeedToggle.XYFocusUp = LegionPerformanceModeComboBox;
-                }
+                LegionPerformanceModeComboBox.XYFocusDown = LegionFanFullSpeedToggle;
+                LegionFanFullSpeedToggle.XYFocusUp = LegionPerformanceModeComboBox;
             }
 
             // Fan curve card stays fully interactive in every power mode now. Per-mode
@@ -2645,34 +2619,9 @@ namespace XboxGamingBar
             }
         }
 
-        /// <summary>
-        /// Handles Custom TDP slider changes and updates the value labels
-        /// Note: The actual value sync is handled by WidgetSliderProperty's built-in debounce
-        /// </summary>
-        private void LegionCustomTDPSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            try
-            {
-                // Update value labels immediately for visual feedback
-                if (LegionCustomTDPSlowSlider != null && LegionCustomTDPSlowValue != null)
-                {
-                    LegionCustomTDPSlowValue.Text = $"{(int)LegionCustomTDPSlowSlider.Value}W";
-                }
-                if (LegionCustomTDPFastSlider != null && LegionCustomTDPFastValue != null)
-                {
-                    LegionCustomTDPFastValue.Text = $"{(int)LegionCustomTDPFastSlider.Value}W";
-                }
-                if (LegionCustomTDPPeakSlider != null && LegionCustomTDPPeakValue != null)
-                {
-                    LegionCustomTDPPeakValue.Text = $"{(int)LegionCustomTDPPeakSlider.Value}W";
-                }
-                // The WidgetSliderProperty handles debouncing and sending to helper
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error in LegionCustomTDPSlider_ValueChanged: {ex.Message}");
-            }
-        }
+        // LegionCustomTDPSlider_ValueChanged removed — the Slow/Fast/Peak sliders no longer
+        // exist on the Legion tab. The Performance-tab master TDP slider + per-profile TDP
+        // Boost deltas own all three values now.
 
         /// <summary>
         /// Updates the TDP display text when slider value changes (Custom mode only)
