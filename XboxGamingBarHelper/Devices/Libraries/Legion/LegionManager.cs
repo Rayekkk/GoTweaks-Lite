@@ -631,6 +631,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 parallelTimer.Stop();
                 Logger.Info($"[TIMING] LegionManager.ReadPerformanceMode+TDP (parallel): {parallelTimer.ElapsedMilliseconds}ms");
 
+                // Overlay the user's persisted SPPL/FPPT (issue #79 — these aren't stored in WMI
+                // for Custom mode; without this the firmware's preset values come back and TDP
+                // Boost re-derives SPPL/FPPT from SPL on the first SetTDP, looking like a revert).
+                // No-op when mode != 255 or when there's nothing persisted.
+                RestorePersistedCustomTDP();
+
                 // Update properties with the values read from device
                 // Use silent update to avoid triggering WMI calls back
                 LegionPerformanceMode.SetValueSilent(performanceMode);
@@ -1536,6 +1542,15 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     // built-in fan curves that automatically take effect when SetSmartFanMode is called.
                     // Setting any fan curve here would override the hardware's preset behavior.
                     // The custom fan curve only applies when in Custom mode (255).
+
+                    // Just entered Custom mode — restore the user's persisted SPPL / FPPT so they
+                    // pick up where they left off (Lenovo's firmware Custom preset would otherwise
+                    // win, and TDP Boost would then re-derive SPPL/FPPT from SPL on the first
+                    // SetTDP, looking like a revert). #79 Rayekkk / kayti TDP-preset-trip symptom.
+                    if (mode == 255)
+                    {
+                        RestorePersistedCustomTDP();
+                    }
                 }
                 else
                 {
@@ -1797,6 +1812,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 return;
             }
 
+            AutoDisableTDPBoostForCustomTDPEdit("SPPL");
+
             try
             {
                 var result = wmiService.SetCPULongTermPowerLimit(fast);
@@ -1804,6 +1821,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPFast = fast;
                     Logger.Info($"Fast TDP (SPPL) set to {fast}W");
+                    if (performanceMode == 255)
+                    {
+                        try { Settings.LocalSettingsHelper.SetValue("LegionCustomTDPFast", fast); }
+                        catch (Exception persistEx) { Logger.Debug($"Could not persist LegionCustomTDPFast: {persistEx.Message}"); }
+                    }
                 }
                 else
                 {
@@ -1834,6 +1856,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 return;
             }
 
+            AutoDisableTDPBoostForCustomTDPEdit("FPPT");
+
             try
             {
                 var result = wmiService.SetCPUPeakPowerLimit(peak);
@@ -1841,6 +1865,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPPeak = peak;
                     Logger.Info($"Peak TDP (FPPT) set to {peak}W");
+                    if (performanceMode == 255)
+                    {
+                        try { Settings.LocalSettingsHelper.SetValue("LegionCustomTDPPeak", peak); }
+                        catch (Exception persistEx) { Logger.Debug($"Could not persist LegionCustomTDPPeak: {persistEx.Message}"); }
+                    }
                 }
                 else
                 {
@@ -1851,6 +1880,77 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Error($"Error setting Peak TDP: {ex.Message}");
             }
+        }
+
+        // Direct SPPL / FPPT edits in Legion Custom mode mutually exclude with TDP Boost: boost
+        // computes SPPL = SPL + delta and FPPT = SPL + delta on every master SetTDP call, so a
+        // direct slider value the user just set would be overwritten the next time anything
+        // triggers SetTDP (profile activation, master TDP slider drag, AutoTDP tick). Silently
+        // disabling boost when the user edits SPPL or FPPT keeps the direct value sticky and is
+        // also what makes the LocalSettings persistence stick across reboots. SetValueSilent so
+        // we don't re-trigger SetTDP from inside boost's own PropertyChanged handler; SyncToRemote
+        // pushes the new state to the widget so the UI toggle reflects it. Rayekkk / Jepl4r on #79.
+        private void AutoDisableTDPBoostForCustomTDPEdit(string editedSliderLabel)
+        {
+            try
+            {
+                if (performanceManager?.TDPBoostEnabled?.Value == true)
+                {
+                    Logger.Info($"Disabling TDP Boost (was on) because user set {editedSliderLabel} directly — direct value would otherwise be overridden by boost re-derive on next SetTDP.");
+                    performanceManager.TDPBoostEnabled.SetValueSilent(false);
+                    performanceManager.TDPBoostEnabled.SyncToRemote();
+                }
+            }
+            catch (Exception ex) { Logger.Debug($"AutoDisableTDPBoost failed: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Overlay the user's persisted Custom SPPL/FPPT values (from LocalSettings) on top of the
+        /// WMI-read defaults when in Custom mode (performanceMode == 255), and push them to
+        /// hardware. Called from startup (after ReadCurrentTDPValues) and from SetPerformanceMode
+        /// when transitioning into Custom. SPL is not persisted here — it already round-trips via
+        /// the master TDP slider/profile. Issue #79 (Rayekkk: 35/38/45 reverted to 35/36/38 because
+        /// SPPL/FPPT were never persisted and TDP Boost auto-filled them as SPL+1/SPL+3).
+        /// </summary>
+        public void RestorePersistedCustomTDP()
+        {
+            if (performanceMode != 255) return;
+            if (wmiService == null) return;
+
+            try
+            {
+                bool gotFast = Settings.LocalSettingsHelper.TryGetValue<int>("LegionCustomTDPFast", out int persistedFast);
+                bool gotPeak = Settings.LocalSettingsHelper.TryGetValue<int>("LegionCustomTDPPeak", out int persistedPeak);
+                if (!gotFast && !gotPeak)
+                {
+                    return;
+                }
+
+                if (gotFast && persistedFast > 0 && persistedFast != customTDPFast)
+                {
+                    var r = wmiService.SetCPULongTermPowerLimit(persistedFast);
+                    if (r.Success)
+                    {
+                        customTDPFast = persistedFast;
+                        LegionCustomTDPFast.SetValueSilent(persistedFast);
+                        LegionCustomTDPFast.SyncToRemote();
+                        Logger.Info($"Restored persisted SPPL = {persistedFast}W from LocalSettings");
+                    }
+                }
+
+                if (gotPeak && persistedPeak > 0 && persistedPeak != customTDPPeak)
+                {
+                    var r = wmiService.SetCPUPeakPowerLimit(persistedPeak);
+                    if (r.Success)
+                    {
+                        customTDPPeak = persistedPeak;
+                        LegionCustomTDPPeak.SetValueSilent(persistedPeak);
+                        LegionCustomTDPPeak.SyncToRemote();
+                        Logger.Info($"Restored persisted FPPT = {persistedPeak}W from LocalSettings");
+                    }
+                }
+            }
+            catch (Exception ex) { Logger.Warn($"RestorePersistedCustomTDP failed: {ex.Message}"); }
         }
 
         // Toggles the fan-curve override path. When false: Lenovo WMI Fan_Set_Table only
