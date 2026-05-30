@@ -78,6 +78,100 @@ namespace XboxGamingBarHelper.Windows
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
 
+        // UWP child-window resolution: ApplicationFrameHost.exe hosts the visible frame for
+        // packaged (MSIX/UWP) apps. The window we see via GetForegroundWindow is the frame
+        // host's, so GetWindowThreadProcessId returns ApplicationFrameHost's PID, not the
+        // real app's. The real UWP process owns a child window with class
+        // "Windows.UI.Core.CoreWindow" (or "ApplicationFrameInputSinkWindow" in some
+        // shapes). We enumerate children to find it and pull the real PID. (#87 Forza
+        // Horizon 4 and any other Microsoft Store / Game Pass game.)
+        private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool QueryFullProcessImageName(IntPtr hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        /// <summary>
+        /// When <paramref name="frameHostWindow"/> is an ApplicationFrameHost top-level window
+        /// (i.e. the chrome that wraps a UWP/MSIX app like Forza Horizon 4), resolve the real
+        /// UWP app's PID and full image path by walking child windows for a Windows.UI.Core
+        /// CoreWindow. Returns true and fills the out params on success; false otherwise.
+        /// Cheap on non-UWP windows: EnumChildWindows on a normal app yields no CoreWindow and
+        /// we bail without any process queries.
+        /// </summary>
+        public static bool TryResolveUwpAppFromFrameHost(IntPtr frameHostWindow, out int realPid, out string realPath, out string realProcessName)
+        {
+            realPid = -1;
+            realPath = string.Empty;
+            realProcessName = string.Empty;
+
+            if (frameHostWindow == IntPtr.Zero) return false;
+
+            try
+            {
+                GetWindowThreadProcessId(frameHostWindow, out IntPtr frameHostPidPtr);
+                int frameHostPid = (int)frameHostPidPtr;
+
+                IntPtr foundChildPidPtr = IntPtr.Zero;
+                var classBuf = new StringBuilder(64);
+
+                EnumChildWindows(frameHostWindow, (childHwnd, _) =>
+                {
+                    classBuf.Length = 0;
+                    if (GetClassName(childHwnd, classBuf, classBuf.Capacity) == 0) return true;
+                    var cls = classBuf.ToString();
+                    if (cls != "Windows.UI.Core.CoreWindow") return true;
+
+                    GetWindowThreadProcessId(childHwnd, out IntPtr childPidPtr);
+                    if ((int)childPidPtr != 0 && (int)childPidPtr != frameHostPid)
+                    {
+                        foundChildPidPtr = childPidPtr;
+                        return false; // stop enumeration
+                    }
+                    return true;
+                }, IntPtr.Zero);
+
+                if (foundChildPidPtr == IntPtr.Zero) return false;
+
+                int childPid = (int)foundChildPidPtr;
+                IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)childPid);
+                if (hProc == IntPtr.Zero) return false;
+                try
+                {
+                    var pathBuf = new StringBuilder(1024);
+                    uint size = (uint)pathBuf.Capacity;
+                    if (!QueryFullProcessImageName(hProc, 0, pathBuf, ref size)) return false;
+                    realPath = pathBuf.ToString();
+                }
+                finally { CloseHandle(hProc); }
+
+                realPid = childPid;
+                try { realProcessName = System.IO.Path.GetFileNameWithoutExtension(realPath); }
+                catch { realProcessName = string.Empty; }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"TryResolveUwpAppFromFrameHost failed: {ex.Message}");
+                return false;
+            }
+        }
+
         // DllImport for GetShellWindow
         [DllImport("user32.dll")]
         private static extern IntPtr GetShellWindow();
@@ -131,10 +225,37 @@ namespace XboxGamingBarHelper.Windows
         /// <summary>
         /// Gets the process ID of the current foreground window.
         /// Returns -1 if no window has focus or process ID cannot be determined.
+        /// For UWP/MSIX apps hosted by ApplicationFrameHost, resolves to the real app PID
+        /// (callers like RTSS matching expect the rendering process, not the frame host). (#87)
         /// </summary>
         public static int GetForegroundProcessId()
         {
-            return GetWindowProcessId(GetForegroundWindow());
+            IntPtr fg = GetForegroundWindow();
+            int pid = GetWindowProcessId(fg);
+            if (pid <= 0) return pid;
+
+            try
+            {
+                var process = Process.GetProcessById(pid);
+                bool isFrameHost = false;
+                try { isFrameHost = string.Equals(process.ProcessName, "ApplicationFrameHost", StringComparison.OrdinalIgnoreCase); }
+                catch { }
+                if (isFrameHost && TryResolveUwpAppFromFrameHost(fg, out int realPid, out string realPath, out string realProcessName))
+                {
+                    // Don't surface GoTweaks itself as the foreground "game" — our widget is also
+                    // a packaged UWP app and would otherwise be returned here. (#87)
+                    bool isOwnPackage =
+                        (realPath != null && realPath.IndexOf("PlayandBuildCustom", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        string.Equals(realProcessName, "XboxGamingBar", StringComparison.OrdinalIgnoreCase);
+                    if (!isOwnPackage)
+                    {
+                        return realPid;
+                    }
+                }
+            }
+            catch { /* process may have exited */ }
+
+            return pid;
         }
 
         public static void GetOpenWindows(IDictionary<int, ProcessWindow> windows)
@@ -195,6 +316,32 @@ namespace XboxGamingBarHelper.Windows
                     {
                         // Can't access MainModule for protected processes (anti-cheat, system processes)
                         // Continue with empty path - this is normal
+                    }
+
+                    // UWP/MSIX apps (Forza Horizon 4, anything from the Microsoft Store / Game
+                    // Pass) are hosted by ApplicationFrameHost.exe — the window we just saw is the
+                    // frame host's, not the real app's. Walk the child windows to find the real
+                    // UWP app PID + path; if found, present the window as belonging to the real
+                    // app so downstream matching (package-prefix path match, profile keying,
+                    // RTSS, AutoTDP) works the same as for a normal Win32 game. (#87)
+                    //
+                    // Skip the substitution when the resolved app IS GoTweaks itself — our widget
+                    // is also a packaged UWP app, so the resolver would otherwise present the
+                    // widget as a running "game" and the widget would detect itself.
+                    bool isFrameHost =
+                        string.Equals(processName, "ApplicationFrameHost", StringComparison.OrdinalIgnoreCase) ||
+                        processPath.EndsWith("ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase);
+                    if (isFrameHost && TryResolveUwpAppFromFrameHost(hWnd, out int realPid, out string realPath, out string realProcessName))
+                    {
+                        bool isOwnPackage =
+                            (realPath != null && realPath.IndexOf("PlayandBuildCustom", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            string.Equals(realProcessName, "XboxGamingBar", StringComparison.OrdinalIgnoreCase);
+                        if (!isOwnPackage)
+                        {
+                            processId = realPid;
+                            processPath = realPath;
+                            processName = realProcessName;
+                        }
                     }
 
                     // Track focus by exact window handle - only the window with keyboard focus is marked as foreground

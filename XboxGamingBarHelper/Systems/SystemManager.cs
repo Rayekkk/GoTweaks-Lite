@@ -61,6 +61,29 @@ namespace XboxGamingBarHelper.Systems
             "hwinfo64.exe",
             "hwinfo32.exe",
             "hwinfo.exe",
+            // UWP / Microsoft Store system apps. Before the #87 ApplicationFrameHost
+            // resolution these all hid behind the host and were skipped by the
+            // applicationframehost.exe entry above. Now that we surface the real packaged
+            // exe so games like Forza Horizon 4 can be detected, these system apps need
+            // explicit exclusion or they get picked up as "games" — especially when the
+            // user has Games-only off.
+            "windowsterminal.exe",
+            "xboxpcapp.exe",            // Microsoft Store / Xbox app
+            "startmenuexperiencehost.exe",
+            "searchhost.exe",
+            "searchapp.exe",
+            "textinputhost.exe",
+            "widgets.exe",
+            "widgetservice.exe",
+            "lockapp.exe",
+            "logonui.exe",
+            "cortana.exe",
+            "shellexperiencehost.exe",
+            "your phone.exe",
+            "phoneexperiencehost.exe",
+            "snippingtool.exe",
+            "calculator.exe",
+            "msteams.exe",
         };
 
         // Some games might not be detected by Xbox Game Bar, emulated games using RetroArch, MelonDS, Citra, etc.
