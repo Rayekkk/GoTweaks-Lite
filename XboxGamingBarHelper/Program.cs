@@ -324,9 +324,25 @@ namespace XboxGamingBarHelper
                 args.Contains("--uninstall"));
             if (!isOneShotMode && AnotherHelperIsAlive())
             {
-                Logger.Warn("Another XboxGamingBarHelper.exe is already running. Exiting to prevent duplicate.");
-                LogManager.Flush();
-                return;
+                // A peer is alive. It may be a healthy running helper (we should exit) OR an old
+                // instance mid-shutdown after a kill/update/restart (we should wait for it to go,
+                // then take over). The widget relaunches on pipe-disconnect, so this path is hit
+                // during the dying helper's shutdown window — exiting immediately there left the
+                // user with no helper; racing it spawned two. Wait up to ~5s for the peer to exit,
+                // re-checking, before giving up. (issue #81 — two helpers racing for the pipe.)
+                bool peerGone = false;
+                for (int i = 0; i < 10; i++)
+                {
+                    System.Threading.Thread.Sleep(500);
+                    if (!AnotherHelperIsAlive()) { peerGone = true; break; }
+                }
+                if (!peerGone)
+                {
+                    Logger.Warn("Another XboxGamingBarHelper.exe is still running after wait. Exiting to prevent duplicate.");
+                    LogManager.Flush();
+                    return;
+                }
+                Logger.Info("Peer helper exited during wait — proceeding with startup (takeover after kill/restart).");
             }
 
             // Process-exit + unhandled-exception cleanup. Two shared concerns:

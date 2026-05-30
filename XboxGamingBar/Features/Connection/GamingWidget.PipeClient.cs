@@ -43,6 +43,12 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        // When the helper signals an intentional exit (HelperExiting), the very next pipe
+        // disconnect is expected and must NOT trigger an auto-relaunch (issue #81). The
+        // intentional initiator (Restart button / update flow) handles relaunch itself. A
+        // disconnect within this window of the signal is treated as intentional.
+        private DateTime _helperIntentionalExitUtc = DateTime.MinValue;
+        private const int IntentionalExitSuppressMs = 8000;
 
         /// <summary>
         /// Handles messages received from helper via Named Pipe.
@@ -68,6 +74,17 @@ namespace XboxGamingBar
                 }
 
                 Logger.Debug($"Widget received pipe message: Function={message["Function"]}");
+
+                // Helper told us it's exiting on purpose (kill / upgrade / update). Mark it so the
+                // imminent pipe-disconnect doesn't auto-relaunch the dying helper and race it
+                // (issue #81 — two helpers contending for the pipe). The intentional initiator
+                // (Restart button / update flow) owns relaunch timing.
+                if (message.TryGetValue("HelperExiting", out object exitReason))
+                {
+                    _helperIntentionalExitUtc = DateTime.UtcNow;
+                    Logger.Info($"Helper signaled intentional exit ({exitReason}) — suppressing auto-relaunch on the imminent disconnect.");
+                    return;
+                }
 
                 // Check for focus widget request from helper
                 if (message.TryGetValue("Function", out object funcObj) &&
@@ -280,6 +297,16 @@ namespace XboxGamingBar
                     FanCurveHelperDisconnectedWarning.Visibility = Windows.UI.Xaml.Visibility.Visible;
                 }
             });
+
+            // Skip auto-relaunch if the helper just told us it's exiting on purpose. Relaunching
+            // the dying helper here raced it and spawned two instances contending for the pipe
+            // (issue #81). The intentional initiator owns relaunch.
+            double sinceIntentionalMs = (DateTime.UtcNow - _helperIntentionalExitUtc).TotalMilliseconds;
+            if (sinceIntentionalMs < IntentionalExitSuppressMs)
+            {
+                Logger.Info($"Pipe disconnected after intentional helper exit ({sinceIntentionalMs:F0}ms ago) - skipping auto-relaunch.");
+                return;
+            }
 
             Logger.Info("Pipe disconnected - starting automatic helper reconnection");
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>

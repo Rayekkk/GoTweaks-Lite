@@ -334,14 +334,13 @@ namespace XboxGamingBar
                     await Task.Delay(1000);
                 }
 
-                // Launch new helper instance
-                Logger.Info("Launching new helper instance");
-                await FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync();
-
-                // Give the helper a moment to start its pipe server, then try to reconnect
-                await Task.Delay(1000);
-                Logger.Info("Attempting to reconnect to helper via Named Pipe");
-                _ = TryConnectPipeAsync();
+                // Launch new helper instance through the guarded path so it shares the
+                // isLaunchingHelper / alive-check guards with the pipe-disconnect relaunch and
+                // can't spawn a second helper racing this one (issue #81). forceLaunch: we just
+                // killed the helper and waited, so the alive-check should pass — force ensures we
+                // launch even if a stale heartbeat lingers.
+                Logger.Info("Launching new helper instance (guarded)");
+                await LaunchHelperWithGuardsAsync("Restart Helper button", forceLaunch: true);
 
                 await Task.Delay(1500);
                 RestartHelperButton.Content = "Restart Helper";

@@ -1198,11 +1198,27 @@ namespace XboxGamingBar
         // Output mix slider value-change handlers all removed in #79 round 5
         // along with the underlying sliders.
 
+        // True while LoadAutoHibernateModeSetting (or any programmatic SelectedIndex assignment) is
+        // mid-flight. Without this, the load assigning SelectedIndex fires SelectionChanged, which
+        // persists + sends — fine when the value matches, but if XAML later re-renders the ComboBox
+        // and the SelectedIndex drops to the default 0 (Always), SelectionChanged fires again and
+        // silently overwrites the user's saved DC Only choice with Always (#88 #3, kayti).
+        private bool _isLoadingAutoHibernateMode;
+
         private async void AutoHibernateModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (AutoHibernateModeComboBox?.SelectedItem == null) return;
             var selected = AutoHibernateModeComboBox.SelectedItem as ComboBoxItem;
             if (selected?.Tag == null) return;
+
+            // Programmatic SelectedIndex assignment from the load path — skip persist + send. The
+            // ComboBox already matches the saved/sent value, so re-writing it adds no information
+            // and any later spurious reset to default would otherwise clobber the saved choice.
+            if (_isLoadingAutoHibernateMode)
+            {
+                Logger.Info($"AutoHibernateMode SelectionChanged ignored (load-driven): {selected.Content}");
+                return;
+            }
 
             int mode = int.Parse(selected.Tag.ToString());
 
@@ -1256,22 +1272,67 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Restores the saved Auto Hibernate power-source mode (Always/AC/DC) on startup and
-        /// re-sends it to the helper. The helper keeps this only in a volatile field, so without
-        /// this the choice silently reverts to "Always" after every reboot. (Issue #88 bug #3)
+        /// Restores the saved Auto Hibernate power-source mode (Always/AC/DC) on startup.
+        ///
+        /// Prefer the shared settings.json file (the helper's persistence store) over UWP
+        /// LocalSettings: Game Bar tears down widget instances aggressively, and UWP LocalSettings
+        /// writes can be lost if the host suspends/terminates the widget before flush. The helper
+        /// writes the latest mode to settings.json on every pipe-receipt, so that file is always
+        /// the freshest source. (Issue #88 bug #3 follow-up — kayti and diego both repro'd the
+        /// UWP-flush race where the widget read a stale 0 after a Kill Helper test.)
         /// </summary>
         private void LoadAutoHibernateModeSetting()
         {
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-                if (!settings.Values.TryGetValue("AutoHibernateMode", out object val)) return;
+                int mode = 0;
+                bool found = false;
 
-                int mode = Convert.ToInt32(val);
+                // Prefer the JSON file written by the helper — it round-trips reliably across
+                // widget tear-downs (UWP LocalSettings can be buffered and lost when Game Bar
+                // suspends the widget process before the write flushes to disk).
+                try
+                {
+                    string jsonPath = System.IO.Path.Combine(
+                        ApplicationData.Current.LocalFolder.Path, "settings.json");
+                    if (System.IO.File.Exists(jsonPath))
+                    {
+                        string text = System.IO.File.ReadAllText(jsonPath);
+                        if (!string.IsNullOrWhiteSpace(text) && Windows.Data.Json.JsonObject.TryParse(text, out var jsonObj))
+                        {
+                            if (jsonObj.TryGetValue("AutoHibernateMode", out var jv) &&
+                                jv.ValueType == Windows.Data.Json.JsonValueType.Number)
+                            {
+                                mode = (int)jv.GetNumber();
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) { Logger.Debug($"AutoHibernateMode JSON read failed, falling back: {ex.Message}"); }
+
+                if (!found)
+                {
+                    var settings = ApplicationData.Current.LocalSettings;
+                    if (!settings.Values.TryGetValue("AutoHibernateMode", out object val)) return;
+                    mode = Convert.ToInt32(val);
+                }
+                else
+                {
+                    // Mirror the freshly-loaded value back into UWP LocalSettings so any code path
+                    // that reads from LocalSettings (and our own load on next session) sees the
+                    // same authoritative value.
+                    try { ApplicationData.Current.LocalSettings.Values["AutoHibernateMode"] = mode; }
+                    catch { }
+                }
                 if (AutoHibernateModeComboBox != null)
                 {
-                    // Setting SelectedIndex fires SelectionChanged, which forwards the value to the helper.
-                    AutoHibernateModeComboBox.SelectedIndex = mode;
+                    // Programmatic load — guard so the resulting SelectionChanged doesn't re-persist
+                    // (harmless when the value matches, but XAML can later reset SelectedIndex to 0
+                    // during re-render, which would silently overwrite the saved choice).
+                    _isLoadingAutoHibernateMode = true;
+                    try { AutoHibernateModeComboBox.SelectedIndex = mode; }
+                    finally { _isLoadingAutoHibernateMode = false; }
                 }
                 Logger.Info($"Loaded Auto Hibernate mode setting: {mode}");
             }

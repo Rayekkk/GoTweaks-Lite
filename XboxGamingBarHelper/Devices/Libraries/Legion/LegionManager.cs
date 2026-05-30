@@ -46,6 +46,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private int _hwLightBrightness;
         private byte _hwLightColorR, _hwLightColorG, _hwLightColorB;
 
+        // True once the light state is known from a real source: a b0:01 hardware readback (even
+        // when the light is off) or a widget/profile sync of color/brightness/speed. Until then the
+        // lightMode/lightColor/lightBrightness fields hold uninitialized defaults (Solid/#FFFFFF/100)
+        // that must NOT be pushed to hardware — doing so on a cold helper start (Kill/Update) flashed
+        // a full-brightness white before the widget synced the user's real values (#81 white stick flash).
+        private bool _lightStateKnown;
+        // Internal-convention light mode (0=Off,1=Solid,2=Pulse,3=Dynamic,4=Spiral) captured from the
+        // b0:01 readback so a restore reflects the real hardware mode (including Off) instead of default Solid.
+        private int _hwLightMode = -1;
+
         /// <summary>
         /// Gets the current performance mode (Quiet=1, Balanced=2, Performance=3, Custom=255).
         /// </summary>
@@ -1087,6 +1097,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         public void RestoreLightSettings()
         {
+            // Don't push light to hardware until we actually know the light state from a real source
+            // (b0:01 hardware readback or a widget/profile sync). On a cold helper start (Kill/Update)
+            // the light fields still hold uninitialized defaults (mode=Solid, #FFFFFF, 100%); applying
+            // those blasted a full-brightness white flash before the widget synced the user's real
+            // values ~9s later (#81 white stick flash). Reactive-disabled init and gyro LED revert both
+            // route through here, so this gate covers every restore caller.
+            if (!_lightStateKnown)
+            {
+                Logger.Info("RestoreLightSettings skipped: light state not yet known (avoiding default white flash).");
+                return;
+            }
+
             // Sync lightColor from the property value (widget is source of truth).
             // The cached lightColor field may still be the default #FFFFFF if SetLightColor
             // was never called (e.g., _hasUserModified check skipped it, or HasExplicitLighting was false).
@@ -1108,6 +1130,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     lightColor = $"#{_hwLightColorR:X2}{_hwLightColorG:X2}{_hwLightColorB:X2}";
                 }
             }
+
+            // Don't sync lightMode from the b0:01 readback here: during a reactive effect the
+            // helper writes Solid+color frames to hardware, so b0:01 reports mode=Solid even when
+            // the user's saved static mode is Off. Overriding lightMode with hw mode at release
+            // time would re-enable the light to Solid instead of returning to Off. The widget's
+            // sync of LegionLightMode is the authoritative source for the user's static mode.
 
             Logger.Info($"Restoring light settings: mode={lightMode}, color={lightColor}, brightness={lightBrightness}");
             SetLightMode(lightMode);
@@ -1186,6 +1214,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         public void SetLightColor(string hexColor)
         {
+            // An external color set is a real source of truth for the light state.
+            _lightStateKnown = true;
+
             bool hasGoSController = isGoSControllerConnected && goSController != null;
             bool hasStandardController = isControllerConnected && controllerService != null;
 
@@ -1278,6 +1309,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         public void SetLightBrightness(int brightness)
         {
+            // An external brightness set is a real source of truth for the light state.
+            _lightStateKnown = true;
+
             bool hasGoSController = isGoSControllerConnected && goSController != null;
             bool hasStandardController = isControllerConnected && controllerService != null;
 
@@ -1349,6 +1383,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         public void SetLightSpeed(int speed)
         {
+            // An external speed set is a real source of truth for the light state.
+            _lightStateKnown = true;
+
             bool hasGoSController = isGoSControllerConnected && goSController != null;
             bool hasStandardController = isControllerConnected && controllerService != null;
 

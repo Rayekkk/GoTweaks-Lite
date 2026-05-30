@@ -57,6 +57,12 @@ namespace XboxGamingBarHelper.Labs
         private bool _edgeHooked;
         private long _lastWriteTicks;
         private (byte r, byte g, byte b) _lastSent = (1, 2, 3);
+        // True once an effect actually started running (we took over the lighting from the static
+        // path). The Disabled-branch release is only meaningful after a takeover; on a cold init
+        // with persisted "disabled" the release would gratuitously re-apply the firmware-cached
+        // light state (briefly differing from the widget's saved state) — the visible "white flash"
+        // users saw after Kill/Update (#81 white stick flash).
+        private bool _hasTakenOver;
 
         public LegionLightingManager(LegionManager legion)
         {
@@ -167,8 +173,16 @@ namespace XboxGamingBarHelper.Labs
             {
                 EnsureEdgeUnhooked();
                 StopEffectThread();
-                // Hand RGB back to the user's static lighting.
-                try { _legion.ReleaseReactiveLighting(); } catch { }
+                // Hand RGB back to the user's static lighting only if a reactive effect actually
+                // took over the lighting at some point. On a cold init with persisted Disabled the
+                // reactive manager never touched the RGB, so releasing here would just re-assert
+                // whatever the firmware cached — which differs from the widget's saved state until
+                // wave-2 sync arrives, producing the visible "white flash" (#81).
+                if (_hasTakenOver)
+                {
+                    try { _legion.ReleaseReactiveLighting(); } catch { }
+                    _hasTakenOver = false;
+                }
                 return;
             }
 
@@ -176,6 +190,9 @@ namespace XboxGamingBarHelper.Labs
             if (IsPressDriven(mode)) EnsureEdgeHooked();
             else EnsureEdgeUnhooked();
             StartEffectThread();
+            // From here on the effect loop will be writing RGB — mark the takeover so a later
+            // transition back to Disabled will properly release to the static lighting.
+            _hasTakenOver = true;
             // _releasedSinceFlash starts true: there's no pending flash to hand back to static on
             // startup. Initializing it false made the effect loop's first idle tick immediately
             // call ReleaseReactiveLighting -> RestoreLightSettings, which applied the helper's

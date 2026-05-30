@@ -743,11 +743,24 @@ namespace XboxGamingBarHelper
                 if (pipeMsg.Extra.ContainsKey("ExitHelper"))
                 {
                     Logger.Info("Pipe: ExitHelper request received - shutting down helper for restart");
+                    // Tell the widget this is an INTENTIONAL exit so its pipe-disconnect handler
+                    // doesn't auto-relaunch us mid-shutdown (which raced the dying helper and
+                    // spawned two instances contending for the pipe — issue #81). The widget
+                    // owns relaunch timing after an intentional exit.
+                    NotifyWidgetHelperExiting("ExitHelper");
                     LogManager.Flush(); // Ensure log is written before we start shutdown
                     SendPipeAck(pipeMsg.RequestId);
                     _isShuttingDown = true;
-                    // Main loop will exit, Initialize() returns, finally block releases mutex naturally
-                    // No Environment.Exit needed - process will exit cleanly via Main() return
+                    // Force a prompt exit so the single-instance mutex is freed quickly and a
+                    // takeover helper's startup wait (Program.cs) resolves fast, instead of
+                    // lingering up to a full main-loop poll interval.
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500);
+                        Logger.Info("ExitHelper: forcing process exit");
+                        LogManager.Flush();
+                        Environment.Exit(0);
+                    });
                     return;
                 }
 
@@ -759,6 +772,7 @@ namespace XboxGamingBarHelper
                     if (!string.IsNullOrEmpty(msixSourcePath))
                     {
                         Logger.Info($"Pipe: UpgradeHelper request received - source: {msixSourcePath}");
+                        NotifyWidgetHelperExiting("UpgradeHelper");
                         LogManager.Flush(); // Ensure log is written before we start shutdown
                         SendPipeAck(pipeMsg.RequestId);
 
@@ -1287,6 +1301,7 @@ namespace XboxGamingBarHelper
 
                             // Exit helper so installer can replace files
                             Logger.Info("Pipe: Exiting helper for update installation...");
+                            NotifyWidgetHelperExiting("UpdateInstall");
                             LogManager.Flush(); // Ensure log is written before exit
 
                             // Release mutex before exiting to ensure clean restart
@@ -1682,6 +1697,32 @@ namespace XboxGamingBarHelper
         /// Sends a simple acknowledgment response to the widget via Named Pipe.
         /// Used for fire-and-forget messages that still need a response to avoid timeout.
         /// </summary>
+        /// <summary>
+        /// Tell the widget the helper is about to exit ON PURPOSE (ExitHelper / Upgrade / Update),
+        /// so its pipe-disconnect handler skips the automatic relaunch for this case. Without this
+        /// the widget relaunched the dying helper mid-shutdown, racing it (two helpers contending
+        /// for the single pipe — issue #81). Best-effort: a dropped message just falls back to the
+        /// old behavior.
+        /// </summary>
+        private static void NotifyWidgetHelperExiting(string reason)
+        {
+            try
+            {
+                if (pipeServer != null && pipeServer.IsConnected)
+                {
+                    var msg = new global::Windows.Foundation.Collections.ValueSet();
+                    msg.Add("HelperExiting", reason ?? "intentional");
+                    var pm = Shared.IPC.PipeMessage.FromValueSet(msg);
+                    pipeServer.SendMessage(pm.ToJson());
+                    Logger.Info($"Notified widget of intentional helper exit ({reason}).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"NotifyWidgetHelperExiting failed: {ex.Message}");
+            }
+        }
+
         private static void SendPipeAck(int requestId, bool success = true)
         {
             try

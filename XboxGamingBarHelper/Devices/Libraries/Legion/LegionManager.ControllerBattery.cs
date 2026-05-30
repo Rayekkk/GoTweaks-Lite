@@ -181,6 +181,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     _hasHwLightState = true;
                 }
 
+                // A b0:01 readback is a real source of truth for the light state even when the light
+                // is off — record it so RestoreLightSettings can apply the true mode (including Off)
+                // instead of the default Solid/white (#81 white stick flash on cold helper start).
+                // Map the firmware animation byte (Solid=0,Pulse=1,Dynamic=2,Spiral=3) to our internal
+                // convention (0=Off,1=Solid,2=Pulse,3=Dynamic,4=Spiral); off when the light is disabled.
+                _hwLightMode = !status.LightEnabled ? 0
+                    : status.LightModeRaw == 0 ? 1
+                    : status.LightModeRaw == 1 ? 2
+                    : status.LightModeRaw == 2 ? 3
+                    : status.LightModeRaw == 3 ? 4
+                    : 1;
+                _lightStateKnown = true;
+
                 // Stable; demoted to Debug. The b0:01 service emits one event per
                 // data slot, which on Legion Go 2 fired ~5x per 5s polling cycle
                 // and dominated user logs. Re-promote to Info during triage if
