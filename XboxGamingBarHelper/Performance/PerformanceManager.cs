@@ -1003,12 +1003,16 @@ namespace XboxGamingBarHelper.Performance
             }
         }
 
-        // Tick counter for fast/slow tier split. CPU/Memory/Battery hardware refresh
-        // every tick (cheap MSR + perfcounter reads, drives "live" CPU% / RAM / battery
-        // line). GPU hardware + ADLX fallback refresh only every SlowTickEvery-th tick
-        // because ADL/NVML queries are the expensive part of the walk (~10–30ms each).
+        // Tick counter for fast/slow tier split. The main helper loop ticks Update()
+        // every 1 s, but a full per-second refresh of CPU% / RAM / Battery / temperature
+        // is overkill for what consumes the data downstream (sidebar / OSD redraw, EC
+        // fan loop at 3 s, AutoTDP at its own cadence). FastTickEvery throttles the
+        // entire walk to every 2 s; SlowTickEvery within that lands the GPU + ADLX
+        // refresh on every 4 s (every 4th raw tick = every 2nd walk), keeping OSD GPU
+        // temp / clock readouts current enough for users running the overlay live.
         private long sensorTickCounter;
-        private const int SlowTickEvery = 3;
+        private const int FastTickEvery = 2;
+        private const int SlowTickEvery = 4;
 
         public override void Update()
         {
@@ -1036,6 +1040,16 @@ namespace XboxGamingBarHelper.Performance
                 return;
 
             sensorTickCounter++;
+
+            // Throttle the entire walk to every FastTickEvery-th active Update so the
+            // cheap CPU/Memory/Battery refresh lands at ~2 s rather than 1 s. The very
+            // first active tick still walks so the sidebar/OSD don't sit on "—" while
+            // they wait for fresh data. (kayti #88 #1/#2 follow-up: idle helper cost
+            // was the dominant CPU draw; this trims it ~50 % without affecting the EC
+            // fan loop, which reads CPUTemperature on its own 3 s cadence.)
+            if (sensorTickCounter != 1 && sensorTickCounter % FastTickEvery != 0)
+                return;
+
             // First active tick always does a full refresh so the OSD/widget aren't
             // stuck showing "—" for GPU sensors during the first 1–2 seconds.
             bool slowTick = (sensorTickCounter == 1) || (sensorTickCounter % SlowTickEvery == 0);

@@ -153,14 +153,15 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// </summary>
         public bool IsFanCurveVisible => fanCurveVisible;
 
-        // True when the EC fan override loop is actively driving 0xC6C8 from a temperature read.
-        // PerformanceManager uses this in its metrics-consumer check so the LHM sensor walk does
-        // not gate when the EC loop needs fresh temp every tick. Without this the cached
-        // CPUTemperature can sit at the last value (e.g. 68°C from gameplay) while the device is
-        // idle/screen-off and the EC loop keeps writing the high-RPM target until the user opens
-        // the widget and a different consumer wakes the sensor walk up (kayti #88 fan stays loud
-        // after sleep, then snaps low when widget opens — gap was ~90 s in her capture).
-        public bool IsEcFanOverrideActive => fanCurveUnlocked && legionEcAccess != null;
+        // True only when the EC fan override timer is actually ticking. Used by
+        // PerformanceManager's metrics-consumer check so the LHM sensor walk does not gate while
+        // the loop is running — the cached CPUTemperature would otherwise sit at the last
+        // reading (e.g. 68°C from gameplay) while the device is idle/screen-off and the loop
+        // would keep writing the matching high-RPM target until something else wakes the walk
+        // up. Gates strictly on ecFanCurveTimer (not fanCurveUnlocked + legionEcAccess) so a
+        // toggled-on-but-EC-init-failed configuration (PawnIO missing) does not keep sensors
+        // walking pointlessly. (kayti #88 fan stays loud after sleep, gap ~90 s in her capture.)
+        public bool IsEcFanOverrideActive => ecFanCurveTimer != null;
 
         // TDP reapply timer (used when switching to Custom mode)
         private System.Timers.Timer tdpReapplyTimer;
