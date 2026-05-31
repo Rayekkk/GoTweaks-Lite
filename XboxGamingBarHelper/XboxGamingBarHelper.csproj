@@ -556,6 +556,7 @@
     <Compile Include="RTSS\OSDItems\OSDItemAutoTDP.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemFan.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemFPS.cs" />
+    <Compile Include="RTSS\OSDItems\OSDItemFrameBudget.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemAppName.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemTime.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemGPU.cs" />
@@ -610,6 +611,10 @@
     <Compile Include="Settings\ProfileCustomGamePathProperty.cs" />
     <Compile Include="Settings\ProfileGamesOnlyProperty.cs" />
     <Compile Include="Settings\ProfileBlacklistPathsProperty.cs" />
+    <Compile Include="PresentMon\PresentMonMetrics.cs" />
+    <Compile Include="PresentMon\PresentMonRunner.cs" />
+    <Compile Include="PresentMon\VrrProbe.cs" />
+    <Compile Include="Startup\Program.PresentMon.cs" />
     <Compile Include="Settings\LocalSettingsHelper.cs" />
     <Compile Include="Settings\SettingsManager.cs" />
     <Compile Include="Systems\ForegroundAppProperty.cs" />
@@ -733,6 +738,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="libviiper.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="PresentMon.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- WinRing0 files removed - deprecated TDP method

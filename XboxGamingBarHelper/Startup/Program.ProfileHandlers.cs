@@ -775,6 +775,10 @@ namespace XboxGamingBarHelper
 
         private static void RunningGame_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // #66: drive PresentMon subprocess lifecycle from the same RunningGame signal.
+            // Wrap in try/catch in the caller so PresentMon faults never break profile flow.
+            OnRunningGameChangedForPresentMon();
+
             // Prevent reentrant profile handling
             if (isApplyingProfile)
             {

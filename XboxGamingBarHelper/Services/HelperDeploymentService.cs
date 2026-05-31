@@ -104,6 +104,7 @@ namespace XboxGamingBarHelper.Services
             "ADLXCSharpBind.dll",
             "libryzenadj.dll",
             "inpoutx64.dll",
+            "PresentMon.exe", // #66 Intel PresentMon CLI for FPS / displayed / FrameType capture
             "NLog.config",
             "NLog.dll",
             "Shared.dll",

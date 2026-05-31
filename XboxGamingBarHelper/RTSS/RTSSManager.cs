@@ -77,8 +77,8 @@ namespace XboxGamingBarHelper.RTSS
         private Dictionary<int, HashSet<string>> osdLevelConfig = new Dictionary<int, HashSet<string>>
         {
             { 1, new HashSet<string> { "Time", "FPS", "Battery" } },
-            { 2, new HashSet<string> { "Time", "FPS", "Battery", "CPU", "GPU", "Fan", "FrametimeGraph" } },
-            { 3, new HashSet<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "Fan", "AutoTDP", "FrametimeGraph" } }
+            { 2, new HashSet<string> { "Time", "FPS", "Battery", "CPU", "GPU", "FrameBudget", "Fan", "FrametimeGraph" } },
+            { 3, new HashSet<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "FrametimeGraph" } }
         };
         private Dictionary<int, string> osdCustomTags = new Dictionary<int, string>
         {
@@ -120,9 +120,9 @@ namespace XboxGamingBarHelper.RTSS
         // Per-level item order
         private Dictionary<int, List<string>> osdLevelOrder = new Dictionary<int, List<string>>
         {
-            { 1, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
-            { 2, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
-            { 3, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } }
+            { 1, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
+            { 2, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
+            { 3, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } }
         };
 
         // Per-level, per-item label colors (e.g., osdItemLabelColors[1]["CPU"] = "FF0000")
@@ -157,6 +157,7 @@ namespace XboxGamingBarHelper.RTSS
                 osdItemControllerBattery,
                 osdItemCPU,
                 osdItemGPU,
+                new OSDItemFrameBudget(),
                 osdItemVRAM,
                 new OSDItemMemory(performanceManager.MemoryUsage, performanceManager.MemoryUsed, performanceManager.MemoryAvailable),
                 osdItemFan,

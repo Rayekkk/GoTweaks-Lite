@@ -1739,6 +1739,10 @@ namespace XboxGamingBarHelper
             _managersReady = true;
             Logger.Info("Managers ready - BatchGet requests will now be processed");
 
+            // #66: bring up PresentMon integration after managers are ready. Lifecycle is
+            // driven from RunningGame_PropertyChanged → OnRunningGameChangedForPresentMon.
+            InitializePresentMon();
+
             // Kick off a background Lenovo driver-update probe so the widget
             // can show an "N updates available" tile the moment it opens.
             // Only for Legion devices — non-Lenovo machines return IsLenovo=false
