@@ -879,11 +879,11 @@ namespace XboxGamingBar
             if (index == 58) return 0xE0;  // LCtrl
             if (index == 59) return 0xE1;  // LShift
             if (index == 60) return 0xE2;  // LAlt
-            if (index == 61) return 0xE3;  // LMeta
+            if (index == 61) return 0xE3;  // LWin (HID Left GUI)
             if (index == 62) return 0xE4;  // RCtrl
             if (index == 63) return 0xE5;  // RShift
             if (index == 64) return 0xE6;  // RAlt
-            if (index == 65) return 0xE7;  // RMeta
+            if (index == 65) return 0xE7;  // RWin (HID Right GUI)
             // Navigation keys
             if (index == 66) return 0x4A;  // Home
             if (index == 67) return 0x4D;  // End
@@ -1089,8 +1089,8 @@ namespace XboxGamingBar
                 { 0x4C, "Del" }, { 0x4D, "End" }, { 0x4E, "PgDn" }, { 0x4F, "Right" },
                 { 0x50, "Left" }, { 0x51, "Down" }, { 0x52, "Up" },
                 // Modifier keys
-                { 0xE0, "LCtrl" }, { 0xE1, "LShift" }, { 0xE2, "LAlt" }, { 0xE3, "LMeta" },
-                { 0xE4, "RCtrl" }, { 0xE5, "RShift" }, { 0xE6, "RAlt" }, { 0xE7, "RMeta" },
+                { 0xE0, "LCtrl" }, { 0xE1, "LShift" }, { 0xE2, "LAlt" }, { 0xE3, "LWin" },
+                { 0xE4, "RCtrl" }, { 0xE5, "RShift" }, { 0xE6, "RAlt" }, { 0xE7, "RWin" },
                 // Media keys
                 { 0x7F, "VolMute" }, { 0x80, "VolUp" }, { 0x81, "VolDown" }
             };
