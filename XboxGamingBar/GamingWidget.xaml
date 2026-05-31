@@ -2697,7 +2697,9 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                         <TextBlock Text="Fluid Motion Frames" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Frame generation" Style="{StaticResource CardCaptionStyle}"/>
+                                        <TextBlock Text="Frame generation — global setting; AMD Adrenalin per-game profiles override this"
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <ToggleSwitch x:Name="AMDFluidMotionFrameToggle"
                                                   Grid.Column="1"
