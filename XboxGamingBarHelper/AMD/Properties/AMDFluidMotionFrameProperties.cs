@@ -16,6 +16,29 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            bool prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            // Display-tab fix: GenericProperty.SetValue's equality skip prevents
+            // NotifyPropertyChanged from firing when our cached value matches
+            // the incoming value — and therefore the SetEnabled call below in
+            // NotifyPropertyChanged never reaches ADLX. The cache CAN drift
+            // from the actual driver state (user toggled AFMF in Adrenalin
+            // directly, a prior SetEnabled silently failed, etc.), so the
+            // Display-tab toggle would persist the new value in the widget UI
+            // but the driver would stay in its previous state. Per-game
+            // profiles bypass this via ForceSetValue but the Display-tab path
+            // hits SetValue. Push to driver here whenever the result was
+            // accepted, regardless of whether the value changed.
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
+                Manager.AMDFluidMotionFrameSetting.SetEnabled(Value);
+            }
+            return result;
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
