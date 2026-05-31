@@ -107,22 +107,31 @@ namespace XboxGamingBarHelper
                         return;
                     }
 
-                    // Check power source mode: 1=AC Only, 2=DC Only
-                    if (autoHibernateMode == 1) // AC Only
+                    // Check power source mode: 1=AC Only, 2=DC Only.
+                    //
+                    // BatteryStatus, not PowerSupplyStatus. PowerSupplyStatus.Adequate means
+                    // "AC line is supplying adequate current right now", not "AC is plugged
+                    // in". When the battery hits a charge limit (Legion Go 2 80% cap, ASUS
+                    // similar) the EC pauses charge current, and Windows downgrades
+                    // PowerSupplyStatus to NotPresent/Inadequate even though the cable is
+                    // physically connected. Using PowerSupplyStatus as the AC gate then
+                    // fired DC-Only hibernate on a plugged-in device at the charge cap (and
+                    // would have done the inverse for AC-Only: skipped a legitimate fire).
+                    // BatteryStatus.Discharging is the authoritative "actually on battery"
+                    // signal: anything else (Idle, Charging, NotPresent) means wall power.
+                    var batteryStatus = global::Windows.System.Power.PowerManager.BatteryStatus;
+                    var powerSupplyStatus = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
+                    bool runningOnBattery = batteryStatus == global::Windows.System.Power.BatteryStatus.Discharging;
+                    Logger.Info($"Auto Hibernate: gate check mode={autoHibernateMode} BatteryStatus={batteryStatus} PowerSupplyStatus={powerSupplyStatus} runningOnBattery={runningOnBattery}");
+                    if (autoHibernateMode == 1 && runningOnBattery) // AC Only, currently on DC
                     {
-                        var powerStatus = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
-                        if (powerStatus != global::Windows.System.Power.PowerSupplyStatus.Adequate)
-                        {
-                            return; // Not on AC, skip
-                        }
+                        Logger.Info("Auto Hibernate: skipping AC-Only on DC");
+                        return;
                     }
-                    else if (autoHibernateMode == 2) // DC Only
+                    else if (autoHibernateMode == 2 && !runningOnBattery) // DC Only, currently on AC
                     {
-                        var powerStatus = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
-                        if (powerStatus == global::Windows.System.Power.PowerSupplyStatus.Adequate)
-                        {
-                            return; // On AC, skip
-                        }
+                        Logger.Info("Auto Hibernate: skipping DC-Only on AC");
+                        return;
                     }
 
                     // Avoid hibernating while a game is in the foreground
