@@ -354,10 +354,48 @@ namespace XboxGamingBarHelper.Labs
         }
 
         /// <summary>
-        /// Returns the latest parsed controller gyro sample from HID input reports.
-        /// Use <paramref name="useLeftController"/> to select left (true) or right (false) controller source.
+        /// Returns the latest parsed controller gyro sample from HID input reports, with the
+        /// stored software bias offset subtracted from each axis (Steam-style one-shot
+        /// calibration; see <see cref="SetGyroBias"/>). Every downstream consumer (legacy CE
+        /// stick-gyro, VIIPER stick-gyro, VIIPER native DS4 / DualSense / Xbox forwarding)
+        /// gets the bias-corrected sample because they all go through this method. To get the
+        /// raw uncorrected sample (e.g. the bias-capture routine), use
+        /// <see cref="TryGetLatestRawGyroSample"/> instead.
         /// </summary>
         public static bool TryGetLatestGyroSample(bool useLeftController, out LegionGyroSample sample)
+        {
+            LegionGyroSample raw;
+            bool ok;
+            lock (_gyroSampleLock)
+            {
+                if (useLeftController)
+                {
+                    raw = _latestLeftGyroSample;
+                    ok = _hasLeftGyroSample;
+                }
+                else
+                {
+                    raw = _latestRightGyroSample;
+                    ok = _hasRightGyroSample;
+                }
+            }
+            if (!ok) { sample = raw; return false; }
+            if (!_hasGyroBias) { sample = raw; return true; }
+            sample = new LegionGyroSample(
+                raw.GyroXDegPerSecond - _gyroBiasX,
+                raw.GyroYDegPerSecond - _gyroBiasY,
+                raw.GyroZDegPerSecond - _gyroBiasZ,
+                raw.AccelXG, raw.AccelYG, raw.AccelZG,
+                raw.TimestampTicksUtc);
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the latest parsed gyro sample without the software bias subtraction applied.
+        /// Only the bias-capture path should call this — gameplay paths must go through
+        /// <see cref="TryGetLatestGyroSample"/> so they see corrected values.
+        /// </summary>
+        public static bool TryGetLatestRawGyroSample(bool useLeftController, out LegionGyroSample sample)
         {
             lock (_gyroSampleLock)
             {
@@ -366,10 +404,101 @@ namespace XboxGamingBarHelper.Labs
                     sample = _latestLeftGyroSample;
                     return _hasLeftGyroSample;
                 }
-
                 sample = _latestRightGyroSample;
                 return _hasRightGyroSample;
             }
+        }
+
+        // Software gyro bias state — captured one-shot from the bias-capture pipe handler,
+        // persisted to LocalSettings, subtracted from every TryGetLatestGyroSample read.
+        // Steam-style: the user certifies "I am holding it still right now" and we just
+        // average the current gyro reading and store the negative of that as the offset.
+        private static float _gyroBiasX;
+        private static float _gyroBiasY;
+        private static float _gyroBiasZ;
+        private static long _gyroBiasCalibratedAtUtc;
+        private static volatile bool _hasGyroBias;
+
+        public static bool TryGetGyroBias(out float x, out float y, out float z, out long calibratedAtUtc)
+        {
+            x = _gyroBiasX; y = _gyroBiasY; z = _gyroBiasZ;
+            calibratedAtUtc = _gyroBiasCalibratedAtUtc;
+            return _hasGyroBias;
+        }
+
+        public static void SetGyroBias(float x, float y, float z, long calibratedAtUtc)
+        {
+            _gyroBiasX = x;
+            _gyroBiasY = y;
+            _gyroBiasZ = z;
+            _gyroBiasCalibratedAtUtc = calibratedAtUtc;
+            _hasGyroBias = true;
+            try
+            {
+                Settings.LocalSettingsHelper.SetValue("GyroBiasX", (double)x);
+                Settings.LocalSettingsHelper.SetValue("GyroBiasY", (double)y);
+                Settings.LocalSettingsHelper.SetValue("GyroBiasZ", (double)z);
+                // Persist ticks as string. As a JSON number (or UWP boxed long round-tripped
+                // through the file-fallback), a large int64 can come back in scientific
+                // notation (e.g. "6.39e+17") and JsonSerializer.Deserialize<long> rejects that.
+                Settings.LocalSettingsHelper.SetValue("GyroBiasCalibratedAtUtc", calibratedAtUtc.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                Logger.Info($"Stored gyro bias offset: X={x:F3} Y={y:F3} Z={z:F3} deg/s");
+            }
+            catch (Exception ex) { Logger.Warn($"Persist gyro bias failed: {ex.Message}"); }
+        }
+
+        public static void ClearGyroBias()
+        {
+            _gyroBiasX = 0;
+            _gyroBiasY = 0;
+            _gyroBiasZ = 0;
+            _gyroBiasCalibratedAtUtc = 0;
+            _hasGyroBias = false;
+            try
+            {
+                Settings.LocalSettingsHelper.Remove("GyroBiasX");
+                Settings.LocalSettingsHelper.Remove("GyroBiasY");
+                Settings.LocalSettingsHelper.Remove("GyroBiasZ");
+                Settings.LocalSettingsHelper.Remove("GyroBiasCalibratedAtUtc");
+                Logger.Info("Cleared gyro bias offset.");
+            }
+            catch (Exception ex) { Logger.Warn($"Clear gyro bias failed: {ex.Message}"); }
+        }
+
+        public static void LoadGyroBiasFromSettings()
+        {
+            try
+            {
+                bool gotX = Settings.LocalSettingsHelper.TryGetValue<double>("GyroBiasX", out double bx);
+                bool gotY = Settings.LocalSettingsHelper.TryGetValue<double>("GyroBiasY", out double by);
+                bool gotZ = Settings.LocalSettingsHelper.TryGetValue<double>("GyroBiasZ", out double bz);
+                long at = 0;
+                bool gotAt = false;
+                if (Settings.LocalSettingsHelper.TryGetValue<string>("GyroBiasCalibratedAtUtc", out string atStr) &&
+                    long.TryParse(atStr, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out at))
+                {
+                    gotAt = true;
+                }
+                else if (Settings.LocalSettingsHelper.TryGetValue<long>("GyroBiasCalibratedAtUtc", out long atLong))
+                {
+                    at = atLong; gotAt = true;
+                }
+                else if (Settings.LocalSettingsHelper.TryGetValue<double>("GyroBiasCalibratedAtUtc", out double atDbl) && atDbl > 0)
+                {
+                    at = (long)atDbl; gotAt = true;
+                }
+                Logger.Info($"LoadGyroBiasFromSettings: gotX={gotX} gotY={gotY} gotZ={gotZ} gotAt={gotAt} at={at}");
+                if (gotX && gotY && gotZ && gotAt && at > 0)
+                {
+                    _gyroBiasX = (float)bx;
+                    _gyroBiasY = (float)by;
+                    _gyroBiasZ = (float)bz;
+                    _gyroBiasCalibratedAtUtc = at;
+                    _hasGyroBias = true;
+                    Logger.Info($"Loaded persisted gyro bias offset: X={_gyroBiasX:F3} Y={_gyroBiasY:F3} Z={_gyroBiasZ:F3} deg/s (calibrated {new DateTime(at, DateTimeKind.Utc):s}Z)");
+                }
+            }
+            catch (Exception ex) { Logger.Warn($"Load gyro bias from settings failed: {ex.Message}"); }
         }
 
         /// <summary>

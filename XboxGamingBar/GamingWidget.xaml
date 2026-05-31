@@ -4815,6 +4815,40 @@
                                             <ComboBoxItem Content="Handheld (device IMU)" Tag="Handheld"/>
                                         </ComboBox>
 
+                                        <!-- Software Gyro Bias (Steam-style one-shot calibration). Captures the
+                                             current resting gyro reading and subtracts it from all subsequent
+                                             samples so any small post-firmware-cal drift gets zeroed across
+                                             every gyro consumer (DS4 / DualSense / Xbox native gyro, stick-gyro,
+                                             legacy CE). Separate from the Legion controller firmware calibration. -->
+                                        <Border Background="#1F1F1F" CornerRadius="6" Padding="10" Margin="0,12,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="Software gyro bias" FontSize="13" Foreground="#FFFFFF" FontWeight="SemiBold"/>
+                                                <TextBlock Margin="0,4,0,0"
+                                                           FontSize="11" Foreground="#A0A0A0" TextWrapping="Wrap"
+                                                           Text="Lay the device flat on a still surface, then press Calibrate to zero out gyro drift. This is separate from the Legion controller firmware calibration."/>
+                                                <Grid Margin="0,8,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button x:Name="CalibrateGyroBiasButton"
+                                                            Grid.Column="0"
+                                                            Content="Calibrate gyro bias"
+                                                            Click="CalibrateGyroBiasButton_Click"
+                                                            Margin="0,0,6,0"/>
+                                                    <Button x:Name="ResetGyroBiasButton"
+                                                            Grid.Column="1"
+                                                            Content="Reset"
+                                                            Click="ResetGyroBiasButton_Click"/>
+                                                </Grid>
+                                                <TextBlock x:Name="GyroBiasStatusText"
+                                                           Margin="0,8,0,0"
+                                                           FontSize="11" Foreground="#CCCCCC" TextWrapping="Wrap"
+                                                           Text="Not calibrated"/>
+                                            </StackPanel>
+                                        </Border>
+
                                         <!-- IMU Axis Mapping — per-axis source selector (with optional flip).
                                              Only relevant for native-motion target types (DS4, DualSense,
                                              joycon-pair etc.) where games read the emulated device's IMU

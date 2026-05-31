@@ -132,6 +132,19 @@ namespace XboxGamingBar
                     return;
                 }
 
+                // Helper push of the current software gyro bias offset (after a calibrate /
+                // reset, and once on connect so the UI shows the persisted state). Routes to
+                // the VIIPER UI handler to update the "Calibrated ... — bias X / Y / Z" line.
+                if (message.TryGetValue("Function", out object gbFuncObj) &&
+                    Convert.ToInt32(gbFuncObj) == (int)Shared.Enums.Function.GyroBiasOffset)
+                {
+                    if (message.TryGetValue("Content", out object gbContent) && gbContent is string gbJson)
+                    {
+                        OnGyroBiasOffsetReceived(gbJson);
+                    }
+                    return;
+                }
+
                 // Helper pushes DriverUpdatesAvailable as an unsolicited message
                 // after its startup driver probe completes. Light up the Quick
                 // tab tile; no other state needs updating yet.

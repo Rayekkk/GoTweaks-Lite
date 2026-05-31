@@ -985,6 +985,83 @@ namespace XboxGamingBarHelper
                         Logger.Info($"Pipe: Sidebar Menu enabled set to: {sidebarMenuEnabled}");
                     }
                 }
+                // Software gyro bias capture or reset. Steam-style one-shot calibration:
+                // user puts the device on a flat surface, presses Calibrate, we sample for
+                // ~500 ms and store the average as the bias offset. LegionButtonMonitor
+                // subtracts this from every TryGetLatestGyroSample read so all gyro
+                // consumers (legacy CE stick-gyro, VIIPER stick-gyro, VIIPER native DS4 /
+                // DualSense / Xbox forwarding) see the corrected stream.
+                else if (functionValue == (int)Function.CalibrateGyroBias)
+                {
+                    string action = request.Content?.ToString()?.Trim()?.ToLowerInvariant() ?? "";
+                    if (action == "reset")
+                    {
+                        XboxGamingBarHelper.Labs.LegionButtonMonitor.ClearGyroBias();
+                        SendGyroBiasOffsetToWidget();
+                        Logger.Info("Pipe: CalibrateGyroBias reset");
+                    }
+                    else
+                    {
+                        Logger.Info("Pipe: CalibrateGyroBias capture starting (500 ms sample window)");
+                        // Run async so the pipe doesn't block during the capture window.
+                        _ = System.Threading.Tasks.Task.Run(() =>
+                        {
+                            try
+                            {
+                                double sumX = 0, sumY = 0, sumZ = 0;
+                                int count = 0;
+                                long lastTimestamp = 0;
+                                var start = DateTime.UtcNow;
+                                while ((DateTime.UtcNow - start).TotalMilliseconds < 500)
+                                {
+                                    // Average both controllers when both are present so we get a
+                                    // single combined bias. The forwarder uses Merge() at runtime,
+                                    // which averages signs-corrected left+right, so we approximate
+                                    // the same here by summing samples from whichever sides reply.
+                                    bool any = false;
+                                    if (XboxGamingBarHelper.Labs.LegionButtonMonitor.TryGetLatestRawGyroSample(true, out var left)
+                                        && left.TimestampTicksUtc != lastTimestamp)
+                                    {
+                                        sumX += left.GyroXDegPerSecond;
+                                        sumY += left.GyroYDegPerSecond;
+                                        sumZ += left.GyroZDegPerSecond;
+                                        count++;
+                                        any = true;
+                                    }
+                                    if (XboxGamingBarHelper.Labs.LegionButtonMonitor.TryGetLatestRawGyroSample(false, out var right)
+                                        && right.TimestampTicksUtc != lastTimestamp)
+                                    {
+                                        sumX += right.GyroXDegPerSecond;
+                                        sumY += right.GyroYDegPerSecond;
+                                        sumZ += right.GyroZDegPerSecond;
+                                        count++;
+                                        any = true;
+                                        lastTimestamp = right.TimestampTicksUtc;
+                                    }
+                                    if (!any) System.Threading.Thread.Sleep(2);
+                                    else System.Threading.Thread.Sleep(4); // ~250 Hz outer poll
+                                }
+                                if (count < 8)
+                                {
+                                    Logger.Warn($"Pipe: CalibrateGyroBias capture insufficient samples ({count}) — leaving bias unchanged. Are the controllers attached and producing input?");
+                                    SendGyroBiasOffsetToWidget(); // still push so widget can show "not calibrated"
+                                    return;
+                                }
+                                float bx = (float)(sumX / count);
+                                float by = (float)(sumY / count);
+                                float bz = (float)(sumZ / count);
+                                long atUtc = DateTime.UtcNow.Ticks;
+                                XboxGamingBarHelper.Labs.LegionButtonMonitor.SetGyroBias(bx, by, bz, atUtc);
+                                Logger.Info($"Pipe: CalibrateGyroBias captured {count} samples, bias X={bx:F3} Y={by:F3} Z={bz:F3} deg/s");
+                                SendGyroBiasOffsetToWidget();
+                            }
+                            catch (Exception capEx)
+                            {
+                                Logger.Warn($"Pipe: CalibrateGyroBias capture threw: {capEx.Message}");
+                            }
+                        });
+                    }
+                }
                 // Auto Hibernate Mode: 0=Always, 1=AC Only, 2=DC Only
                 else if (functionValue == (int)Function.AutoHibernateMode)
                 {
@@ -1720,6 +1797,39 @@ namespace XboxGamingBarHelper
             catch (Exception ex)
             {
                 Logger.Warn($"NotifyWidgetHelperExiting failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Push the current software gyro bias offset to the widget for display. JSON content
+        /// matches the GyroBiasOffset Function comment:
+        ///   { "x":<deg/s>, "y":<deg/s>, "z":<deg/s>, "at":<UTC ticks>, "valid":<bool> }
+        /// Sent after every CalibrateGyroBias capture/reset, and on widget connect (so the
+        /// status text reflects the persisted state immediately on reopen).
+        /// </summary>
+        private static void SendGyroBiasOffsetToWidget()
+        {
+            try
+            {
+                if (pipeServer == null || !pipeServer.IsConnected) return;
+                bool valid = XboxGamingBarHelper.Labs.LegionButtonMonitor.TryGetGyroBias(
+                    out float bx, out float by, out float bz, out long atUtc);
+                string json =
+                    "{\"x\":" + bx.ToString("F4", System.Globalization.CultureInfo.InvariantCulture)
+                    + ",\"y\":" + by.ToString("F4", System.Globalization.CultureInfo.InvariantCulture)
+                    + ",\"z\":" + bz.ToString("F4", System.Globalization.CultureInfo.InvariantCulture)
+                    + ",\"at\":" + atUtc.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + ",\"valid\":" + (valid ? "true" : "false")
+                    + "}";
+                var msg = new global::Windows.Foundation.Collections.ValueSet();
+                msg.Add(nameof(Shared.Enums.Function), (int)Shared.Enums.Function.GyroBiasOffset);
+                msg.Add("Content", json);
+                var pm = Shared.IPC.PipeMessage.FromValueSet(msg);
+                pipeServer.SendMessage(pm.ToJson());
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"SendGyroBiasOffsetToWidget failed: {ex.Message}");
             }
         }
 

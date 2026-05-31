@@ -815,6 +815,10 @@ namespace XboxGamingBarHelper
                     // without changing the running power mode.
                     try { legionManager?.PushAllPerModeStateToWidget(); }
                     catch (Exception ex) { Logger.Warn($"Failed to push per-mode fan curve state on connect: {ex.Message}"); }
+                    // Push the persisted software gyro bias offset so the Calibrate Gyro Bias
+                    // status text in the widget reflects the saved state immediately on connect.
+                    try { SendGyroBiasOffsetToWidget(); }
+                    catch (Exception ex) { Logger.Warn($"Failed to push gyro bias offset on connect: {ex.Message}"); }
                 };
                 pipeServer.Disconnected += (s, e) => Logger.Info("Widget disconnected from Named Pipe");
                 pipeServer.Start();
@@ -1228,6 +1232,11 @@ namespace XboxGamingBarHelper
                     try
                     {
                         LegionButtonMonitor.LoadCachedDevicePathFromSettings();
+                        LegionButtonMonitor.LoadGyroBiasFromSettings();
+                        // Widget typically connects to the pipe seconds before this load runs,
+                        // so the Connected-event push happens with _hasGyroBias=false. Push
+                        // again here so the widget UI reflects the persisted offset.
+                        try { SendGyroBiasOffsetToWidget(); } catch { }
                         LegionButtonMonitor monitor = EnsureLegionButtonMonitor();
 
                         if (monitor.StartForBatteryMonitoring())

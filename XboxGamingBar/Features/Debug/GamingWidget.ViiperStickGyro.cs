@@ -725,6 +725,124 @@ namespace XboxGamingBar
         /// </summary>
         private void StickGyroLegacyResetButton_Click(object sender, RoutedEventArgs e) => ApplyStickGyroRecommendedDefaults();
 
+        /// <summary>
+        /// "Calibrate gyro bias" button — Steam-style one-shot software calibration. We show
+        /// a brief countdown so the user has time to set the device down on a flat surface,
+        /// then ask the helper to sample the resting gyro for ~500 ms and store the average
+        /// as a bias offset to subtract from all subsequent samples. Separate from the
+        /// Legion-firmware Calibrate Gyro button (which sends an HID command to the
+        /// controller's internal sensor) — both can coexist.
+        /// </summary>
+        private async void CalibrateGyroBiasButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!App.IsConnected)
+            {
+                if (GyroBiasStatusText != null) GyroBiasStatusText.Text = "Helper not connected.";
+                return;
+            }
+            try
+            {
+                if (CalibrateGyroBiasButton != null) CalibrateGyroBiasButton.IsEnabled = false;
+                if (ResetGyroBiasButton != null) ResetGyroBiasButton.IsEnabled = false;
+                for (int n = 3; n >= 1; n--)
+                {
+                    if (GyroBiasStatusText != null)
+                        GyroBiasStatusText.Text = $"Hold still on a flat surface... {n}";
+                    await System.Threading.Tasks.Task.Delay(1000);
+                }
+                if (GyroBiasStatusText != null) GyroBiasStatusText.Text = "Capturing...";
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.CalibrateGyroBias },
+                    { "Content", "capture" }
+                };
+                App.PipeClient?.SendValueSet(request);
+                // Helper pushes GyroBiasOffset back after ~500 ms; OnGyroBiasOffsetReceived
+                // updates the status text and re-enables the buttons.
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"CalibrateGyroBiasButton_Click failed: {ex.Message}");
+                if (GyroBiasStatusText != null) GyroBiasStatusText.Text = "Calibration failed.";
+                if (CalibrateGyroBiasButton != null) CalibrateGyroBiasButton.IsEnabled = true;
+                if (ResetGyroBiasButton != null) ResetGyroBiasButton.IsEnabled = true;
+            }
+        }
+
+        private void ResetGyroBiasButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!App.IsConnected)
+            {
+                if (GyroBiasStatusText != null) GyroBiasStatusText.Text = "Helper not connected.";
+                return;
+            }
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.CalibrateGyroBias },
+                    { "Content", "reset" }
+                };
+                App.PipeClient?.SendValueSet(request);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"ResetGyroBiasButton_Click failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Helper-pushed bias offset arrived. JSON shape:
+        ///   { "x":<deg/s>, "y":<deg/s>, "z":<deg/s>, "at":<UTC ticks>, "valid":<bool> }
+        /// Updates the status text and re-enables the buttons (in case the call was a capture
+        /// and we'd disabled them for the countdown).
+        /// </summary>
+        public void OnGyroBiasOffsetReceived(string json)
+        {
+            try
+            {
+                if (!Windows.Data.Json.JsonObject.TryParse(json, out var obj)) return;
+                double x = obj.TryGetValue("x", out var xv) && xv.ValueType == Windows.Data.Json.JsonValueType.Number ? xv.GetNumber() : 0.0;
+                double y = obj.TryGetValue("y", out var yv) && yv.ValueType == Windows.Data.Json.JsonValueType.Number ? yv.GetNumber() : 0.0;
+                double z = obj.TryGetValue("z", out var zv) && zv.ValueType == Windows.Data.Json.JsonValueType.Number ? zv.GetNumber() : 0.0;
+                bool valid = obj.TryGetValue("valid", out var vv) && vv.ValueType == Windows.Data.Json.JsonValueType.Boolean && vv.GetBoolean();
+                long at = 0;
+                if (obj.TryGetValue("at", out var atv) && atv.ValueType == Windows.Data.Json.JsonValueType.Number)
+                    at = (long)atv.GetNumber();
+
+                _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                {
+                    if (CalibrateGyroBiasButton != null) CalibrateGyroBiasButton.IsEnabled = true;
+                    if (ResetGyroBiasButton != null) ResetGyroBiasButton.IsEnabled = true;
+                    if (GyroBiasStatusText == null) return;
+                    if (!valid || at == 0)
+                    {
+                        GyroBiasStatusText.Text = "Not calibrated";
+                        return;
+                    }
+                    string ageDesc = FormatAgeFromUtcTicks(at);
+                    GyroBiasStatusText.Text = $"Calibrated {ageDesc} — X {x:+0.00;-0.00;0.00}°/s, Y {y:+0.00;-0.00;0.00}°/s, Z {z:+0.00;-0.00;0.00}°/s";
+                });
+            }
+            catch (Exception ex) { Logger.Debug($"OnGyroBiasOffsetReceived parse failed: {ex.Message}"); }
+        }
+
+        private static string FormatAgeFromUtcTicks(long atUtcTicks)
+        {
+            try
+            {
+                var dt = new DateTime(atUtcTicks, DateTimeKind.Utc);
+                var span = DateTime.UtcNow - dt;
+                if (span.TotalSeconds < 60) return "just now";
+                if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
+                if (span.TotalHours < 24) return $"{(int)span.TotalHours} h ago";
+                return $"{(int)span.TotalDays} d ago";
+            }
+            catch { return "recently"; }
+        }
+
         private void ApplyStickGyroRecommendedDefaults()
         {
             // Activation

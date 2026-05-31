@@ -495,5 +495,21 @@
         // Legion controller auto-sleep (idle power-off) timeout, in minutes. 0 = never.
         // Written via HID sub-command 0x09. Common values: 0, 5, 10, 15, 20, 30.
         LegionControllerSleepMinutes,                       // int - minutes, 0 = never
+
+        // Software gyro bias capture (Steam-style one-shot calibration). Widget sends this
+        // function to request a fresh capture (Content="capture") or to clear the stored bias
+        // (Content="reset"). Helper samples raw gyro for ~500 ms, averages per axis, persists
+        // the values in LocalSettings, and pushes back via GyroBiasOffset for the UI to show.
+        // Subtraction is applied at LegionButtonMonitor.TryGetLatestGyroSample so every
+        // downstream consumer (legacy CE stick-gyro, VIIPER stick-gyro, VIIPER native DS4 /
+        // DualSense / Xbox forwarding) gets bias-corrected samples. Separate from the Legion
+        // hardware CalibrateGyro path (which sends a firmware-level zero command to the
+        // controller); the two coexist and address different drift sources.
+        CalibrateGyroBias,                                  // string - "capture" or "reset"
+
+        // Helper -> widget push of the current stored bias offset and timestamp, so the UI
+        // can show "Calibrated 2 min ago, X +0.05, Y -0.03, Z +0.08 deg/s". Content is JSON:
+        //   { "x":<deg/s>, "y":<deg/s>, "z":<deg/s>, "at":<UTC ticks>, "valid":<bool> }
+        GyroBiasOffset,                                     // string JSON - see format above
     }
 }
