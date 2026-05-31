@@ -118,13 +118,16 @@ namespace XboxGamingBarHelper.Performance
 
         public CPUUsageSensor CPUUsage { get; }
         public CPUClockSensor CPUClock { get; }
-        public CPUWattageSensor CPUWattage { get ; }
+        // Wattage typed as base HardwareSensor so we can swap CPU<->GPU
+        // sources on devices where LibreHardwareMonitor reports them swapped
+        // (e.g. LeGo2 / Ryzen Z2 Extreme — see PerformanceManager constructor).
+        public HardwareSensor CPUWattage { get; private set; }
         public CPUTemperatureSensor CPUTemperature { get; }
         public VRMTemperatureSensor VRMTemperature { get; }
 
         public GPUUsageSensor GPUUsage { get; }
         public GPUClockSensor GPUClock { get; }
-        public GPUWattageSensor GPUWattage { get; }
+        public HardwareSensor GPUWattage { get; private set; }
         public GPUTemperatureSensor GPUTemperature { get; }
 
         public MemoryUsageSensor MemoryUsage { get; }
@@ -636,6 +639,29 @@ namespace XboxGamingBarHelper.Performance
             GPUClock = new GPUClockSensor();
             GPUTemperature = new GPUTemperatureSensor();
             GPUWattage = new GPUWattageSensor();
+
+            // LeGo2 (Ryzen Z2 Extreme): LibreHardwareMonitor's CPU "Package" sensor
+            // reports what AMD Adrenalin's overlay labels GPU Power, and the GPU
+            // "GPU Core" sensor reports CPU package power — they're swapped vs.
+            // their labels. Confirmed live by Diego on 2026-05-31 (GoTweaks CPU
+            // showed 25 W at the same time AMD Adrenalin showed 25 W on GPU).
+            // Swap the two sensor references so OSD labels match what the user
+            // expects (and what AMD's overlay shows).
+            try
+            {
+                var detected = Devices.DeviceDetector.DetectDevice();
+                if (detected != null && detected.DeviceType == Shared.Enums.DeviceType.LegionGo2)
+                {
+                    var tmpW = CPUWattage;
+                    CPUWattage = GPUWattage;
+                    GPUWattage = tmpW;
+                    Logger.Info("PerformanceManager: LeGo2 detected — swapped CPU/GPU wattage sensors (Adrenalin agrees)");
+                }
+            }
+            catch (System.Exception swapEx)
+            {
+                Logger.Warn($"PerformanceManager: LeGo2 wattage swap check failed: {swapEx.Message}");
+            }
             MemoryUsage = new MemoryUsageSensor();
             MemoryUsed = new MemoryUsedSensor();
             MemoryAvailable = new MemoryAvailableSensor();
