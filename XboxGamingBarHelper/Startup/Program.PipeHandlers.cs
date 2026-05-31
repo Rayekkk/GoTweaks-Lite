@@ -1008,8 +1008,9 @@ namespace XboxGamingBarHelper
                         {
                             try
                             {
-                                double sumX = 0, sumY = 0, sumZ = 0;
-                                int count = 0;
+                                var xs = new System.Collections.Generic.List<double>(256);
+                                var ys = new System.Collections.Generic.List<double>(256);
+                                var zs = new System.Collections.Generic.List<double>(256);
                                 long lastTimestamp = 0;
                                 var start = DateTime.UtcNow;
                                 while ((DateTime.UtcNow - start).TotalMilliseconds < 500)
@@ -1022,37 +1023,55 @@ namespace XboxGamingBarHelper
                                     if (XboxGamingBarHelper.Labs.LegionButtonMonitor.TryGetLatestRawGyroSample(true, out var left)
                                         && left.TimestampTicksUtc != lastTimestamp)
                                     {
-                                        sumX += left.GyroXDegPerSecond;
-                                        sumY += left.GyroYDegPerSecond;
-                                        sumZ += left.GyroZDegPerSecond;
-                                        count++;
+                                        xs.Add(left.GyroXDegPerSecond);
+                                        ys.Add(left.GyroYDegPerSecond);
+                                        zs.Add(left.GyroZDegPerSecond);
                                         any = true;
                                     }
                                     if (XboxGamingBarHelper.Labs.LegionButtonMonitor.TryGetLatestRawGyroSample(false, out var right)
                                         && right.TimestampTicksUtc != lastTimestamp)
                                     {
-                                        sumX += right.GyroXDegPerSecond;
-                                        sumY += right.GyroYDegPerSecond;
-                                        sumZ += right.GyroZDegPerSecond;
-                                        count++;
+                                        xs.Add(right.GyroXDegPerSecond);
+                                        ys.Add(right.GyroYDegPerSecond);
+                                        zs.Add(right.GyroZDegPerSecond);
                                         any = true;
                                         lastTimestamp = right.TimestampTicksUtc;
                                     }
                                     if (!any) System.Threading.Thread.Sleep(2);
                                     else System.Threading.Thread.Sleep(4); // ~250 Hz outer poll
                                 }
+                                int count = xs.Count;
                                 if (count < 8)
                                 {
                                     Logger.Warn($"Pipe: CalibrateGyroBias capture insufficient samples ({count}) — leaving bias unchanged. Are the controllers attached and producing input?");
                                     SendGyroBiasOffsetToWidget(); // still push so widget can show "not calibrated"
                                     return;
                                 }
-                                float bx = (float)(sumX / count);
-                                float by = (float)(sumY / count);
-                                float bz = (float)(sumZ / count);
+                                // Compute median-and-MAD per axis and reject samples outside
+                                // median +/- k*MAD. MAD scaled by 1.4826 ~= Gaussian sigma, k=6
+                                // keeps ~99.99% of clean noise while pruning the ~one-in-thousand
+                                // single-sample BMI260 spikes (~+/-15 deg/s, see capture audit
+                                // 2026-05-30). Final mean is computed on the kept samples; if any
+                                // axis drops > 25% the capture is rejected as "not still enough".
+                                AxisStats sx = ComputeRobustAxisStats(xs);
+                                AxisStats sy = ComputeRobustAxisStats(ys);
+                                AxisStats sz = ComputeRobustAxisStats(zs);
+                                int maxDropped = Math.Max(sx.Dropped, Math.Max(sy.Dropped, sz.Dropped));
+                                if (maxDropped * 4 > count)
+                                {
+                                    Logger.Warn($"Pipe: CalibrateGyroBias rejected — too many outliers (X dropped={sx.Dropped} Y={sy.Dropped} Z={sz.Dropped} of {count}). Was the device actually still?");
+                                    SendGyroBiasOffsetToWidget();
+                                    return;
+                                }
+                                float bx = (float)sx.TrimmedMean;
+                                float by = (float)sy.TrimmedMean;
+                                float bz = (float)sz.TrimmedMean;
                                 long atUtc = DateTime.UtcNow.Ticks;
                                 XboxGamingBarHelper.Labs.LegionButtonMonitor.SetGyroBias(bx, by, bz, atUtc);
                                 Logger.Info($"Pipe: CalibrateGyroBias captured {count} samples, bias X={bx:F3} Y={by:F3} Z={bz:F3} deg/s");
+                                Logger.Info($"  X: trimMean={bx:F3} trimStd={sx.TrimmedStd:F3} rawMean={sx.RawMean:F3} rawStd={sx.RawStd:F3} min={sx.Min:F3} max={sx.Max:F3} dropped={sx.Dropped}");
+                                Logger.Info($"  Y: trimMean={by:F3} trimStd={sy.TrimmedStd:F3} rawMean={sy.RawMean:F3} rawStd={sy.RawStd:F3} min={sy.Min:F3} max={sy.Max:F3} dropped={sy.Dropped}");
+                                Logger.Info($"  Z: trimMean={bz:F3} trimStd={sz.TrimmedStd:F3} rawMean={sz.RawMean:F3} rawStd={sz.RawStd:F3} min={sz.Min:F3} max={sz.Max:F3} dropped={sz.Dropped}");
                                 SendGyroBiasOffsetToWidget();
                             }
                             catch (Exception capEx)
@@ -1798,6 +1817,80 @@ namespace XboxGamingBarHelper
             {
                 Logger.Warn($"NotifyWidgetHelperExiting failed: {ex.Message}");
             }
+        }
+
+        private struct AxisStats
+        {
+            public double TrimmedMean;
+            public double TrimmedStd;
+            public double RawMean;
+            public double RawStd;
+            public double Min;
+            public double Max;
+            public int Dropped;
+        }
+
+        // MAD-rejection threshold. 6 * 1.4826 * MAD is roughly 6 sigma for Gaussian noise,
+        // which keeps essentially all clean samples and prunes the rare BMI260 single-sample
+        // step (~+/-15 deg/s at rest) we caught during the 2026-05-30 capture audit.
+        private const double GyroBiasMadK = 6.0;
+
+        private static AxisStats ComputeRobustAxisStats(System.Collections.Generic.List<double> samples)
+        {
+            var s = new AxisStats();
+            int n = samples.Count;
+            if (n == 0) return s;
+            double sum = 0, sumSq = 0, min = double.MaxValue, max = double.MinValue;
+            for (int i = 0; i < n; i++)
+            {
+                double v = samples[i];
+                sum += v; sumSq += v * v;
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+            s.RawMean = sum / n;
+            s.RawStd = Math.Sqrt(Math.Max(0.0, sumSq / n - s.RawMean * s.RawMean));
+            s.Min = min;
+            s.Max = max;
+
+            var sorted = new double[n];
+            samples.CopyTo(sorted);
+            Array.Sort(sorted);
+            double median = (n % 2 == 0)
+                ? 0.5 * (sorted[n / 2 - 1] + sorted[n / 2])
+                : sorted[n / 2];
+            var dev = new double[n];
+            for (int i = 0; i < n; i++) dev[i] = Math.Abs(sorted[i] - median);
+            Array.Sort(dev);
+            double mad = (n % 2 == 0)
+                ? 0.5 * (dev[n / 2 - 1] + dev[n / 2])
+                : dev[n / 2];
+            // Floor MAD so an essentially-flat run (mad ~= 0) doesn't reject all but the median
+            // value as outliers. 0.05 deg/s is ~one HQ LSB scaled, well below sensor noise floor.
+            double sigma = Math.Max(0.05, 1.4826 * mad);
+            double lo = median - GyroBiasMadK * sigma;
+            double hi = median + GyroBiasMadK * sigma;
+
+            double tSum = 0, tSumSq = 0;
+            int tN = 0;
+            for (int i = 0; i < n; i++)
+            {
+                double v = samples[i];
+                if (v < lo || v > hi) continue;
+                tSum += v; tSumSq += v * v; tN++;
+            }
+            s.Dropped = n - tN;
+            if (tN > 0)
+            {
+                s.TrimmedMean = tSum / tN;
+                s.TrimmedStd = Math.Sqrt(Math.Max(0.0, tSumSq / tN - s.TrimmedMean * s.TrimmedMean));
+            }
+            else
+            {
+                s.TrimmedMean = s.RawMean;
+                s.TrimmedStd = s.RawStd;
+            }
+            return s;
         }
 
         /// <summary>
