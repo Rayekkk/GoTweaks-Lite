@@ -3175,26 +3175,41 @@ namespace XboxGamingBarHelper.Labs
                 // uses BMI260's native convention directly.
                 if (leftHighQualityActive)
                 {
+                    short lgX = ReadInt16LittleEndian(buffer, leftBase + 7);
+                    short lgY = ReadInt16LittleEndian(buffer, leftBase + 11);
+                    short lgZ = ReadInt16LittleEndian(buffer, leftBase + 9);
+                    LogGyroSpikeIfAny("L", buffer, leftBase, lgX, lgY, lgZ); // log raw, before filter, so the audit log keeps showing torn reads even after we mask them
+                    // See FilterTornGyroValue comment for torn-read background.
+                    short flgX = FilterTornGyroValue(lgX, ref _leftPrevGX1, ref _leftPrevGX2, ref _leftConsecGX, ref _leftTornReadSubstitutions);
+                    short flgY = FilterTornGyroValue(lgY, ref _leftPrevGY1, ref _leftPrevGY2, ref _leftConsecGY, ref _leftTornReadSubstitutions);
+                    short flgZ = FilterTornGyroValue(lgZ, ref _leftPrevGZ1, ref _leftPrevGZ2, ref _leftConsecGZ, ref _leftTornReadSubstitutions);
                     leftSample = new LegionGyroSample(
-                        -ReadInt16LittleEndian(buffer, leftBase + 7) * GYRO_SCALE_DEG_PER_SECOND,    // X (negated)
-                        -ReadInt16LittleEndian(buffer, leftBase + 11) * GYRO_SCALE_DEG_PER_SECOND,   // Y (negated)
-                         ReadInt16LittleEndian(buffer, leftBase + 9) * GYRO_SCALE_DEG_PER_SECOND,    // Z
-                        ReadInt16LittleEndian(buffer, leftBase + 1) * ACCEL_SCALE_G,                 // X
-                        ReadInt16LittleEndian(buffer, leftBase + 5) * ACCEL_SCALE_G,                 // Y
-                        ReadInt16LittleEndian(buffer, leftBase + 3) * ACCEL_SCALE_G,                 // Z
+                        -flgX * GYRO_SCALE_DEG_PER_SECOND,
+                        -flgY * GYRO_SCALE_DEG_PER_SECOND,
+                         flgZ * GYRO_SCALE_DEG_PER_SECOND,
+                        ReadInt16LittleEndian(buffer, leftBase + 1) * ACCEL_SCALE_G,
+                        ReadInt16LittleEndian(buffer, leftBase + 5) * ACCEL_SCALE_G,
+                        ReadInt16LittleEndian(buffer, leftBase + 3) * ACCEL_SCALE_G,
                         sampleTimestampUtc);
                     hasLeftSample = true;
                 }
 
                 if (rightHighQualityActive)
                 {
+                    short rgX = ReadInt16LittleEndian(buffer, rightBase + 9);
+                    short rgY = ReadInt16LittleEndian(buffer, rightBase + 11);
+                    short rgZ = ReadInt16LittleEndian(buffer, rightBase + 7);
+                    LogGyroSpikeIfAny("R", buffer, rightBase, rgX, rgY, rgZ);
+                    short frgX = FilterTornGyroValue(rgX, ref _rightPrevGX1, ref _rightPrevGX2, ref _rightConsecGX, ref _rightTornReadSubstitutions);
+                    short frgY = FilterTornGyroValue(rgY, ref _rightPrevGY1, ref _rightPrevGY2, ref _rightConsecGY, ref _rightTornReadSubstitutions);
+                    short frgZ = FilterTornGyroValue(rgZ, ref _rightPrevGZ1, ref _rightPrevGZ2, ref _rightConsecGZ, ref _rightTornReadSubstitutions);
                     rightSample = new LegionGyroSample(
-                        ReadInt16LittleEndian(buffer, rightBase + 9) * GYRO_SCALE_DEG_PER_SECOND,    // X
-                        ReadInt16LittleEndian(buffer, rightBase + 11) * GYRO_SCALE_DEG_PER_SECOND,   // Y
-                        ReadInt16LittleEndian(buffer, rightBase + 7) * GYRO_SCALE_DEG_PER_SECOND,    // Z
-                        ReadInt16LittleEndian(buffer, rightBase + 3) * ACCEL_SCALE_G,                // X
-                        ReadInt16LittleEndian(buffer, rightBase + 5) * ACCEL_SCALE_G,                // Y
-                        ReadInt16LittleEndian(buffer, rightBase + 1) * ACCEL_SCALE_G,                // Z
+                        frgX * GYRO_SCALE_DEG_PER_SECOND,
+                        frgY * GYRO_SCALE_DEG_PER_SECOND,
+                        frgZ * GYRO_SCALE_DEG_PER_SECOND,
+                        ReadInt16LittleEndian(buffer, rightBase + 3) * ACCEL_SCALE_G,
+                        ReadInt16LittleEndian(buffer, rightBase + 5) * ACCEL_SCALE_G,
+                        ReadInt16LittleEndian(buffer, rightBase + 1) * ACCEL_SCALE_G,
                         sampleTimestampUtc);
                     hasRightSample = true;
                 }
@@ -3500,6 +3515,90 @@ namespace XboxGamingBarHelper.Labs
             }
 
             return (short)scaled;
+        }
+
+        // Diagnostic: when an HQ-parsed gyro reading is implausibly large (device should be
+        // at rest most of the time, and even held-handheld motion rarely exceeds a couple
+        // hundred deg/s), dump the raw int16 and the surrounding 16-byte HQ block so we can
+        // see which byte is going wild. Rate-limited to once per 5 s per side so logs stay sane.
+        private const double GYRO_SPIKE_THRESHOLD_RAW = 200.0; // raw int16 ~= 12 deg/s
+        private static long _lastSpikeLogLeftTicks;
+        private static long _lastSpikeLogRightTicks;
+
+        // Torn-read filter state. The Legion firmware occasionally publishes a non-atomic gyro
+        // register read in the HID report (low/high byte updated independently inside the
+        // controller MCU before the report is assembled). Accel stays clean across these
+        // frames so it is specifically the gyro path. The artifact manifests as an isolated
+        // single-frame jump landing at exactly +/-255 or +/-256 raw LSB (the partial-update
+        // bit patterns 0x00FF / 0xFF00 / 0xFF01 / 0x0100), surrounded by quiet noise-floor
+        // samples. The 2026-05-30 capture audit confirmed this on Diego's Legion Go 2: every
+        // spike was an isolated frame, accel was always intact, and the values were always
+        // one of the four torn-read int16 patterns. We can't fix the firmware so we filter
+        // here. Filter rules:
+        //   * Substitute curr with mean(prev1, prev2) only when both neighbours are within
+        //     STABLE_LSB (~1.8 deg/s) of each other AND curr differs from each by more than
+        //     JUMP_LSB (~6 deg/s). Real motion would push prev1 vs prev2 apart and disarm.
+        //   * Bail out after 3 consecutive substitutions on the same axis: that is the
+        //     signature of an actual fast motion onset, not a torn read. Letting the raw
+        //     value through resyncs the history within 2-3 frames.
+        // Net cost on real motion: at most ~24 ms (3 frames at 125 Hz) of onset delay if the
+        // user yanks the controller from a dead stop into > 6 deg/s in a single sample, which
+        // is well below the noise floor of human-perceptible aim latency.
+        private const int TORN_READ_JUMP_LSB = 100;
+        private const int TORN_READ_STABLE_LSB = 30;
+        private const int TORN_READ_MAX_CONSEC = 3;
+        private static short _leftPrevGX1, _leftPrevGX2, _leftPrevGY1, _leftPrevGY2, _leftPrevGZ1, _leftPrevGZ2;
+        private static short _rightPrevGX1, _rightPrevGX2, _rightPrevGY1, _rightPrevGY2, _rightPrevGZ1, _rightPrevGZ2;
+        private static byte _leftConsecGX, _leftConsecGY, _leftConsecGZ;
+        private static byte _rightConsecGX, _rightConsecGY, _rightConsecGZ;
+        private static long _leftTornReadSubstitutions;
+        private static long _rightTornReadSubstitutions;
+
+        private static short FilterTornGyroValue(short curr, ref short prev1, ref short prev2, ref byte consec, ref long substCounter)
+        {
+            short result = curr;
+            if (consec < TORN_READ_MAX_CONSEC
+                && Math.Abs(curr - prev1) > TORN_READ_JUMP_LSB
+                && Math.Abs(curr - prev2) > TORN_READ_JUMP_LSB
+                && Math.Abs(prev1 - prev2) < TORN_READ_STABLE_LSB)
+            {
+                result = (short)((prev1 + prev2) / 2);
+                substCounter++;
+                consec++;
+            }
+            else
+            {
+                consec = 0;
+            }
+            prev2 = prev1;
+            prev1 = result;
+            return result;
+        }
+        private static void LogGyroSpikeIfAny(string sideTag, byte[] buffer, int baseOffset, short gX, short gY, short gZ)
+        {
+            int aX = Math.Abs(gX), aY = Math.Abs(gY), aZ = Math.Abs(gZ);
+            int worst = aX > aY ? aX : aY;
+            if (aZ > worst) worst = aZ;
+            if (worst < GYRO_SPIKE_THRESHOLD_RAW) return;
+            long now = DateTime.UtcNow.Ticks;
+            ref long last = ref (sideTag == "L" ? ref _lastSpikeLogLeftTicks : ref _lastSpikeLogRightTicks);
+            if (now - last < TimeSpan.TicksPerSecond * 5) return;
+            last = now;
+            int end = Math.Min(buffer.Length, baseOffset + 13);
+            var sb = new System.Text.StringBuilder(96);
+            for (int i = baseOffset; i < end; i++)
+            {
+                if (i > baseOffset) sb.Append(' ');
+                sb.Append(buffer[i].ToString("X2"));
+            }
+            int pre = Math.Max(0, baseOffset - 4);
+            var preSb = new System.Text.StringBuilder(16);
+            for (int i = pre; i < baseOffset; i++)
+            {
+                if (i > pre) preSb.Append(' ');
+                preSb.Append(buffer[i].ToString("X2"));
+            }
+            Logger.Info($"GyroSpike[{sideTag}] base={baseOffset} gX={gX} gY={gY} gZ={gZ} | pre[{pre}..{baseOffset - 1}]={preSb} block[{baseOffset}..{end - 1}]={sb}");
         }
 
         private static bool HasHighQualityImuSample(byte[] buffer, int baseOffset)
