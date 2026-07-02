@@ -576,6 +576,7 @@ namespace XboxGamingBar
         private readonly CurrentTDPProperty currentTdp;
         private readonly RunningGameProperty runningGame;
         private readonly PerGameProfileProperty perGameProfile;
+        private readonly DeleteGameProfileProperty deleteGameProfile;
         private readonly CPUBoostProperty cpuBoost;
         private readonly CPUEPPProperty cpuEPP;
         private readonly MaxCPUStateProperty maxCPUState;
@@ -1217,6 +1218,7 @@ namespace XboxGamingBar
                 UpdateDetectedGameScrollAnimation();
             });
             perGameProfile = new PerGameProfileProperty(PerGameProfileToggle, this);
+            deleteGameProfile = new DeleteGameProfileProperty();
             cpuBoost = new CPUBoostProperty(CPUBoostToggle, this);
             cpuEPP = new CPUEPPProperty(80, CPUEPPSlider, this);
             maxCPUState = new MaxCPUStateProperty();
@@ -1608,6 +1610,7 @@ namespace XboxGamingBar
                 tdp,
                 runningGame,
                 perGameProfile,
+                deleteGameProfile,
                 cpuBoost,
                 cpuEPP,
                 maxCPUState,

@@ -1023,6 +1023,17 @@ namespace XboxGamingBarHelper.Services
                 new[] { "vga", "graphics", "display", "video" },
                 // Audio: catalog "audio", Windows device "sound" / "audio".
                 new[] { "audio", "sound", "hdaudio" },
+                // Energy/Power management: on Legion Go handhelds the catalog package
+                // "Lenovo Energy Management" (category "Power Management") installs as the
+                // PnP device "Lenovo ACPI-Compliant Virtual Power Controller" — the two
+                // share NO literal tokens ({energy,management} vs {acpi,virtual,power,
+                // controller}), so it always showed NotInstalled (issue #79). Aliasing
+                // energy<->power bridges them: catalog gains "power", the device gains
+                // "energy", giving the 2-token overlap the matcher needs. The version
+                // tie-break then prefers the Virtual Power Controller (v matches the
+                // catalog exactly) over the unrelated "ACPI Power Button". Confirmed on
+                // LGO2 MT 83N0: both sides report 15.11.30.11.
+                new[] { "energy", "power" },
                 // Cardreader: catalog "cardreader", Windows typically "card" / "reader".
                 new[] { "cardreader", "reader" },
                 // Fingerprint reader: catalog "fingerprinter" (typo in Lenovo's catalog), Windows says "fingerprint" / "biometric".
