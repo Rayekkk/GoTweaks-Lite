@@ -248,40 +248,7 @@ namespace XboxGamingBar
                         RequestControllerEmulationDriverStatus();
                         break;
                 }
-
-                // Re-apply theme to newly visible tab (StaticResources don't update dynamically)
-                // Defer with delay to ensure visual tree is fully loaded
-                if (currentThemeName != "Default")
-                {
-                    _ = ApplyThemeToCurrentTabAsync();
-                }
             }
-        }
-
-        private async Task ApplyThemeToCurrentTabAsync()
-        {
-            // Wait for visual tree to fully load
-            await Task.Delay(50);
-            ApplyThemeToCurrentTab();
-        }
-
-        private void ApplyThemeToCurrentTab()
-        {
-            if (!WidgetThemes.TryGetValue(currentThemeName, out var theme)) return;
-
-            var cardBgBrush = new SolidColorBrush(theme.CardBackground);
-            var cardBorderBrush = new SolidColorBrush(theme.CardBorder);
-            var accentBrush = new SolidColorBrush(theme.AccentColor);
-            var textSecondaryBrush = new SolidColorBrush(theme.TextSecondary);
-
-            // Apply to all scroll viewers (only visible ones will have loaded content)
-            ApplyThemeToVisualTree(QuickSettingsScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(PerformanceScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(GameScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(AMDScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(ScalingScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(LegionScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            ApplyThemeToVisualTree(SystemScrollViewer, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
         }
 
         // Trigger-press edge tracking for tab navigation. Holding LT/RT would otherwise

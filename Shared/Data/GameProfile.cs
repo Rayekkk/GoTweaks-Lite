@@ -129,56 +129,37 @@ namespace Shared.Data
             }
         }
 
-        [XmlElement("TDPBoostEnabled")]
-        private bool tdpBoostEnabled;
-        public bool TDPBoostEnabled
+        // Custom Power Limits (per profile). In Custom (255) mode the helper applies these three
+        // values directly via Lenovo WMI: TDP holds SPL (Slow), TDPFast = SPPT (Fast), TDPPeak =
+        // FPPT (Peak). Boost is always-on now (no TDPBoost toggle): SPPT/FPPT are always applied.
+        // Struct, so no field initializers — the getters fall back to TDP (SPL) when the backing
+        // field is 0 (the value old profiles deserialize to), preserving the legacy "all three
+        // equal" behaviour for profiles saved before SPPT/FPPT existed.
+        [XmlElement("TDPFast")]
+        private int tdpFast;
+        public int TDPFast
         {
-            get { return tdpBoostEnabled; }
+            get { return tdpFast > 0 ? tdpFast : tdp; }
             set
             {
-                if (tdpBoostEnabled != value)
+                if (tdpFast != value)
                 {
-                    tdpBoostEnabled = value;
+                    tdpFast = value;
                     Save();
                 }
             }
         }
 
-        // TDP Boost deltas (per profile). When TDPBoostEnabled is on, the helper applies
-        // SPPL = TDP + tdpBoostSPPT and FPPT = TDP + tdpBoostFPPT in PerformanceManager.SetTDP.
-        // Replaces the previous global helper settings so each profile can configure how aggressive
-        // its boost is — and removes the Legion-tab Custom SPPL/FPPT sliders that previously
-        // fought with the boost path.
-        //
-        // GameProfile is a struct so field initializers aren't supported on C# 7.3; the getter
-        // returns the legacy defaults (1 / 3) when the backing field is 0 (also the value old
-        // profiles will deserialize to since they have no TDPBoostSPPT/FPPT XML element). A delta
-        // of 0 is meaningless (no boost) so this overload is safe.
-        [XmlElement("TDPBoostSPPT")]
-        private int tdpBoostSPPT;
-        public int TDPBoostSPPT
+        [XmlElement("TDPPeak")]
+        private int tdpPeak;
+        public int TDPPeak
         {
-            get { return tdpBoostSPPT > 0 ? tdpBoostSPPT : 1; }
+            get { return tdpPeak > 0 ? tdpPeak : tdp; }
             set
             {
-                if (tdpBoostSPPT != value)
+                if (tdpPeak != value)
                 {
-                    tdpBoostSPPT = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("TDPBoostFPPT")]
-        private int tdpBoostFPPT;
-        public int TDPBoostFPPT
-        {
-            get { return tdpBoostFPPT > 0 ? tdpBoostFPPT : 3; }
-            set
-            {
-                if (tdpBoostFPPT != value)
-                {
-                    tdpBoostFPPT = value;
+                    tdpPeak = value;
                     Save();
                 }
             }
@@ -263,9 +244,8 @@ namespace Shared.Data
         }
 
         /// <summary>
-        /// Whether DGP is enabled on AC power for this game.
-        /// null = use default auto behavior (disabled on AC)
-        /// true/false = user preference
+        /// LEGACY (Default Game Profiles feature removed). Kept so existing profile XML still
+        /// round-trips; no longer read or written by the app.
         /// </summary>
         [XmlElement("DgpEnabledOnAC")]
         private bool? dgpEnabledOnAC;
@@ -283,9 +263,8 @@ namespace Shared.Data
         }
 
         /// <summary>
-        /// Whether DGP is enabled on DC (battery) power for this game.
-        /// null = use default auto behavior (enabled on DC)
-        /// true/false = user preference
+        /// LEGACY (Default Game Profiles feature removed). Kept so existing profile XML still
+        /// round-trips; no longer read or written by the app.
         /// </summary>
         [XmlElement("DgpEnabledOnDC")]
         private bool? dgpEnabledOnDC;
@@ -329,148 +308,6 @@ namespace Shared.Data
                 if (fpsLimitDC != value)
                 {
                     fpsLimitDC = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPEnabled")]
-        private bool autoTDPEnabled;
-        public bool AutoTDPEnabled
-        {
-            get { return autoTDPEnabled; }
-            set
-            {
-                if (autoTDPEnabled != value)
-                {
-                    autoTDPEnabled = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPEnabled_DC")]
-        private bool? autoTDPEnabledDC;
-        public bool? AutoTDPEnabled_DC
-        {
-            get { return autoTDPEnabledDC; }
-            set
-            {
-                if (autoTDPEnabledDC != value)
-                {
-                    autoTDPEnabledDC = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPTargetFPS")]
-        private int autoTDPTargetFPS;
-        public int AutoTDPTargetFPS
-        {
-            get { return autoTDPTargetFPS; }
-            set
-            {
-                if (autoTDPTargetFPS != value)
-                {
-                    autoTDPTargetFPS = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPTargetFPS_DC")]
-        private int? autoTDPTargetFPSDC;
-        public int? AutoTDPTargetFPS_DC
-        {
-            get { return autoTDPTargetFPSDC; }
-            set
-            {
-                if (autoTDPTargetFPSDC != value)
-                {
-                    autoTDPTargetFPSDC = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPMinTDP")]
-        private int autoTDPMinTDP;
-        public int AutoTDPMinTDP
-        {
-            get { return autoTDPMinTDP; }
-            set
-            {
-                if (autoTDPMinTDP != value)
-                {
-                    autoTDPMinTDP = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPMaxTDP")]
-        private int autoTDPMaxTDP;
-        public int AutoTDPMaxTDP
-        {
-            get { return autoTDPMaxTDP; }
-            set
-            {
-                if (autoTDPMaxTDP != value)
-                {
-                    autoTDPMaxTDP = value;
-                    Save();
-                }
-            }
-        }
-
-        /// <summary>
-        /// DEPRECATED: Use AutoTDPControllerType instead.
-        /// Kept for backwards compatibility during migration.
-        /// </summary>
-        [XmlElement("AutoTDPUseMLMode")]
-        private bool autoTDPUseMLMode;
-        public bool AutoTDPUseMLMode
-        {
-            get { return autoTDPUseMLMode; }
-            set
-            {
-                if (autoTDPUseMLMode != value)
-                {
-                    autoTDPUseMLMode = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("AutoTDPPauseWhenUnfocused")]
-        private bool autoTDPPauseWhenUnfocused;
-        public bool AutoTDPPauseWhenUnfocused
-        {
-            get { return autoTDPPauseWhenUnfocused; }
-            set
-            {
-                if (autoTDPPauseWhenUnfocused != value)
-                {
-                    autoTDPPauseWhenUnfocused = value;
-                    Save();
-                }
-            }
-        }
-
-        /// <summary>
-        /// AutoTDP controller type: 0=PID, 1=Q-Learning, 2=SARSA
-        /// </summary>
-        [XmlElement("AutoTDPControllerType")]
-        private int autoTDPControllerType;
-        public int AutoTDPControllerType
-        {
-            get { return autoTDPControllerType; }
-            set
-            {
-                if (autoTDPControllerType != value)
-                {
-                    autoTDPControllerType = value;
                     Save();
                 }
             }
@@ -546,21 +383,6 @@ namespace Shared.Data
                 if (refreshRate != value)
                 {
                     refreshRate = value;
-                    Save();
-                }
-            }
-        }
-
-        [XmlElement("StickyTDP")]
-        private bool stickyTDP;
-        public bool StickyTDP
-        {
-            get { return stickyTDP; }
-            set
-            {
-                if (stickyTDP != value)
-                {
-                    stickyTDP = value;
                     Save();
                 }
             }
@@ -1196,7 +1018,7 @@ namespace Shared.Data
             set { cache = value; }
         }
 
-        public GameProfile(string gameName, string gamePath, bool inUse, int inTDP, bool inCPUBoost, int inCPUEPP, int inMaxCPUState, int inMinCPUState, bool inTDPBoostEnabled, string inPath, IDictionary<GameId, GameProfile> inCache)
+        public GameProfile(string gameName, string gamePath, bool inUse, int inTDP, bool inCPUBoost, int inCPUEPP, int inMaxCPUState, int inMinCPUState, string inPath, IDictionary<GameId, GameProfile> inCache)
         {
             GameId = new GameId(gameName, gamePath);
             use = inUse;
@@ -1206,38 +1028,27 @@ namespace Shared.Data
             cpuEPP = inCPUEPP;
             maxCPUState = inMaxCPUState;
             minCPUState = inMinCPUState;
-            tdpBoostEnabled = inTDPBoostEnabled;
-            tdpBoostSPPT = 0; // 0 = property getter returns legacy default 1
-            tdpBoostFPPT = 0; // 0 = property getter returns legacy default 3
+            tdpFast = 0; // 0 = property getter falls back to TDP (SPL)
+            tdpPeak = 0; // 0 = property getter falls back to TDP (SPL)
             // DC overrides (null = use AC value)
             tdpDC = null;
             cpuBoostDC = null;
             cpuEppDC = null;
             maxCpuStateDC = null;
             minCpuStateDC = null;
-            // DGP preferences
+            // Legacy DGP fields (feature removed; kept for XML round-trip)
             dgpEnabledOnAC = null;
             dgpEnabledOnDC = null;
             // Additional profile settings (AC)
             fpsLimit = 0;
-            autoTDPEnabled = false;
-            autoTDPTargetFPS = 60;
-            autoTDPMinTDP = 8;
-            autoTDPMaxTDP = 30;
-            autoTDPUseMLMode = false;
-            autoTDPPauseWhenUnfocused = true; // Default: pause when game not focused
-            autoTDPControllerType = 0; // PID by default
             osPowerMode = null;
             // Additional profile settings (DC overrides)
             fpsLimitDC = null;
-            autoTDPEnabledDC = null;
-            autoTDPTargetFPSDC = null;
             osPowerModeDC = null;
             // Display settings (shared AC/DC)
             hdrEnabled = false;
             resolution = null;
             refreshRate = null;
-            stickyTDP = false;
             // Overlay and CPU affinity
             overlayLevel = null;
             cpuAffinity = null;

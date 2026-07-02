@@ -166,17 +166,6 @@ namespace XboxGamingBar
                     return;
                 }
 
-                // Skip TDP and CurrentTDP updates during Sticky TDP reapply
-                if (isStickyTDPReapplying && message.ContainsKey("Function"))
-                {
-                    var function = Convert.ToInt32(message["Function"]);
-                    if (function == (int)Shared.Enums.Function.TDP || function == (int)Shared.Enums.Function.CurrentTDP)
-                    {
-                        Logger.Debug("Skipping TDP/CurrentTDP pipe update during Sticky TDP reapply");
-                        return;
-                    }
-                }
-
                 // Dispatch the whole property-update path to the UI thread. NamedPipeClient
                 // delivers MessageReceived on a background reader thread; GenericProperty.SetValue
                 // fires InvokePropertyChanged synchronously, and several subscribers (color picker

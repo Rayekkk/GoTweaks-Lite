@@ -56,7 +56,9 @@ namespace XboxGamingBar
             var settings = ApplicationData.Current.LocalSettings;
             var container = settings.CreateContainer($"Profile_{profileName}", ApplicationDataCreateDisposition.Always);
 
-            container.Values["TDP"] = profile.TDP;
+            container.Values["TDP"] = profile.TDP;          // SPL (Slow)
+            container.Values["TDPFast"] = profile.TDPFast;   // SPPT (Fast)
+            container.Values["TDPPeak"] = profile.TDPPeak;   // FPPT (Peak)
             container.Values["CPUBoost"] = profile.CPUBoost;
             container.Values["CPUEPP"] = profile.CPUEPP;
             container.Values["MaxCPUState"] = profile.MaxCPUState;
@@ -74,26 +76,15 @@ namespace XboxGamingBar
             container.Values["RadeonChillMaxFPS"] = profile.RadeonChillMaxFPS;
             container.Values["FPSLimitEnabled"] = profile.FPSLimitEnabled;
             container.Values["FPSLimitValue"] = profile.FPSLimitValue;
-            container.Values["AutoTDPEnabled"] = profile.AutoTDPEnabled;
-            container.Values["AutoTDPTargetFPS"] = profile.AutoTDPTargetFPS;
-            container.Values["AutoTDPMinTDP"] = profile.AutoTDPMinTDP;
-            container.Values["AutoTDPMaxTDP"] = profile.AutoTDPMaxTDP;
-            container.Values["AutoTDPUseMLMode"] = profile.AutoTDPUseMLMode;
-            container.Values["AutoTDPControllerType"] = profile.AutoTDPControllerType;
             container.Values["OSPowerMode"] = profile.OSPowerMode;
             container.Values["LegionPerformanceMode"] = profile.LegionPerformanceMode;
             container.Values["TDPModeIndex"] = profile.TDPModeIndex;
-            container.Values["TDPBoostEnabled"] = profile.TDPBoostEnabled;
-            container.Values["TDPBoostSPPT"] = profile.TDPBoostSPPT;
-            container.Values["TDPBoostFPPT"] = profile.TDPBoostFPPT;
             container.Values["HDREnabled"] = profile.HDREnabled;
             container.Values["Resolution"] = profile.Resolution;
             if (profile.RefreshRate.HasValue)
                 container.Values["RefreshRate"] = profile.RefreshRate.Value;
             else
                 container.Values.Remove("RefreshRate");
-            container.Values["StickyTDPEnabled"] = profile.StickyTDPEnabled;
-            container.Values["StickyTDPInterval"] = profile.StickyTDPInterval;
             container.Values["OverlayLevel"] = profile.OverlayLevel;
             container.Values["CPUAffinity"] = profile.CPUAffinity;
             // Last-saved timestamp drives the "modified Nm/h/d ago" line on the profile
@@ -114,6 +105,10 @@ namespace XboxGamingBar
                 // via global.xml) rather than a hardcoded 15 W — otherwise non-Legion devices
                 // reset TDP to 15 on every cold start (issues #74, #79).
                 profile.TDP = container.Values.ContainsKey("TDP") ? (double)container.Values["TDP"] : (tdp?.Value ?? 15);
+                // SPPT/FPPT for Custom mode. Old profiles (saved before these existed) fall back to
+                // TDP (SPL) so they keep the legacy "all three equal" behaviour.
+                profile.TDPFast = container.Values.ContainsKey("TDPFast") ? (double)container.Values["TDPFast"] : profile.TDP;
+                profile.TDPPeak = container.Values.ContainsKey("TDPPeak") ? (double)container.Values["TDPPeak"] : profile.TDP;
                 // Use current system values as defaults for EPP and CPU Boost (synced from helper)
                 profile.CPUBoost = container.Values.ContainsKey("CPUBoost") ? (bool)container.Values["CPUBoost"] : (cpuBoost?.Value ?? false);
                 profile.CPUEPP = container.Values.ContainsKey("CPUEPP") ? (double)container.Values["CPUEPP"] : (cpuEPP?.Value ?? 80);
@@ -132,12 +127,6 @@ namespace XboxGamingBar
                 profile.RadeonChillMaxFPS = container.Values.ContainsKey("RadeonChillMaxFPS") ? (double)container.Values["RadeonChillMaxFPS"] : 60;
                 profile.FPSLimitEnabled = container.Values.ContainsKey("FPSLimitEnabled") ? (bool)container.Values["FPSLimitEnabled"] : false;
                 profile.FPSLimitValue = container.Values.ContainsKey("FPSLimitValue") ? (int)container.Values["FPSLimitValue"] : 60;
-                profile.AutoTDPEnabled = container.Values.ContainsKey("AutoTDPEnabled") ? (bool)container.Values["AutoTDPEnabled"] : false;
-                profile.AutoTDPTargetFPS = container.Values.ContainsKey("AutoTDPTargetFPS") ? (int)container.Values["AutoTDPTargetFPS"] : 60;
-                profile.AutoTDPMinTDP = container.Values.ContainsKey("AutoTDPMinTDP") ? (int)container.Values["AutoTDPMinTDP"] : 8;
-                profile.AutoTDPMaxTDP = container.Values.ContainsKey("AutoTDPMaxTDP") ? (int)container.Values["AutoTDPMaxTDP"] : 30;
-                profile.AutoTDPUseMLMode = container.Values.ContainsKey("AutoTDPUseMLMode") ? (bool)container.Values["AutoTDPUseMLMode"] : false;
-                profile.AutoTDPControllerType = container.Values.ContainsKey("AutoTDPControllerType") ? (int)container.Values["AutoTDPControllerType"] : 0;
                 profile.OSPowerMode = container.Values.ContainsKey("OSPowerMode") ? (int)container.Values["OSPowerMode"] : 1;
                 // Only load LegionPerformanceMode if it exists in storage - keep profile's existing value otherwise
                 // This preserves the default (Balanced=2) for new profiles but doesn't override if storage key is missing
@@ -147,14 +136,9 @@ namespace XboxGamingBar
                 }
                 // Load TDPModeIndex for custom presets (-1 means use LegionPerformanceMode to determine index)
                 profile.TDPModeIndex = container.Values.ContainsKey("TDPModeIndex") ? (int)container.Values["TDPModeIndex"] : -1;
-                profile.TDPBoostEnabled = container.Values.ContainsKey("TDPBoostEnabled") ? (bool)container.Values["TDPBoostEnabled"] : false;
-                profile.TDPBoostSPPT = container.Values.ContainsKey("TDPBoostSPPT") ? (int)container.Values["TDPBoostSPPT"] : 1;
-                profile.TDPBoostFPPT = container.Values.ContainsKey("TDPBoostFPPT") ? (int)container.Values["TDPBoostFPPT"] : 3;
                 profile.HDREnabled = container.Values.ContainsKey("HDREnabled") ? (bool)container.Values["HDREnabled"] : false;
                 profile.Resolution = container.Values.ContainsKey("Resolution") ? (string)container.Values["Resolution"] : "";
                 profile.RefreshRate = container.Values.ContainsKey("RefreshRate") ? (int?)container.Values["RefreshRate"] : null;
-                profile.StickyTDPEnabled = container.Values.ContainsKey("StickyTDPEnabled") ? (bool)container.Values["StickyTDPEnabled"] : true;
-                profile.StickyTDPInterval = container.Values.ContainsKey("StickyTDPInterval") ? (int)container.Values["StickyTDPInterval"] : 5;
                 profile.OverlayLevel = container.Values.ContainsKey("OverlayLevel") ? (int)container.Values["OverlayLevel"] : 0;
                 profile.CPUAffinity = container.Values.ContainsKey("CPUAffinity") ? (string)container.Values["CPUAffinity"] : "";
 

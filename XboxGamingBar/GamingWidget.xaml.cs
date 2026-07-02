@@ -48,7 +48,9 @@ namespace XboxGamingBar
     /// </summary>
     public class PerformanceProfile
     {
-        public double TDP { get; set; } = 15;
+        public double TDP { get; set; } = 15;          // Absolute SPL (base TDP) in Custom mode
+        public double TDPFast { get; set; } = 25;       // Absolute SPPT (= TDP + SPPT Boost) in Custom mode
+        public double TDPPeak { get; set; } = 30;       // Absolute FPPT (= TDP + FPPT Boost) in Custom mode
         public bool CPUBoost { get; set; } = false;
         public double CPUEPP { get; set; } = 0;
         public int MaxCPUState { get; set; } = 100;
@@ -67,13 +69,6 @@ namespace XboxGamingBar
         // FPS Limit settings
         public bool FPSLimitEnabled { get; set; } = false;
         public int FPSLimitValue { get; set; } = 60;
-        // AutoTDP settings
-        public bool AutoTDPEnabled { get; set; } = false;
-        public int AutoTDPTargetFPS { get; set; } = 60;
-        public int AutoTDPMinTDP { get; set; } = 8;
-        public int AutoTDPMaxTDP { get; set; } = 30;
-        public bool AutoTDPUseMLMode { get; set; } = false;
-        public int AutoTDPControllerType { get; set; } = 0;  // 0=PID, 1=Q-Learning, 2=SARSA
         // OS Power Mode (0=Best Power Efficiency, 1=Balanced, 2=Best Performance)
         public int OSPowerMode { get; set; } = 1;
         // Legion Performance Mode (1=Quiet, 2=Balanced, 3=Performance, 255=Custom)
@@ -81,19 +76,10 @@ namespace XboxGamingBar
         // TDP Mode Index in the TDPModeComboBox (for user-made presets)
         // -1 means use LegionPerformanceMode to determine index (backwards compatibility)
         public int TDPModeIndex { get; set; } = -1;
-        // TDP Boost toggle state (per-profile)
-        public bool TDPBoostEnabled { get; set; } = false;
-        // TDP Boost deltas (per-profile): SPPL = TDP + TDPBoostSPPT, FPPT = TDP + TDPBoostFPPT.
-        // Replaces the previous global helper settings so each profile picks its own boost.
-        public int TDPBoostSPPT { get; set; } = 1;
-        public int TDPBoostFPPT { get; set; } = 3;
         // HDR and Resolution settings (per-profile)
         public bool HDREnabled { get; set; } = false;
         public string Resolution { get; set; } = "";
         public int? RefreshRate { get; set; } = null;
-        // Sticky TDP settings (per-profile)
-        public bool StickyTDPEnabled { get; set; } = true;
-        public int StickyTDPInterval { get; set; } = 5;
         // Overlay Level (0=Off, 1-4 for RTSS/AMD)
         public int OverlayLevel { get; set; } = 0;
         // CPU Affinity as "pCores,eCores" string
@@ -104,6 +90,8 @@ namespace XboxGamingBar
             return new PerformanceProfile
             {
                 TDP = this.TDP,
+                TDPFast = this.TDPFast,
+                TDPPeak = this.TDPPeak,
                 CPUBoost = this.CPUBoost,
                 CPUEPP = this.CPUEPP,
                 MaxCPUState = this.MaxCPUState,
@@ -121,23 +109,12 @@ namespace XboxGamingBar
                 RadeonChillMaxFPS = this.RadeonChillMaxFPS,
                 FPSLimitEnabled = this.FPSLimitEnabled,
                 FPSLimitValue = this.FPSLimitValue,
-                AutoTDPEnabled = this.AutoTDPEnabled,
-                AutoTDPTargetFPS = this.AutoTDPTargetFPS,
-                AutoTDPMinTDP = this.AutoTDPMinTDP,
-                AutoTDPMaxTDP = this.AutoTDPMaxTDP,
-                AutoTDPUseMLMode = this.AutoTDPUseMLMode,
-                AutoTDPControllerType = this.AutoTDPControllerType,
                 OSPowerMode = this.OSPowerMode,
                 LegionPerformanceMode = this.LegionPerformanceMode,
                 TDPModeIndex = this.TDPModeIndex,
-                TDPBoostEnabled = this.TDPBoostEnabled,
-                TDPBoostSPPT = this.TDPBoostSPPT,
-                TDPBoostFPPT = this.TDPBoostFPPT,
                 HDREnabled = this.HDREnabled,
                 Resolution = this.Resolution,
                 RefreshRate = this.RefreshRate,
-                StickyTDPEnabled = this.StickyTDPEnabled,
-                StickyTDPInterval = this.StickyTDPInterval,
                 OverlayLevel = this.OverlayLevel,
                 CPUAffinity = this.CPUAffinity
             };
@@ -147,21 +124,6 @@ namespace XboxGamingBar
     /// <summary>
     /// Theme color palette definition
     /// </summary>
-    public class ThemeColors
-    {
-        public string Name { get; set; }
-        public Windows.UI.Color PageBackground { get; set; }
-        public Windows.UI.Color CardBackground { get; set; }
-        public Windows.UI.Color CardBorder { get; set; }
-        public Windows.UI.Color AccentColor { get; set; }
-        public Windows.UI.Color TextPrimary { get; set; }
-        public Windows.UI.Color TextSecondary { get; set; }
-        public Windows.UI.Color ButtonBackground { get; set; }
-        public Windows.UI.Color ButtonBorder { get; set; }
-        public Windows.UI.Color TileOff { get; set; }
-        public Windows.UI.Color TileOn { get; set; }
-    }
-
     /// <summary>
     /// View model for OSD item in the reorderable list
     /// </summary>
@@ -523,16 +485,6 @@ namespace XboxGamingBar
     }
 
     /// <summary>
-    /// Represents a power plan for UI binding
-    /// </summary>
-    public class PowerPlanItem
-    {
-        public Guid Guid { get; set; }
-        public string Name { get; set; }
-        public override string ToString() => Name;
-    }
-
-    /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
     public sealed partial class GamingWidget : Page, INotifyPropertyChanged
@@ -554,91 +506,6 @@ namespace XboxGamingBar
             "App Installer", //Somehow App Installer shows up as a game sometimes
         };
 
-        // Theme definitions
-        private static readonly Dictionary<string, ThemeColors> WidgetThemes = new Dictionary<string, ThemeColors>
-        {
-            { "Default", new ThemeColors {
-                Name = "Default",
-                PageBackground = Windows.UI.Color.FromArgb(255, 37, 40, 44),      // #25282C
-                CardBackground = Windows.UI.Color.FromArgb(255, 48, 52, 58),      // #30343A
-                CardBorder = Windows.UI.Color.FromArgb(255, 80, 85, 92),          // #50555C
-                AccentColor = Windows.UI.Color.FromArgb(255, 0, 200, 255),        // #00C8FF
-                TextPrimary = Windows.UI.Color.FromArgb(255, 255, 255, 255),      // #FFFFFF
-                TextSecondary = Windows.UI.Color.FromArgb(255, 160, 160, 160),    // #A0A0A0
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 62, 67, 75),    // #3E434B
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 107, 117, 132),     // #6B7584
-                TileOff = Windows.UI.Color.FromArgb(255, 26, 28, 30),             // #1A1C1E
-                TileOn = Windows.UI.Color.FromArgb(255, 26, 46, 31)               // #1A2E1F
-            }},
-            { "Dark", new ThemeColors {
-                Name = "Dark",
-                PageBackground = Windows.UI.Color.FromArgb(255, 26, 26, 26),      // #1A1A1A
-                CardBackground = Windows.UI.Color.FromArgb(255, 37, 37, 37),      // #252525
-                CardBorder = Windows.UI.Color.FromArgb(255, 58, 58, 58),          // #3A3A3A
-                AccentColor = Windows.UI.Color.FromArgb(255, 0, 200, 255),        // #00C8FF
-                TextPrimary = Windows.UI.Color.FromArgb(255, 255, 255, 255),      // #FFFFFF
-                TextSecondary = Windows.UI.Color.FromArgb(255, 144, 144, 144),    // #909090
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 50, 50, 50),    // #323232
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 80, 80, 80),        // #505050
-                TileOff = Windows.UI.Color.FromArgb(255, 20, 20, 20),             // #141414
-                TileOn = Windows.UI.Color.FromArgb(255, 20, 40, 25)               // #142819
-            }},
-            { "OLED", new ThemeColors {
-                Name = "OLED",
-                PageBackground = Windows.UI.Color.FromArgb(255, 0, 0, 0),         // #000000
-                CardBackground = Windows.UI.Color.FromArgb(255, 10, 10, 10),      // #0A0A0A
-                CardBorder = Windows.UI.Color.FromArgb(255, 26, 26, 26),          // #1A1A1A
-                AccentColor = Windows.UI.Color.FromArgb(255, 0, 200, 255),        // #00C8FF
-                TextPrimary = Windows.UI.Color.FromArgb(255, 255, 255, 255),      // #FFFFFF
-                TextSecondary = Windows.UI.Color.FromArgb(255, 128, 128, 128),    // #808080
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 20, 20, 20),    // #141414
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 40, 40, 40),        // #282828
-                TileOff = Windows.UI.Color.FromArgb(255, 5, 5, 5),                // #050505
-                TileOn = Windows.UI.Color.FromArgb(255, 10, 30, 15)               // #0A1E0F
-            }},
-            { "Dracula", new ThemeColors {
-                Name = "Dracula",
-                PageBackground = Windows.UI.Color.FromArgb(255, 40, 42, 54),      // #282A36
-                CardBackground = Windows.UI.Color.FromArgb(255, 68, 71, 90),      // #44475A
-                CardBorder = Windows.UI.Color.FromArgb(255, 98, 114, 164),        // #6272A4
-                AccentColor = Windows.UI.Color.FromArgb(255, 189, 147, 249),      // #BD93F9
-                TextPrimary = Windows.UI.Color.FromArgb(255, 248, 248, 242),      // #F8F8F2
-                TextSecondary = Windows.UI.Color.FromArgb(255, 98, 114, 164),     // #6272A4
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 68, 71, 90),    // #44475A
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 98, 114, 164),      // #6272A4
-                TileOff = Windows.UI.Color.FromArgb(255, 33, 34, 44),             // #21222C
-                TileOn = Windows.UI.Color.FromArgb(255, 80, 250, 123)             // #50FA7B (green)
-            }},
-            { "Nord", new ThemeColors {
-                Name = "Nord",
-                PageBackground = Windows.UI.Color.FromArgb(255, 46, 52, 64),      // #2E3440
-                CardBackground = Windows.UI.Color.FromArgb(255, 59, 66, 82),      // #3B4252
-                CardBorder = Windows.UI.Color.FromArgb(255, 76, 86, 106),         // #4C566A
-                AccentColor = Windows.UI.Color.FromArgb(255, 136, 192, 208),      // #88C0D0
-                TextPrimary = Windows.UI.Color.FromArgb(255, 236, 239, 244),      // #ECEFF4
-                TextSecondary = Windows.UI.Color.FromArgb(255, 216, 222, 233),    // #D8DEE9
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 67, 76, 94),    // #434C5E
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 76, 86, 106),       // #4C566A
-                TileOff = Windows.UI.Color.FromArgb(255, 36, 40, 50),             // #242832
-                TileOn = Windows.UI.Color.FromArgb(255, 163, 190, 140)            // #A3BE8C (green)
-            }},
-            { "Catppuccin", new ThemeColors {
-                Name = "Catppuccin",
-                PageBackground = Windows.UI.Color.FromArgb(255, 30, 30, 46),      // #1E1E2E
-                CardBackground = Windows.UI.Color.FromArgb(255, 49, 50, 68),      // #313244
-                CardBorder = Windows.UI.Color.FromArgb(255, 69, 71, 90),          // #45475A
-                AccentColor = Windows.UI.Color.FromArgb(255, 203, 166, 247),      // #CBA6F7
-                TextPrimary = Windows.UI.Color.FromArgb(255, 205, 214, 244),      // #CDD6F4
-                TextSecondary = Windows.UI.Color.FromArgb(255, 166, 173, 200),    // #A6ADC8
-                ButtonBackground = Windows.UI.Color.FromArgb(255, 49, 50, 68),    // #313244
-                ButtonBorder = Windows.UI.Color.FromArgb(255, 88, 91, 112),       // #585B70
-                TileOff = Windows.UI.Color.FromArgb(255, 24, 24, 37),             // #181825
-                TileOn = Windows.UI.Color.FromArgb(255, 166, 227, 161)            // #A6E3A1 (green)
-            }}
-        };
-
-        private string currentThemeName = "Default";
-
         // Xbox Game Bar logic
         private XboxGameBarWidget widget = null;
         private XboxGameBarWidgetActivity widgetActivity = null;
@@ -656,12 +523,6 @@ namespace XboxGamingBar
 
         // Widget unloading flag - prevents UI updates during shutdown
         private bool isUnloading = false;
-
-        // Sticky TDP monitoring
-        private DispatcherTimer stickyTDPTimer = null;
-        private double targetTDPLimit = 15; // Stores the TDP limit we want to maintain
-        private int stickyTDPCheckIntervalSeconds = 5;
-        private bool isStickyTDPReapplying = false; // Prevents slider flicker during reapply
 
         // Power source change TDP reapply timer
         private DispatcherTimer powerSourceTdpReapplyTimer = null;
@@ -730,6 +591,7 @@ namespace XboxGamingBar
         private readonly DisplayOrientationProperty displayOrientation;
         private readonly HDRSupportedProperty hdrSupported;
         private readonly HDREnabledProperty hdrEnabled;
+        private readonly AutoSdrEnabledProperty autoSdrEnabled;
         private readonly AdaptiveBrightnessModeProperty adaptiveBrightnessMode;
         private readonly TrackedGameProperty trackedGame;
         private readonly RTSSInstalledProperty rtssInstalled;
@@ -813,9 +675,12 @@ namespace XboxGamingBar
         private readonly LegionLightBrightnessProperty legionLightBrightness;
         private readonly LegionLightSpeedProperty legionLightSpeed;
         private readonly LegionPerformanceModeProperty legionPerformanceMode;
-        // Legion Custom SPL/SPPL/FPPT slider properties removed — TDP is now governed by the
-        // Performance-tab master TDP slider + per-profile TDP Boost deltas. Helper still tracks
-        // the hardware values internally for SetCustomTDP / WMI roundtrips.
+        // Legion Custom SPL/SPPT/FPPT sliders (Performance tab, shown only in Custom mode).
+        // Each writes its limit straight through Lenovo WMI via the helper's ApplyCustomTDP*.
+        // Boost is always-on: SPPT (Fast) and FPPT (Peak) are always applied alongside SPL.
+        private readonly LegionCustomTDPSlowProperty legionCustomTDPSlow;
+        private readonly LegionCustomTDPFastProperty legionCustomTDPFast;
+        private readonly LegionCustomTDPPeakProperty legionCustomTDPPeak;
         private readonly LegionFanFullSpeedProperty legionFanFullSpeed;
         private readonly LegionUnlockFanCurveProperty legionUnlockFanCurve;
         private readonly LegionFanCurveGraphProperty legionFanCurveGraph;
@@ -964,11 +829,6 @@ namespace XboxGamingBar
         private readonly GPDFanCurveVisibleProperty gpdFanCurveVisible;
         private readonly GPDFanCurveEnabledProperty gpdFanCurveEnabled;
 
-        // Default Game Profile properties (Microsoft Gaming Services profiles)
-        private readonly DefaultGameProfileAvailableProperty defaultGameProfileAvailable;
-        private readonly DefaultGameProfileDataProperty defaultGameProfileData;
-        private readonly DefaultGameProfileEnabledProperty defaultGameProfileEnabled;
-
         // Settings properties
         private readonly TdpMethodProperty tdpMethod;
         private readonly EmulationBackendProperty emulationBackend;
@@ -1002,42 +862,7 @@ namespace XboxGamingBar
         private readonly AutoHibernateEnabledProperty autoHibernateEnabled;
         private readonly AutoHibernateIdleMinutesProperty autoHibernateIdleMinutes;
 
-        // AutoTDP properties
-        private readonly AutoTDPEnabledProperty autoTDPEnabled;
-        private readonly AutoTDPTargetFPSProperty autoTDPTargetFPS;
-        private readonly AutoTDPCurrentFPSProperty autoTDPCurrentFPS;
-        private readonly AutoTDPMinTDPProperty autoTDPMinTDP;
-        private readonly AutoTDPMaxTDPProperty autoTDPMaxTDP;
-        private readonly AutoTDPUseMLModeProperty autoTDPUseMLMode;  // DEPRECATED: use autoTDPControllerType
-        private readonly AutoTDPControllerTypeProperty autoTDPControllerType;  // 0=PID, 1=Q-Learning, 2=SARSA
-        private readonly AutoTDPMLStatusProperty autoTDPMLStatus;
-        private readonly AutoTDPLearnedGameDataProperty autoTDPLearnedGameData;
-        private readonly AutoTDPResetMLProperty autoTDPResetML;
-        private readonly AutoTDPPauseWhenUnfocusedProperty autoTDPPauseWhenUnfocused;
         private readonly TDPLimitsProperty tdpLimits;
-
-        // AutoTDP slider debounce timers (delay sending to helper until user stops sliding)
-        private DispatcherTimer autoTDPTargetFPSDebounceTimer;
-        private DispatcherTimer autoTDPMinDebounceTimer;
-        private DispatcherTimer autoTDPMaxDebounceTimer;
-        private int pendingAutoTDPTargetFPS;
-        private int pendingAutoTDPMinTDP;
-        private int pendingAutoTDPMaxTDP;
-
-        private readonly CPUCoreConfigProperty cpuCoreConfig;
-        private readonly CPUCoreActiveConfigProperty cpuCoreActiveConfig;
-        private readonly CoreParkingPercentProperty coreParkingPercent;
-        private readonly ForceParkModeProperty forceParkMode;
-        private readonly ForceDefaultGameProfileProperty forceDefaultGameProfile;
-
-        // TDP Boost properties
-        private readonly TDPBoostEnabledProperty tdpBoostEnabled;
-        private readonly TDPBoostSPPTProperty tdpBoostSPPT;
-        private readonly TDPBoostFPPTProperty tdpBoostFPPT;
-        private bool isTDPBoostExpanded = false;
-        private bool isLoadingTDPBoostSettings = false;
-        private bool isLoadingStickyTDPSettings = false;
-        private bool isUpdatingTDPMode = false; // Prevents saving toggle states during mode changes
 
         // OS Power Mode
         private readonly OSPowerModeProperty osPowerMode;
@@ -1088,7 +913,6 @@ namespace XboxGamingBar
         private bool isSwitchingControllerProfile = false;
         private DateTime lastProfileApplyTime = DateTime.MinValue; // Prevents duplicate sends from queued UI events
         private int profileSwitchEpoch = 0; // Incremented on each LoadProfileSettings; used to skip stale deferred callbacks
-        private string lastSentGamepadMappingsJson = null; // Tracks last sent mappings to avoid duplicates
 
         // Helper to check if we have a valid game (not null, not empty, not "No game detected")
         private bool HasValidGame(string gameName)
@@ -1276,14 +1100,11 @@ namespace XboxGamingBar
         private bool _saveCPUState = true;
         private bool _saveAMDFeatures = false;
         private bool _saveFPSLimit = true;
-        private bool _saveAutoTDP = true;
         private bool _saveOSPowerMode = true;
         private bool _saveHDR = false;
         private bool _saveResolution = false;
         private bool _saveRefreshRate = false;
-        private bool _saveStickyTDP = false;
         private bool _saveOverlayLevel = false;
-        private bool _saveCPUAffinity = false;
         // Legion device-wide settings default to false so they behave as global device
         // settings rather than per-game; the helper routes writes to GlobalProfile when these
         // are false and still applies from the game profile only when the game stored a value.
@@ -1298,14 +1119,11 @@ namespace XboxGamingBar
         private bool SaveCPUState => _saveCPUState;
         private bool SaveAMDFeatures => _saveAMDFeatures;
         private bool SaveFPSLimit => _saveFPSLimit;
-        private bool SaveAutoTDP => _saveAutoTDP;
         private bool SaveOSPowerMode => _saveOSPowerMode;
         private bool SaveHDR => _saveHDR;
         private bool SaveResolution => _saveResolution;
         private bool SaveRefreshRate => _saveRefreshRate;
-        private bool SaveStickyTDP => _saveStickyTDP;
         private bool SaveOverlayLevel => _saveOverlayLevel;
-        private bool SaveCPUAffinity => _saveCPUAffinity;
         private bool SaveNintendoLayout => _saveNintendoLayout;
         private bool SaveVibration => _saveVibration;
         private bool SaveLighting => _saveLighting;
@@ -1348,8 +1166,6 @@ namespace XboxGamingBar
             isLoadingOSDConfig = true;
             // Prevent profile settings checkbox events from saving during XAML initialization
             isLoadingProfileSettings = true;
-            // Prevent TDP limits slider events from saving during XAML initialization
-            isLoadingTDPLimits = true;
             // Prevent controller profile events from saving during XAML initialization
             // This MUST be set before InitializeComponent() to prevent button ComboBox events
             // from overwriting stored button mappings with defaults
@@ -1384,7 +1200,10 @@ namespace XboxGamingBar
             this.GotFocus += (s, args) => ResetTriggerTabNavState();
 
             var propertiesTimer = Stopwatch.StartNew();
-            tdp = new TDPProperty(4, TDPSlider, this);
+            // Headless: the master TDP slider was removed (Legion-only build). The property stays
+            // as the Function.TDP wire channel + the helper's master-TDP value cache, but no longer
+            // drives a UI control. On Legion the Custom limits are owned by the boost sliders.
+            tdp = new TDPProperty(4, null, this);
             currentTdp = new CurrentTDPProperty(CurrentTDPValueText, this);
             osd = new OSDProperty(0, PerformanceOverlaySlider, this);
             runningGame = new RunningGameProperty(RunningGameText, PerGameProfileToggle, DetectedGameText, this);
@@ -1415,6 +1234,7 @@ namespace XboxGamingBar
             displayOrientation = new DisplayOrientationProperty();
             hdrSupported = new HDRSupportedProperty(HDRToggle, this);
             hdrEnabled = new HDREnabledProperty(HDRToggle, this);
+            autoSdrEnabled = new AutoSdrEnabledProperty(AutoSdrToggle, this);
             adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(AdaptiveBrightnessModeComboBox, this);
             trackedGame = new TrackedGameProperty(new TrackedGame());
             rtssInstalled = new RTSSInstalledProperty(PerformanceOverlaySlider, this);
@@ -1500,7 +1320,15 @@ namespace XboxGamingBar
             legionLightColor = new LegionLightColorProperty(LegionColorPicker, this);
             legionLightBrightness = new LegionLightBrightnessProperty(LegionBrightnessSlider, this);
             legionLightSpeed = new LegionLightSpeedProperty(LegionSpeedSlider, this);
-            legionPerformanceMode = new LegionPerformanceModeProperty(LegionPerformanceModeComboBox, this);
+            // The Legion-tab "Power Profile" dropdown was removed; the property now binds to the
+            // Performance tab's TDP Mode dropdown, the single control for the performance mode.
+            legionPerformanceMode = new LegionPerformanceModeProperty(TDPModeComboBox, this);
+            // Headless wire channels for the absolute Custom SPL/SPPT/FPPT — driven manually from
+            // the TDP / SPPT Boost / FPPT Boost sliders (see GamingWidget.LegionGo.cs). No slider
+            // binding / debounce so limits apply live via WMI while dragging.
+            legionCustomTDPSlow = new LegionCustomTDPSlowProperty();
+            legionCustomTDPFast = new LegionCustomTDPFastProperty();
+            legionCustomTDPPeak = new LegionCustomTDPPeakProperty();
             legionFanFullSpeed = new LegionFanFullSpeedProperty(LegionFanFullSpeedToggle, this);
             legionUnlockFanCurve = new LegionUnlockFanCurveProperty(LegionUnlockFanCurveToggle, this);
 
@@ -1661,17 +1489,6 @@ namespace XboxGamingBar
             gpdFanCurveVisible = new GPDFanCurveVisibleProperty();
             gpdFanCurveEnabled = new GPDFanCurveEnabledProperty(this);
 
-            // Default Game Profile properties
-            defaultGameProfileAvailable = new DefaultGameProfileAvailableProperty(this);
-            defaultGameProfileData = new DefaultGameProfileDataProperty(this);
-            defaultGameProfileEnabled = new DefaultGameProfileEnabledProperty(this);
-
-            // Set up Default Game Profile callbacks
-            defaultGameProfileAvailable.SetVisibilityCallback(SetDefaultProfileCardVisibility);
-            defaultGameProfileData.SetDataCallback(UpdateDefaultProfileDisplay);
-            defaultGameProfileEnabled.BindToggle(DefaultProfileToggle);
-            defaultGameProfileEnabled.SetEnabledCallback(OnDefaultProfileEnabledChanged);
-
             // Settings properties
             tdpMethod = new TdpMethodProperty(TdpMethodComboBox, this);
             emulationBackend = new EmulationBackendProperty(ViiperEmulationToggle, this);
@@ -1734,29 +1551,7 @@ namespace XboxGamingBar
             vigemBusInstalled.SetInstalledCallback(UpdateViGEmBusInstalledUI);
             hidHideInstalled.SetInstalledCallback(UpdateHidHideInstalledUI);
 
-            // AutoTDP properties
-            autoTDPEnabled = new AutoTDPEnabledProperty(false);
-            autoTDPTargetFPS = new AutoTDPTargetFPSProperty(60);
-            autoTDPCurrentFPS = new AutoTDPCurrentFPSProperty(0);
-            autoTDPMinTDP = new AutoTDPMinTDPProperty(8);
-            autoTDPMaxTDP = new AutoTDPMaxTDPProperty(30);
-            autoTDPUseMLMode = new AutoTDPUseMLModeProperty(false);
-            autoTDPControllerType = new AutoTDPControllerTypeProperty(0);  // 0=PID
-            autoTDPMLStatus = new AutoTDPMLStatusProperty("");
-            autoTDPLearnedGameData = new AutoTDPLearnedGameDataProperty("");
-            autoTDPResetML = new AutoTDPResetMLProperty(false);
-            autoTDPPauseWhenUnfocused = new AutoTDPPauseWhenUnfocusedProperty(true); // Default: enabled
             tdpLimits = new TDPLimitsProperty("4,35");
-            cpuCoreConfig = new CPUCoreConfigProperty("");
-            cpuCoreActiveConfig = new CPUCoreActiveConfigProperty("");
-            coreParkingPercent = new CoreParkingPercentProperty(100); // 100% = all cores active
-            forceParkMode = new ForceParkModeProperty(false);
-            forceDefaultGameProfile = new ForceDefaultGameProfileProperty(false);
-
-            // TDP Boost properties (defaults: enabled=false, SPPT=1W, FPPT=3W)
-            tdpBoostEnabled = new TDPBoostEnabledProperty(false);
-            tdpBoostSPPT = new TDPBoostSPPTProperty(1);
-            tdpBoostFPPT = new TDPBoostFPPTProperty(3);
 
             // OS Power Mode property
             osPowerMode = new OSPowerModeProperty();
@@ -1828,6 +1623,7 @@ namespace XboxGamingBar
                 displayOrientation,
                 hdrSupported,
                 hdrEnabled,
+                autoSdrEnabled,
                 adaptiveBrightnessMode,
                 trackedGame,
                 rtssInstalled,
@@ -1903,6 +1699,9 @@ namespace XboxGamingBar
                 legionLightBrightness,
                 legionLightSpeed,
                 legionPerformanceMode,
+                legionCustomTDPSlow,
+                legionCustomTDPFast,
+                legionCustomTDPPeak,
                 legionFanFullSpeed,
                 legionUnlockFanCurve,
                 legionFanCurveGraph,
@@ -1976,27 +1775,9 @@ namespace XboxGamingBar
                 installHidHide,
                 autoHibernateEnabled,
                 autoHibernateIdleMinutes,
-                autoTDPEnabled,
-                autoTDPTargetFPS,
-                autoTDPCurrentFPS,
-                autoTDPMinTDP,
-                autoTDPMaxTDP,
-                autoTDPUseMLMode,
-                autoTDPControllerType,
-                autoTDPPauseWhenUnfocused,
-                autoTDPMLStatus,
-                autoTDPLearnedGameData,
-                autoTDPResetML,
                 fpsLimit,
                 osPowerMode,
                 tdpLimits,
-                cpuCoreConfig,
-                cpuCoreActiveConfig,
-                coreParkingPercent,
-                forceParkMode,
-                tdpBoostEnabled,
-                tdpBoostSPPT,
-                tdpBoostFPPT,
                 legionDesktopControls,
                 legionJoystickAsMouseMode,
                 legionJoystickMouseSens,
@@ -2074,10 +1855,6 @@ namespace XboxGamingBar
                 gpdCPUTemp,
                 gpdFanCurveVisible,
                 gpdFanCurveEnabled,
-                defaultGameProfileAvailable,
-                defaultGameProfileData,
-                defaultGameProfileEnabled,
-                forceDefaultGameProfile,
                 // Profile Detection Settings
                 profileMatchByExe,
                 profileGamesOnly
@@ -2119,8 +1896,8 @@ namespace XboxGamingBar
             // Load profile customization settings
             LoadProfileCustomizationSettings();
 
-            // Load TDP preset customization settings
-            LoadTdpPresetsSettings();
+            // Populate the fixed TDP mode dropdown (Quiet/Balanced/Performance/Custom)
+            PopulateTdpModeComboBox();
 
             // Initialize CPU State comboboxes with percentage values
             InitializeCPUStateComboBoxes();
@@ -2205,35 +1982,8 @@ namespace XboxGamingBar
             UpdateProfileDisplay();
             UpdateGameProfileCardVisibility();
 
-            // Load Device TDP limits (must be before AutoTDP settings)
+            // Load Device TDP limits
             LoadTDPLimitsFromStorage();
-
-            // Load AutoTDP settings and subscribe to current FPS updates
-            LoadAutoTDPSettings();
-            if (autoTDPCurrentFPS != null)
-                autoTDPCurrentFPS.PropertyChanged += AutoTDPCurrentFPS_PropertyChanged;
-            if (autoTDPMLStatus != null)
-                autoTDPMLStatus.PropertyChanged += AutoTDPMLStatus_PropertyChanged;
-            if (autoTDPLearnedGameData != null)
-                autoTDPLearnedGameData.PropertyChanged += AutoTDPLearnedGameData_PropertyChanged;
-            if (autoTDPUseMLMode != null)
-                autoTDPUseMLMode.PropertyChanged += AutoTDPUseMLMode_PropertyChanged;
-            if (autoTDPControllerType != null)
-                autoTDPControllerType.PropertyChanged += AutoTDPControllerType_PropertyChanged;
-            if (autoTDPEnabled != null)
-                autoTDPEnabled.PropertyChanged += AutoTDPEnabled_PropertyChanged;
-            if (autoTDPTargetFPS != null)
-                autoTDPTargetFPS.PropertyChanged += AutoTDPTargetFPS_PropertyChanged;
-
-            // Load TDP Boost settings (SPPT/FPPT from LocalSettings)
-            LoadTDPBoostSettings();
-
-            // Load Sticky TDP settings (defaults to enabled on new installs)
-            LoadStickyTDPSettings();
-
-            // Subscribe to TDP Boost property changes from helper (profile sync)
-            if (tdpBoostEnabled != null)
-                tdpBoostEnabled.PropertyChanged += TDPBoostEnabled_PropertyChanged;
 
             // Subscribe to property changes that affect Quick Settings tiles
             SubscribeToQuickSettingsPropertyChanges();
@@ -2251,12 +2001,6 @@ namespace XboxGamingBar
             // Load Performance Overlay setting
             LoadPerformanceOverlaySetting();
 
-            // Load Power Plan settings
-            LoadPowerPlanSettings();
-
-            // Load Force Default Game Profile setting
-            LoadForceDefaultGameProfileSetting();
-
             // Restore Auto Hibernate AC/DC power-source choice (issue #88 bug #3)
             LoadAutoHibernateModeSetting();
 
@@ -2266,18 +2010,6 @@ namespace XboxGamingBar
 
             // Initialize Labs section (DAService status polling)
             InitializeLabsSection();
-        }
-
-        private void AutoTDPCurrentFPS_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                if (AutoTDPCurrentFPSValue != null && autoTDPCurrentFPS != null)
-                {
-                    int fps = autoTDPCurrentFPS.Value;
-                    AutoTDPCurrentFPSValue.Text = fps > 0 ? $"{fps} FPS" : "-- FPS";
-                }
-            });
         }
 
         private void SubscribeToQuickSettingsPropertyChanges()
@@ -2320,8 +2052,6 @@ namespace XboxGamingBar
                 amdRadeonChillEnabled.PropertyChanged += QuickSettingsProperty_Changed;
             if (amdRadeonBoostEnabled != null)
                 amdRadeonBoostEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-            if (autoTDPEnabled != null)
-                autoTDPEnabled.PropertyChanged += QuickSettingsProperty_Changed;
 
             // Controller battery properties - update tile when battery status changes
             if (controllerBatteryLeft != null)
@@ -2361,31 +2091,7 @@ namespace XboxGamingBar
                 controllerDeviceStatus.PropertyChanged += LegionControllerDeviceStatus_PropertyChanged;
             }
 
-            // Subscribe to CPU core config changes
-            if (cpuCoreConfig != null)
-                cpuCoreConfig.PropertyChanged += CPUCoreConfig_PropertyChanged;
-
             Logger.Info("Subscribed to Quick Settings property changes");
-        }
-
-        private void CPUCoreConfig_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                if (cpuCoreConfig != null && !string.IsNullOrEmpty(cpuCoreConfig.Value))
-                {
-                    // Parse "pCores,eCores,isHybrid" format
-                    var parts = cpuCoreConfig.Value.Split(',');
-                    if (parts.Length >= 3 &&
-                        int.TryParse(parts[0], out int pCores) &&
-                        int.TryParse(parts[1], out int eCores) &&
-                        bool.TryParse(parts[2], out bool isHybrid))
-                    {
-                        Logger.Info($"Received CPU core config from helper: {pCores}P + {eCores}E cores, hybrid={isHybrid}");
-                        SetupCPUCoreConfigUI(pCores, eCores);
-                    }
-                }
-            });
         }
 
         private void QuickSettingsProperty_Changed(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -3243,9 +2949,6 @@ namespace XboxGamingBar
             widgetDarkThemeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 40, 44));
             widgetLightThemeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
 
-            // Load saved theme preference
-            LoadThemeSetting();
-
             // Only update widget if new parameter is an XboxGameBarWidget, preserve existing otherwise
             if (e.Parameter is XboxGameBarWidget newWidget)
             {
@@ -3373,36 +3076,22 @@ namespace XboxGamingBar
                     // Don't apply profile TDP mode to helper - helper is source of truth
                     // Helper already has correct mode from its own profile
 
-                    // Sync TDPModeComboBox with helper's LegionPerformanceMode
-                    if (legionGoDetected?.Value == true && LegionPerformanceModeComboBox != null && TDPModeComboBox != null)
+                    // TDPModeComboBox now follows the helper's LegionPerformanceMode automatically
+                    // (the bound legionPerformanceMode property updates it on every helper push).
+                    // Keep lastTDPModeIndex aligned and seed savedCustomTDP from the helper's TDP.
+                    if (legionGoDetected?.Value == true && TDPModeComboBox != null)
                     {
-                        if (TDPModeComboBox.SelectedIndex != LegionPerformanceModeComboBox.SelectedIndex)
-                        {
-                            Logger.Info($"Syncing TDPModeComboBox to match helper's mode: index {LegionPerformanceModeComboBox.SelectedIndex}");
-                            lastTDPModeIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                            TDPModeComboBox.SelectedIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                        }
+                        lastTDPModeIndex = TDPModeComboBox.SelectedIndex;
 
                         // Initialize savedCustomTDP from helper's synced TDP value
-                        if (IsCustomTdpModeIndex(LegionPerformanceModeComboBox.SelectedIndex) && tdp != null)
+                        if (IsCustomTdpModeSelected() && tdp != null)
                         {
                             savedCustomTDP = tdp.Value;
                             Logger.Info($"Initialized savedCustomTDP from helper's TDP: {savedCustomTDP}W");
                         }
                     }
 
-                    // Update TDP slider to show helper's actual TDP value
-                    if (tdp != null && TDPSlider != null)
-                    {
-                        double helperTDP = tdp.Value;
-                        if (Math.Abs(TDPSlider.Value - helperTDP) > 0.5)
-                        {
-                            Logger.Info($"Updating TDP slider from stale {TDPSlider.Value}W to helper's {helperTDP}W");
-                            TDPSlider.Value = helperTDP;
-                        }
-                    }
-
-                    // Update TDP display text and enabled state based on current mode
+                    // Update Custom mode display / cards based on current mode (master TDP slider removed)
                     UpdateTDPSliderEnabledState();
                     Logger.Info($"Updated TDP slider enabled state after sync");
 
@@ -3698,71 +3387,39 @@ namespace XboxGamingBar
                 // It already has the correct mode from its own profile (global.xml)
                 Logger.Info("[PIPE] Skipping profile TDP mode apply - helper is source of truth");
 
-                // Sync TDPModeComboBox with helper's LegionPerformanceMode
-                // This is needed because LegionPerformanceModeComboBox_SelectionChanged skips
-                // TDPModeComboBox sync during isInitialSync
+                // TDPModeComboBox now follows the helper's LegionPerformanceMode automatically via
+                // the bound legionPerformanceMode property. Just realign lastTDPModeIndex (and seed
+                // savedCustomTDP on Legion) so the first user mode change isn't skipped as stale.
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                 {
-                    if (LegionPerformanceModeComboBox != null && TDPModeComboBox != null)
+                    if (TDPModeComboBox != null)
                     {
+                        lastTDPModeIndex = TDPModeComboBox.SelectedIndex;
+
                         if (legionGoDetected?.Value == true)
                         {
-                            if (TDPModeComboBox.SelectedIndex != LegionPerformanceModeComboBox.SelectedIndex)
-                            {
-                                Logger.Info($"[PIPE] Syncing TDPModeComboBox to match helper's mode: index {LegionPerformanceModeComboBox.SelectedIndex}");
-                                lastTDPModeIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                                TDPModeComboBox.SelectedIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                            }
-                            else
-                            {
-                                // Always sync lastTDPModeIndex even when indices already match
-                                // to prevent stale values from a previous session
-                                lastTDPModeIndex = TDPModeComboBox.SelectedIndex;
-                            }
-
                             // Initialize savedCustomTDP from helper's synced TDP value
                             // This prevents stale savedCustomTDP (default 15W) from overriding
                             // the helper's actual TDP when TDPModeComboBox_SelectionChanged fires
-                            if (IsCustomTdpModeIndex(LegionPerformanceModeComboBox.SelectedIndex) && tdp != null)
+                            if (IsCustomTdpModeSelected() && tdp != null)
                             {
                                 savedCustomTDP = tdp.Value;
                                 Logger.Info($"[PIPE] Initialized savedCustomTDP from helper's TDP: {savedCustomTDP}W");
                             }
                         }
-                        else
-                        {
-                            // Generic device: sync lastTDPModeIndex from current ComboBox state
-                            // to prevent stale values from causing the first mode change to be skipped
-                            lastTDPModeIndex = TDPModeComboBox.SelectedIndex;
-                            Logger.Info($"[PIPE] Synced lastTDPModeIndex for generic device: {lastTDPModeIndex}");
-                        }
                     }
 
-                    // Update the TDP slider to show helper's actual TDP value
-                    // The slider may have been set to a stale profile value during LoadProfileSettings
-                    if (tdp != null && TDPSlider != null)
-                    {
-                        double helperTDP = tdp.Value;
-                        if (Math.Abs(TDPSlider.Value - helperTDP) > 0.5)
-                        {
-                            Logger.Info($"[PIPE] Updating TDP slider from stale {TDPSlider.Value}W to helper's {helperTDP}W");
-                            TDPSlider.Value = helperTDP;
-                        }
-                    }
-
-                    // Update TDP display text and enabled state based on current mode
-                    // Without this, TDPValueText/CurrentTDPValueText show stale "Balanced mode" from XAML defaults
+                    // Update Custom mode display / cards based on current mode (master TDP slider removed).
+                    // Without this, CurrentTDPValueText shows stale "Balanced mode" from XAML defaults.
                     UpdateTDPSliderEnabledState();
-                    Logger.Info($"[PIPE] Updated TDP slider enabled state after sync");
+                    Logger.Info($"[PIPE] Updated Custom TDP display after sync");
                 });
 
                 // Send Quick Metrics and Screen Saver enabled states to helper (fire-and-forget)
                 Logger.Info("[PIPE] Sending Quick Metrics and Screen Saver enabled states to helper...");
                 SendQuickMetricsEnabledToHelper();
                 SendScreenSaverEnabledToHelper();
-                SendSidebarMenuEnabledToHelper();
                 SendProfileSaveFlagsToHelper();
-                SendPowerSourceProfileConfigToHelper();
                 SendPowerSourceProfileValuesToHelper();
                 // Without this, the helper's ControllerHotkeyMonitor only learns the
                 // widget's View+ABXY / Menu+DPad bindings on the next dropdown change.

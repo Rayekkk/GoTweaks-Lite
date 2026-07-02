@@ -63,13 +63,6 @@ namespace XboxGamingBarHelper.Performance
         {
             base.NotifyPropertyChanged(propertyName);
 
-            // Skip hardware apply if AutoTDP is managing TDP
-            if (Manager.IsAutoTDPActive)
-            {
-                Logger.Debug($"Skipping TDP hardware apply - AutoTDP is active (value={Value}W)");
-                return;
-            }
-
             Manager.SetTDP(Value);
         }
     }

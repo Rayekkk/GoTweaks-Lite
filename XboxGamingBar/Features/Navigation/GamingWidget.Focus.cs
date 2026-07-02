@@ -64,10 +64,6 @@ namespace XboxGamingBar
             PerGameProfileToggle.GotFocus += Control_GotFocus;
             PerGameProfileToggle.LostFocus += Control_LostFocus;
 
-            // Performance tab - Default Game Profile card
-            DefaultProfileToggle.GotFocus += Control_GotFocus;
-            DefaultProfileToggle.LostFocus += Control_LostFocus;
-
             // Performance tab - Performance Overlay card
             PerformanceOverlayComboBox.GotFocus += Control_GotFocus;
             PerformanceOverlayComboBox.LostFocus += Control_LostFocus;
@@ -76,15 +72,13 @@ namespace XboxGamingBar
             TDPModeComboBox.GotFocus += Control_GotFocus;
             TDPModeComboBox.LostFocus += Control_LostFocus;
 
-            // Performance tab - TDP card
-            TDPSlider.GotFocus += Control_GotFocus;
-            TDPSlider.LostFocus += Control_LostFocus;
-
-            // Performance tab - AutoTDP card
-            AutoTDPToggle.GotFocus += Control_GotFocus;
-            AutoTDPToggle.LostFocus += Control_LostFocus;
-            AutoTDPTargetFPSSlider.GotFocus += Control_GotFocus;
-            AutoTDPTargetFPSSlider.LostFocus += Control_LostFocus;
+            // Performance tab - Custom power-limit sliders (master TDP slider removed)
+            CustomTDPSlowSlider.GotFocus += Control_GotFocus;
+            CustomTDPSlowSlider.LostFocus += Control_LostFocus;
+            CustomTDPFastSlider.GotFocus += Control_GotFocus;
+            CustomTDPFastSlider.LostFocus += Control_LostFocus;
+            CustomTDPPeakSlider.GotFocus += Control_GotFocus;
+            CustomTDPPeakSlider.LostFocus += Control_LostFocus;
 
             // Performance tab - CPU Boost card
             CPUBoostToggle.GotFocus += Control_GotFocus;
@@ -172,31 +166,13 @@ namespace XboxGamingBar
             ProfileSaveCPUStateCheckBox.GotFocus += StandaloneControl_GotFocus;
             ProfileSaveAMDFeaturesCheckBox.GotFocus += StandaloneControl_GotFocus;
 
-            // System tab - Sticky TDP card
-            StickyTDPToggle.GotFocus += Control_GotFocus;
-            StickyTDPToggle.LostFocus += Control_LostFocus;
-            StickyTDPIntervalSlider.GotFocus += Control_GotFocus;
-            StickyTDPIntervalSlider.LostFocus += Control_LostFocus;
-
             // System tab - TDP Method card
             TdpMethodComboBox.GotFocus += Control_GotFocus;
             TdpMethodComboBox.LostFocus += Control_LostFocus;
 
-            // System tab - TDP Settings card
+            // System tab - PawnIO Driver card
             TDPSettingsExpandButton.GotFocus += Control_GotFocus;
             TDPSettingsExpandButton.LostFocus += Control_LostFocus;
-            TDPLimitsMinSlider.GotFocus += Control_GotFocus;
-            TDPLimitsMinSlider.LostFocus += Control_LostFocus;
-            TDPLimitsMaxSlider.GotFocus += Control_GotFocus;
-            TDPLimitsMaxSlider.LostFocus += Control_LostFocus;
-
-            // Performance tab - Advanced card (Power Plan controls)
-            ACPowerPlanComboBox.GotFocus += Control_GotFocus;
-            ACPowerPlanComboBox.LostFocus += Control_LostFocus;
-            DCPowerPlanComboBox.GotFocus += Control_GotFocus;
-            DCPowerPlanComboBox.LostFocus += Control_LostFocus;
-            PowerPlanAutoSwitchToggle.GotFocus += Control_GotFocus;
-            PowerPlanAutoSwitchToggle.LostFocus += Control_LostFocus;
 
             // System tab - OSD Customization card
             OSDCustomizeExpandButton.GotFocus += Control_GotFocus;
@@ -266,10 +242,6 @@ namespace XboxGamingBar
             ControllerEmulationVirtualAbxyLayoutComboBox.GotFocus += Control_GotFocus;
             ControllerEmulationVirtualAbxyLayoutComboBox.LostFocus += Control_LostFocus;
 
-            // System tab - Advanced card
-            AdvancedExpandButton.GotFocus += Control_GotFocus;
-            AdvancedExpandButton.LostFocus += Control_LostFocus;
-
             // Scaling tab - Status card buttons
             ShowLosslessScalingWindowButton.GotFocus += Control_GotFocus;
             ShowLosslessScalingWindowButton.LostFocus += Control_LostFocus;
@@ -336,9 +308,8 @@ namespace XboxGamingBar
             LegionBrightnessSlider.GotFocus += Control_GotFocus;
             LegionBrightnessSlider.LostFocus += Control_LostFocus;
 
-            // Legion tab - Performance Mode card
-            LegionPerformanceModeComboBox.GotFocus += Control_GotFocus;
-            LegionPerformanceModeComboBox.LostFocus += Control_LostFocus;
+            // Legion tab - Performance Mode "Power Profile" dropdown removed; the Performance tab's
+            // TDP Mode dropdown is now the single performance-mode control.
 
             // Legion tab - Custom TDP card removed; SPL/SPPL/FPPT now live on Performance tab.
 

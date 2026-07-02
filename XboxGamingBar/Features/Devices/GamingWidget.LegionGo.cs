@@ -64,13 +64,6 @@ namespace XboxGamingBar
 
                 // Update XY focus bindings - TDP Mode card is always present now
                 UpdatePerformanceTabXYFocus(true);
-
-                // Sync TDP Mode with Legion Performance Mode if Legion device
-                // Skip during initial sync - ApplyProfileTDPToHelper will set the correct value
-                if (visible && LegionPerformanceModeComboBox != null && TDPModeComboBox != null && !isInitialSync)
-                {
-                    TDPModeComboBox.SelectedIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                }
             }
 
             // Show/hide Manufacturer WMI option in TDP Method dropdown based on Legion detection
@@ -1082,466 +1075,41 @@ namespace XboxGamingBar
         /// </summary>
         private void UpdatePerformanceTabXYFocus(bool isLegion)
         {
-            if (PerformanceOverlayComboBox != null && TDPModeComboBox != null && TDPSlider != null)
+            // Master TDP slider removed: PerformanceOverlay -> TDPMode dropdown. From the dropdown the
+            // focus continues to the Custom sliders (when visible) or OSPowerMode, wired in XAML.
+            if (PerformanceOverlayComboBox != null && TDPModeComboBox != null)
             {
-                if (isLegion)
-                {
-                    // Legion: PerformanceOverlay -> TDPMode -> TDPSlider
-                    PerformanceOverlayComboBox.XYFocusDown = TDPModeComboBox;
-                    TDPSlider.XYFocusUp = TDPModeComboBox;
-                }
-                else
-                {
-                    // Non-Legion: PerformanceOverlay -> TDPSlider
-                    PerformanceOverlayComboBox.XYFocusDown = TDPSlider;
-                    TDPSlider.XYFocusUp = PerformanceOverlayComboBox;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Shows or hides the Default Game Profile card based on profile availability.
-        /// </summary>
-        private void SetDefaultProfileCardVisibility(bool isVisible)
-        {
-            if (DefaultGameProfileCard != null)
-            {
-                DefaultGameProfileCard.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"Default Game Profile card visibility set to: {isVisible}");
-
-                // Update XY navigation when DGP visibility changes
-                UpdatePerformanceTabXYNavigation();
+                PerformanceOverlayComboBox.XYFocusDown = TDPModeComboBox;
+                TDPModeComboBox.XYFocusUp = PerformanceOverlayComboBox;
             }
         }
 
         /// <summary>
         /// Updates XY focus navigation for the Performance tab based on current state.
-        /// Flow: Nav -> DGP Toggle (if visible) -> PerGameProfile Toggle (if game detected) -> Performance Overlay -> ...
-        /// When DGP is ON: Nav -> DGP Toggle -> TDP Extras (skip disabled TDP/FPS controls)
+        /// Flow: Nav -> PerGameProfile Toggle (if game detected) -> Performance Overlay -> ...
         /// </summary>
         private void UpdatePerformanceTabXYNavigation()
         {
             // Early exit if UI elements aren't ready
             if (PerformanceNavItem == null || PerformanceOverlayComboBox == null) return;
 
-            bool dgpVisible = DefaultGameProfileCard?.Visibility == Visibility.Visible;
-            bool dgpEnabled = defaultGameProfileEnabled?.Value == true;
             bool gameDetected = runningGame?.Value.IsValid() == true;
 
-            Logger.Debug($"UpdatePerformanceTabXYNavigation: dgpVisible={dgpVisible}, dgpEnabled={dgpEnabled}, gameDetected={gameDetected}");
+            Logger.Debug($"UpdatePerformanceTabXYNavigation: gameDetected={gameDetected}");
 
-            // Determine the chain of focusable elements
-            // Start from PerformanceNavItem going down
-
-            if (dgpVisible && DefaultProfileToggle != null)
+            if (gameDetected && PerGameProfileToggle != null)
             {
-                // DGP is visible: Nav -> DefaultProfileToggle
-                PerformanceNavItem.XYFocusDown = DefaultProfileToggle;
-                DefaultProfileToggle.XYFocusUp = PerformanceNavItem;
-
-                if (dgpEnabled && TDPExtrasExpandToggle != null)
-                {
-                    // DGP is ON: skip disabled TDP/FPS controls, go to TDP Extras dropdown
-                    // (OS Power Mode and CPU Extras are still available)
-                    DefaultProfileToggle.XYFocusDown = TDPExtrasExpandToggle;
-                    TDPExtrasExpandToggle.XYFocusUp = DefaultProfileToggle;
-
-                    // Set navigation from TDP Extras down to OS Power Mode, and OS Power Mode up to TDP Extras
-                    if (OSPowerModeComboBox != null)
-                    {
-                        TDPExtrasExpandToggle.XYFocusDown = OSPowerModeComboBox;
-                        OSPowerModeComboBox.XYFocusUp = TDPExtrasExpandToggle;
-                    }
-                }
-                else if (gameDetected && PerGameProfileToggle != null)
-                {
-                    // DGP visible but OFF, game detected: DGP Toggle -> PerGameProfile Toggle -> Overlay
-                    DefaultProfileToggle.XYFocusDown = PerGameProfileToggle;
-                    PerGameProfileToggle.XYFocusUp = DefaultProfileToggle;
-                    PerGameProfileToggle.XYFocusDown = PerformanceOverlayComboBox;
-                    PerformanceOverlayComboBox.XYFocusUp = PerGameProfileToggle;
-                }
-                else
-                {
-                    // DGP visible but OFF, no game: DGP Toggle -> Overlay (skip disabled PerGameProfile)
-                    DefaultProfileToggle.XYFocusDown = PerformanceOverlayComboBox;
-                    PerformanceOverlayComboBox.XYFocusUp = DefaultProfileToggle;
-                }
+                // Game detected: Nav -> PerGameProfile Toggle -> Overlay
+                PerformanceNavItem.XYFocusDown = PerGameProfileToggle;
+                PerGameProfileToggle.XYFocusUp = PerformanceNavItem;
+                PerGameProfileToggle.XYFocusDown = PerformanceOverlayComboBox;
+                PerformanceOverlayComboBox.XYFocusUp = PerGameProfileToggle;
             }
             else
             {
-                // DGP not visible
-                if (gameDetected && PerGameProfileToggle != null)
-                {
-                    // No DGP, game detected: Nav -> PerGameProfile Toggle -> Overlay
-                    PerformanceNavItem.XYFocusDown = PerGameProfileToggle;
-                    PerGameProfileToggle.XYFocusUp = PerformanceNavItem;
-                    PerGameProfileToggle.XYFocusDown = PerformanceOverlayComboBox;
-                    PerformanceOverlayComboBox.XYFocusUp = PerGameProfileToggle;
-                }
-                else
-                {
-                    // No DGP, no game: Nav -> Overlay (skip disabled PerGameProfile)
-                    PerformanceNavItem.XYFocusDown = PerformanceOverlayComboBox;
-                    PerformanceOverlayComboBox.XYFocusUp = PerformanceNavItem;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Updates the Default Game Profile card display with profile settings.
-        /// </summary>
-        private void UpdateDefaultProfileDisplay(Shared.Data.DefaultGameProfile? profile)
-        {
-            if (profile.HasValue)
-            {
-                var p = profile.Value;
-
-                // Store current profile first (needed by UpdateDefaultProfileGameIcon)
-                currentDefaultGameProfile = p;
-
-                // Update game name
-                if (DefaultProfileGameName != null)
-                {
-                    DefaultProfileGameName.Text = p.GameName ?? "";
-                }
-
-                // Update game icon from Steam CDN if available
-                UpdateDefaultProfileGameIcon();
-
-                // Update settings text
-                if (DefaultProfileSettingsText != null)
-                {
-                    var settings = new System.Collections.Generic.List<string>();
-
-                    settings.Add($"{p.TDP}W");
-
-                    if (p.FrameCap.HasValue && p.FrameCap.Value > 0)
-                    {
-                        settings.Add($"{p.FrameCap.Value}fps");
-                    }
-
-                    if (!string.IsNullOrEmpty(p.ResolutionCap))
-                    {
-                        settings.Add(p.ResolutionCap);
-                    }
-
-                    DefaultProfileSettingsText.Text = string.Join(" - ", settings);
-                    Logger.Info($"Default Game Profile display updated: {DefaultProfileSettingsText.Text}");
-                }
-
-                // Update "Optimizing for Z2/Z1 Extreme" text based on hardware model
-                if (DefaultProfileOptimizingText != null && DefaultProfileSeparator != null)
-                {
-                    string optimizingText = "Optimizing for your device";
-                    if (!string.IsNullOrEmpty(p.HardwareModel))
-                    {
-                        if (p.HardwareModel == "HORSEM4N")
-                        {
-                            optimizingText = "Optimizing for Z2 Extreme";
-                        }
-                        else if (p.HardwareModel == "OMNI")
-                        {
-                            optimizingText = "Optimizing for Z1 Extreme";
-                        }
-                    }
-                    DefaultProfileOptimizingText.Text = optimizingText;
-                    DefaultProfileOptimizingText.Visibility = Visibility.Visible;
-                    DefaultProfileSeparator.Visibility = Visibility.Visible;
-                }
-            }
-            else
-            {
-                // Hide elements when no profile
-                if (DefaultProfileOptimizingText != null)
-                {
-                    DefaultProfileOptimizingText.Visibility = Visibility.Collapsed;
-                }
-                if (DefaultProfileSeparator != null)
-                {
-                    DefaultProfileSeparator.Visibility = Visibility.Collapsed;
-                }
-                if (DefaultProfileGameName != null)
-                {
-                    DefaultProfileGameName.Text = "";
-                }
-                currentDefaultGameProfile = null;
-            }
-        }
-
-        /// <summary>
-        /// Updates the game icon in the Default Game Profile card.
-        /// First tries helper-cached icons, then Steam's local cache.
-        /// </summary>
-        private async void UpdateDefaultProfileGameIcon()
-        {
-            // Ensure we're on the UI thread
-            if (!Dispatcher.HasThreadAccess)
-            {
-                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => UpdateDefaultProfileGameIcon());
-                return;
-            }
-
-            if (DefaultProfileGameIcon == null)
-            {
-                Logger.Info("UpdateDefaultProfileGameIcon: DefaultProfileGameIcon element is null");
-                return;
-            }
-
-            Logger.Info($"UpdateDefaultProfileGameIcon: Starting, currentGameExePath={currentGameExePath ?? "null"}");
-
-            string iconPath = null;
-
-            // First, try to use the helper-cached icon for the current running game
-            // (Default profiles are shown when a matching game is detected)
-            if (!string.IsNullOrEmpty(currentGameExePath))
-            {
-                iconPath = GetCachedIconPath(currentGameExePath);
-                if (!string.IsNullOrEmpty(iconPath))
-                {
-                    Logger.Info($"UpdateDefaultProfileGameIcon: Using helper-cached icon: {iconPath}");
-                }
-                else
-                {
-                    Logger.Info($"UpdateDefaultProfileGameIcon: No cached icon found for {currentGameExePath}");
-                }
-            }
-
-            // Fall back to Steam icon if we have a Steam App ID
-            if (string.IsNullOrEmpty(iconPath) && currentDefaultGameProfile.HasValue)
-            {
-                iconPath = currentDefaultGameProfile.Value.GetSteamIconPath();
-                if (!string.IsNullOrEmpty(iconPath))
-                {
-                    Logger.Info($"UpdateDefaultProfileGameIcon: Using Steam icon: {iconPath}");
-                }
-            }
-
-            // Try to load the icon
-            if (!string.IsNullOrEmpty(iconPath))
-            {
-                try
-                {
-                    // Load from local file using StorageFile for UWP compatibility
-                    var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(iconPath);
-                    using (var stream = await file.OpenReadAsync())
-                    {
-                        var bitmap = new Windows.UI.Xaml.Media.Imaging.BitmapImage();
-                        await bitmap.SetSourceAsync(stream);
-                        DefaultProfileGameIcon.Source = bitmap;
-                        DefaultProfileGameIcon.Visibility = Visibility.Visible;
-                        Logger.Info($"UpdateDefaultProfileGameIcon: Icon loaded successfully");
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"UpdateDefaultProfileGameIcon: Failed to load icon from {iconPath}: {ex.Message}");
-                }
-            }
-            else
-            {
-                Logger.Info("UpdateDefaultProfileGameIcon: No icon path available");
-            }
-
-            // Hide the icon if no icon available
-            DefaultProfileGameIcon.Visibility = Visibility.Collapsed;
-        }
-
-        // Cached default game profile for UI state management
-        private Shared.Data.DefaultGameProfile? currentDefaultGameProfile;
-
-        /// <summary>
-        /// Called when the Default Game Profile enabled state changes.
-        /// Greys out TDP controls and syncs FPS limit when enabled.
-        /// </summary>
-        private void OnDefaultProfileEnabledChanged(bool enabled)
-        {
-            Logger.Info($"Default Game Profile enabled changed to: {enabled}");
-
-            // IMPORTANT: When DISABLING, load the appropriate profile for current power state!
-            // Don't restore saved values - they may be from a different power state (e.g., DC when now on AC)
-            // Set flag to suppress profile saves during restoration (toggle handlers would otherwise save wrong values)
-            if (!enabled)
-            {
-                isRestoringFromDefaultProfile = true;
-                try
-                {
-                    // Clear saved state - we'll load from profile instead of restoring
-                    // FPS limit and TDP can differ between AC/DC profiles, so restoring pre-DGP state is wrong
-                    originalFpsLimitToggleState = null;
-                    originalFpsLimitSliderValue = null;
-                    originalTdpSliderValue = null;
-
-                    // Load the appropriate profile for current power state
-                    // This ensures AC profile is loaded when on AC, DC profile when on DC
-                    // Profile loading handles TDP, FPS limit, and all other settings
-                    string targetProfile = GetTargetProfileName();
-                    Logger.Info($"DGP disabled - loading profile for current power state: {targetProfile}");
-                    LoadProfileSettings(targetProfile, isExplicitSwitch: false);
-                }
-                finally
-                {
-                    isRestoringFromDefaultProfile = false;
-                }
-            }
-
-            // Update TDP controls enabled state (now with correct values if disabling)
-            UpdateTDPControlsForDefaultProfile(enabled);
-
-            // Update per-game profile toggle state
-            UpdatePerGameProfileForDefaultProfile(enabled);
-
-            if (enabled && currentDefaultGameProfile.HasValue)
-            {
-                var profile = currentDefaultGameProfile.Value;
-
-                // Save original FPS limit state before changing
-                if (FPSLimitToggle != null && !originalFpsLimitToggleState.HasValue)
-                {
-                    originalFpsLimitToggleState = FPSLimitToggle.IsOn;
-                    originalFpsLimitSliderValue = FPSLimitSlider?.Value ?? 60;
-                    Logger.Info($"Saved original FPS limit state: toggle={originalFpsLimitToggleState}, value={originalFpsLimitSliderValue}");
-                }
-
-                // Save original TDP slider value before changing
-                if (TDPSlider != null && !originalTdpSliderValue.HasValue)
-                {
-                    originalTdpSliderValue = TDPSlider.Value;
-                    Logger.Info($"Saved original TDP slider value: {originalTdpSliderValue}W");
-                }
-
-                // Sync FPS limit toggle and slider to match profile
-                if (profile.FrameCap.HasValue && profile.FrameCap.Value > 0)
-                {
-                    if (FPSLimitToggle != null)
-                    {
-                        FPSLimitToggle.IsOn = true;
-                    }
-                    if (FPSLimitSlider != null)
-                    {
-                        FPSLimitSlider.Value = profile.FrameCap.Value;
-                    }
-                    Logger.Info($"FPS limit synced to default profile: {profile.FrameCap.Value}fps");
-                }
-
-                // Sync TDP slider to match profile
-                if (profile.TDP > 0 && TDPSlider != null)
-                {
-                    TDPSlider.Value = profile.TDP;
-                    Logger.Info($"TDP slider synced to default profile: {profile.TDP}W");
-                }
-            }
-
-            // Update Quick tab tile styling
-            UpdateQuickSettingsTileStates();
-
-            // Update XY navigation for controller support
-            UpdatePerformanceTabXYNavigation();
-        }
-
-        // Store original state for restoration when default profile is disabled
-        private bool? originalFpsLimitToggleState;
-        private double? originalFpsLimitSliderValue;
-        private double? originalTdpSliderValue;
-        private bool isRestoringFromDefaultProfile; // Flag to suppress profile saves during DGP restoration
-
-        /// <summary>
-        /// Updates per-game profile toggle state based on Default Game Profile.
-        /// </summary>
-        private void UpdatePerGameProfileForDefaultProfile(bool defaultProfileEnabled)
-        {
-            if (defaultProfileEnabled)
-            {
-                // Hide the Active Profile card when default game profile is enabled
-                if (ActiveProfileCard != null)
-                {
-                    ActiveProfileCard.Visibility = Visibility.Collapsed;
-                }
-
-                Logger.Debug("Active Profile card hidden - Default Game Profile is active");
-            }
-            else
-            {
-                // Show the Active Profile card when default game profile is disabled
-                if (ActiveProfileCard != null)
-                {
-                    ActiveProfileCard.Visibility = Visibility.Visible;
-                }
-
-                // Re-enable the per-game profile toggle
-                if (PerGameProfileToggle != null)
-                {
-                    PerGameProfileToggle.IsEnabled = runningGame?.Value.IsValid() == true;
-                }
-
-                Logger.Debug("Active Profile card shown - Default Game Profile is inactive");
-            }
-        }
-
-        /// <summary>
-        /// Updates TDP control enabled states based on Default Game Profile.
-        /// </summary>
-        private void UpdateTDPControlsForDefaultProfile(bool defaultProfileEnabled)
-        {
-            if (defaultProfileEnabled)
-            {
-                // Disable TDP controls when default profile is active
-                if (TDPModeComboBox != null)
-                {
-                    TDPModeComboBox.IsEnabled = false;
-                }
-                if (TDPSlider != null)
-                {
-                    TDPSlider.IsEnabled = false;
-                }
-                if (TDPBoostToggle != null)
-                {
-                    TDPBoostToggle.IsEnabled = false;
-                }
-                if (AutoTDPToggle != null)
-                {
-                    AutoTDPToggle.IsEnabled = false;
-                }
-                if (StickyTDPToggle != null)
-                {
-                    StickyTDPToggle.IsEnabled = false;
-                }
-
-                // Also disable FPS limit controls (controlled by Default Game Profile)
-                if (FPSLimitToggle != null)
-                {
-                    FPSLimitToggle.IsEnabled = false;
-                }
-                if (FPSLimitSlider != null)
-                {
-                    FPSLimitSlider.IsEnabled = false;
-                }
-
-                Logger.Debug("TDP and FPS controls disabled - Default Game Profile is active");
-            }
-            else
-            {
-                // Re-enable TDP controls based on current mode
-                if (TDPModeComboBox != null)
-                {
-                    TDPModeComboBox.IsEnabled = true;
-                }
-
-                // Re-enable FPS limit controls
-                if (FPSLimitToggle != null)
-                {
-                    FPSLimitToggle.IsEnabled = true;
-                }
-                if (FPSLimitSlider != null)
-                {
-                    FPSLimitSlider.IsEnabled = true;
-                }
-
-                // Re-evaluate other controls based on current TDP mode
-                UpdateTDPSliderEnabledState();
-
-                Logger.Debug("TDP and FPS controls re-enabled - Default Game Profile is inactive");
+                // No game: Nav -> Overlay (skip disabled PerGameProfile)
+                PerformanceNavItem.XYFocusDown = PerformanceOverlayComboBox;
+                PerformanceOverlayComboBox.XYFocusUp = PerformanceNavItem;
             }
         }
 
@@ -1696,23 +1264,7 @@ namespace XboxGamingBar
                 // TDPSettingsExpandButton.XYFocusUp must always point to SystemNavItem (for navigating out of card)
                 if (TdpMethodComboBox != null && TDPSettingsExpandButton != null)
                 {
-                    if (installed)
-                    {
-                        // Skip disabled Install button: ComboBox -> next slider
-                        TdpMethodComboBox.XYFocusDown = TDPLimitsMinSlider;
-                        if (TDPLimitsMinSlider != null)
-                        {
-                            TDPLimitsMinSlider.XYFocusUp = TdpMethodComboBox;
-                        }
-                    }
-                    else
-                    {
-                        TdpMethodComboBox.XYFocusDown = InstallPawnIOButton;
-                        if (TDPLimitsMinSlider != null && InstallPawnIOButton != null)
-                        {
-                            TDPLimitsMinSlider.XYFocusUp = InstallPawnIOButton;
-                        }
-                    }
+                    TdpMethodComboBox.XYFocusDown = InstallPawnIOButton;
                     // Always allow navigating up from card header to nav bar
                     TDPSettingsExpandButton.XYFocusUp = SystemNavItem;
                 }
@@ -1948,11 +1500,8 @@ namespace XboxGamingBar
         /// </summary>
         private void SetCustomTDPVisibility(bool visible)
         {
-            if (LegionPerformanceModeComboBox != null && LegionFanFullSpeedToggle != null)
-            {
-                LegionPerformanceModeComboBox.XYFocusDown = LegionFanFullSpeedToggle;
-                LegionFanFullSpeedToggle.XYFocusUp = LegionPerformanceModeComboBox;
-            }
+            // Show/hide the three Performance-tab SPL/SPPT/FPPT sliders for Custom mode.
+            UpdateCustomTDPCardsVisibility();
 
             // Fan curve card stays fully interactive in every power mode now. Per-mode
             // storage means each mode has its own saved curve + EC-override unlock state,
@@ -2116,49 +1665,6 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Handles performance mode ComboBox selection in Legion tab
-        /// </summary>
-        private void LegionPerformanceModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            // Check if this change came from a pipe/property sync (not user interaction).
-            // When true, TDPModeComboBox_SelectionChanged must skip profile saves to prevent
-            // corrupting game profiles with global values during game exit transitions.
-            bool fromHelperSync = legionPerformanceMode?.IsUpdatingUI == true;
-            Logger.Info($"Legion Performance mode selection changed (fromHelperSync={fromHelperSync})");
-
-            // Sync TDP Mode dropdown in Performance tab
-            // Skip during initial sync - ApplyProfileTDPToHelper will set the correct value
-            if (TDPModeComboBox != null && LegionPerformanceModeComboBox != null && !isInitialSync)
-            {
-                if (TDPModeComboBox.SelectedIndex != LegionPerformanceModeComboBox.SelectedIndex)
-                {
-                    // Set isApplyingHelperUpdate during sync so TDPModeComboBox_SelectionChanged
-                    // returns early (skips profile save and value sends).
-                    if (fromHelperSync)
-                        isApplyingHelperUpdate = true;
-                    try
-                    {
-                        TDPModeComboBox.SelectedIndex = LegionPerformanceModeComboBox.SelectedIndex;
-                    }
-                    finally
-                    {
-                        if (fromHelperSync)
-                            isApplyingHelperUpdate = false;
-                    }
-                }
-            }
-
-            // Update TDP slider enabled state based on mode
-            UpdateTDPSliderEnabledState();
-
-            // Keep the fan-curve power-mode dropdown in sync with whatever power mode
-            // is now active. Fires for both user-driven and helper-pushed mode changes,
-            // so the fan curve dropdown follows the Lenovo button, TDP card, etc.
-            try { SyncFanCurvePresetComboToActiveMode(); }
-            catch (Exception ex) { Logger.Debug($"SyncFanCurvePresetComboToActiveMode failed: {ex.Message}"); }
-        }
-
-        /// <summary>
         /// Handles TDP Mode ComboBox selection in Performance tab (Legion devices only)
         /// </summary>
         private int lastTDPModeIndex = 1; // Track last index to avoid redundant updates (init to XAML default: Balanced)
@@ -2182,6 +1688,18 @@ namespace XboxGamingBar
                 return;
             }
 
+            // Helper pushed a new performance mode: legionPerformanceMode updated this dropdown
+            // directly (it now binds to TDPModeComboBox). Treat it like the old Legion-tab mirror
+            // handler did — keep dependent UI in sync, but don't re-send to helper or save the profile.
+            if (legionPerformanceMode?.IsUpdatingUI == true)
+            {
+                lastTDPModeIndex = selectedIndex;
+                UpdateTDPSliderEnabledState();
+                try { SyncFanCurvePresetComboToActiveMode(); }
+                catch (Exception ex) { Logger.Debug($"SyncFanCurvePresetComboToActiveMode failed: {ex.Message}"); }
+                return;
+            }
+
             // Skip if this is the same index as last time (avoid redundant processing)
             if (selectedIndex == lastTDPModeIndex)
             {
@@ -2192,21 +1710,20 @@ namespace XboxGamingBar
             // Check if switching away from Custom mode (to save slider value)
             // Use lastTDPModeIndex to check the PREVIOUS selection, not the new one
             bool wasCustomMode = lastTDPModeIndex >= 0 && IsCustomTdpModeIndex(lastTDPModeIndex);
-            if (wasCustomMode && TDPSlider != null)
+            if (wasCustomMode && CustomTDPSlowSlider != null)
             {
-                savedCustomTDP = TDPSlider.Value;
-                Logger.Info($"Saved custom TDP value: {savedCustomTDP}W before switching to preset mode");
+                savedCustomTDP = CustomTDPSlowSlider.Value;
+                Logger.Info($"Saved custom TDP (SPL) value: {savedCustomTDP}W before switching to preset mode");
             }
 
             lastTDPModeIndex = selectedIndex;
 
-            // Use the new preset system to get TDP and Legion mode values
+            // Map the selected dropdown index to TDP and Legion mode values
             bool isCustomMode = IsCustomTdpModeSelected();
             int presetTdpValue = GetCurrentPresetTdpValue();
             int legionModeValue = GetCurrentPresetLegionMode();
-            bool? presetTdpBoost = GetCurrentPresetTdpBoost();
 
-            Logger.Info($"TDP Mode selection changed to index {selectedIndex}: isCustom={isCustomMode}, presetTDP={presetTdpValue}W, legionMode={legionModeValue}, boost={presetTdpBoost}");
+            Logger.Info($"TDP Mode selection changed to index {selectedIndex}: isCustom={isCustomMode}, presetTDP={presetTdpValue}W, legionMode={legionModeValue}");
 
             bool isLegion = legionGoDetected?.Value == true;
 
@@ -2215,12 +1732,6 @@ namespace XboxGamingBar
                 // Legion device: use hardware presets via WMI
                 // For built-in presets with LegionModeValue (1/2/3), use hardware mode
                 // For custom presets (LegionModeValue == 255), use Custom mode + software TDP
-
-                // Sync with Legion Performance Mode ComboBox if using default mode (not custom presets)
-                if (!useCustomTDPPresets && LegionPerformanceModeComboBox != null && LegionPerformanceModeComboBox.SelectedIndex != selectedIndex)
-                {
-                    LegionPerformanceModeComboBox.SelectedIndex = selectedIndex;
-                }
 
                 // Send Legion mode to helper - force send even if cached value matches
                 if (legionPerformanceMode != null)
@@ -2235,50 +1746,23 @@ namespace XboxGamingBar
                     }
                 }
 
-                // For custom presets without hardware mode (255), also apply TDP via software
+                // Legacy "custom preset" path (legionMode 255 but not the Custom item) — no longer
+                // reachable in the fixed 4-mode model (255 ⟺ Custom), kept defensively.
                 if (legionModeValue == 255 && !isCustomMode && presetTdpValue > 0)
                 {
-                    // Custom preset on Legion: apply TDP value via software
-                    if (TDPSlider != null)
-                    {
-                        TDPSlider.Value = presetTdpValue;
-                    }
-                    if (tdp != null)
-                    {
-                        tdp.SetValue(presetTdpValue);
-                        Logger.Info($"Legion device: Applied custom preset TDP {presetTdpValue}W via software");
-                    }
+                    tdp?.SetValue(presetTdpValue);
+                    Logger.Info($"Legion device: Applied custom preset TDP {presetTdpValue}W via software");
                 }
-                // For actual Custom mode on Legion, restore saved custom TDP value
-                else if (isCustomMode)
-                {
-                    if (TDPSlider != null)
-                    {
-                        TDPSlider.Value = savedCustomTDP;
-                        Logger.Info($"Legion device: Restored custom TDP value to slider: {savedCustomTDP}W");
-                    }
-                }
+                // For actual Custom mode on Legion the boost sliders keep their values; the
+                // entering-Custom hardware apply runs in UpdateTDPSliderEnabledState below.
             }
             else
             {
-                // Generic device: apply TDP value directly based on preset
-                if (isCustomMode)
+                // Generic (non-Legion) device: apply the preset TDP via the Function.TDP wire path.
+                // (No master slider UI in this build; Custom on non-Legion has no manual control.)
+                if (!isCustomMode)
                 {
-                    // Custom mode: restore saved custom TDP value to slider
-                    if (TDPSlider != null)
-                    {
-                        TDPSlider.Value = savedCustomTDP;
-                        Logger.Info($"Restored custom TDP value to slider: {savedCustomTDP}W");
-                    }
-                }
-                else
-                {
-                    // Preset mode: set TDP directly and update slider to show the value
-                    int targetTDP = presetTdpValue > 0 ? presetTdpValue : 15; // Default to 15W if something goes wrong
-                    if (TDPSlider != null)
-                    {
-                        TDPSlider.Value = targetTDP;
-                    }
+                    int targetTDP = presetTdpValue > 0 ? presetTdpValue : 15;
                     if (tdp != null)
                     {
                         tdp.SetValue(targetTDP);
@@ -2287,34 +1771,12 @@ namespace XboxGamingBar
                 }
             }
 
-            // Update TDP slider enabled state based on mode
+            // Update Custom card visibility / display based on mode
             UpdateTDPSliderEnabledState();
-
-            // Apply TDP Boost setting from preset (only for custom presets with TdpBoostEnabled set)
-            // This should use software TDP control, so only apply when not using Lenovo hardware modes
-            if (presetTdpBoost.HasValue && !isCustomMode)
-            {
-                bool shouldEnableTdpBoost = presetTdpBoost.Value;
-                // Only apply if we're using software TDP control (not Lenovo hardware modes)
-                // For Legion devices using hardware modes (legionModeValue != 255), TDP Boost is controlled by hardware
-                if (legionModeValue == 255 || !(legionGoDetected?.Value == true))
-                {
-                    if (TDPBoostToggle != null)
-                    {
-                        TDPBoostToggle.IsOn = shouldEnableTdpBoost;
-                    }
-                    if (tdpBoostEnabled != null && tdpBoostEnabled.Value != shouldEnableTdpBoost)
-                    {
-                        tdpBoostEnabled.SetValue(shouldEnableTdpBoost);
-                        Logger.Info($"Applied preset TDP Boost: {shouldEnableTdpBoost}");
-                    }
-                }
-            }
 
             // Save profile when TDP Mode changes (if not during initialization or helper update)
             // Allow save if user-initiated from Quick Tab tile (bypasses isApplyingHelperUpdate)
-            // Don't save when Default Game Profile is active (to avoid contaminating user's profile)
-            if (!isInitialSync && !isLoadingProfile && SaveTDP && (!isApplyingHelperUpdate || isUserInitiatedTDPModeChange) && defaultGameProfileEnabled?.Value != true)
+            if (!isInitialSync && !isLoadingProfile && SaveTDP && (!isApplyingHelperUpdate || isUserInitiatedTDPModeChange))
             {
                 // Don't save to game profile if per-game profile is disabled.
                 // During game close, helper sends global mode via pipe → ComboBox changes → handler fires.
@@ -2334,323 +1796,365 @@ namespace XboxGamingBar
             }
             else
             {
-                Logger.Warn($"TDP Mode save skipped: isInitialSync={isInitialSync}, isApplyingHelperUpdate={isApplyingHelperUpdate}, isLoadingProfile={isLoadingProfile}, SaveTDP={SaveTDP}, isUserInitiatedTDPModeChange={isUserInitiatedTDPModeChange}, defaultGameProfile={defaultGameProfileEnabled?.Value}");
+                Logger.Warn($"TDP Mode save skipped: isInitialSync={isInitialSync}, isApplyingHelperUpdate={isApplyingHelperUpdate}, isLoadingProfile={isLoadingProfile}, SaveTDP={SaveTDP}, isUserInitiatedTDPModeChange={isUserInitiatedTDPModeChange}");
             }
         }
 
         /// <summary>
-        /// Updates TDP slider enabled state based on TDP Mode
-        /// For all devices: slider disabled in preset modes (Quiet/Balanced/Performance), enabled in Custom mode
-        /// Also updates XY focus bindings to skip disabled TDP slider
+        /// Reacts to a TDP Mode change: shows/hides the Custom power-limit card, refreshes the live
+        /// readout, (re)asserts the Custom limits on entering Custom, and fixes the XY focus chain.
+        /// The master single TDP slider was removed — Custom is the only manual TDP control (Legion).
         /// </summary>
         private void UpdateTDPSliderEnabledState()
         {
-            if (TDPSlider == null) return;
+            // Show/hide the Custom power-limit sliders based on mode/device.
+            UpdateCustomTDPCardsVisibility();
 
-            // If Default Game Profile is active, keep TDP controls disabled
-            if (defaultGameProfileEnabled?.Value == true)
-            {
-                Logger.Debug("TDP slider state update skipped - Default Game Profile is active");
-                return;
-            }
-
-            // Check if in Custom mode (uses preset system for proper detection)
             bool isCustomMode = IsCustomTdpModeSelected();
             bool isLegion = legionGoDetected?.Value == true;
-
-            // Check if the mode change came from helper pipe sync (not user interaction).
-            // When true, widget's profile may have stale values - use helper's property values instead.
+            // Mode change came from helper pipe sync (not user interaction)?
             bool isHelperModeSync = legionPerformanceMode?.IsUpdatingUI == true;
 
-            // TDP slider, TDP Boost, and AutoTDP should only be enabled in Custom mode
-            // Note: TDP slider also requires tdp property to be ready (IsEnabled is set elsewhere too)
             if (!isCustomMode)
             {
-                TDPSlider.IsEnabled = false;
-
-                // Update display to show preset name and TDP value
+                // Preset mode: the Custom card is hidden. Keep the readout sane (shown only if the
+                // card becomes visible again) and route focus straight past the hidden sliders.
                 int modeIndex = TDPModeComboBox?.SelectedIndex ?? 1;
-                string modeName = "Balanced";
-                int presetTdp = GetCurrentPresetTdpValue();
+                string[] defaultModeNames = { "Quiet", "Balanced", "Performance" };
+                string modeName = (modeIndex >= 0 && modeIndex < defaultModeNames.Length) ? defaultModeNames[modeIndex] : "Balanced";
+                if (CurrentTDPValueText != null) CurrentTDPValueText.Text = $"{modeName} mode";
 
-                if (useCustomTDPPresets && tdpPresets != null && modeIndex >= 0 && modeIndex < tdpPresets.Count)
-                {
-                    modeName = tdpPresets[modeIndex].Name;
-                }
-                else
-                {
-                    string[] defaultModeNames = { "Quiet", "Balanced", "Performance" };
-                    modeName = (modeIndex >= 0 && modeIndex < defaultModeNames.Length) ? defaultModeNames[modeIndex] : "Balanced";
-                }
-
-                if (TDPValueText != null)
-                {
-                    // Show TDP value for custom presets, mode name for defaults
-                    TDPValueText.Text = (useCustomTDPPresets && presetTdp > 0) ? $"{presetTdp}W" : $"{modeName} mode";
-                }
-                if (CurrentTDPValueText != null)
-                {
-                    CurrentTDPValueText.Text = (useCustomTDPPresets && presetTdp > 0) ? $"{modeName} ({presetTdp}W)" : $"{modeName} mode";
-                }
-
-                // Set flag to prevent toggle handlers from saving forced-off state to LocalSettings
-                isUpdatingTDPMode = true;
-                bool wasAutoTDPOn = AutoTDPToggle?.IsOn == true;
-                bool wasStickyTDPOn = StickyTDPToggle?.IsOn == true;
-                try
-                {
-                    // Also disable TDP Boost and AutoTDP controls in preset modes
-                    if (TDPBoostToggle != null)
-                    {
-                        TDPBoostToggle.IsEnabled = false;
-                        TDPBoostToggle.IsOn = false; // Turn off when switching to preset mode (binding handles slider visibility)
-                    }
-                    if (AutoTDPToggle != null)
-                    {
-                        AutoTDPToggle.IsEnabled = false;
-                        AutoTDPToggle.IsOn = false; // Turn off when switching to preset mode
-                    }
-                    if (AutoTDPTargetFPSSlider != null) AutoTDPTargetFPSSlider.IsEnabled = false;
-                    if (AutoTDPMinSlider != null) AutoTDPMinSlider.IsEnabled = false;
-                    if (AutoTDPMaxSlider != null) AutoTDPMaxSlider.IsEnabled = false;
-                    if (StickyTDPToggle != null)
-                    {
-                        StickyTDPToggle.IsEnabled = false;
-                        StickyTDPToggle.IsOn = false; // Turn off when switching to preset mode
-                    }
-                    if (StickyTDPIntervalSlider != null) StickyTDPIntervalSlider.IsEnabled = false;
-                }
-                finally
-                {
-                    isUpdatingTDPMode = false;
-                }
-
-                // Explicitly notify helper to disable AutoTDP/StickyTDP since toggle handlers were blocked.
-                // Skip when:
-                // - isLoadingProfile: helper manages state during profile switches, ComboBox may show wrong mode
-                // - isHelperModeSync: mode change came from helper pipe sync (not user).
-                //   During game close, helper sends global mode → widget shouldn't send stale values back.
-                //   During game open, helper sends game mode → widget's profile may have stale AutoTDP.
-                if (wasAutoTDPOn && !isLoadingProfile && !isHelperModeSync)
-                {
-                    autoTDPEnabled?.SetValue(false);
-                    Logger.Info("AutoTDP disabled due to TDP mode change away from Custom");
-                }
-                if (wasStickyTDPOn)
-                {
-                    StopStickyTDPTimer();
-                    Logger.Info("Sticky TDP disabled due to TDP mode change away from Custom");
-                }
-
-                // Update XY focus to skip disabled controls
-                // TDPModeComboBox -> OSPowerModeComboBox (skip all TDP controls)
                 if (TDPModeComboBox != null && OSPowerModeComboBox != null)
                 {
                     TDPModeComboBox.XYFocusDown = OSPowerModeComboBox;
                     OSPowerModeComboBox.XYFocusUp = TDPModeComboBox;
                 }
-
-                Logger.Debug($"TDP slider disabled - using {modeName} mode");
+                Logger.Debug($"Custom card hidden - using {modeName} mode");
             }
             else
             {
-                // In Custom mode, enable if tdp property is ready
-                TDPSlider.IsEnabled = tdp != null;
-
-                // Reset the "Limits" line — when switching into Custom mode the non-Custom
-                // branch above (or the widget's initial default-to-Balanced state) leaves
-                // a stale "Balanced mode" string here. CurrentTDPProperty pushes the real
-                // hardware values from the helper, but only on the next CurrentTDP update,
-                // which can be deferred until the user applies a setting. Pre-fill from the
-                // helper's last-known value if BatchGet already populated it; otherwise
-                // show a neutral placeholder so the user doesn't think the helper is in
-                // Balanced when it isn't.
+                // Custom mode: pre-fill the live readout from the helper's last-known value (the
+                // helper pushes the real SPL/SPPT/FPPT on the next CurrentTDP update), and refresh
+                // the boost labels.
                 if (CurrentTDPValueText != null)
                 {
                     CurrentTDPValueText.Text = !string.IsNullOrEmpty(currentTdp?.Value) ? currentTdp.Value : "-- W";
                 }
+                UpdateCustomTDPBoostRanges();
+                UpdateCustomTDPValueLabels();
 
-                // Re-enable TDP Boost, AutoTDP, and Sticky TDP controls in Custom mode
-                if (TDPBoostToggle != null) TDPBoostToggle.IsEnabled = true;
-                if (AutoTDPToggle != null) AutoTDPToggle.IsEnabled = true;
-                if (AutoTDPTargetFPSSlider != null) AutoTDPTargetFPSSlider.IsEnabled = true;
-                if (AutoTDPMinSlider != null) AutoTDPMinSlider.IsEnabled = true;
-                if (AutoTDPMaxSlider != null) AutoTDPMaxSlider.IsEnabled = true;
-                if (StickyTDPToggle != null) StickyTDPToggle.IsEnabled = true;
-                if (StickyTDPIntervalSlider != null) StickyTDPIntervalSlider.IsEnabled = true;
-
-                // Restore toggle states when switching back to Custom mode.
-                // When SaveAutoTDP/SaveTDP is enabled, use the CURRENT PROFILE's values (source of truth)
-                // instead of LocalSettings. LocalSettings stores a global value that can be stale
-                // (e.g., AutoTDP=true from a per-game profile bleeds into global via deferred UI updates).
-                // Only fall back to LocalSettings when the profile system doesn't manage the setting.
-                isUpdatingTDPMode = true;
-                try
+                if (isLegion)
                 {
-                    var settings = ApplicationData.Current.LocalSettings;
-
-                    // Skip sending to helper when:
-                    // - isLoadingProfile: profile is being loaded, helper manages state
-                    // - isHelperModeSync: mode change came from helper pipe sync, widget's profile
-                    //   may have stale values (e.g., AutoTDP=false saved during game close)
-                    bool canSendToHelper = !isLoadingProfile && !isHelperModeSync;
-
-                    if (TDPBoostToggle != null)
+                    // The TDP / SPPT Boost / FPPT Boost sliders own the limits (Lenovo WMI). Force a
+                    // push on entering Custom so the hardware matches the sliders even if the triplet
+                    // equals the last push (e.g. Performance↔Custom round-trip). Skip during helper
+                    // sync / profile load (those drive their own values).
+                    if (!isLoadingProfile && !isHelperModeSync)
                     {
-                        if (SaveTDP)
-                        {
-                            var profile = GetProfile(currentProfileName);
-                            // When helper is syncing mode, use the helper's property value.
-                            bool tdpBoostState = isHelperModeSync && this.tdpBoostEnabled != null
-                                ? this.tdpBoostEnabled.Value
-                                : profile.TDPBoostEnabled;
-                            TDPBoostToggle.IsOn = tdpBoostState;
-                            if (canSendToHelper)
-                                this.tdpBoostEnabled?.SetValue(tdpBoostState);
-                            Logger.Debug($"Restored TDP Boost from {(isHelperModeSync ? "helper" : "profile")} '{currentProfileName}': {tdpBoostState}");
-                        }
-                        else if (settings.Values.TryGetValue("TDPBoostEnabled", out object tdpBoostVal) && tdpBoostVal is bool tdpBoostEnabledVal)
-                        {
-                            TDPBoostToggle.IsOn = tdpBoostEnabledVal;
-                            if (canSendToHelper)
-                                this.tdpBoostEnabled?.SetValue(tdpBoostEnabledVal);
-                            Logger.Debug($"Restored TDP Boost from LocalSettings: {tdpBoostEnabledVal}");
-                        }
-                    }
-
-                    if (AutoTDPToggle != null)
-                    {
-                        isLoadingAutoTDPSettings = true;
-                        try
-                        {
-                            if (SaveAutoTDP)
-                            {
-                                var profile = GetProfile(currentProfileName);
-                                // When helper is syncing mode, use the helper's property value.
-                                // The widget's profile may be stale (e.g., AutoTDP=false saved during
-                                // game close). The helper's autoTDPEnabled.Value is the source of truth.
-                                bool autoTDPState = isHelperModeSync && autoTDPEnabled != null
-                                    ? autoTDPEnabled.Value
-                                    : profile.AutoTDPEnabled;
-                                AutoTDPToggle.IsOn = autoTDPState;
-                                if (canSendToHelper)
-                                    autoTDPEnabled?.SetValue(autoTDPState);
-                                Logger.Debug($"Restored AutoTDP from {(isHelperModeSync ? "helper" : "profile")} '{currentProfileName}': {autoTDPState}");
-                            }
-                            else if (settings.Values.TryGetValue("AutoTDPEnabled", out object autoTdpVal) && autoTdpVal is bool autoTdpEnabled)
-                            {
-                                AutoTDPToggle.IsOn = autoTdpEnabled;
-                                if (canSendToHelper)
-                                    autoTDPEnabled?.SetValue(autoTdpEnabled);
-                                Logger.Debug($"Restored AutoTDP from LocalSettings: {autoTdpEnabled}");
-                            }
-                        }
-                        finally
-                        {
-                            isLoadingAutoTDPSettings = false;
-                        }
-                    }
-
-                    if (StickyTDPToggle != null && settings.Values.TryGetValue("StickyTDPEnabled", out object stickyVal) && stickyVal is bool stickyEnabled)
-                    {
-                        StickyTDPToggle.IsOn = stickyEnabled;
-                        if (stickyEnabled)
-                        {
-                            targetTDPLimit = TDPSlider.Value;
-                            StartStickyTDPTimer();
-                            Logger.Debug($"Restored Sticky TDP enabled - monitoring TDP: {targetTDPLimit}W");
-                        }
-                        else
-                        {
-                            StopStickyTDPTimer();
-                        }
-                        Logger.Debug($"Restored Sticky TDP toggle state from LocalSettings: {stickyEnabled}");
+                        ApplyCustomTDPSlidersToHelper(force: true);
                     }
                 }
-                finally
+
+                // Focus chain in Custom mode: TDPMode -> Custom sliders -> OSPowerMode (the slider-to-
+                // slider links are wired in XAML).
+                if (TDPModeComboBox != null && OSPowerModeComboBox != null
+                    && CustomTDPSlowSlider != null && CustomTDPPeakSlider != null)
                 {
-                    isUpdatingTDPMode = false;
-                }
-
-                Logger.Debug($"TDP slider, TDP Boost, AutoTDP, and Sticky TDP enabled in Custom mode: {TDPSlider.IsEnabled}");
-
-                // Update display to show wattage in Custom mode
-                UpdateTDPDisplayText();
-
-                // CRITICAL FIX: Sync TDPProperty.Value with the slider's current visual value
-                // When TDP sync is skipped (preset modes), TDPProperty.Value stays at initial value (4).
-                // Profile loads set TDPSlider.Value but not TDPProperty.Value.
-                // Without this sync, Slider_ValueChanged comparison (newValue != Value) fails
-                // because the property's Value doesn't match what the user sees on screen.
-                if (tdp != null)
-                {
-                    int currentSliderValue = (int)TDPSlider.Value;
-                    tdp.StopDebounceTimer(); // Cancel any pending debounce
-                    tdp.SetValueSilent(currentSliderValue); // Update internal Value without sending
-
-                    // Also send current value to helper to ensure hardware matches UI
-                    tdp.ForceSetValue(currentSliderValue);
-                    Logger.Info($"Custom mode enabled - synced TDP property to slider value: {currentSliderValue}W");
-                }
-
-                // Restore normal XY focus chain in Custom mode
-                // TDPModeComboBox -> TDPSlider -> TDPExtrasExpandToggle -> [expanded: TDPBoost/AutoTDP/Sticky] -> OSPowerModeComboBox
-                if (TDPModeComboBox != null && OSPowerModeComboBox != null)
-                {
-                    TDPModeComboBox.XYFocusDown = TDPSlider;
-                    TDPSlider.XYFocusUp = TDPModeComboBox;
-                    TDPSlider.XYFocusDown = TDPExtrasExpandToggle;
-                    TDPExtrasExpandToggle.XYFocusUp = TDPSlider;
-
-                    // Internal chain when TDP Extras is expanded
-                    TDPBoostToggle.XYFocusUp = TDPExtrasExpandToggle;
-                    TDPBoostToggle.XYFocusDown = AutoTDPToggle;
-                    AutoTDPToggle.XYFocusUp = TDPBoostToggle;
-                    AutoTDPToggle.XYFocusDown = StickyTDPToggle;
-                    StickyTDPToggle.XYFocusUp = AutoTDPToggle;
-                    StickyTDPToggle.XYFocusDown = OSPowerModeComboBox;
-
-                    // TDPExtrasExpandToggle.XYFocusDown depends on expanded state
-                    bool isTDPExtrasOpen = TDPExtrasContent?.Visibility == Visibility.Visible;
-                    TDPExtrasExpandToggle.XYFocusDown = isTDPExtrasOpen ? (DependencyObject)TDPBoostToggle : OSPowerModeComboBox;
-                    OSPowerModeComboBox.XYFocusUp = isTDPExtrasOpen ? (DependencyObject)StickyTDPToggle : TDPExtrasExpandToggle;
-                    Logger.Debug($"XY focus restored for Custom mode (TDP Extras expanded: {isTDPExtrasOpen})");
+                    TDPModeComboBox.XYFocusDown = CustomTDPSlowSlider;
+                    OSPowerModeComboBox.XYFocusUp = CustomTDPPeakSlider;
                 }
             }
         }
 
-        // LegionCustomTDPSlider_ValueChanged removed — the Slow/Fast/Peak sliders no longer
-        // exist on the Legion tab. The Performance-tab master TDP slider + per-profile TDP
-        // Boost deltas own all three values now.
+        // ===== Custom Power Limits (Performance tab, Legion-only, Custom mode) =====
+        //
+        // UI model: three sliders — TDP (base SPL, 5-50W), SPPT Boost (+0..+10W) and FPPT Boost
+        // (+0..+15W). The effective limits are SPPT = TDP + SPPT Boost and FPPT = TDP + FPPT Boost,
+        // with the invariant SPPT <= FPPT enforced (i.e. SPPT Boost <= FPPT Boost) and both effective
+        // limits clamped to CustomTDPCeilingW. Those absolute SPL/SPPT/FPPT values are what we push
+        // to the helper (live, via WMI) and persist per profile.
+
+        // Guards re-entrant ValueChanged logic while we set slider values programmatically
+        // (profile load, boost clamping). Distinct from the WidgetSliderProperty.IsUpdatingUI flag,
+        // which no longer applies now that these sliders are plain (unbound) controls.
+        private bool isUpdatingCustomTDPSliders;
+
+        // Last absolute (SPL, SPPT, FPPT) we pushed to the helper, to skip redundant WMI writes
+        // while dragging. (-1, -1, -1) means "nothing sent yet".
+        private (int spl, int sppt, int fppt) lastSentCustomTDP = (-1, -1, -1);
+
+        // Hard ceiling for the effective Custom power limits (W). The base TDP (SPL) slider runs up
+        // to this value; the SPPT/FPPT boosts can never push the EFFECTIVE limit past it — e.g.
+        // TDP=50 + SPPT Boost=+10 + FPPT Boost=+15 still clamps to 50/50/50, not 50/60/65.
+        private const int CustomTDPCeilingW = 50;
 
         /// <summary>
-        /// Updates the TDP display text when slider value changes (Custom mode only)
+        /// Shows the TDP / SPPT Boost / FPPT Boost sliders (and hides the master single slider) only
+        /// on a Legion device in Custom mode. In every other case the master "TDP Power Limit" card
+        /// is shown instead.
         /// </summary>
-        private void TDPSlider_ValueChanged_UpdateDisplay(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        private void UpdateCustomTDPCardsVisibility()
         {
-            // Only update display if in Custom mode and slider is enabled
-            // The slider is disabled in preset modes, so this prevents overwriting mode names
-            if (IsCustomTdpModeSelected() && TDPSlider?.IsEnabled == true)
+            bool isLegion = legionGoDetected?.Value == true;
+            bool isCustom = IsCustomTdpModeSelected();
+            bool showCustom = isLegion && isCustom;
+
+            if (CustomTDPCard != null)
             {
-                UpdateTDPDisplayText();
+                CustomTDPCard.Visibility = showCustom ? Visibility.Visible : Visibility.Collapsed;
+                if (showCustom) UpdateCustomTDPValueLabels();
             }
         }
 
         /// <summary>
-        /// Updates TDP display text to show current wattage (for Custom mode)
+        /// Reads the TDP / SPPT Boost / FPPT Boost sliders and returns the absolute SPL/SPPT/FPPT
+        /// limits, enforcing the SPPT &lt;= FPPT invariant.
         /// </summary>
-        private void UpdateTDPDisplayText()
+        private (int spl, int sppt, int fppt) ComputeCustomTDPAbsolute()
         {
-            if (TDPSlider == null) return;
+            int spl = CustomTDPSlowSlider != null ? (int)CustomTDPSlowSlider.Value : 15;
+            int spptBoost = CustomTDPFastSlider != null ? (int)CustomTDPFastSlider.Value : 0;
+            int fpptBoost = CustomTDPPeakSlider != null ? (int)CustomTDPPeakSlider.Value : 0;
+            if (spptBoost > fpptBoost) spptBoost = fpptBoost; // SPPT can never exceed FPPT
+            // Safety net: the boost slider maxima are already capped to the ceiling headroom by
+            // UpdateCustomTDPBoostRanges (so spl + boost <= CustomTDPCeilingW normally), but clamp
+            // here too in case a slider was set out of range. min() preserves SPPT <= FPPT.
+            int sppt = Math.Min(spl + spptBoost, CustomTDPCeilingW);
+            int fppt = Math.Min(spl + fpptBoost, CustomTDPCeilingW);
+            return (spl, sppt, fppt);
+        }
 
-            int tdpValue = (int)TDPSlider.Value;
-            if (TDPValueText != null)
+        /// <summary>
+        /// Pushes the current absolute Custom power limits to the helper (which writes them straight
+        /// through Lenovo WMI). Applied live on every slider change so the limits track the sliders
+        /// in real time. Redundant writes (unchanged triplet) are skipped while dragging.
+        /// </summary>
+        /// <param name="force">When true, send all three even if the values match the last push
+        /// (used when (re)entering Custom mode so the hardware is guaranteed to match the sliders).</param>
+        private void ApplyCustomTDPSlidersToHelper(bool force = false)
+        {
+            var (spl, sppt, fppt) = ComputeCustomTDPAbsolute();
+            var prev = lastSentCustomTDP;
+            if (!force && prev == (spl, sppt, fppt)) return;
+            lastSentCustomTDP = (spl, sppt, fppt);
+
+            // Per-limit dedup: each ForceSetValue is a separate ~300ms WMI write on the helper, so
+            // only push the limits that actually changed. A boost-slider drag then costs ONE write
+            // (just SPPT or FPPT); only a TDP (SPL) drag moves all three.
+            if (force || spl != prev.spl) legionCustomTDPSlow?.ForceSetValue(spl);
+            if (force || sppt != prev.sppt) legionCustomTDPFast?.ForceSetValue(sppt);
+            if (force || fppt != prev.fppt) legionCustomTDPPeak?.ForceSetValue(fppt);
+            Logger.Info($"Applied Custom power limits to helper: SPL={spl}W, SPPT={sppt}W, FPPT={fppt}W (force={force})");
+        }
+
+        // ===== Live-apply throttle =====
+        // Slider drags fire ValueChanged on every integer tick. Each push is up to three serialized
+        // ~300ms WMI writes on the helper, so applying on every tick floods the pipe and the hardware
+        // lags seconds behind a fast drag. Throttle to a fixed cadence with leading + trailing edges:
+        // the first move applies immediately (responsive), further moves within the window coalesce
+        // and re-apply at each window boundary, and the final value always lands within one window of
+        // release. ~250ms ≈ the helper's worst-case triplet write time, so the queue can't grow.
+        private const int CUSTOM_TDP_THROTTLE_MS = 250;
+        private Windows.UI.Xaml.DispatcherTimer customTDPThrottleTimer;
+        private bool customTDPApplyPending;
+
+        private void RequestCustomTDPApply()
+        {
+            if (customTDPThrottleTimer == null)
             {
-                TDPValueText.Text = $"{tdpValue}W";
+                customTDPThrottleTimer = new Windows.UI.Xaml.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(CUSTOM_TDP_THROTTLE_MS)
+                };
+                customTDPThrottleTimer.Tick += CustomTDPThrottleTimer_Tick;
             }
-            // Note: CurrentTDPValueText is updated by the helper with actual hardware limits
-            // via CurrentTDPProperty. Don't set it here - slider values would overwrite
-            // the detailed hardware readout (e.g., "S:21W F:21W L:21W").
+
+            if (!customTDPThrottleTimer.IsEnabled)
+            {
+                // Leading edge: apply immediately and open the throttle window.
+                customTDPApplyPending = false;
+                ApplyCustomTDPSlidersToHelper();
+                customTDPThrottleTimer.Start();
+            }
+            else
+            {
+                // Within the window: coalesce; the latest value goes out at the next boundary.
+                customTDPApplyPending = true;
+            }
+        }
+
+        private void CustomTDPThrottleTimer_Tick(object sender, object e)
+        {
+            if (customTDPApplyPending)
+            {
+                customTDPApplyPending = false;
+                ApplyCustomTDPSlidersToHelper();
+                // Keep the window open so continued dragging stays throttled.
+            }
+            else
+            {
+                customTDPThrottleTimer.Stop();
+            }
+        }
+
+        /// <summary>
+        /// Sets the three Custom sliders (and their value labels) from a profile's absolute
+        /// SPL/SPPT/FPPT without triggering a send to the helper. SPPT/FPPT are converted back to
+        /// boosts (clamped to the slider ranges). Used during profile load; the hardware apply is
+        /// driven separately by the Legion mode-apply flow.
+        /// </summary>
+        private void SetCustomTDPSlidersSilent(double spl, double sppt, double fppt)
+        {
+            int splV = (int)spl;
+            int spptBoost = (int)Math.Round(sppt - spl);
+            int fpptBoost = (int)Math.Round(fppt - spl);
+            if (fpptBoost < spptBoost) fpptBoost = spptBoost; // keep the invariant on load too
+
+            isUpdatingCustomTDPSliders = true;
+            try
+            {
+                SetOneSliderClamped(CustomTDPSlowSlider, splV);
+                // Cap the boost maxima to the loaded SPL's headroom BEFORE placing the boost values,
+                // so they clamp into the valid range (effective <= 50 W).
+                UpdateCustomTDPBoostRanges();
+                SetOneSliderClamped(CustomTDPPeakSlider, fpptBoost); // set FPPT first so SPPT clamps against it
+                SetOneSliderClamped(CustomTDPFastSlider, spptBoost);
+            }
+            finally
+            {
+                isUpdatingCustomTDPSliders = false;
+            }
+
+            UpdateCustomTDPValueLabels();
+            // Keep the wire-channel cache aligned with what we loaded so the next live push isn't
+            // skipped as "unchanged" against a stale triplet, and the OSD/tile read the right SPL.
+            var (a, b, c) = ComputeCustomTDPAbsolute();
+            lastSentCustomTDP = (a, b, c);
+            legionCustomTDPSlow?.SetValueSilent(a);
+            legionCustomTDPFast?.SetValueSilent(b);
+            legionCustomTDPPeak?.SetValueSilent(c);
+        }
+
+        private static void SetOneSliderClamped(Windows.UI.Xaml.Controls.Slider slider, int value)
+        {
+            if (slider == null) return;
+            if (value < slider.Minimum) value = (int)slider.Minimum;
+            if (value > slider.Maximum) value = (int)slider.Maximum;
+            slider.Value = value;
+        }
+
+        /// <summary>
+        /// Refreshes the three value labels to show the base TDP and the effective (absolute)
+        /// SPPT/FPPT next to their boosts.
+        /// </summary>
+        private void UpdateCustomTDPValueLabels()
+        {
+            var (spl, sppt, fppt) = ComputeCustomTDPAbsolute();
+            if (CustomTDPSlowValue != null) CustomTDPSlowValue.Text = $"{spl} W";
+            if (CustomTDPFastValue != null) CustomTDPFastValue.Text = $"+{sppt - spl} W  (= {sppt} W)";
+            if (CustomTDPPeakValue != null) CustomTDPPeakValue.Text = $"+{fppt - spl} W  (= {fppt} W)";
+        }
+
+        /// <summary>
+        /// Caps the SPPT/FPPT Boost slider maximums to the headroom under the 50 W ceiling
+        /// (headroom = CustomTDPCeilingW - SPL). At SPL=50 both boosts cap at 0; at SPL ≤ 35 they
+        /// keep their full +10 / +15 ranges. This keeps the slider position equal to the effective
+        /// boost — no slider/label mismatch and no save→reload drift — while guaranteeing the
+        /// effective SPPT/FPPT can never exceed the ceiling. Preserves SPPT Boost ≤ FPPT Boost.
+        /// </summary>
+        private void UpdateCustomTDPBoostRanges()
+        {
+            if (CustomTDPSlowSlider == null) return;
+            int spl = (int)CustomTDPSlowSlider.Value;
+            int headroom = Math.Max(0, CustomTDPCeilingW - spl);
+
+            // Suppress re-entrant ValueChanged: lowering Maximum below a slider's Value makes WinUI
+            // clamp the Value, which would otherwise fire a live apply mid-adjustment.
+            bool prev = isUpdatingCustomTDPSliders;
+            isUpdatingCustomTDPSliders = true;
+            try
+            {
+                if (CustomTDPPeakSlider != null) CustomTDPPeakSlider.Maximum = Math.Min(15, headroom); // FPPT first
+                if (CustomTDPFastSlider != null) CustomTDPFastSlider.Maximum = Math.Min(10, headroom); // SPPT
+                // Re-assert SPPT Boost ≤ FPPT Boost after the maxima (and thus values) shrank.
+                if (CustomTDPFastSlider != null && CustomTDPPeakSlider != null
+                    && CustomTDPFastSlider.Value > CustomTDPPeakSlider.Value)
+                {
+                    CustomTDPFastSlider.Value = CustomTDPPeakSlider.Value;
+                }
+            }
+            finally
+            {
+                isUpdatingCustomTDPSliders = prev;
+            }
+        }
+
+        private void CustomTDPSlowSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (isUpdatingCustomTDPSliders) return;
+            // SPL changed → adjust the boost headroom (keeps effective SPPT/FPPT <= 50 W), then the
+            // effective SPPT/FPPT (SPL + boost) move with it. Refresh labels, push all three live
+            // and persist.
+            UpdateCustomTDPBoostRanges();
+            UpdateCustomTDPValueLabels();
+            OnCustomTDPSliderChanged();
+            // SPL drives the Quick-tab "Custom (NW)" tile — refresh it so the tile tracks the
+            // sustained limit live instead of the stale master slider.
+            UpdateQuickSettingsTileStates();
+        }
+
+        private void CustomTDPFastSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (isUpdatingCustomTDPSliders) return;
+            // Block SPPT Boost from exceeding FPPT Boost (effective SPPT <= FPPT).
+            if (CustomTDPPeakSlider != null && e.NewValue > CustomTDPPeakSlider.Value)
+            {
+                isUpdatingCustomTDPSliders = true;
+                try { CustomTDPFastSlider.Value = CustomTDPPeakSlider.Value; }
+                finally { isUpdatingCustomTDPSliders = false; }
+            }
+            UpdateCustomTDPValueLabels();
+            OnCustomTDPSliderChanged();
+        }
+
+        private void CustomTDPPeakSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (isUpdatingCustomTDPSliders) return;
+            // Lowering FPPT Boost below SPPT Boost drags SPPT Boost down with it (keeps SPPT <= FPPT).
+            if (CustomTDPFastSlider != null && e.NewValue < CustomTDPFastSlider.Value)
+            {
+                isUpdatingCustomTDPSliders = true;
+                try { CustomTDPFastSlider.Value = e.NewValue; }
+                finally { isUpdatingCustomTDPSliders = false; }
+            }
+            UpdateCustomTDPValueLabels();
+            OnCustomTDPSliderChanged();
+        }
+
+        /// <summary>
+        /// Applies the Custom power limits to the helper live (via WMI) and persists them to the
+        /// current profile after a user-driven slider change. Skipped during helper sync / profile
+        /// loads (which set the sliders themselves).
+        /// </summary>
+        private void OnCustomTDPSliderChanged()
+        {
+            if (isApplyingHelperUpdate || isLoadingProfile || isInitialSync) return;
+            if (WidgetSliderProperty.HelperSyncCount > 0) return;
+
+            // Live hardware apply (only meaningful on a Legion in Custom mode; the helper ignores
+            // these writes outside Custom mode anyway). Throttled so a fast drag doesn't flood the
+            // pipe / WMI — see RequestCustomTDPApply.
+            if (legionGoDetected?.Value == true && IsCustomTdpModeSelected())
+            {
+                RequestCustomTDPApply();
+            }
+
+            if (!SaveTDP) return;
+
+            bool isGameProfile = currentProfileName?.StartsWith("Game_") == true;
+            if (isGameProfile && perGameProfile?.Value != true) return;
+
+            SaveCurrentSettingsToProfile(currentProfileName);
         }
 
     }

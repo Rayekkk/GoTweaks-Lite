@@ -163,20 +163,6 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Don't save when Default Game Profile is active - prevents overwriting user's profile
-            if (defaultGameProfileEnabled?.Value == true)
-            {
-                Logger.Debug($"Skipping profile save for {profileName} - Default Game Profile is active");
-                return;
-            }
-
-            // Don't save during DGP restoration - toggle handlers would save wrong values during state restore
-            if (isRestoringFromDefaultProfile)
-            {
-                Logger.Debug($"Skipping profile save for {profileName} - restoring from Default Game Profile");
-                return;
-            }
-
             // Never save to "No game detected" profile (case-insensitive check)
             if (profileName.IndexOf("No game detected", StringComparison.OrdinalIgnoreCase) >= 0)
             {
@@ -201,7 +187,7 @@ namespace XboxGamingBar
             var profile = GetProfile(profileName);
 
             // Save only enabled settings
-            if (SaveTDP && TDPSlider != null && TDPModeComboBox != null)
+            if (SaveTDP && TDPModeComboBox != null)
             {
                 int selectedIndex = TDPModeComboBox.SelectedIndex;
                 if (selectedIndex >= 0)
@@ -217,9 +203,18 @@ namespace XboxGamingBar
                     // Not for user-made presets (which also have legionModeValue=255 but aren't Custom)
                     if (IsCustomTdpModeSelected())
                     {
-                        profile.TDP = TDPSlider.Value;
-                        // Also update savedCustomTDP for consistency
-                        savedCustomTDP = TDPSlider.Value;
+                        // On Legion the Custom sliders are TDP / SPPT Boost / FPPT Boost; persist the
+                        // resolved ABSOLUTE SPL/SPPT/FPPT (= TDP, TDP+SPPT Boost, TDP+FPPT Boost) so
+                        // the profile format stays backwards compatible. On generic devices the master
+                        // single slider is SPL only.
+                        if (CustomTDPSlowSlider != null)
+                        {
+                            var (spl, sppt, fppt) = ComputeCustomTDPAbsolute();
+                            profile.TDP = spl;        // SPL (base TDP)
+                            profile.TDPFast = sppt;   // SPPT (= TDP + SPPT Boost)
+                            profile.TDPPeak = fppt;   // FPPT (= TDP + FPPT Boost)
+                            savedCustomTDP = spl;
+                        }
                     }
                     // For preset modes (including user-made), keep the profile's existing TDP value
                 }
@@ -256,35 +251,9 @@ namespace XboxGamingBar
                 profile.FPSLimitEnabled = FPSLimitToggle.IsOn;
                 profile.FPSLimitValue = (int)FPSLimitSlider.Value;
             }
-            if (SaveAutoTDP && AutoTDPToggle != null && AutoTDPTargetFPSSlider != null && AutoTDPMinSlider != null && AutoTDPMaxSlider != null)
-            {
-                profile.AutoTDPEnabled = AutoTDPToggle.IsOn;
-                profile.AutoTDPTargetFPS = (int)AutoTDPTargetFPSSlider.Value;
-                profile.AutoTDPMinTDP = (int)AutoTDPMinSlider.Value;
-                profile.AutoTDPMaxTDP = (int)AutoTDPMaxSlider.Value;
-                // Save the controller type (0=PID, 1=Q-Learning, 2=SARSA)
-                profile.AutoTDPControllerType = AutoTDPControllerModeComboBox?.SelectedIndex ?? 0;
-                // Also update deprecated field for backwards compatibility
-                profile.AutoTDPUseMLMode = AutoTDPControllerModeComboBox?.SelectedIndex > 0;
-            }
             if (SaveOSPowerMode && OSPowerModeComboBox != null)
             {
                 profile.OSPowerMode = OSPowerModeComboBox.SelectedIndex;
-            }
-            // TDP Boost is always saved with TDP (they go together). Per-profile boost deltas
-            // (SPPT / FPPT additions) replace the previous global helper settings — they live on
-            // the same profile object so each game's boost aggressiveness is independent.
-            if (SaveTDP && TDPBoostToggle != null)
-            {
-                profile.TDPBoostEnabled = TDPBoostToggle.IsOn;
-                if (TDPBoostSPPTSlider != null)
-                {
-                    profile.TDPBoostSPPT = (int)Math.Round(TDPBoostSPPTSlider.Value);
-                }
-                if (TDPBoostFPPTSlider != null)
-                {
-                    profile.TDPBoostFPPT = (int)Math.Round(TDPBoostFPPTSlider.Value);
-                }
             }
             // HDR
             if (SaveHDR)
@@ -301,21 +270,10 @@ namespace XboxGamingBar
             {
                 profile.RefreshRate = refreshRate?.Value;
             }
-            // Sticky TDP
-            if (SaveStickyTDP && StickyTDPToggle != null)
-            {
-                profile.StickyTDPEnabled = StickyTDPToggle.IsOn;
-                profile.StickyTDPInterval = (int)(StickyTDPIntervalSlider?.Value ?? 5);
-            }
             // Overlay Level
             if (SaveOverlayLevel && PerformanceOverlayComboBox != null)
             {
                 profile.OverlayLevel = PerformanceOverlayComboBox.SelectedIndex;
-            }
-            // CPU Affinity
-            if (SaveCPUAffinity)
-            {
-                profile.CPUAffinity = $"{activePCores},{activeECores}";
             }
 
             // Persist to storage
@@ -338,35 +296,24 @@ namespace XboxGamingBar
 
                 // For Legion devices: check if we need to switch to Custom mode BEFORE sending any TDP-related settings
                 // This prevents TDP/TDPBoost/EPP from being ignored when helper is still in preset mode
-                bool legionNeedsModeChange = false;
                 bool legionSwitchingToCustom = false;
-                if (legionGoDetected?.Value == true && defaultGameProfileEnabled?.Value != true && !isInitialSync)
+                if (legionGoDetected?.Value == true && !isInitialSync)
                 {
                     int profileMode = profile.LegionPerformanceMode;
                     int modeIndex = GetProfileTDPModeIndex(profile);
                     if (modeIndex >= 0 && legionPerformanceMode?.Value != profileMode)
                     {
-                        legionNeedsModeChange = true;
                         legionSwitchingToCustom = profileMode == 255;
                     }
                 }
 
                 // Apply only enabled settings to UI controls
-                // Skip TDP loading when DGP is active - DGP controls TDP
-                if (SaveTDP && defaultGameProfileEnabled?.Value != true)
+                if (SaveTDP)
                 {
-                    // Set IsUpdatingUI to prevent the slider's ValueChanged from starting debounce timer.
-                    // Without this, the slider fires ValueChanged → debounce timer → sends stale LocalSettings
-                    // value back to helper, corrupting the per-game profile.
-                    if (tdp != null) tdp.IsUpdatingUI = true;
-                    try
-                    {
-                        TDPSlider.Value = profile.TDP;
-                    }
-                    finally
-                    {
-                        if (tdp != null) tdp.IsUpdatingUI = false;
-                    }
+                    // Master TDP slider removed: keep the headless tdp property aligned to the profile
+                    // (Function.TDP wire path) without sending. The visible Custom sliders are loaded
+                    // separately by SetCustomTDPSlidersSilent below.
+                    if (tdp != null) tdp.SetValueSilent((int)profile.TDP);
                     // Only initialize savedCustomTDP from profile's TDP value if the profile was saved in Custom mode
                     // Otherwise we'd be saving a preset's TDP value as the custom TDP value
                     if (profile.LegionPerformanceMode == 255)
@@ -374,6 +321,12 @@ namespace XboxGamingBar
                         savedCustomTDP = profile.TDP;
                         Logger.Debug($"Initialized savedCustomTDP from profile (Custom mode): {savedCustomTDP}W");
                     }
+
+                    // Load Custom power limits (SPL/SPPT/FPPT) into the three Legion sliders silently.
+                    // The hardware push happens via the Legion mode-apply flow below
+                    // (UpdateTDPSliderEnabledState → ApplyCustomTDPSlidersToHelper). Without this the
+                    // sliders would keep the previous profile's values after a profile switch.
+                    SetCustomTDPSlidersSilent(profile.TDP, profile.TDPFast, profile.TDPPeak);
 
                     // For Legion devices: TDP value will be sent AFTER TDP mode is applied (see Legion-specific handling below)
                     // This prevents TDP from being ignored when switching from preset mode to Custom mode
@@ -391,42 +344,6 @@ namespace XboxGamingBar
                     {
                         tdp?.ForceSetValue((int)profile.TDP);
                     }
-                    // Update Sticky TDP target when loading profile
-                    if (StickyTDPToggle?.IsOn == true)
-                    {
-                        targetTDPLimit = profile.TDP;
-                        Logger.Info($"Sticky TDP target updated to: {targetTDPLimit}W (profile load)");
-                    }
-                    // Load TDP Boost toggle state from profile
-                    // For Legion devices switching to Custom mode: defer sending to helper until mode change is applied
-                    if (TDPBoostToggle != null)
-                    {
-                        TDPBoostToggle.IsOn = profile.TDPBoostEnabled;
-                        if (!legionSwitchingToCustom && !isApplyingHelperUpdate)
-                        {
-                            tdpBoostEnabled?.SetValue(profile.TDPBoostEnabled);
-                        }
-                        Logger.Info($"TDP Boost loaded from profile: {profile.TDPBoostEnabled} (deferred={legionSwitchingToCustom})");
-                    }
-                    // Load per-profile TDP Boost deltas (SPPT / FPPT additions). Replaces the
-                    // previous global helper settings, so each profile can pick its own boost
-                    // aggressiveness. isLoadingTDPBoostSettings guards the slider's
-                    // ValueChanged handler from re-saving the same value back to the profile.
-                    isLoadingTDPBoostSettings = true;
-                    try
-                    {
-                        if (TDPBoostSPPTSlider != null) TDPBoostSPPTSlider.Value = profile.TDPBoostSPPT;
-                        if (TDPBoostFPPTSlider != null) TDPBoostFPPTSlider.Value = profile.TDPBoostFPPT;
-                        if (TDPBoostSPPTValue != null) TDPBoostSPPTValue.Text = $"+{profile.TDPBoostSPPT}W";
-                        if (TDPBoostFPPTValue != null) TDPBoostFPPTValue.Text = $"+{profile.TDPBoostFPPT}W";
-                        UpdateTDPBoostCardActiveText();
-                        if (!legionSwitchingToCustom && !isApplyingHelperUpdate)
-                        {
-                            tdpBoostSPPT?.SetValue(profile.TDPBoostSPPT);
-                            tdpBoostFPPT?.SetValue(profile.TDPBoostFPPT);
-                        }
-                    }
-                    finally { isLoadingTDPBoostSettings = false; }
                 }
                 if (SaveCPUBoost)
                 {
@@ -529,49 +446,6 @@ namespace XboxGamingBar
                     int fpsLimitValue = profile.FPSLimitEnabled ? profile.FPSLimitValue : 0;
                     fpsLimit?.SetValue(fpsLimitValue);
                 }
-                if (SaveAutoTDP)
-                {
-                    // Set loading flag to prevent toggled event from sending to helper
-                    isLoadingAutoTDPSettings = true;
-                    try
-                    {
-                        // For game profiles, use the helper's synced property value.
-                        // The widget's profile may be stale (e.g., AutoTDP=false saved during game close
-                        // when helper restored global values). The helper is the source of truth.
-                        bool autoTDPState = profileName.StartsWith("Game_") && autoTDPEnabled != null
-                            ? autoTDPEnabled.Value
-                            : profile.AutoTDPEnabled;
-                        AutoTDPToggle.IsOn = autoTDPState;
-                        AutoTDPTargetFPSSlider.Value = profile.AutoTDPTargetFPS;
-                        AutoTDPMinSlider.Value = profile.AutoTDPMinTDP;
-                        AutoTDPMaxSlider.Value = profile.AutoTDPMaxTDP;
-                        // Update text displays explicitly
-                        if (AutoTDPTargetFPSValue != null)
-                        {
-                            AutoTDPTargetFPSValue.Text = $"{profile.AutoTDPTargetFPS} FPS";
-                        }
-                        if (AutoTDPMinValue != null)
-                        {
-                            AutoTDPMinValue.Text = $"{profile.AutoTDPMinTDP}W";
-                        }
-                        if (AutoTDPMaxValue != null)
-                        {
-                            AutoTDPMaxValue.Text = $"{profile.AutoTDPMaxTDP}W";
-                        }
-                        // Update controller type selection (0=PID, 1=Q-Learning, 2=SARSA)
-                        if (AutoTDPControllerModeComboBox != null)
-                        {
-                            AutoTDPControllerModeComboBox.SelectedIndex = profile.AutoTDPControllerType;
-                            UpdateAutoTDPMLInfoPanelVisibility();
-                        }
-                        // NOTE: Do NOT send to helper here - helper is source of truth for profile values
-                        // Helper will apply profile values and sync back to widget
-                    }
-                    finally
-                    {
-                        isLoadingAutoTDPSettings = false;
-                    }
-                }
                 if (SaveOSPowerMode)
                 {
                     isLoadingOSPowerMode = true;
@@ -591,11 +465,9 @@ namespace XboxGamingBar
                     }
                 }
                 // Legion Performance Mode handling
-                // Skip TDP mode loading when:
-                // - Default Game Profile is active (DGP controls TDP)
-                // - Initial sync is in progress (let helper's value take precedence - DGP state not yet known)
-                Logger.Info($"LoadProfileSettings Legion check: legionGoDetected={legionGoDetected?.Value}, LegionPerformanceModeComboBox={LegionPerformanceModeComboBox != null}, TDPModeComboBox={TDPModeComboBox != null}, defaultGameProfileEnabled={defaultGameProfileEnabled?.Value}, isInitialSync={isInitialSync}");
-                if (legionGoDetected?.Value == true && LegionPerformanceModeComboBox != null && TDPModeComboBox != null && defaultGameProfileEnabled?.Value != true && !isInitialSync)
+                // Skip TDP mode loading during initial sync (let helper's value take precedence)
+                Logger.Info($"LoadProfileSettings Legion check: legionGoDetected={legionGoDetected?.Value}, TDPModeComboBox={TDPModeComboBox != null}, isInitialSync={isInitialSync}");
+                if (legionGoDetected?.Value == true && TDPModeComboBox != null && !isInitialSync)
                 {
                     int[] modeValues = { 1, 2, 3, 255 }; // Quiet, Balanced, Performance, Custom
 
@@ -649,8 +521,6 @@ namespace XboxGamingBar
                         bool modeChanged = false;
                         if (index >= 0 && (legionPerformanceMode.Value != savedLegionPerformanceMode || TDPModeComboBox.SelectedIndex != index))
                         {
-                            if (LegionPerformanceModeComboBox.SelectedIndex != index)
-                                LegionPerformanceModeComboBox.SelectedIndex = index;
                             if (TDPModeComboBox.SelectedIndex != index)
                             {
                                 lastTDPModeIndex = index;
@@ -660,38 +530,31 @@ namespace XboxGamingBar
                             modeChanged = true;
                             Logger.Info($"Restored Legion Performance Mode: {GetLegionModeShortName(savedLegionPerformanceMode)} ({savedLegionPerformanceMode}) after game closed");
                         }
-                        // Also restore the TDP slider to the profile's TDP value
-                        // This is needed because the slider may still show the game profile's TDP
-                        if (SaveTDP && TDPSlider.Value != profile.TDP)
-                        {
-                            TDPSlider.Value = profile.TDP;
-                            Logger.Info($"Restored TDP slider to {profile.TDP}W after game closed");
-                        }
-                        // If restoring to Custom mode (255), send deferred settings after mode change
+                        // If restoring to Custom mode (255), reload the Custom power limits from the
+                        // profile (the boost sliders may still show the just-closed game's values) and
+                        // push them to hardware. The master TDP slider was removed, so we drive the
+                        // three Custom sliders directly.
                         if (SaveTDP && savedLegionPerformanceMode == 255)
                         {
+                            SetCustomTDPSlidersSilent(profile.TDP, profile.TDPFast, profile.TDPPeak);
+
                             if (modeChanged)
                             {
                                 _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
                                 {
                                     await Task.Delay(500); // Allow mode change to propagate to helper
-                                    // Send deferred TDP-related settings
-                                    if (TDPBoostToggle != null)
-                                    {
-                                        tdpBoostEnabled?.ForceSetValue(profile.TDPBoostEnabled);
-                                    }
                                     if (SaveCPUEPP)
                                     {
                                         cpuEPP?.ForceSetValue((int)profile.CPUEPP);
                                     }
-                                    tdp?.ForceSetValue((int)profile.TDP);
-                                    Logger.Info($"Restored TDP settings after mode change: TDP={profile.TDP}W, Boost={profile.TDPBoostEnabled}, EPP={profile.CPUEPP}");
+                                    ApplyCustomTDPSlidersToHelper(force: true);
+                                    Logger.Info($"Restored Custom TDP after mode change: SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W, EPP={profile.CPUEPP}");
                                 });
                             }
                             else
                             {
-                                tdp?.ForceSetValue((int)profile.TDP);
-                                Logger.Info($"Restored TDP value (already in Custom mode): {profile.TDP}W");
+                                ApplyCustomTDPSlidersToHelper(force: true);
+                                Logger.Info($"Restored Custom TDP (already in Custom mode): SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W");
                             }
                         }
                         savedLegionPerformanceMode = -1; // Clear saved mode
@@ -713,14 +576,17 @@ namespace XboxGamingBar
                             lastTDPModeIndex = modeIndex;
 
                             modeChanged = legionPerformanceMode.Value != profileMode;
-                            if (LegionPerformanceModeComboBox.SelectedIndex != modeIndex)
-                                LegionPerformanceModeComboBox.SelectedIndex = modeIndex;
                             if (TDPModeComboBox.SelectedIndex != modeIndex)
                                 TDPModeComboBox.SelectedIndex = modeIndex;
                             legionPerformanceMode?.ForceSetValue(profileMode);
                             Logger.Info($"Applied profile TDP Mode: {GetLegionModeShortName(profileMode)} ({profileMode}) for {profileName}");
 
-                            // If Custom mode (255), send deferred settings after mode change
+                            // If Custom mode (255), push the profile's Custom SPL/SPPT/FPPT to hardware.
+                            // NOTE: tdp.ForceSetValue (Function.TDP) is NOT enough here — on Legion in
+                            // Custom the helper re-asserts its CACHED triplet (ReassertCustomTDP) and
+                            // ignores the flat value, so the profile's distinct SPPT/FPPT would never be
+                            // applied. Push the three dedicated Legion limit channels instead, matching
+                            // the "returning from game" restore path above.
                             if (profileMode == 255)
                             {
                                 if (modeChanged)
@@ -729,22 +595,18 @@ namespace XboxGamingBar
                                     {
                                         await Task.Delay(500); // Allow mode change to propagate to helper
                                         // Send deferred TDP-related settings
-                                        if (TDPBoostToggle != null)
-                                        {
-                                            tdpBoostEnabled?.ForceSetValue(profile.TDPBoostEnabled);
-                                        }
                                         if (SaveCPUEPP)
                                         {
                                             cpuEPP?.ForceSetValue((int)profile.CPUEPP);
                                         }
-                                        tdp?.ForceSetValue((int)profile.TDP);
-                                        Logger.Info($"Applied profile TDP settings after mode change: TDP={profile.TDP}W, Boost={profile.TDPBoostEnabled}, EPP={profile.CPUEPP} for {profileName}");
+                                        ApplyCustomTDPSlidersToHelper(force: true);
+                                        Logger.Info($"Applied profile Custom TDP after mode change: SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W, EPP={profile.CPUEPP} for {profileName}");
                                     });
                                 }
                                 else
                                 {
-                                    tdp?.ForceSetValue((int)profile.TDP);
-                                    Logger.Info($"Applied profile TDP value (already in Custom mode): {profile.TDP}W for {profileName}");
+                                    ApplyCustomTDPSlidersToHelper(force: true);
+                                    Logger.Info($"Applied profile Custom TDP (already in Custom mode): SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W for {profileName}");
                                 }
                             }
                         }
@@ -763,7 +625,7 @@ namespace XboxGamingBar
                     }
                 }
                 // Generic device TDP Mode handling
-                else if (legionGoDetected?.Value != true && TDPModeComboBox != null && defaultGameProfileEnabled?.Value != true && !isInitialSync)
+                else if (legionGoDetected?.Value != true && TDPModeComboBox != null && !isInitialSync)
                 {
                     // Load TDP Mode from profile for generic devices
                     int profileMode = profile.LegionPerformanceMode;
@@ -790,7 +652,6 @@ namespace XboxGamingBar
                                 if (modeIndex >= 0 && modeIndex < genericTDPValues.Length)
                                 {
                                     int presetTDP = genericTDPValues[modeIndex];
-                                    TDPSlider.Value = presetTDP;
                                     tdp?.ForceSetValue(presetTDP);
                                     Logger.Info($"Applied generic device preset TDP: {presetTDP}W");
                                 }
@@ -884,39 +745,6 @@ namespace XboxGamingBar
                     }
                 }
 
-                // Sticky TDP
-                if (SaveStickyTDP && StickyTDPToggle != null)
-                {
-                    isLoadingStickyTDPSettings = true;
-                    try
-                    {
-                        StickyTDPToggle.IsOn = profile.StickyTDPEnabled;
-                        if (StickyTDPIntervalSlider != null)
-                        {
-                            StickyTDPIntervalSlider.Value = profile.StickyTDPInterval;
-                            stickyTDPCheckIntervalSeconds = profile.StickyTDPInterval;
-                        }
-                        if (StickyTDPIntervalValue != null)
-                        {
-                            StickyTDPIntervalValue.Text = $"{profile.StickyTDPInterval}s";
-                        }
-                        // Update timer state based on profile
-                        if (profile.StickyTDPEnabled)
-                        {
-                            targetTDPLimit = profile.TDP;
-                            StartStickyTDPTimer();
-                        }
-                        else
-                        {
-                            StopStickyTDPTimer();
-                        }
-                    }
-                    finally
-                    {
-                        isLoadingStickyTDPSettings = false;
-                    }
-                }
-
                 // Overlay Level
                 if (SaveOverlayLevel && PerformanceOverlayComboBox != null)
                 {
@@ -928,64 +756,8 @@ namespace XboxGamingBar
                     }
                 }
 
-                // CPU Affinity
-                if (SaveCPUAffinity && !string.IsNullOrEmpty(profile.CPUAffinity))
-                {
-                    var parts = profile.CPUAffinity.Split(',');
-                    if (parts.Length == 2 && int.TryParse(parts[0], out int pCores) && int.TryParse(parts[1], out int eCores))
-                    {
-                        // Validate that at least one core type is active
-                        if (pCores > 0 || eCores > 0)
-                        {
-                            isLoadingCPUCoreConfig = true;
-                            try
-                            {
-                                activePCores = pCores;
-                                activeECores = eCores;
-                                // Update UI controls
-                                UpdatePCoreComboBox();
-                                UpdateECoreComboBox();
-                            }
-                            finally
-                            {
-                                isLoadingCPUCoreConfig = false;
-                            }
-                            // Send to helper
-                            SendCPUCoreConfigToHelper();
-                            Logger.Info($"Applied CPU Affinity from profile: P={pCores}, E={eCores}");
-                        }
-                    }
-                }
-
                 // Update profile display to show correct TDP mode in Profiles tab
                 UpdateProfileDisplay();
-
-                // Safety check: If AutoTDP is enabled but we're not in Custom mode, switch to Custom mode
-                // This handles profiles that were saved with incorrect mode values before the fix.
-                // Skip for game profiles: helper manages TDP mode for game profiles, and the toggle
-                // may show true from autoTDPEnabled.Value which belongs to a DIFFERENT game's profile.
-                if (SaveAutoTDP && AutoTDPToggle?.IsOn == true && legionGoDetected?.Value == true && !profileName.StartsWith("Game_"))
-                {
-                    int customIndex = GetCustomTdpModeIndex();
-                    if (TDPModeComboBox != null && !IsCustomTdpModeSelected())
-                    {
-                        Logger.Info($"AutoTDP enabled but not in Custom mode - fixing mode to Custom");
-                        isUpdatingTDPMode = true;
-                        try
-                        {
-                            lastTDPModeIndex = customIndex;
-                            TDPModeComboBox.SelectedIndex = customIndex;
-                            if (LegionPerformanceModeComboBox != null)
-                                LegionPerformanceModeComboBox.SelectedIndex = customIndex;
-                            legionPerformanceMode?.SetValue(255);
-                            UpdateTDPSliderEnabledState();
-                        }
-                        finally
-                        {
-                            isUpdatingTDPMode = false;
-                        }
-                    }
-                }
             }
             finally
             {

@@ -78,6 +78,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private int customTDPSlow = 15;
         private int customTDPFast = 25;
         private int customTDPPeak = 35;
+
+        // Raised right after a Custom SPL/SPPT/FPPT limit is successfully written to WMI (cache
+        // updated). PerformanceManager subscribes to refresh the "Limits" readout (currentTdp)
+        // immediately instead of waiting for the 2 s poll — the cache is the only reliable signal
+        // of the applied limits, since the WMI getter returns preset values in Custom mode.
+        public event System.Action CustomTDPApplied;
+
         private bool fanFullSpeed = false;
         private ushort[] fanCurve = new ushort[10] { 44, 48, 55, 60, 71, 79, 87, 87, 100, 100 }; // active Legion Go fan curve — points to whichever per-mode slot is currently selected
         // Per-mode curve storage (Rodpad LeGo2-Fan-Control pattern). Each TdpMode value
@@ -120,6 +127,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private const int EC_FAN_PANIC_TEMP_C = 101;
         private const int EC_FAN_PANIC_MIN_RPM = 4800; // matches the EC firmware's own failsafe RPM
         private bool ecInPanicMode = false; // sticky log latch — log once when entering, once when leaving
+
+        // Fan-full-speed override latch. When the user enables "Fan Full Speed" while the EC
+        // override loop is active (curve unlocked for the current mode), the WMI full-speed
+        // command and the EC loop's 0xC6C8 curve write fight — the loop walks the fan back to
+        // the curve target within one tick. While fanFullSpeed is on, the loop commands
+        // EC_FAN_MAX_RPM instead of the curve value so both paths agree; on the off transition
+        // it resets the anchor so the curve target is re-asserted on the next tick.
+        private bool ecInFullSpeed = false;
         private bool gyroEnabled = false;
         private int vibrationLevel = 2; // Medium
         private bool powerLightEnabled = true;
@@ -169,9 +184,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         private int pendingTdpFast;
         private int pendingTdpPeak;
 
-        // Cooldown to prevent RefreshTDPValuesFromDevice from overwriting recently-set values
-        private DateTime lastTdpSetTime = DateTime.MinValue;
-        private const int TDP_REFRESH_COOLDOWN_MS = 3000; // 3 seconds cooldown after setting TDP
 
         // Rate-limiting for fan speed refresh (WMI calls are CPU-expensive).
         // We refresh every FAN_SPEED_REFRESH_INTERVAL_MS when someone needs live fan
@@ -206,6 +218,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         public readonly LegionLightBrightnessProperty LegionLightBrightness;
         public readonly LegionLightSpeedProperty LegionLightSpeed;
         public readonly LegionPerformanceModeProperty LegionPerformanceMode;
+
         public readonly LegionCustomTDPSlowProperty LegionCustomTDPSlow;
         public readonly LegionCustomTDPFastProperty LegionCustomTDPFast;
         public readonly LegionCustomTDPPeakProperty LegionCustomTDPPeak;
@@ -568,8 +581,15 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             LegionRightTriggerEnd = new LegionRightTriggerEndProperty(0, this);
             LegionHairTriggers = new LegionHairTriggersProperty(false, this);
 
-            // Initialize touchpad vibration property (GLOBAL setting)
+            // Initialize touchpad vibration property (GLOBAL setting).
+            // Touchpad vibration is the one Legion setting the WIDGET does not persist (it's not
+            // part of any controller profile), so the helper owns its persistence: restore the
+            // saved level before building the property (so BatchGet reports the real value, not the
+            // hard default), then re-apply it to hardware below since the firmware resets on reboot.
+            LoadTouchpadVibrationLevel();
             LegionTouchpadVibration = new LegionTouchpadVibrationProperty(touchpadVibrationLevel, this);
+            try { SetTouchpadVibration(touchpadVibrationLevel); }
+            catch (Exception ex) { Logger.Warn($"Touchpad vibration startup apply failed: {ex.Message}"); }
 
             // Initialize joystick as mouse properties (per-game profile)
             LegionJoystickAsMouseMode = new LegionJoystickAsMouseModeProperty(joystickAsMouseMode, this);
@@ -1547,6 +1567,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     // Setting any fan curve here would override the hardware's preset behavior.
                     // The custom fan curve only applies when in Custom mode (255).
 
+                    // Entering Custom: the firmware resets SPL/SPPT/FPPT to its own defaults when
+                    // it switches into Custom mode. The widget pushes the three limits via the
+                    // individual ApplyCustomTDP* messages, but those land BEFORE this mode-switch
+                    // WMI call (mode is debounced 150ms; sliders are sent immediately), so the
+                    // firmware reset wins and the console ends up at ~15W. Reapply the cached
+                    // limits once the hardware confirms Custom so they stick.
+                    if (mode == 255)
+                    {
+                        ReapplyCustomTDPAfterModeSwitch();
+                    }
                 }
                 else
                 {
@@ -1559,6 +1589,54 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Error($"Error setting performance mode: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Reapplies the cached SPL/SPPT/FPPT after the hardware confirms it has entered Custom
+        /// mode. Entering Custom makes the firmware reset the three limits to its own defaults
+        /// (~15W), which would otherwise clobber the values the widget pushed moments earlier.
+        /// Mirrors the confirm-then-apply guard in <see cref="SetCustomTDP"/> and schedules a
+        /// second delayed reapply as a safety net against late firmware settling.
+        /// Runs on the performance-mode debounce timer thread, so the short blocking poll is fine.
+        /// </summary>
+        private void ReapplyCustomTDPAfterModeSwitch()
+        {
+            if (wmiService == null) return;
+
+            int slow = customTDPSlow;
+            int fast = customTDPFast;
+            int peak = customTDPPeak;
+
+            // Wait for the firmware to actually report Custom before writing limits — the WMI
+            // SetSmartFanMode call returns fast but the hardware takes ~400ms to switch (and to
+            // perform its default-limit reset). Writing before that completes would be wiped.
+            const int maxAttempts = 10; // ~500ms max wait
+            const int delayMs = 50;
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                // A newer mode change may have superseded this one (e.g. user toggled away again).
+                // Bail out so we don't force Custom limits onto a preset mode.
+                if (performanceMode != 255)
+                {
+                    Logger.Info($"Skipping Custom TDP reapply - mode changed to {performanceMode} during confirm wait");
+                    return;
+                }
+
+                var modeResult = wmiService.GetSmartFanMode();
+                if (modeResult.Success && modeResult.Result == TdpMode.Custom)
+                {
+                    Logger.Info($"Hardware confirmed Custom mode after {(i + 1) * delayMs}ms - reapplying limits SPL={slow}W, SPPT={fast}W, FPPT={peak}W");
+                    break;
+                }
+                System.Threading.Thread.Sleep(delayMs);
+            }
+
+            if (performanceMode != 255) return;
+
+            ApplyTDPValues(slow, fast, peak);
+            // Safety net: some firmware revisions finish the default-limit reset slightly after
+            // they report Custom. A single delayed reapply ensures the user's values win.
+            ScheduleTDPReapply(slow, fast, peak);
         }
 
         public void SetCustomTDP(int slow, int fast, int peak)
@@ -1641,15 +1719,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 // Apply TDP values
                 ApplyTDPValues(slow, fast, peak);
 
-                // Set cooldown to prevent RefreshTDPValuesFromDevice from overwriting these values
-                lastTdpSetTime = DateTime.Now;
-
-                // Keep the helper's internal cache in sync with the applied values, but no longer
-                // SyncToRemote — the Legion-tab Slow/Fast/Peak sliders were removed in the per-
-                // profile TDP Boost refactor, so the widget has no handler for these property
-                // pushes and just logs "Property LegionCustomTDP... not found for pipe message"
-                // 60+ times per minute. The helper still uses the cached fields internally for
-                // WMI bookkeeping / OSD current-TDP display.
+                // Keep the helper's internal cache (customTDPSlow/Fast/Peak via these properties) in
+                // sync with the applied values, but do NOT SyncToRemote: the widget owns the Custom
+                // limits (it drives them live from the TDP / SPPT Boost / FPPT Boost sliders), so the
+                // helper never needs to push them back. The cache feeds ReassertCustomTDP, the OSD
+                // current-TDP readout and GetCurrentTDPValues.
                 LegionCustomTDPSlow.SetValueSilent(slow);
                 LegionCustomTDPFast.SetValueSilent(fast);
                 LegionCustomTDPPeak.SetValueSilent(peak);
@@ -1659,6 +1733,23 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             {
                 Logger.Error($"Error setting custom TDP: {ex.Message}");
             }
+        }
+
+        /// <summary>True when the helper is in Custom performance mode (255).</summary>
+        public bool IsInCustomMode => performanceMode == 255;
+
+        /// <summary>
+        /// Re-pushes the cached Custom SPL/SPPT/FPPT limits to hardware. Used by the master-TDP
+        /// reapply paths (ReapplyTDP / power-source change / global-profile apply) which carry a
+        /// SINGLE master TDP value — on Legion that value must NOT collapse the three independent
+        /// Custom limits to v/v/v. Re-asserts the cached triplet instead. No-op outside Custom mode
+        /// (preset modes are firmware-managed).
+        /// </summary>
+        public void ReassertCustomTDP()
+        {
+            if (performanceMode != 255) return;
+            Logger.Info($"Reasserting cached Custom TDP limits: SPL={customTDPSlow}W, SPPT={customTDPFast}W, FPPT={customTDPPeak}W");
+            SetCustomTDP(customTDPSlow, customTDPFast, customTDPPeak);
         }
 
         /// <summary>
@@ -1711,6 +1802,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             customTDPFast = fast;
             customTDPPeak = peak;
             Logger.Info($"All TDP values applied successfully: SPL={slow}W, SPPL={fast}W, FPPT={peak}W");
+            CustomTDPApplied?.Invoke();
         }
 
         /// <summary>
@@ -1759,6 +1851,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// </summary>
         public void ApplyCustomTDPSlow(int slow)
         {
+            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            if (performanceMode != 255)
+            {
+                Logger.Debug($"Skipping ApplyCustomTDPSlow({slow}W) - not in Custom mode (mode={performanceMode})");
+                return;
+            }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
@@ -1779,6 +1877,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPSlow = slow;
                     Logger.Info($"Slow TDP (SPL) set to {slow}W");
+                    CustomTDPApplied?.Invoke();
                 }
                 else
                 {
@@ -1796,6 +1895,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// </summary>
         public void ApplyCustomTDPFast(int fast)
         {
+            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            if (performanceMode != 255)
+            {
+                Logger.Debug($"Skipping ApplyCustomTDPFast({fast}W) - not in Custom mode (mode={performanceMode})");
+                return;
+            }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
@@ -1816,6 +1921,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPFast = fast;
                     Logger.Info($"Fast TDP (SPPL) set to {fast}W");
+                    CustomTDPApplied?.Invoke();
                 }
                 else
                 {
@@ -1833,6 +1939,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// </summary>
         public void ApplyCustomTDPPeak(int peak)
         {
+            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            if (performanceMode != 255)
+            {
+                Logger.Debug($"Skipping ApplyCustomTDPPeak({peak}W) - not in Custom mode (mode={performanceMode})");
+                return;
+            }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
@@ -1853,6 +1965,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     customTDPPeak = peak;
                     Logger.Info($"Peak TDP (FPPT) set to {peak}W");
+                    CustomTDPApplied?.Invoke();
                 }
                 else
                 {
@@ -2423,6 +2536,36 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     ecCurrentTargetRpm = -1;
                 }
 
+                // --- Fan Full Speed override. ---
+                // When the user has Full Speed on, the WMI full-speed command and this loop's
+                // curve write to 0xC6C8 would otherwise fight. Command EC_FAN_MAX_RPM here so
+                // both paths agree (force a re-write every tick to defeat any firmware walk-back).
+                if (fanFullSpeed)
+                {
+                    int fullRpm = Math.Min(EC_FAN_MAX_RPM, 65535);
+                    if (!ecInFullSpeed)
+                    {
+                        Logger.Info($"EC fan FULL SPEED engaged — commanding {fullRpm} RPM via 0xC6C8 (curve/anchor bypassed until Full Speed is turned off).");
+                        ecInFullSpeed = true;
+                    }
+                    if (legionEcAccess.SetTargetFanRpm((ushort)fullRpm))
+                    {
+                        ecCurrentTargetRpm = fullRpm;
+                        ecLastWrittenRpm = fullRpm;
+                        ecLastForcedRewriteUtc = DateTime.UtcNow;
+                    }
+                    return; // skip anchor/curve evaluation while Full Speed is on
+                }
+
+                if (ecInFullSpeed)
+                {
+                    Logger.Info("EC fan FULL SPEED cleared — resuming curve-driven control.");
+                    ecInFullSpeed = false;
+                    // Force a fresh anchor evaluation so the curve target is re-asserted now.
+                    ecAnchorTempC = int.MinValue;
+                    ecCurrentTargetRpm = -1;
+                }
+
                 // --- Anchor-point hysteresis (Rodpad pattern). ---
                 // Only recompute the target RPM when temperature has drifted ≥5°C from the
                 // last anchor. Between anchors the fan target stays constant — prevents the
@@ -2549,6 +2692,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     fanFullSpeed = enabled;
                     Logger.Info($"Fan full speed {(enabled ? "enabled" : "disabled")}");
+
+                    // If the EC override loop is running (curve unlocked for the active mode),
+                    // run one tick immediately so Full Speed engages/releases at once instead of
+                    // fighting the loop for up to one EC_FAN_TICK_MS window. The tick honors the
+                    // fanFullSpeed flag set above (max RPM on, curve target on release).
+                    if (ecFanCurveTimer != null)
+                    {
+                        try { EcFanCurveTick(null); }
+                        catch (Exception tickEx) { Logger.Debug($"Immediate EC tick after full-speed toggle failed: {tickEx.Message}"); }
+                    }
                 }
                 else
                 {
@@ -3077,13 +3230,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         LegionFanSensorTemp.UpdateTemp(fanSensorResult.Result.Value);
                     }
 
-                    // Also send CPU temp for reference (VRM temp with fallback to CPU temp)
-                    if (performanceManager?.VRMTemperature != null && performanceManager.VRMTemperature.Value > 0)
-                    {
-                        int vrmTemp = (int)performanceManager.VRMTemperature.Value;
-                        LegionCPUCurrentTemp.UpdateTemp(vrmTemp);
-                    }
-                    else if (performanceManager?.CPUTemperature != null)
+                    // Send the true CPU temperature (Tctl/Tdie). This is what the fan-curve UI
+                    // displays and what the EC override loop evaluates the curve against — NOT
+                    // the EC fan-control sensor (0x01) above, which reads a chipset/board area
+                    // and was being mistaken for the CPU temp.
+                    if (performanceManager?.CPUTemperature != null && performanceManager.CPUTemperature.Value > 0)
                     {
                         int cpuTemp = (int)performanceManager.CPUTemperature.Value;
                         LegionCPUCurrentTemp.UpdateTemp(cpuTemp);
@@ -3116,13 +3267,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     LegionFanSensorTemp.UpdateTemp(fanSensorResult.Value.Result.Value);
                 }
 
-                // Also push CPU temp for reference (VRM temp with fallback to CPU temp)
-                if (performanceManager?.VRMTemperature != null && performanceManager.VRMTemperature.Value > 0)
-                {
-                    int vrmTemp = (int)performanceManager.VRMTemperature.Value;
-                    LegionCPUCurrentTemp.UpdateTemp(vrmTemp);
-                }
-                else if (performanceManager?.CPUTemperature != null)
+                // Push the true CPU temperature (Tctl/Tdie) — see the polling path above.
+                if (performanceManager?.CPUTemperature != null && performanceManager.CPUTemperature.Value > 0)
                 {
                     int cpuTemp = (int)performanceManager.CPUTemperature.Value;
                     LegionCPUCurrentTemp.UpdateTemp(cpuTemp);
@@ -3141,52 +3287,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// <summary>
         /// Reads current TDP values from device and updates properties silently (without triggering WMI set calls)
         /// </summary>
-        private void RefreshTDPValuesFromDevice()
-        {
-            // Skip refresh during cooldown period after TDP was set
-            // This prevents stale WMI reads from overwriting recently-set values
-            if ((DateTime.Now - lastTdpSetTime).TotalMilliseconds < TDP_REFRESH_COOLDOWN_MS)
-            {
-                return;
-            }
-
-            try
-            {
-                // Skip SyncToRemote — the Legion-tab SPL/SPPL/FPPT sliders were removed in the
-                // per-profile TDP Boost refactor, so pushing these properties produces only
-                // "Property LegionCustomTDP... not found for pipe message" widget warns.
-                // The helper cache (customTDPSlow / Fast / Peak fields) is still updated for
-                // internal bookkeeping and OSD display via CurrentTDP.
-                var slowResult = wmiService.GetCPUShortTermPowerLimit();
-                if (slowResult.Success && slowResult.Result.HasValue && slowResult.Result.Value != customTDPSlow)
-                {
-                    customTDPSlow = slowResult.Result.Value;
-                    LegionCustomTDPSlow.SetValueSilent(customTDPSlow);
-                    Logger.Debug($"Refreshed Slow TDP (SPL): {customTDPSlow}W");
-                }
-
-                var fastResult = wmiService.GetCPULongTermPowerLimit();
-                if (fastResult.Success && fastResult.Result.HasValue && fastResult.Result.Value != customTDPFast)
-                {
-                    customTDPFast = fastResult.Result.Value;
-                    LegionCustomTDPFast.SetValueSilent(customTDPFast);
-                    Logger.Debug($"Refreshed Fast TDP (SPPL): {customTDPFast}W");
-                }
-
-                var peakResult = wmiService.GetCPUPeakPowerLimit();
-                if (peakResult.Success && peakResult.Result.HasValue && peakResult.Result.Value != customTDPPeak)
-                {
-                    customTDPPeak = peakResult.Result.Value;
-                    LegionCustomTDPPeak.SetValueSilent(customTDPPeak);
-                    Logger.Debug($"Refreshed Peak TDP (FPPT): {customTDPPeak}W");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"Error refreshing TDP values: {ex.Message}");
-            }
-        }
-
         protected override void Dispose(bool disposing)
         {
             if (disposing)

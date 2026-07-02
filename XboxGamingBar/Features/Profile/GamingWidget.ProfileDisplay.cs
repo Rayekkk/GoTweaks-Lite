@@ -55,12 +55,10 @@ namespace XboxGamingBar
             var cpuEPPVisibility = SaveCPUEPP ? Visibility.Visible : Visibility.Collapsed;
             var cpuStateVisibility = SaveCPUState ? Visibility.Visible : Visibility.Collapsed;
             var fpsLimitVisibility = SaveFPSLimit ? Visibility.Visible : Visibility.Collapsed;
-            var autoTDPVisibility = SaveAutoTDP ? Visibility.Visible : Visibility.Collapsed;
             var powerModeVisibility = SaveOSPowerMode ? Visibility.Visible : Visibility.Collapsed;
             var amdVisibility = SaveAMDFeatures ? Visibility.Visible : Visibility.Collapsed;
             var hdrVisibility = SaveHDR ? Visibility.Visible : Visibility.Collapsed;
             var resolutionVisibility = SaveResolution ? Visibility.Visible : Visibility.Collapsed;
-            var stickyTDPVisibility = SaveStickyTDP ? Visibility.Visible : Visibility.Collapsed;
 
             // Update Global profile display (simple mode)
             GlobalProfileTDPModeLabel.Visibility = tdpModeVisibility;
@@ -87,10 +85,6 @@ namespace XboxGamingBar
             GlobalProfileFPSLimitText.Visibility = fpsLimitVisibility;
             GlobalProfileFPSLimitText.Text = globalProfile.FPSLimitEnabled ? $"{globalProfile.FPSLimitValue}" : "Off";
 
-            GlobalProfileAutoTDPLabel.Visibility = autoTDPVisibility;
-            GlobalProfileAutoTDPText.Visibility = autoTDPVisibility;
-            GlobalProfileAutoTDPText.Text = globalProfile.AutoTDPEnabled ? $"{globalProfile.AutoTDPTargetFPS}fps" : "Off";
-
             GlobalProfilePowerModeLabel.Visibility = powerModeVisibility;
             GlobalProfilePowerModeText.Visibility = powerModeVisibility;
             GlobalProfilePowerModeText.Text = GetPowerModeShortName(globalProfile.OSPowerMode);
@@ -107,10 +101,6 @@ namespace XboxGamingBar
             GlobalProfileResolutionLabel.Visibility = resolutionVisibility;
             GlobalProfileResolutionText.Visibility = resolutionVisibility;
             GlobalProfileResolutionText.Text = string.IsNullOrEmpty(globalProfile.Resolution) ? "Native" : globalProfile.Resolution;
-
-            GlobalProfileStickyTDPLabel.Visibility = stickyTDPVisibility;
-            GlobalProfileStickyTDPText.Visibility = stickyTDPVisibility;
-            GlobalProfileStickyTDPText.Text = globalProfile.StickyTDPEnabled ? "On" : "Off";
 
             // Update AC/DC profile display
             ACDCProfileTDPModeLabel.Visibility = tdpModeVisibility;
@@ -149,12 +139,6 @@ namespace XboxGamingBar
             ACProfileFPSLimitText.Text = acProfile.FPSLimitEnabled ? $"{acProfile.FPSLimitValue}" : "Off";
             DCProfileFPSLimitText.Text = dcProfile.FPSLimitEnabled ? $"{dcProfile.FPSLimitValue}" : "Off";
 
-            ACDCProfileAutoTDPLabel.Visibility = autoTDPVisibility;
-            ACProfileAutoTDPText.Visibility = autoTDPVisibility;
-            DCProfileAutoTDPText.Visibility = autoTDPVisibility;
-            ACProfileAutoTDPText.Text = acProfile.AutoTDPEnabled ? $"{acProfile.AutoTDPTargetFPS}fps" : "Off";
-            DCProfileAutoTDPText.Text = dcProfile.AutoTDPEnabled ? $"{dcProfile.AutoTDPTargetFPS}fps" : "Off";
-
             ACDCProfilePowerModeLabel.Visibility = powerModeVisibility;
             ACProfilePowerModeText.Visibility = powerModeVisibility;
             DCProfilePowerModeText.Visibility = powerModeVisibility;
@@ -180,12 +164,6 @@ namespace XboxGamingBar
             DCProfileResolutionText.Visibility = resolutionVisibility;
             ACProfileResolutionText.Text = string.IsNullOrEmpty(acProfile.Resolution) ? "Native" : acProfile.Resolution;
             DCProfileResolutionText.Text = string.IsNullOrEmpty(dcProfile.Resolution) ? "Native" : dcProfile.Resolution;
-
-            ACDCProfileStickyTDPLabel.Visibility = stickyTDPVisibility;
-            ACProfileStickyTDPText.Visibility = stickyTDPVisibility;
-            DCProfileStickyTDPText.Visibility = stickyTDPVisibility;
-            ACProfileStickyTDPText.Text = acProfile.StickyTDPEnabled ? "On" : "Off";
-            DCProfileStickyTDPText.Text = dcProfile.StickyTDPEnabled ? "On" : "Off";
 
             // Update game profile display (if game is running)
             if (HasValidGame(currentGameName))
@@ -234,13 +212,6 @@ namespace XboxGamingBar
                     GameACProfileFPSLimitText.Text = gameACProfile.FPSLimitEnabled ? $"{gameACProfile.FPSLimitValue}" : "Off";
                     GameDCProfileFPSLimitText.Text = gameDCProfile.FPSLimitEnabled ? $"{gameDCProfile.FPSLimitValue}" : "Off";
 
-                    // AutoTDP
-                    GameACDCProfileAutoTDPLabel.Visibility = autoTDPVisibility;
-                    GameACProfileAutoTDPText.Visibility = autoTDPVisibility;
-                    GameDCProfileAutoTDPText.Visibility = autoTDPVisibility;
-                    GameACProfileAutoTDPText.Text = gameACProfile.AutoTDPEnabled ? $"{gameACProfile.AutoTDPTargetFPS}fps" : "Off";
-                    GameDCProfileAutoTDPText.Text = gameDCProfile.AutoTDPEnabled ? $"{gameDCProfile.AutoTDPTargetFPS}fps" : "Off";
-
                     // Power Mode
                     GameACDCProfilePowerModeLabel.Visibility = powerModeVisibility;
                     GameACProfilePowerModeText.Visibility = powerModeVisibility;
@@ -270,13 +241,6 @@ namespace XboxGamingBar
                     GameDCProfileResolutionText.Visibility = resolutionVisibility;
                     GameACProfileResolutionText.Text = string.IsNullOrEmpty(gameACProfile.Resolution) ? "Native" : gameACProfile.Resolution;
                     GameDCProfileResolutionText.Text = string.IsNullOrEmpty(gameDCProfile.Resolution) ? "Native" : gameDCProfile.Resolution;
-
-                    // Sticky TDP
-                    GameACDCProfileStickyTDPLabel.Visibility = stickyTDPVisibility;
-                    GameACProfileStickyTDPText.Visibility = stickyTDPVisibility;
-                    GameDCProfileStickyTDPText.Visibility = stickyTDPVisibility;
-                    GameACProfileStickyTDPText.Text = gameACProfile.StickyTDPEnabled ? "On" : "Off";
-                    GameDCProfileStickyTDPText.Text = gameDCProfile.StickyTDPEnabled ? "On" : "Off";
                 }
                 else
                 {
@@ -289,11 +253,6 @@ namespace XboxGamingBar
                     GameProfileTDPLabel.Visibility = tdpVisibility;
                     GameProfileTDPText.Visibility = tdpVisibility;
                     GameProfileTDPText.Text = $"{gameProfile.TDP}W";
-
-                    // TDP Boost (saved with TDP)
-                    GameProfileTDPBoostLabel.Visibility = tdpVisibility;
-                    GameProfileTDPBoostText.Visibility = tdpVisibility;
-                    GameProfileTDPBoostText.Text = gameProfile.TDPBoostEnabled ? "On" : "Off";
 
                     // CPU Boost
                     GameProfileCPUBoostLabel.Visibility = cpuBoostVisibility;
@@ -315,11 +274,6 @@ namespace XboxGamingBar
                     GameProfileFPSLimitText.Visibility = fpsLimitVisibility;
                     GameProfileFPSLimitText.Text = gameProfile.FPSLimitEnabled ? $"{gameProfile.FPSLimitValue}" : "Off";
 
-                    // AutoTDP
-                    GameProfileAutoTDPLabel.Visibility = autoTDPVisibility;
-                    GameProfileAutoTDPText.Visibility = autoTDPVisibility;
-                    GameProfileAutoTDPText.Text = gameProfile.AutoTDPEnabled ? $"{gameProfile.AutoTDPTargetFPS}fps" : "Off";
-
                     // Power Mode
                     GameProfilePowerModeLabel.Visibility = powerModeVisibility;
                     GameProfilePowerModeText.Visibility = powerModeVisibility;
@@ -340,11 +294,6 @@ namespace XboxGamingBar
                     GameProfileResolutionLabel.Visibility = resolutionVisibility;
                     GameProfileResolutionText.Visibility = resolutionVisibility;
                     GameProfileResolutionText.Text = string.IsNullOrEmpty(gameProfile.Resolution) ? "Native" : gameProfile.Resolution;
-
-                    // Sticky TDP
-                    GameProfileStickyTDPLabel.Visibility = stickyTDPVisibility;
-                    GameProfileStickyTDPText.Visibility = stickyTDPVisibility;
-                    GameProfileStickyTDPText.Text = gameProfile.StickyTDPEnabled ? "On" : "Off";
                 }
             }
 
@@ -380,19 +329,6 @@ namespace XboxGamingBar
         /// </summary>
         private string GetProfileTDPModeName(PerformanceProfile profile)
         {
-            // If TDPModeIndex is set and we have custom presets, use the preset name
-            if (profile.TDPModeIndex >= 0 && useCustomTDPPresets && tdpPresets != null)
-            {
-                if (profile.TDPModeIndex < tdpPresets.Count)
-                {
-                    return tdpPresets[profile.TDPModeIndex].Name;
-                }
-                else if (profile.TDPModeIndex == tdpPresets.Count)
-                {
-                    return "Custom"; // The actual Custom mode after all presets
-                }
-            }
-            // Fall back to legacy mode name
             return GetLegionModeShortName(profile.LegionPerformanceMode);
         }
 
@@ -402,15 +338,10 @@ namespace XboxGamingBar
         /// </summary>
         private int GetProfileTDPModeIndex(PerformanceProfile profile)
         {
-            // If TDPModeIndex is set, use it directly (for custom presets)
-            if (profile.TDPModeIndex >= 0)
+            // If TDPModeIndex is set, use it directly
+            if (profile.TDPModeIndex >= 0 && profile.TDPModeIndex <= 3)
             {
-                // Validate the index is still valid with current preset configuration
-                int maxIndex = useCustomTDPPresets && tdpPresets != null ? tdpPresets.Count : 3;
-                if (profile.TDPModeIndex <= maxIndex)
-                {
-                    return profile.TDPModeIndex;
-                }
+                return profile.TDPModeIndex;
             }
             // Fall back to legacy: convert LegionPerformanceMode to index
             int[] modeValues = { 1, 2, 3, 255 }; // Quiet, Balanced, Performance, Custom

@@ -58,190 +58,6 @@ namespace XboxGamingBar
             }
         }
 
-        private bool isThemeInitialized = false;
-
-        private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (!isThemeInitialized) return; // Don't save until initial load completes
-
-            if (ThemeComboBox?.SelectedItem is ComboBoxItem item)
-            {
-                string themeName = item.Content?.ToString() ?? "Default";
-                ApplyTheme(themeName);
-                SaveThemeSetting(themeName);
-            }
-        }
-
-        private void ApplyTheme(string themeName)
-        {
-            if (!WidgetThemes.TryGetValue(themeName, out var theme))
-            {
-                Logger.Warn($"Theme '{themeName}' not found, using Default");
-                theme = WidgetThemes["Default"];
-                themeName = "Default";
-            }
-
-            currentThemeName = themeName;
-            Logger.Info($"Applying theme: {themeName}");
-
-            // Update page background
-            this.Background = new SolidColorBrush(theme.PageBackground);
-            widgetDarkThemeBrush = new SolidColorBrush(theme.PageBackground);
-
-            // Update resource brushes (for new elements)
-            try
-            {
-                Resources["PageBackgroundBrush"] = new SolidColorBrush(theme.PageBackground);
-                Resources["CardBackgroundBrush"] = new SolidColorBrush(theme.CardBackground);
-                Resources["CardBorderBrush"] = new SolidColorBrush(theme.CardBorder);
-                Resources["ButtonBackground"] = new SolidColorBrush(theme.ButtonBackground);
-                Resources["ButtonBorderBrush"] = new SolidColorBrush(theme.ButtonBorder);
-                Resources["TileOffBackground"] = new SolidColorBrush(theme.TileOff);
-                Resources["TileOnBackground"] = new SolidColorBrush(theme.TileOn);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error updating theme resources: {ex.Message}");
-            }
-
-            // Manually update existing elements (StaticResource doesn't update at runtime)
-            try
-            {
-                var cardBgBrush = new SolidColorBrush(theme.CardBackground);
-                var cardBorderBrush = new SolidColorBrush(theme.CardBorder);
-                var accentBrush = new SolidColorBrush(theme.AccentColor);
-                var textSecondaryBrush = new SolidColorBrush(theme.TextSecondary);
-
-                // Update all Border elements (cards)
-                ApplyThemeToVisualTree(this, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-
-                Logger.Info($"Theme '{themeName}' applied to visual tree");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error applying theme to visual tree: {ex.Message}");
-            }
-        }
-
-        private void ApplyThemeToVisualTree(DependencyObject parent, ThemeColors theme,
-            SolidColorBrush cardBgBrush, SolidColorBrush cardBorderBrush,
-            SolidColorBrush accentBrush, SolidColorBrush textSecondaryBrush)
-        {
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < childCount; i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-
-                // Update Border elements (cards use CardStyle with specific properties)
-                if (child is Border border)
-                {
-                    // Check if this looks like a card (has corner radius and padding typical of CardStyle)
-                    // Skip borders with LinearGradientBrush backgrounds (custom gradients for "smart" features like DGP card)
-                    if (border.CornerRadius.TopLeft == 8 && border.Padding.Left == 12 &&
-                        !(border.Background is LinearGradientBrush))
-                    {
-                        border.Background = cardBgBrush;
-                        border.BorderBrush = cardBorderBrush;
-                    }
-                }
-
-                // Update accent-colored TextBlocks (section headers, card values)
-                if (child is TextBlock textBlock)
-                {
-                    if (textBlock.Foreground is SolidColorBrush brush)
-                    {
-                        // Check for cyan accent color (#00C8FF) - update to new accent
-                        if (brush.Color.R == 0 && brush.Color.G == 200 && brush.Color.B == 255)
-                        {
-                            textBlock.Foreground = accentBrush;
-                        }
-                        // Check for secondary text color (#A0A0A0)
-                        else if (brush.Color.R == 160 && brush.Color.G == 160 && brush.Color.B == 160)
-                        {
-                            textBlock.Foreground = textSecondaryBrush;
-                        }
-                    }
-                }
-
-                // Recurse into children
-                ApplyThemeToVisualTree(child, theme, cardBgBrush, cardBorderBrush, accentBrush, textSecondaryBrush);
-            }
-        }
-
-        private async Task ApplyThemeOnLoadAsync(string themeName)
-        {
-            // Wait for UI to fully initialize
-            await Task.Delay(100);
-
-            try
-            {
-                // Set ComboBox selection (isThemeInitialized is still false, so this won't trigger save)
-                if (ThemeComboBox != null)
-                {
-                    for (int i = 0; i < ThemeComboBox.Items.Count; i++)
-                    {
-                        if (ThemeComboBox.Items[i] is ComboBoxItem item && item.Content?.ToString() == themeName)
-                        {
-                            ThemeComboBox.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-
-                ApplyTheme(themeName);
-
-                // Apply to all tabs to prevent flash when switching
-                ApplyThemeToCurrentTab();
-            }
-            finally
-            {
-                // Now allow saves on future changes
-                isThemeInitialized = true;
-            }
-        }
-
-        private void SaveThemeSetting(string themeName)
-        {
-            try
-            {
-                ApplicationData.Current.LocalSettings.Values["WidgetTheme"] = themeName;
-                Logger.Info($"Theme setting saved: {themeName}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to save theme setting: {ex.Message}");
-            }
-        }
-
-        private void LoadThemeSetting()
-        {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                if (settings.Values.TryGetValue("WidgetTheme", out var saved) && saved is string themeName)
-                {
-                    currentThemeName = themeName;
-                    Logger.Info($"Theme loaded from settings: {themeName}");
-
-                    // Defer visual updates until UI is fully ready
-                    _ = ApplyThemeOnLoadAsync(themeName);
-                }
-                else
-                {
-                    // No saved theme - mark as initialized so user can save their choice
-                    _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () =>
-                    {
-                        isThemeInitialized = true;
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to load theme setting: {ex.Message}");
-                isThemeInitialized = true; // Allow saves even on error
-            }
-        }
-
         private bool isAboutExpanded = false;
 
         private void AboutExpandButton_Click(object sender, RoutedEventArgs e)
@@ -270,29 +86,6 @@ namespace XboxGamingBar
                 {
                     // Keep default version text
                 }
-            }
-        }
-
-        private async void DonateButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Send message to helper to launch URL (Game Bar blocks direct URL launching)
-                if (App.IsConnected)
-                {
-                    var message = new Windows.Foundation.Collections.ValueSet();
-                    message.Add("LaunchUrl", "https://paypal.me/corando98");
-                    await App.SendMessageAsync(message);
-                    Logger.Info("Sent LaunchUrl request to helper");
-                }
-                else
-                {
-                    Logger.Warn("Cannot launch donate URL - no connection to helper");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to send donate link request: {ex.Message}");
             }
         }
 
@@ -529,10 +322,24 @@ namespace XboxGamingBar
                 _pendingUpdateZipUrl = null;
                 _pendingUpdateVersion = null;
 
+                // Updates are disabled while no release repo is configured (see
+                // Shared.Constants.UpdateConstants). Never query the upstream repo so the
+                // app does not self-update to the official build.
+                if (!Shared.Constants.UpdateConstants.UpdatesEnabled)
+                {
+                    var pv = Package.Current.Id.Version;
+                    var cv = $"v{pv.Major}.{pv.Minor}.{pv.Build}.{pv.Revision}";
+                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
+                    UpdateStatusText.Text = $"You're up to date! ({cv})";
+                    CheckForUpdateButton.Content = "Check for Update";
+                    CheckForUpdateButton.IsEnabled = true;
+                    return;
+                }
+
                 using (var httpClient = new HttpClient())
                 {
                     httpClient.DefaultRequestHeaders.Add("User-Agent", "GoTweaks-UpdateChecker");
-                    var response = await httpClient.GetStringAsync("https://api.github.com/repos/corando98/GoTweaks/releases/latest");
+                    var response = await httpClient.GetStringAsync(Shared.Constants.UpdateConstants.LatestReleaseApiUrl);
 
                     // Parse JSON response using Windows.Data.Json
                     var jsonObject = Windows.Data.Json.JsonObject.Parse(response);
@@ -708,35 +515,42 @@ namespace XboxGamingBar
 
                 string remoteVersion = null;
                 string remoteZipUrl = null;
-                try
+                // Only query the remote repo when one is configured (see
+                // Shared.Constants.UpdateConstants). Disabled by default so the app does
+                // not self-update to the upstream build; the local AppPackages probe below
+                // still runs for the local dev iteration loop.
+                if (Shared.Constants.UpdateConstants.UpdatesEnabled)
                 {
-                    using (var httpClient = new HttpClient())
+                    try
                     {
-                        httpClient.DefaultRequestHeaders.Add("User-Agent", "GoTweaks-UpdateChecker");
-                        var response = await httpClient.GetStringAsync("https://api.github.com/repos/corando98/GoTweaks/releases/latest");
-
-                        var jsonObject = Windows.Data.Json.JsonObject.Parse(response);
-                        remoteVersion = jsonObject.GetNamedString("tag_name", "");
-
-                        if (jsonObject.ContainsKey("assets"))
+                        using (var httpClient = new HttpClient())
                         {
-                            var assets = jsonObject.GetNamedArray("assets");
-                            foreach (var asset in assets)
+                            httpClient.DefaultRequestHeaders.Add("User-Agent", "GoTweaks-UpdateChecker");
+                            var response = await httpClient.GetStringAsync(Shared.Constants.UpdateConstants.LatestReleaseApiUrl);
+
+                            var jsonObject = Windows.Data.Json.JsonObject.Parse(response);
+                            remoteVersion = jsonObject.GetNamedString("tag_name", "");
+
+                            if (jsonObject.ContainsKey("assets"))
                             {
-                                var assetObj = asset.GetObject();
-                                var name = assetObj.GetNamedString("name", "");
-                                if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                                var assets = jsonObject.GetNamedArray("assets");
+                                foreach (var asset in assets)
                                 {
-                                    remoteZipUrl = assetObj.GetNamedString("browser_download_url", "");
-                                    break;
+                                    var assetObj = asset.GetObject();
+                                    var name = assetObj.GetNamedString("name", "");
+                                    if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        remoteZipUrl = assetObj.GetNamedString("browser_download_url", "");
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Startup update check: remote check failed: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Startup update check: remote check failed: {ex.Message}");
+                    }
                 }
 
                 // Probe the helper's local AppPackages folder for a newer debug build so the
@@ -932,146 +746,6 @@ namespace XboxGamingBar
             Logger.Info($"Auto-update check setting changed to: {AutoUpdateCheckToggle.IsOn}");
         }
 
-        private async void CheckForUpdateDebugButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                CheckForUpdateDebugButton.IsEnabled = false;
-                CheckForUpdateDebugButton.Content = "Checking...";
-                UpdateStatusText.Visibility = Visibility.Visible;
-                UpdateStatusText.Text = "Checking local AppPackages...";
-                UpdateButton.Visibility = Visibility.Collapsed;
-                _pendingUpdateZipUrl = null;
-                _pendingUpdateVersion = null;
-
-                if (!App.IsConnected)
-                {
-                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                    UpdateStatusText.Text = "Helper not connected";
-                    CheckForUpdateDebugButton.Content = "Check for Update (Debug)";
-                    CheckForUpdateDebugButton.IsEnabled = true;
-                    return;
-                }
-
-                // Ask helper to check for local updates (helper has file system access)
-                var message = new Windows.Foundation.Collections.ValueSet();
-                message.Add("Command", (int)Shared.Enums.Command.Get);
-                message.Add("Function", (int)Shared.Enums.Function.CheckLocalUpdate);
-                var result = await App.SendMessageAsync(message);
-
-                if (result != null)
-                {
-                    if (result.TryGetValue("Error", out object errorObj))
-                    {
-                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                        UpdateStatusText.Text = errorObj?.ToString() ?? "Unknown error";
-                    }
-                    else if (result.TryGetValue("LatestVersion", out object versionObj) &&
-                             result.TryGetValue("MsixbundlePath", out object pathObj))
-                    {
-                        var foundVersionStr = versionObj?.ToString();
-                        var msixbundlePath = pathObj?.ToString();
-                        var folderName = result.TryGetValue("FolderName", out object folderObj) ? folderObj?.ToString() : "";
-
-                        // Get current version
-                        var packageVersion = Package.Current.Id.Version;
-                        var currentVersion = $"v{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
-                        var foundVersion = $"v{foundVersionStr}";
-
-                        Logger.Info($"Debug update check: current={currentVersion}, found={foundVersion}, path={msixbundlePath}");
-
-                        // Compare versions
-                        var currentVer = new Version(packageVersion.Major, packageVersion.Minor, packageVersion.Build, packageVersion.Revision);
-                        if (Version.TryParse(foundVersionStr, out var latestVersion) && latestVersion > currentVer)
-                        {
-                            UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
-                            UpdateStatusText.Text = $"[DEBUG] New version found: {foundVersion}\nCurrent: {currentVersion}\n{folderName}";
-                            _pendingUpdateZipUrl = msixbundlePath; // Local path to msixbundle
-                            _pendingUpdateVersion = foundVersion;
-                            UpdateButton.Visibility = Visibility.Visible;
-                        }
-                        else
-                        {
-                            UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
-                            UpdateStatusText.Text = $"[DEBUG] You're up to date! ({currentVersion})\nLatest in AppPackages: {foundVersion}";
-                        }
-                    }
-                    else
-                    {
-                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                        UpdateStatusText.Text = "Invalid response from helper";
-                    }
-                }
-                else
-                {
-                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                    UpdateStatusText.Text = "Failed to communicate with helper";
-                }
-
-                CheckForUpdateDebugButton.Content = "Check for Update (Debug)";
-                CheckForUpdateDebugButton.IsEnabled = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to check for debug update: {ex.Message}");
-                UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                UpdateStatusText.Text = $"Failed: {ex.Message}";
-                CheckForUpdateDebugButton.Content = "Check for Update (Debug)";
-                CheckForUpdateDebugButton.IsEnabled = true;
-            }
-        }
-
-        private async void ExportDGPsButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                ExportDGPsButton.IsEnabled = false;
-                ExportDGPsButton.Content = "Exporting...";
-
-                if (!App.IsConnected)
-                {
-                    ExportDGPsButton.Content = "Helper not connected";
-                    await Task.Delay(2000);
-                    ExportDGPsButton.Content = "Export DGPs (Desktop)";
-                    ExportDGPsButton.IsEnabled = true;
-                    return;
-                }
-
-                // Send request to helper to export DGPs
-                var message = new Windows.Foundation.Collections.ValueSet();
-                message.Add("Command", (int)Shared.Enums.Command.Set);
-                message.Add("Function", (int)Shared.Enums.Function.Debug_ExportDGPs);
-                var result = await App.SendMessageAsync(message);
-
-                if (result != null)
-                {
-                    if (result.TryGetValue("ExportPath", out object pathObj))
-                    {
-                        ExportDGPsButton.Content = $"Exported!";
-                        Logger.Info($"DGPs exported to: {pathObj}");
-                    }
-                    else if (result.TryGetValue("Error", out object errorObj))
-                    {
-                        ExportDGPsButton.Content = $"Error: {errorObj}";
-                    }
-                }
-                else
-                {
-                    ExportDGPsButton.Content = "Failed";
-                }
-
-                await Task.Delay(2000);
-                ExportDGPsButton.Content = "Export DGPs (Desktop)";
-                ExportDGPsButton.IsEnabled = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to export DGPs: {ex.Message}");
-                ExportDGPsButton.Content = "Export DGPs (Desktop)";
-                ExportDGPsButton.IsEnabled = true;
-            }
-        }
-
         private async void ExportAllDataButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1160,7 +834,6 @@ namespace XboxGamingBar
                     "This will:\n" +
                     "• Import all per-game profiles\n" +
                     "• Import global settings\n" +
-                    "• Import AutoTDP Q-learning model\n" +
                     "• Import helper settings\n" +
                     "• Apply widget settings\n\n" +
                     "Existing data will be overwritten. Continue?",
@@ -1245,11 +918,6 @@ namespace XboxGamingBar
                 // Export all known settings keys
                 var keysToExport = new[]
                 {
-                    // AutoTDP settings
-                    "AutoTDPEnabled", "AutoTDPTargetFPS", "AutoTDPMinTDP", "AutoTDPMaxTDP",
-                    "AutoTDPUseMLMode", "AutoTDPPauseWhenUnfocused",
-                    // TDP Boost settings
-                    "TDPBoostEnabled", "TDPBoostSPPT", "TDPBoostFPPT",
                     // OSD settings
                     "OSDConfig", "OLEDConfig",
                     // Profile settings
@@ -1263,7 +931,7 @@ namespace XboxGamingBar
                     // Display settings
                     "RefreshRateProfile",
                     // Other settings
-                    "TdpMethod", "ForceDefaultGameProfile"
+                    "TdpMethod"
                 };
 
                 foreach (var key in keysToExport)

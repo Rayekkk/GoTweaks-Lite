@@ -48,7 +48,6 @@ namespace XboxGamingBar
         private SolidColorBrush tileOnBrush;
         private SolidColorBrush tileActiveBrush;
         private SolidColorBrush tileTriggerBrush;
-        private LinearGradientBrush tileDefaultProfileBrush;
         private bool quickSettingsInitialized = false;
 
         // Tile definitions with visibility tracking
@@ -89,8 +88,6 @@ namespace XboxGamingBar
         private bool quickMetricsEnabled = false;
         private bool isUpdatingMetricCheckboxes = false;
         private bool screenSaverEnabled = false;
-        private bool sidebarMenuEnabled = false;
-        private const string SidebarMenuEnabledKey = "SidebarMenuEnabled";
         private const string ScreenSaverEnabledKey = "QS_ScreenSaverEnabled";
         private const int ScreenSaverTimeoutSeconds = 60;
         private DispatcherTimer screenSaverCountdownTimer;
@@ -183,20 +180,6 @@ namespace XboxGamingBar
                 tileActiveBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 37, 48)); // #1A2530 - dark blue
                 tileTriggerBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 32, 48)); // #252030 - dark purple
 
-                // Default Game Profile gradient brush (matches Performance tab card)
-                tileDefaultProfileBrush = new LinearGradientBrush
-                {
-                    StartPoint = new Windows.Foundation.Point(0, 0),
-                    EndPoint = new Windows.Foundation.Point(1, 1),
-                    GradientStops = new GradientStopCollection
-                    {
-                        new GradientStop { Color = Windows.UI.Color.FromArgb(0x40, 0xC0, 0x40, 0x40), Offset = 0.0 },
-                        new GradientStop { Color = Windows.UI.Color.FromArgb(0x40, 0x40, 0x80, 0x50), Offset = 0.35 },
-                        new GradientStop { Color = Windows.UI.Color.FromArgb(0x40, 0x40, 0x50, 0x80), Offset = 0.65 },
-                        new GradientStop { Color = Windows.UI.Color.FromArgb(0x40, 0x80, 0x40, 0x60), Offset = 1.0 }
-                    }
-                };
-
                 // Define all tiles
                 DefineQuickSettingsTiles();
 
@@ -250,7 +233,6 @@ namespace XboxGamingBar
 
             // Row 1 - Performance Core (most used)
             AddTileDefinition("TDPMode", "TDP Mode", "\uE945", order: order++);
-            AddTileDefinition("AutoTDP", "AutoTDP", "\uE9F5", order: order++);
             AddTileDefinition("PowerMode", "Power Mode", "\uE945", order: order++);
             AddTileDefinition("CPUBoost", "CPU Boost", "\uE7F4", order: order++);
 
@@ -264,6 +246,7 @@ namespace XboxGamingBar
             AddTileDefinition("Resolution", "Resolution", "\uE7F8", order: order++);
             AddTileDefinition("Rotation", "Rotation", "\uE7AD", order: order++);
             AddTileDefinition("HDR", "HDR", "\uE706", order: order++);
+            AddTileDefinition("AutoSDR", "Auto SDR", "\uE706", order: order++);
             AddTileDefinition("Fullscreen", "Fullscreen", "\uE740", order: order++);
 
             // Row 4 - AMD Graphics Features
@@ -496,13 +479,6 @@ namespace XboxGamingBar
                     }
                 }
 
-                // Load Sidebar Menu toggle state
-                if (settings.Values.TryGetValue(SidebarMenuEnabledKey, out object sbVal) && sbVal is bool sbEnabled)
-                {
-                    sidebarMenuEnabled = sbEnabled;
-                    SidebarMenuToggle.IsOn = sidebarMenuEnabled;
-                }
-
                 // Load Quick Metrics selection
                 selectedMetrics.Clear();
                 if (settings.Values.TryGetValue(QuickMetricsSelectionKey, out object selectionVal) && selectionVal is string selectionStr)
@@ -650,36 +626,6 @@ namespace XboxGamingBar
             catch (Exception ex)
             {
                 Logger.Error($"Error sending Screen Saver enabled state: {ex.Message}");
-            }
-        }
-
-        private void SidebarMenuToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            sidebarMenuEnabled = SidebarMenuToggle.IsOn;
-            var settings = ApplicationData.Current.LocalSettings;
-            settings.Values[SidebarMenuEnabledKey] = sidebarMenuEnabled;
-            SendSidebarMenuEnabledToHelper();
-            Logger.Info($"Sidebar Menu toggled: {sidebarMenuEnabled}");
-        }
-
-        private void SendSidebarMenuEnabledToHelper()
-        {
-            try
-            {
-                if (!App.IsConnected) return;
-
-                var request = new Windows.Foundation.Collections.ValueSet
-                {
-                    { "Command", (int)Shared.Enums.Command.Set },
-                    { "Function", (int)Shared.Enums.Function.SidebarMenuEnabled },
-                    { "Content", sidebarMenuEnabled }
-                };
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info($"Sent Sidebar Menu enabled state to helper: {sidebarMenuEnabled}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending Sidebar Menu enabled state: {ex.Message}");
             }
         }
 

@@ -17,7 +17,7 @@ namespace XboxGamingBarHelper.Profile
         /// <summary>
         /// Package family name for constructing LocalState path when running outside MSIX
         /// </summary>
-        private const string PACKAGE_FAMILY_NAME = "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg";
+        private const string PACKAGE_FAMILY_NAME = Shared.Constants.PackageConstants.PackageFamilyName;
 
         /// <summary>
         /// Cached local folder path (works both in MSIX and elevated contexts)
@@ -88,7 +88,7 @@ namespace XboxGamingBarHelper.Profile
             if (!File.Exists(globalProfilePath))
             {
                 // Create global profile path when it's not previously exist.
-                GlobalProfile = new GameProfile(GameProfile.GLOBAL_PROFILE_NAME, GameProfile.GLOBAL_PROFILE_NAME, true, 25, true, 80, 100, 5, false, globalProfilePath, gameProfiles);
+                GlobalProfile = new GameProfile(GameProfile.GLOBAL_PROFILE_NAME, GameProfile.GLOBAL_PROFILE_NAME, true, 25, true, 80, 100, 5, globalProfilePath, gameProfiles);
                 GlobalProfile.Save();
             }
             else
@@ -256,7 +256,7 @@ namespace XboxGamingBarHelper.Profile
             }
 
             var newGameProfilePath = Path.Combine(GetGameProfilesFolder(), $"{Path.GetFileNameWithoutExtension(gameId.Path)}{XML_EXTENSION}");
-            var newGameProfile = new GameProfile(gameId.Name, gameId.Path, true, CurrentProfile.TDP, CurrentProfile.CPUBoost, CurrentProfile.CPUEPP, CurrentProfile.MaxCPUState, CurrentProfile.MinCPUState, CurrentProfile.TDPBoostEnabled, newGameProfilePath, gameProfiles);
+            var newGameProfile = new GameProfile(gameId.Name, gameId.Path, true, CurrentProfile.TDP, CurrentProfile.CPUBoost, CurrentProfile.CPUEPP, CurrentProfile.MaxCPUState, CurrentProfile.MinCPUState, newGameProfilePath, gameProfiles);
             newGameProfile.Save();
             Logger.Info($"Add new profile for {gameId.Name} at {newGameProfilePath}.");
             return newGameProfile;
@@ -332,49 +332,6 @@ namespace XboxGamingBarHelper.Profile
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Updates DGP preference for a game profile.
-        /// </summary>
-        public void UpdateDgpPreference(string gamePath, bool isOnBattery, bool enabled)
-        {
-            if (string.IsNullOrEmpty(gamePath))
-            {
-                return;
-            }
-
-            // Find the profile by path
-            GameId? targetKey = null;
-            foreach (var kvp in gameProfiles)
-            {
-                if (string.Equals(kvp.Key.Path, gamePath, StringComparison.OrdinalIgnoreCase))
-                {
-                    targetKey = kvp.Key;
-                    break;
-                }
-            }
-
-            if (!targetKey.HasValue)
-            {
-                Logger.Warn($"No profile found for {gamePath} to update DGP preference");
-                return;
-            }
-
-            // Get mutable copy, update, and save
-            var profile = gameProfiles[targetKey.Value];
-            if (isOnBattery)
-            {
-                profile.DgpEnabledOnDC = enabled;
-            }
-            else
-            {
-                profile.DgpEnabledOnAC = enabled;
-            }
-
-            // Update cache (profile.Save() already does this via its setter)
-            gameProfiles[targetKey.Value] = profile;
-            Logger.Info($"Updated DGP preference for {targetKey.Value.Name}: {(isOnBattery ? "DC" : "AC")}={enabled}");
         }
     }
 }

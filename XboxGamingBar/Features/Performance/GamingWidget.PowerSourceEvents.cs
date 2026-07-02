@@ -64,34 +64,16 @@ namespace XboxGamingBar
 
                 UpdateActiveProfileIndicator();
 
-                // Auto-switch power plan based on power source
-                if (powerPlanAutoSwitch)
-                {
-                    bool isOnAC = powerSupplyStatus != PowerSupplyStatus.NotPresent;
-                    Guid planToApply = isOnAC ? acPowerPlanGuid : dcPowerPlanGuid;
-                    if (planToApply != Guid.Empty)
-                    {
-                        ApplyPowerPlan(planToApply);
-                        Logger.Info($"Auto-switched power plan to {(isOnAC ? "AC" : "DC")}: {planToApply}");
-                    }
-                }
-
                 // Only reapply TDP after power source change if:
                 // 1. On Legion Go in Custom mode (255) - system changes TDP, need to restore
                 // 2. Power Source Profile toggle is enabled - user wants different profiles per power state
                 // For Legion preset modes (Quiet=1, Balanced=2, Performance=3), let the system handle TDP
-                // Skip TDP reapply when DGP is active - DGP controls TDP regardless of power source
                 bool isLegionCustomMode = legionGoDetected?.Value == true && legionPerformanceMode?.Value == 255;
                 bool powerSourceProfileEnabled = GetPowerSourceProfileEnabledForCurrentContext();
-                bool dgpActive = defaultGameProfileEnabled?.Value == true;
 
-                if ((isLegionCustomMode || powerSourceProfileEnabled) && !dgpActive)
+                if (isLegionCustomMode || powerSourceProfileEnabled)
                 {
                     SchedulePowerSourceTdpReapply();
-                }
-                else if (dgpActive)
-                {
-                    Logger.Info("Power source change: Skipping TDP reapply - Default Game Profile is active");
                 }
             });
         }
@@ -117,13 +99,6 @@ namespace XboxGamingBar
                 {
                     powerSourceTdpReapplyTimer.Stop();
 
-                    // Skip TDP reapply if DGP is active - DGP controls TDP regardless of power source
-                    if (defaultGameProfileEnabled?.Value == true)
-                    {
-                        Logger.Info("Power source change: Skipping TDP reapply - Default Game Profile is active");
-                        return;
-                    }
-
                     // Skip TDP reapply if not in Custom mode - preset modes manage TDP automatically
                     if (legionGoDetected?.Value == true && legionPerformanceMode?.Value != 255)
                     {
@@ -131,14 +106,10 @@ namespace XboxGamingBar
                         return;
                     }
 
-                    // Read TDP value NOW (at timer fire time), not when scheduled
-                    // This ensures we use the new profile's TDP after profile switch completes
-                    int currentTdpValue = (int)TDPSlider.Value;
-
-                    // Ask the helper to re-push current TDP to hardware via a dedicated pipe
-                    // message. The previous N-1/N trick corrupted global.xml by briefly
-                    // writing TDP-1 (profile persistence rounded to that transient value
-                    // whenever widget re-init / reboot landed during the 100 ms gap).
+                    // Ask the helper to re-push the current TDP to hardware via a dedicated pipe
+                    // message. On Legion in Custom mode the helper re-asserts the cached
+                    // SPL/SPPT/FPPT (ReassertCustomTDP); the master TDP slider was removed so there's
+                    // no widget value to read here.
                     try
                     {
                         if (App.IsConnected)
@@ -146,7 +117,7 @@ namespace XboxGamingBar
                             var request = new Windows.Foundation.Collections.ValueSet();
                             request.Add("ReapplyTDP", true);
                             await App.SendMessageAsync(request);
-                            Logger.Info($"Power source change: Asked helper to reapply current TDP ({currentTdpValue}W)");
+                            Logger.Info("Power source change: Asked helper to reapply current TDP");
                         }
                     }
                     catch (Exception ex)

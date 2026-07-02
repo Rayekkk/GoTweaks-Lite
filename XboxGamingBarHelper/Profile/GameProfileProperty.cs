@@ -70,18 +70,6 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
-        public bool TDPBoostEnabled
-        {
-            get { return value.TDPBoostEnabled; }
-            set
-            {
-                if (this.value.TDPBoostEnabled != value)
-                {
-                    this.value.TDPBoostEnabled = value;
-                }
-            }
-        }
-
         public GameId GameId
         {
             get { return value.GameId; }
@@ -552,89 +540,5 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
-        // AutoTDP properties
-        public bool AutoTDPEnabled
-        {
-            get { return value.AutoTDPEnabled; }
-            set
-            {
-                if (this.value.AutoTDPEnabled != value)
-                {
-                    this.value.AutoTDPEnabled = value;
-                }
-            }
-        }
-
-        public int AutoTDPTargetFPS
-        {
-            get { return value.AutoTDPTargetFPS; }
-            set
-            {
-                if (this.value.AutoTDPTargetFPS != value)
-                {
-                    this.value.AutoTDPTargetFPS = value;
-                }
-            }
-        }
-
-        public int AutoTDPMinTDP
-        {
-            get { return value.AutoTDPMinTDP; }
-            set
-            {
-                if (this.value.AutoTDPMinTDP != value)
-                {
-                    this.value.AutoTDPMinTDP = value;
-                }
-            }
-        }
-
-        public int AutoTDPMaxTDP
-        {
-            get { return value.AutoTDPMaxTDP; }
-            set
-            {
-                if (this.value.AutoTDPMaxTDP != value)
-                {
-                    this.value.AutoTDPMaxTDP = value;
-                }
-            }
-        }
-
-        public bool AutoTDPUseMLMode
-        {
-            get { return value.AutoTDPUseMLMode; }
-            set
-            {
-                if (this.value.AutoTDPUseMLMode != value)
-                {
-                    this.value.AutoTDPUseMLMode = value;
-                }
-            }
-        }
-
-        public int AutoTDPControllerType
-        {
-            get { return value.AutoTDPControllerType; }
-            set
-            {
-                if (this.value.AutoTDPControllerType != value)
-                {
-                    this.value.AutoTDPControllerType = value;
-                }
-            }
-        }
-
-        public bool AutoTDPPauseWhenUnfocused
-        {
-            get { return value.AutoTDPPauseWhenUnfocused; }
-            set
-            {
-                if (this.value.AutoTDPPauseWhenUnfocused != value)
-                {
-                    this.value.AutoTDPPauseWhenUnfocused = value;
-                }
-            }
-        }
     }
 }

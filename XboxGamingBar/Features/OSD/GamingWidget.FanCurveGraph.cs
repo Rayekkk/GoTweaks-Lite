@@ -169,22 +169,28 @@ namespace XboxGamingBar
             UpdateActiveModeLabel();
         }
 
-        // Show "Active: <mode>" only when the user is viewing a non-active mode, so
-        // there's a visual hint that edits to the current view will only kick in
-        // once that mode is selected (or via Lenovo button etc).
+        // Always spell out what the dropdown below is editing, since it selects which power
+        // mode's saved curve you're viewing — it does NOT change the running mode. When the
+        // viewed mode differs from the one the console is actually running, highlight it in
+        // blue so it's obvious edits won't take effect until that mode becomes active.
         private void UpdateActiveModeLabel()
         {
-            if (FanCurveActiveModeLabel == null || legionPerformanceMode == null) return;
-            int active = legionPerformanceMode.Value;
-            if (active == selectedFanCurveMode)
+            if (FanCurveActiveModeLabel == null) return;
+            int viewed = selectedFanCurveMode;
+            int active = legionPerformanceMode?.Value ?? viewed;
+            string viewedName = LegionModeShortName(viewed);
+
+            if (active == viewed)
             {
-                FanCurveActiveModeLabel.Visibility = Visibility.Collapsed;
+                FanCurveActiveModeLabel.Text = $"Editing the running curve ({viewedName})";
+                FanCurveActiveModeLabel.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x88, 0x88, 0x88));
             }
             else
             {
-                FanCurveActiveModeLabel.Text = $"Active: {LegionModeShortName(active)}";
-                FanCurveActiveModeLabel.Visibility = Visibility.Visible;
+                FanCurveActiveModeLabel.Text = $"Editing {viewedName} curve — console is running {LegionModeShortName(active)}";
+                FanCurveActiveModeLabel.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x88, 0xB0, 0xE0));
             }
+            FanCurveActiveModeLabel.Visibility = Visibility.Visible;
         }
 
         private static string LegionModeShortName(int mode)
@@ -440,30 +446,45 @@ namespace XboxGamingBar
         // matching what HWiNFO/Rodpad show; the displayed temp must match what's
         // actually being used to evaluate the curve. When locked, firmware drives
         // the fan from its own 0x01 sensor, so we show that.
+        // The whole fan-curve UI shows the true CPU temperature (Tctl/Tdie) regardless of
+        // lock state: it's the sensor the EC override loop evaluates the curve against when
+        // unlocked, and it's what users expect — NOT the EC's internal fan-control sensor
+        // (0x01), which reads a chipset/board area and was being mistaken for the CPU temp.
         private void OnCPUTempUpdated(int tempC)
         {
-            // Live indicators only meaningful when the user is viewing the curve that's
-            // actually running. When viewing a non-active mode, hide the live temp dot
-            // since it can't honestly map onto an inactive curve.
-            if (!IsViewingActiveFanCurveMode()) { HideLiveIndicators(); return; }
-            if (!IsFanCurveOverrideUnlocked()) return; // ignore — fan-sensor path owns the display
-            UpdateFanCurveGraphTemp(tempC);
+            // Header readout is live hardware — always show it while the card is open,
+            // independent of which mode's curve is being viewed below.
+            UpdateHeaderTemp(tempC);
+            // The on-graph temp dot maps onto the displayed curve, so only draw it when the
+            // viewed curve is the one actually running.
+            if (IsViewingActiveFanCurveMode()) UpdateFanCurveGraphTemp(tempC);
+            else HideLiveIndicators();
         }
 
+        // The EC fan-control sensor (0x01, chipset/board) is intentionally no longer shown —
+        // it was being mistaken for the CPU temperature. The firmware still uses it internally
+        // in locked mode (the Info expander notes the firmware may map temps differently).
         private void OnFanSensorTempUpdated(int tempC)
         {
-            if (!IsViewingActiveFanCurveMode()) { HideLiveIndicators(); return; }
-            if (IsFanCurveOverrideUnlocked()) return; // ignore — CPU temp path owns the display
-            UpdateFanCurveGraphTemp(tempC);
+            // not displayed — CPU temp drives the readout everywhere now.
         }
 
-        // Hide the live temp/RPM dots + label values when viewing a non-active mode.
+        // Live header temperature readout (next to the RPM). Always reflects the sensor that's
+        // currently driving the fan, independent of which mode's curve the graph is showing.
+        private void UpdateHeaderTemp(int tempC)
+        {
+            if (FanHeaderTempLabel != null) FanHeaderTempLabel.Text = $"{tempC}°C";
+        }
+
+        // Hide the ON-GRAPH live indicators (temp dot, RPM line) and the in-graph driving-temp
+        // label when viewing a non-active mode — they can't honestly map onto a curve that isn't
+        // running. The header Fan/temp readout is left untouched: it stays live because it
+        // reflects real hardware, not the displayed curve.
         private void HideLiveIndicators()
         {
             if (TempIndicatorLine != null) TempIndicatorLine.Visibility = Visibility.Collapsed;
             if (RPMIndicatorLine != null) RPMIndicatorLine.Visibility = Visibility.Collapsed;
             if (CurrentTempLabel != null) CurrentTempLabel.Text = "--";
-            if (FanRPMLabel != null) FanRPMLabel.Text = "-- RPM";
         }
 
         private bool IsFanCurveOverrideUnlocked()
@@ -480,18 +501,18 @@ namespace XboxGamingBar
 
         private void OnFanRPMUpdated(int rpm)
         {
-            if (!IsViewingActiveFanCurveMode())
-            {
-                HideLiveIndicators();
-                return;
-            }
-            if (FanRPMLabel != null)
-            {
-                FanRPMLabel.Text = $"{rpm} RPM";
-            }
+            // Header RPM is a live hardware reading — always show it while the card is open
+            // (the card being expanded is what gates polling; which mode's curve you're viewing
+            // below is irrelevant to the fan's actual RPM). This is the fix for the readout
+            // showing "-- RPM" whenever the viewed mode differed from the running mode.
+            if (FanRPMLabel != null) FanRPMLabel.Text = $"{rpm} RPM";
 
-            // Update RPM indicator line on graph
-            UpdateRPMIndicator(rpm);
+            // The on-graph RPM line maps onto the displayed curve, so only draw it for the
+            // curve that's actually running.
+            if (IsViewingActiveFanCurveMode())
+                UpdateRPMIndicator(rpm);
+            else if (RPMIndicatorLine != null)
+                RPMIndicatorLine.Visibility = Visibility.Collapsed;
         }
 
         private void UpdateRPMIndicator(int rpm)
@@ -539,10 +560,8 @@ namespace XboxGamingBar
                 DrawGridLines();
                 UpdateFanCurveGraph();
 
-                // Re-update temp indicator using whichever sensor matches the current unlock state.
-                int? activeTemp = IsFanCurveOverrideUnlocked()
-                    ? (legionCPUTemp != null && legionCPUTemp.Value > 0 ? legionCPUTemp.Value : (int?)null)
-                    : (legionFanSensorTemp != null && legionFanSensorTemp.Value > 0 ? legionFanSensorTemp.Value : (int?)null);
+                // Re-update temp indicator from the CPU temperature (always — see OnCPUTempUpdated).
+                int? activeTemp = legionCPUTemp != null && legionCPUTemp.Value > 0 ? legionCPUTemp.Value : (int?)null;
                 if (activeTemp.HasValue)
                 {
                     UpdateTemperatureIndicator(activeTemp.Value);
@@ -565,7 +584,7 @@ namespace XboxGamingBar
             bool viewingActive = IsViewingActiveFanCurveMode();
 
             if (CurrentTempPrefixLabel != null)
-                CurrentTempPrefixLabel.Text = activeUnlocked ? "CPU Temp: " : "Fan Sensor Temp: ";
+                CurrentTempPrefixLabel.Text = "CPU Temp: ";
 
             // EC floor line + legend make no sense once we're bypassing the firmware
             // (active unlock on). Also hide them while editing a non-active mode since
@@ -594,11 +613,9 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Push the temp value from whichever sensor owns the display now so the label
-            // and indicator switch immediately rather than waiting for the next sensor tick.
-            int? newTemp = activeUnlocked
-                ? (legionCPUTemp != null && legionCPUTemp.Value > 0 ? legionCPUTemp.Value : (int?)null)
-                : (legionFanSensorTemp != null && legionFanSensorTemp.Value > 0 ? legionFanSensorTemp.Value : (int?)null);
+            // Push the current CPU temperature now so the label + indicator refresh immediately
+            // rather than waiting for the next sensor tick.
+            int? newTemp = legionCPUTemp != null && legionCPUTemp.Value > 0 ? legionCPUTemp.Value : (int?)null;
             if (newTemp.HasValue)
             {
                 UpdateFanCurveGraphTemp(newTemp.Value);

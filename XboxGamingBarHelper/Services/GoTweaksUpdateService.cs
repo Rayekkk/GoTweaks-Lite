@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using NLog;
+using Shared.Constants;
 
 namespace XboxGamingBarHelper.Services
 {
@@ -13,9 +14,11 @@ namespace XboxGamingBarHelper.Services
     /// .msixbundle via PowerShell's Add-AppxPackage (helper runs elevated
     /// so the child inherits admin, and AppX install requires it).
     ///
-    /// Repo is hard-coded to the fork that ships the releases users install
-    /// from — <c>corando98/GoTweaks</c>. If we ever flip upstreams, change
-    /// <see cref="RepoPath"/> only.
+    /// The release repo is configured centrally in
+    /// <see cref="Shared.Constants.UpdateConstants.Repo"/>. It is EMPTY in this
+    /// fork, so every check short-circuits to "up to date" and self-install is
+    /// refused — the app will not auto-update to the upstream build. Set that
+    /// constant to your own repo to re-enable updates.
     ///
     /// Everything here is defensive — network issues, API rate limits, or
     /// asset-naming changes produce an empty/update-not-found result rather
@@ -24,7 +27,6 @@ namespace XboxGamingBarHelper.Services
     /// </summary>
     internal static class GoTweaksUpdateService
     {
-        private const string RepoPath = "corando98/GoTweaks";
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static readonly HttpClient _http = CreateHttpClient();
 
@@ -58,9 +60,19 @@ namespace XboxGamingBarHelper.Services
             {
                 CurrentVersion = currentVersion ?? "",
             };
+
+            // Updates are disabled while no release repo is configured. Never reach out
+            // to the upstream repo — report "up to date" so the app does not self-update.
+            if (!UpdateConstants.UpdatesEnabled)
+            {
+                Logger.Info("GoTweaks update check skipped — no release repo configured (updates disabled)");
+                _lastResult = result;
+                return result;
+            }
+
             try
             {
-                string url = $"https://api.github.com/repos/{RepoPath}/releases/latest";
+                string url = UpdateConstants.LatestReleaseApiUrl;
                 using var response = await _http.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -129,6 +141,10 @@ namespace XboxGamingBarHelper.Services
         /// </summary>
         public static async Task<string> InstallAsync(string downloadUrl)
         {
+            // Refuse self-install while updates are disabled (no repo configured).
+            if (!UpdateConstants.UpdatesEnabled)
+                return "{\"success\":false,\"message\":\"Updates are disabled (no release repo configured).\"}";
+
             if (string.IsNullOrWhiteSpace(downloadUrl))
                 return "{\"success\":false,\"message\":\"No download URL from GitHub release.\"}";
 

@@ -180,19 +180,13 @@ namespace Shared.Data
             // out / controllers shown "detached" because helper's BatchGet
             // snapshotted the property at its default-zero UpdatedTime before
             // the post-init SyncToRemote landed at the widget).
-            if (updatedTime == 0)
+            // Staleness + "no info" (UpdatedTime==0, issue #79) arbitration is decoupled into
+            // PropertyUpdateArbiter so the rules are unit-testable without a ValueSet-coupled
+            // property instance. Behavior is unchanged; on success `updatedTime` is set to the
+            // timestamp to record (coerced to now for the fresh zero-stamped case).
+            if (!PropertyUpdateArbiter.TryResolveTimestamp(lastUpdatedTime, updatedTime, out updatedTime))
             {
-                if (lastUpdatedTime > 0)
-                {
-                    Logger.Debug($"Skip value {newValue} of {Function} because incoming UpdatedTime=0 (no info) and we already have a real timestamp {lastUpdatedTime}.");
-                    return false;
-                }
-                updatedTime = DateTime.Now.Ticks;
-            }
-
-            if (updatedTime < lastUpdatedTime)
-            {
-                Logger.Debug($"Skip value {newValue} of {Function} because it is older than current value {updatedTime} vs {lastUpdatedTime}.");
+                Logger.Debug($"Skip value {newValue} of {Function}: rejected by timestamp arbiter (incoming stale or zero-with-prior; last={lastUpdatedTime}).");
                 return false;
             }
 

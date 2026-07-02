@@ -127,7 +127,7 @@ namespace XboxGamingBarHelper.Settings
                     ?? Path.Combine(
                         localAppData,
                         "Packages",
-                        "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg",
+                        Shared.Constants.PackageConstants.PackageFamilyName,
                         "LocalCache"
                     );
 

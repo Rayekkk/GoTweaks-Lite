@@ -72,9 +72,6 @@ namespace XboxGamingBar
                             case "TDPMode":
                                 CycleTDPMode();
                                 break;
-                            case "AutoTDP":
-                                ToggleAutoTDPTile();
-                                break;
                             case "Profile":
                                 TogglePerGameProfile();
                                 break;
@@ -95,6 +92,9 @@ namespace XboxGamingBar
                                 break;
                             case "HDR":
                                 ToggleHDR();
+                                break;
+                            case "AutoSDR":
+                                ToggleAutoSdr();
                                 break;
                             case "LosslessScaling":
                                 ToggleLosslessScaling();
@@ -181,78 +181,11 @@ namespace XboxGamingBar
 
         private void CycleTDPMode()
         {
-            // If default game profile is active, turn it off when user manually changes TDP mode
-            if (defaultGameProfileEnabled?.Value == true && DefaultProfileToggle != null)
-            {
-                Logger.Info("TDP Mode tile clicked - turning off Default Game Profile");
-                DefaultProfileToggle.IsOn = false;
-                // The toggle change will trigger OnDefaultProfileEnabledChanged which re-enables controls
-            }
-
             bool isLegion = legionGoDetected?.Value == true;
             int currentIndex = TDPModeComboBox?.SelectedIndex ?? 0;
 
-            // Use custom presets if enabled
-            if (useCustomTDPPresets && tdpPresets != null && tdpPresets.Count > 0)
             {
-                // Total items = presets + Custom mode
-                int totalItems = tdpPresets.Count + 1;
-                int nextIndex = (currentIndex + 1) % totalItems;
-
-                // Update combobox
-                if (TDPModeComboBox != null)
-                {
-                    isUserInitiatedTDPModeChange = true;
-                    TDPModeComboBox.SelectedIndex = nextIndex;
-                    isUserInitiatedTDPModeChange = false;
-                }
-
-                // Determine the Legion mode and TDP to apply
-                int nextLegionMode;
-                int? nextTdp = null;
-                string presetName;
-
-                if (nextIndex < tdpPresets.Count)
-                {
-                    var preset = tdpPresets[nextIndex];
-                    nextLegionMode = preset.LegionModeValue ?? 255;
-                    nextTdp = preset.TdpWatts;
-                    presetName = preset.Name;
-                }
-                else
-                {
-                    // Custom mode (last item)
-                    nextLegionMode = 255;
-                    presetName = "Custom";
-                }
-
-                // For Legion devices, set the hardware mode
-                if (isLegion && legionPerformanceMode != null)
-                {
-                    legionPerformanceMode.SetValue(nextLegionMode);
-                }
-
-                // Apply TDP for software-controlled presets (no LegionModeValue or Custom mode)
-                if (nextLegionMode == 255 && nextTdp.HasValue)
-                {
-                    // Apply the preset's TDP via the TDP slider/property
-                    if (TDPSlider != null)
-                    {
-                        TDPSlider.Value = nextTdp.Value;
-                    }
-                    ScheduleQsTdpReapply();
-                }
-                else if (nextLegionMode == 255)
-                {
-                    // Pure Custom mode - schedule reapply for current slider value
-                    ScheduleQsTdpReapply();
-                }
-
-                Logger.Info($"TDP Mode cycled to preset '{presetName}' (index={nextIndex}, legionMode={nextLegionMode}, tdp={nextTdp})");
-            }
-            else
-            {
-                // Default hardcoded mode cycling: Quiet(1) -> Balanced(2) -> Performance(3) -> Custom(255)
+                // Mode cycling: Quiet(1) -> Balanced(2) -> Performance(3) -> Custom(255)
                 int[] modeValues = { 1, 2, 3, 255 };
                 int currentMode;
                 if (isLegion && legionPerformanceMode != null)
@@ -300,15 +233,6 @@ namespace XboxGamingBar
             }
         }
 
-        private void ToggleAutoTDPTile()
-        {
-            if (AutoTDPToggle != null)
-            {
-                AutoTDPToggle.IsOn = !AutoTDPToggle.IsOn;
-                Logger.Info($"AutoTDP tile toggled to: {AutoTDPToggle.IsOn}");
-            }
-        }
-
         private void ScheduleQsTdpReapply()
         {
             try
@@ -329,12 +253,9 @@ namespace XboxGamingBar
                     bool isCustomMode = TDPModeComboBox?.SelectedIndex == 3;
                     if (isCustomMode)
                     {
-                        // Read TDP value NOW (at timer fire time), not when scheduled
-                        // This ensures we use the current profile's TDP if profile switched
-                        int currentTdpValue = (int)(TDPSlider?.Value ?? 15);
-
-                        // Ask helper to re-push current TDP to hardware. The previous
-                        // N-1/N trick corrupted global.xml by briefly writing TDP-1.
+                        // Ask the helper to re-push the current TDP to hardware. On Legion in Custom
+                        // mode the helper re-asserts the cached SPL/SPPT/FPPT (ReassertCustomTDP); the
+                        // master TDP slider was removed so there's no widget value to read here.
                         try
                         {
                             if (App.IsConnected)
@@ -342,7 +263,7 @@ namespace XboxGamingBar
                                 var request = new Windows.Foundation.Collections.ValueSet();
                                 request.Add("ReapplyTDP", true);
                                 await App.SendMessageAsync(request);
-                                Logger.Info($"Quick Settings: Asked helper to reapply current TDP ({currentTdpValue}W)");
+                                Logger.Info("Quick Settings: Asked helper to reapply current TDP");
                             }
                         }
                         catch (Exception ex)
@@ -362,14 +283,6 @@ namespace XboxGamingBar
 
         private void TogglePerGameProfile()
         {
-            // If Default Game Profile is active, toggle it off instead
-            if (defaultGameProfileEnabled?.Value == true && DefaultProfileToggle != null)
-            {
-                Logger.Info("Profile tile clicked - turning off Default Game Profile");
-                DefaultProfileToggle.IsOn = false;
-                return;
-            }
-
             // Only allow toggling when a game is detected
             if (perGameProfile != null && runningGame != null && runningGame.Value.IsValid())
             {
@@ -593,6 +506,19 @@ namespace XboxGamingBar
                 if (HDRToggle != null)
                     HDRToggle.IsOn = newValue;
                 Logger.Info($"HDR toggled to {newValue}");
+            }
+        }
+
+        private void ToggleAutoSdr()
+        {
+            if (autoSdrEnabled != null)
+            {
+                bool newValue = !autoSdrEnabled.Value;
+                autoSdrEnabled.SetValue(newValue);
+                // Keep the bound Display-tab toggle in sync (WidgetToggleProperty echoes UI too).
+                if (AutoSdrToggle != null)
+                    AutoSdrToggle.IsOn = newValue;
+                Logger.Info($"Auto SDR toggled to {newValue}");
             }
         }
 
@@ -920,8 +846,7 @@ namespace XboxGamingBar
             }
 
             // Save to profile if FPS Limit saving is enabled
-            // Don't save during DGP restoration - values being restored to original state
-            if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile && !isRestoringFromDefaultProfile)
+            if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
             {
                 SaveCurrentSettingsToProfile(currentProfileName);
             }

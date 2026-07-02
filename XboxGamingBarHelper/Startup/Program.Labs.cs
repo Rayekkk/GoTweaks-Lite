@@ -30,8 +30,6 @@ using XboxGamingBarHelper.Profile;
 using XboxGamingBarHelper.RTSS;
 using XboxGamingBarHelper.Settings;
 using XboxGamingBarHelper.Systems;
-using XboxGamingBarHelper.AutoTDP;
-using XboxGamingBarHelper.DefaultGameProfiles;
 using XboxGamingBarHelper.Labs;
 using Shared.Enums;
 
@@ -165,56 +163,6 @@ namespace XboxGamingBarHelper
             {
                 Logger.Error($"Labs: Error controlling DAService: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Export all Default Game Profiles to a text file on the Desktop.
-        /// </summary>
-        private static string ExportDefaultGameProfiles()
-        {
-            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            var exportPath = System.IO.Path.Combine(desktopPath, $"GoTweaks_DGPs_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt");
-
-            using (var writer = new System.IO.StreamWriter(exportPath))
-            {
-                writer.WriteLine($"GoTweaks Default Game Profiles Export");
-                writer.WriteLine($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                writer.WriteLine($"========================================");
-                writer.WriteLine();
-
-                if (defaultGameProfileManager == null)
-                {
-                    writer.WriteLine("DefaultGameProfileManager not initialized.");
-                    return exportPath;
-                }
-
-                var service = defaultGameProfileManager.GetService();
-                if (service == null)
-                {
-                    writer.WriteLine("DefaultGameProfileService not available.");
-                    return exportPath;
-                }
-
-                writer.WriteLine($"Hardware Variant: {service.HardwareVariant}");
-                writer.WriteLine($"Primary Profile Key: {service.PrimaryProfileKey}");
-                writer.WriteLine($"Effective Profile Key: {service.EffectiveProfileKey}");
-                writer.WriteLine($"Total Profiles: {service.ProfileCount}");
-                writer.WriteLine();
-                writer.WriteLine("========================================");
-                writer.WriteLine("PROFILE LIST (key -> game name [hardware]: TDP/FPS)");
-                writer.WriteLine("========================================");
-                writer.WriteLine();
-
-                var keys = service.GetAllProfileKeys().OrderBy(k => k).ToList();
-                foreach (var key in keys)
-                {
-                    var info = service.GetProfileDebugInfo(key);
-                    // Format: key -> info (which already includes game name and profiles)
-                    writer.WriteLine($"{key} -> {info}");
-                }
-            }
-
-            return exportPath;
         }
 
         /// <summary>
@@ -429,7 +377,7 @@ namespace XboxGamingBarHelper
             // 3. Export Q-learning model (AutoTDP)
             var localStatePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalState"
+                "Packages", PackageConstants.PackageFamilyName, "LocalState"
             );
             var qTablePath = Path.Combine(localStatePath, "autotdp_qtable.json");
             if (File.Exists(qTablePath))
@@ -443,7 +391,7 @@ namespace XboxGamingBarHelper
             // 4. Export helper settings (from LocalCache/settings.json)
             var localCachePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalCache"
+                "Packages", PackageConstants.PackageFamilyName, "LocalCache"
             );
             var helperSettingsPath = Path.Combine(localCachePath, "settings.json");
             if (File.Exists(helperSettingsPath))
@@ -554,35 +502,6 @@ namespace XboxGamingBarHelper
                 }
             }
 
-            // 3. Import Q-learning model
-            var srcQTable = Path.Combine(importPath, "autotdp_qtable.json");
-            if (File.Exists(srcQTable))
-            {
-                try
-                {
-                    var localStatePath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalState"
-                    );
-                    Directory.CreateDirectory(localStatePath);
-                    var destPath = Path.Combine(localStatePath, "autotdp_qtable.json");
-                    File.Copy(srcQTable, destPath, true);
-                    importedCount++;
-                    summary.AppendLine("✓ Imported AutoTDP Q-learning model");
-
-                    // Notify AutoTDPManager to reload if active
-                    if (autoTDPManager != null)
-                    {
-                        autoTDPManager.ReloadQLearningModel();
-                        summary.AppendLine("  (Q-learning model reloaded)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Failed to import Q-learning model: {ex.Message}");
-                    summary.AppendLine($"✗ Failed to import Q-learning model: {ex.Message}");
-                }
-            }
 
             // 4. Import helper settings
             var srcHelperSettings = Path.Combine(importPath, "helper_settings.json");
@@ -592,7 +511,7 @@ namespace XboxGamingBarHelper
                 {
                     var localCachePath = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalCache"
+                        "Packages", PackageConstants.PackageFamilyName, "LocalCache"
                     );
                     Directory.CreateDirectory(localCachePath);
                     var destPath = Path.Combine(localCachePath, "settings.json");
@@ -632,7 +551,7 @@ namespace XboxGamingBarHelper
                 {
                     var localStatePath = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalState"
+                        "Packages", PackageConstants.PackageFamilyName, "LocalState"
                     );
                     Directory.CreateDirectory(localStatePath);
                     var destPath = Path.Combine(localStatePath, "system_restore_data.json");
@@ -1290,15 +1209,6 @@ namespace XboxGamingBarHelper
                     return;
                 }
                 lastFocusWidgetTime = now;
-
-                // If sidebar mode is enabled, toggle sidebar instead of opening Game Bar
-                Logger.Info($"FocusGoTweaks: sidebarMenuEnabled={sidebarMenuEnabled}, sidebarManager={sidebarManager != null}");
-                if (sidebarMenuEnabled && sidebarManager != null)
-                {
-                    sidebarManager.Toggle();
-                    Logger.Info("Sidebar: Toggled sidebar overlay");
-                    return;
-                }
 
                 // Open Game Bar (required for widget activation)
                 SendKeyboardShortcutViaInputInjector("Win+G");

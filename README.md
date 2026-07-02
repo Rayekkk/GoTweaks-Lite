@@ -1,10 +1,23 @@
+# GoTweaks Widget Lite
+
+A stripped-down, **Lenovo Legion Go 2**-focused fork of [GoTweaks](https://github.com/corando98/GoTweaks) by corando98 (itself a fork of [namquang93](https://github.com/namquang93)'s original). It keeps the same Xbox Game Bar widget foundation, trimmed to a clean, focused base for the Legion Go 2 (AMD Ryzen Z2 Extreme).
+
+### What's different from upstream
+
+- **Legion Go 2 focus** — the build targets the Legion Go 2; other devices are not a priority.
+- **Simplified TDP control** — a single *TDP Mode* selector (Quiet / Balanced / Performance / Custom); Custom exposes SPL plus SPPT/FPPT boosts with a 50 W safety ceiling and live apply.
+- **Leaner feature set** — removed AutoTDP, Sticky TDP, the TDP Boost UI, TDP presets, the beta Sidebar overlay, and Microsoft Default Game Profiles (custom per-game profiles stay).
+- **Fixes & polish** — correct system-tray icon plus assorted TDP, fan and lighting reliability fixes.
+
+> **Installing differs from upstream** — use the [`Installer/`](Installer/) folder (run **Install GoTweaks.bat**) instead of the original install steps further down.
+
+---
+
+*Everything below is the original upstream README, kept for reference.*
+
 # GoTweaks Widget
 
 A powerful Game Bar widget for controlling gaming settings with your controller. Designed for handheld gaming PCs with deep integration for Legion Go, AMD Radeon GPUs, and performance tuning.
-
-[![Video Overview](https://img.youtube.com/vi/6zoOBG9X_WU/0.jpg)](https://www.youtube.com/watch?v=6zoOBG9X_WU)
-
-*Video by [GameTechPlanet](https://www.youtube.com/@GameTechPlanet) - Note: Installation has been simplified and the widget has received many updates since this video.*
 
 ## Features
 
@@ -26,11 +39,6 @@ Fine-tune power and CPU settings for optimal performance or battery life.
 - **Custom TDP** - Adjust system power limits with real-time monitoring
 - **Sticky TDP** - Automatically restore TDP if changed by other apps
 - **TDP Boost** - Per-game boost with separate SPPT/FPPT controls
-
-**AutoTDP (Beta):**
-- Automatically adjusts TDP to maintain your target FPS
-- Smart algorithm finds the minimum power needed
-- Real-time status shown in OSD overlay
 
 **CPU Controls:**
 - **CPU Boost** - Enable or disable CPU boost

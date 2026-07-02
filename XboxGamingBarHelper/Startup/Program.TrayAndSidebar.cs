@@ -30,8 +30,6 @@ using XboxGamingBarHelper.Profile;
 using XboxGamingBarHelper.RTSS;
 using XboxGamingBarHelper.Settings;
 using XboxGamingBarHelper.Systems;
-using XboxGamingBarHelper.AutoTDP;
-using XboxGamingBarHelper.DefaultGameProfiles;
 using XboxGamingBarHelper.Labs;
 using Shared.Enums;
 
@@ -64,31 +62,6 @@ namespace XboxGamingBarHelper
             {
                 Logger.Warn($"Tray indicator startup failed: {ex.Message}");
                 _trayIndicator = null;
-            }
-        }
-
-        private static void TryStartSidebar()
-        {
-            try
-            {
-                // Load persisted sidebar state
-                sidebarMenuEnabled = Properties.Settings.Default.SidebarMenuEnabled;
-                Logger.Info($"Sidebar: Loaded persisted state: {sidebarMenuEnabled}");
-
-                sidebarManager = new Sidebar.SidebarManager();
-                if (sidebarManager.Start())
-                {
-                    Logger.Info("Sidebar manager started");
-                }
-                else
-                {
-                    Logger.Warn("Sidebar manager failed to start");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Sidebar manager startup failed: {ex.Message}");
-                sidebarManager = null;
             }
         }
 
@@ -248,6 +221,48 @@ Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction Silent
                 return _startupException == null;
             }
 
+            private static global::System.Drawing.Icon LoadTrayIcon()
+            {
+                // Primary: the GoTweaks icon embedded as a manifest resource (travels with the
+                // deployed exe regardless of the helper deployment allowlist).
+                try
+                {
+                    var assembly = global::System.Reflection.Assembly.GetExecutingAssembly();
+                    using (var stream = assembly.GetManifestResourceStream("XboxGamingBarHelper.GoTweaks.ico"))
+                    {
+                        if (stream != null)
+                        {
+                            return new global::System.Drawing.Icon(stream, new global::System.Drawing.Size(32, 32));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Tray icon: embedded resource load failed: {ex.Message}");
+                }
+
+                // Fallback: the icon embedded in the exe's Win32 resources (ApplicationIcon).
+                try
+                {
+                    string exePath = Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrEmpty(exePath))
+                    {
+                        var extracted = global::System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                        if (extracted != null)
+                        {
+                            return extracted;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Tray icon: ExtractAssociatedIcon failed: {ex.Message}");
+                }
+
+                // Last resort: keep the previous default so the tray entry is never iconless.
+                return global::System.Drawing.SystemIcons.Application;
+            }
+
             private void TrayUiThreadMain()
             {
                 _threadId = GetCurrentThreadId();
@@ -266,17 +281,29 @@ Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction Silent
                         menu.Items.Add(new global::System.Windows.Forms.ToolStripSeparator());
                         menu.Items.Add(exitItem);
 
-                        using (var notifyIcon = new global::System.Windows.Forms.NotifyIcon())
+                        var trayIcon = LoadTrayIcon();
+                        try
                         {
-                            notifyIcon.Text = "GoTweaks Helper";
-                            notifyIcon.Icon = global::System.Drawing.SystemIcons.Application;
-                            notifyIcon.ContextMenuStrip = menu;
-                            notifyIcon.Visible = true;
+                            using (var notifyIcon = new global::System.Windows.Forms.NotifyIcon())
+                            {
+                                notifyIcon.Text = "GoTweaks Helper";
+                                notifyIcon.Icon = trayIcon;
+                                notifyIcon.ContextMenuStrip = menu;
+                                notifyIcon.Visible = true;
 
-                            _startupSignal.Set();
-                            global::System.Windows.Forms.Application.Run();
+                                _startupSignal.Set();
+                                global::System.Windows.Forms.Application.Run();
 
-                            notifyIcon.Visible = false;
+                                notifyIcon.Visible = false;
+                            }
+                        }
+                        finally
+                        {
+                            // Only dispose icons we created ourselves; SystemIcons are shared/static.
+                            if (!ReferenceEquals(trayIcon, global::System.Drawing.SystemIcons.Application))
+                            {
+                                trayIcon.Dispose();
+                            }
                         }
                     }
                 }

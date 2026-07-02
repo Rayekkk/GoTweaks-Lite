@@ -52,13 +52,6 @@ namespace XboxGamingBar
         {
             try
             {
-                // Skip when Default Game Profile is active - DGP controls TDP, not the profile
-                if (defaultGameProfileEnabled?.Value == true)
-                {
-                    Logger.Info("Skipping ApplyProfileTDPToHelper - Default Game Profile is active");
-                    return;
-                }
-
                 var profile = GetProfile(currentProfileName);
                 if (profile == null)
                 {
@@ -80,20 +73,13 @@ namespace XboxGamingBar
 
                         if (modeIndex >= 0)
                         {
-                            // During initial sync, always apply the profile's TDP mode to ensure
-                            // hardware matches profile (hardware may have been set to Custom by TDP sync)
-                            bool needsUIUpdate = (TDPModeComboBox != null && TDPModeComboBox.SelectedIndex != modeIndex) ||
-                                                 (LegionPerformanceModeComboBox != null && LegionPerformanceModeComboBox.SelectedIndex != modeIndex);
-
                             Logger.Info($"Applying profile TDP Mode to helper: {GetLegionModeShortName(profileMode)} ({profileMode}) (profile: {currentProfileName})");
 
                             // Update lastTDPModeIndex FIRST before any ComboBox changes to prevent
                             // TDPModeComboBox_SelectionChanged from treating this as a user-initiated change
                             lastTDPModeIndex = modeIndex;
 
-                            // Update UI combo boxes if needed
-                            if (LegionPerformanceModeComboBox != null && LegionPerformanceModeComboBox.SelectedIndex != modeIndex)
-                                LegionPerformanceModeComboBox.SelectedIndex = modeIndex;
+                            // Update the TDP Mode dropdown if needed
                             if (TDPModeComboBox != null && TDPModeComboBox.SelectedIndex != modeIndex)
                                 TDPModeComboBox.SelectedIndex = modeIndex;
 
@@ -141,13 +127,6 @@ namespace XboxGamingBar
                         // value matches but was never sent to hardware
                         tdp.SetValueSilent(-1);
                         tdp.SetValue(targetTDP, DateTime.Now.Ticks);
-
-                        // Update Sticky TDP target if enabled
-                        if (StickyTDPToggle?.IsOn == true)
-                        {
-                            targetTDPLimit = profile.TDP;
-                            Logger.Info($"Sticky TDP target set to: {targetTDPLimit}W");
-                        }
                     }
                     else if (tdp != null && !isCustomMode)
                     {

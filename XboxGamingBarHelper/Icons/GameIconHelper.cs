@@ -36,7 +36,7 @@ namespace XboxGamingBarHelper.Icons
                 // Fallback for running outside package context (e.g., via scheduled task)
                 // Use the same path as the deployed helper location
                 var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                return Path.Combine(localAppData, "Packages", "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg", "LocalCache", ICON_CACHE_FOLDER);
+                return Path.Combine(localAppData, "Packages", Shared.Constants.PackageConstants.PackageFamilyName, "LocalCache", ICON_CACHE_FOLDER);
             }
         }
 

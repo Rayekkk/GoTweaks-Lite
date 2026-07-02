@@ -137,14 +137,6 @@ namespace XboxGamingBar
                 {
                     try
                     {
-                        // Skip reloading profile settings if Default Game Profile is active
-                        // The Default Game Profile settings are already applied and should not be overwritten
-                        if (defaultGameProfileEnabled?.Value == true)
-                        {
-                            Logger.Info("Skipping profile reload - Default Game Profile is active");
-                            return;
-                        }
-
                         string expectedProfile = GetTargetProfileName();
                         if (expectedProfile != currentProfileName)
                         {

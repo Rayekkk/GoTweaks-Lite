@@ -30,8 +30,6 @@ using XboxGamingBarHelper.Profile;
 using XboxGamingBarHelper.RTSS;
 using XboxGamingBarHelper.Settings;
 using XboxGamingBarHelper.Systems;
-using XboxGamingBarHelper.AutoTDP;
-using XboxGamingBarHelper.DefaultGameProfiles;
 using XboxGamingBarHelper.Labs;
 using Shared.Enums;
 
@@ -114,10 +112,6 @@ namespace XboxGamingBarHelper
         private static GPDManager gpdManager;
         private static ControllerEmulationManager controllerEmulationManager;
         private static XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager viiperEmulationManager;
-        private static AutoTDPManager autoTDPManager;
-        private static DefaultGameProfileManager defaultGameProfileManager;
-        private static Sidebar.SidebarManager sidebarManager;
-        private static bool sidebarMenuEnabled;
         private static List<IManager> Managers;
 
         public static OnScreenDisplayProperty onScreenDisplay;
@@ -388,22 +382,6 @@ namespace XboxGamingBarHelper
                 catch { }
             };
 
-            // Check for export-profiles mode - exports registry game profiles to bundled JSON
-            // Run this on a system with Xbox FSE enabled to generate bundled_profiles.json
-            if (args.Contains("--export-profiles"))
-            {
-                Logger.Info("=== Export Profiles Mode ===");
-                var outputPath = args.SkipWhile(a => a != "--export-profiles").Skip(1).FirstOrDefault()
-                    ?? Path.Combine(Environment.CurrentDirectory, "bundled_profiles.json");
-
-                Logger.Info($"Exporting profiles to: {outputPath}");
-                var count = BundledProfileExporter.ExportToJson(outputPath);
-                Logger.Info($"Exported {count} game profiles");
-                Console.WriteLine($"Exported {count} game profiles to: {outputPath}");
-                LogManager.Flush();
-                return;
-            }
-
             // Check for setup mode FIRST (before anything else)
             // Setup mode: deploy files, create scheduled task, run task, then EXIT
             // The task launches the elevated helper which will connect to the widget.
@@ -519,7 +497,6 @@ namespace XboxGamingBarHelper
             try
             {
                 TryStartTrayIndicator();
-                TryStartSidebar();
                 await Initialize();
             }
             catch (Exception ex)
@@ -530,7 +507,6 @@ namespace XboxGamingBarHelper
             }
             finally
             {
-                sidebarManager?.Dispose();
                 DisposeTrayIndicator();
                 // Intentionally NOT releasing/disposing singleInstanceMutex here.
                 // The kernel releases named mutexes automatically on process exit.
@@ -750,7 +726,7 @@ namespace XboxGamingBarHelper
                         localStateFolder = Path.Combine(
                             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                             "Packages",
-                            "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg",
+                            PackageConstants.PackageFamilyName,
                             "LocalState"
                         );
                     }
@@ -828,62 +804,6 @@ namespace XboxGamingBarHelper
             {
                 Logger.Error($"Failed to start Named Pipe server: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Initialize DefaultGameProfileManager in background.
-        /// Deferred because it's not needed for initial UI and takes ~600ms.
-        /// DGP only activates when a game starts running.
-        /// </summary>
-        private static async void InitializeDefaultGameProfileManagerAsync()
-        {
-            await Task.Run(() =>
-            {
-                var dgpTimer = System.Diagnostics.Stopwatch.StartNew();
-                try
-                {
-                    defaultGameProfileManager = new DefaultGameProfileManager(performanceManager, rtssManager, systemManager, profileManager, legionManager);
-
-                    if (defaultGameProfileManager != null)
-                    {
-                        // Wait for Managers list to be initialized before trying to lock it
-                        while (Managers == null)
-                        {
-                            Thread.Sleep(10);
-                        }
-
-                        // Add to Managers list for cleanup
-                        lock (Managers)
-                        {
-                            Managers.Add(defaultGameProfileManager);
-                        }
-
-                        // Wait for properties to be initialized before adding DGP properties
-                        // The properties object is created in Initialize() which runs before this
-                        while (properties == null)
-                        {
-                            Thread.Sleep(10);
-                        }
-
-                        // Add properties dynamically using thread-safe Add method
-                        properties.Add(defaultGameProfileManager.ProfileAvailable);
-                        properties.Add(defaultGameProfileManager.ProfileData);
-                        properties.Add(defaultGameProfileManager.ProfileEnabled);
-                        properties.Add(defaultGameProfileManager.ForceProfile);
-
-                        Logger.Info("DefaultGameProfileManager properties added to helper");
-                    }
-
-                    dgpTimer.Stop();
-                    Logger.Info($"[TIMING] DefaultGameProfileManager (background): {dgpTimer.ElapsedMilliseconds}ms");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error($"Failed to initialize DefaultGameProfileManager: {ex.Message}");
-                    Logger.Error($"Stack trace: {ex.StackTrace}");
-                    defaultGameProfileManager = null;
-                }
-            });
         }
 
         /// <summary>
@@ -1154,20 +1074,8 @@ namespace XboxGamingBarHelper
             wave2Timer.Stop();
             Logger.Info($"[TIMING] Wave 2 (parallel): {wave2Timer.ElapsedMilliseconds}ms");
 
-            // Wave 3: Managers that depend on Wave 2
-            var wave3Timer = System.Diagnostics.Stopwatch.StartNew();
-            Logger.Info("Wave 3: AutoTDPManager");
-            autoTDPManager = new AutoTDPManager(performanceManager, systemManager);
-            wave3Timer.Stop();
-            Logger.Info($"[TIMING] Wave 3: {wave3Timer.ElapsedMilliseconds}ms");
-
             totalTimer.Stop();
             Logger.Info($"[TIMING] All managers total (parallel): {totalTimer.ElapsedMilliseconds}ms");
-
-            // Initialize DefaultGameProfileManager in background - not needed for initial UI
-            // Deferred to avoid blocking startup - DGP only kicks in when a game is running
-            Logger.Info("Initialize Default Game Profile Manager (deferred to background).");
-            InitializeDefaultGameProfileManagerAsync();
 
             // Initialize input injector for keyboard shortcuts (works in widget context unlike SendInput)
             inputInjector = InputInjector.TryCreate();
@@ -1269,12 +1177,6 @@ namespace XboxGamingBarHelper
                 });
             }
 
-            // Set AutoTDPManager reference in RTSSManager for AutoTDP OSD support
-            rtssManager.SetAutoTDPManager(autoTDPManager);
-
-            // Set RTSSManager reference in AutoTDPManager for frametime stability detection
-            autoTDPManager.SetRTSSManager(rtssManager);
-
             // Initialize Display/OSD config (position shift handled by RTSSManager, adaptive brightness by SystemManager)
             Logger.Info("Initialize DisplayOSD Config.");
             rtssManager.InitializeDisplayOSDConfig(systemManager.SetAdaptiveBrightness);
@@ -1294,13 +1196,8 @@ namespace XboxGamingBarHelper
                 settingsManager,
                 legionManager,
                 gpdManager,
-                controllerEmulationManager,
-                autoTDPManager
+                controllerEmulationManager
             };
-            // Note: defaultGameProfileManager is added in background task when ready
-
-            // Wire sidebar manager to live managers (WPF thread already running from TryStartSidebar)
-            sidebarManager?.SetManagers(performanceManager, autoTDPManager, profileManager, legionManager, controllerEmulationManager, powerManager, rtssManager, systemManager);
 
             // Gate the per-tick LibreHardwareMonitor walk on whether anyone actually wants
             // fresh sensor data. PerformanceManager already short-circuits on QuickMetrics
@@ -1311,8 +1208,6 @@ namespace XboxGamingBarHelper
             {
                 try
                 {
-                    if (sidebarManager?.IsVisibleCached == true) return true;
-                    if (autoTDPManager?.Enabled?.Value == true) return true;
                     if (legionManager?.IsFanCurveVisible == true) return true;
                     // EC fan override loop reads CPUTemperature every tick to drive 0xC6C8. If
                     // the sensor walk is gated off when no one else needs sensors, the cached
@@ -1333,7 +1228,7 @@ namespace XboxGamingBarHelper
             onScreenDisplayProviders = new List<OnScreenDisplayManager>() { rtssManager, amdManager };
             //onScreenDisplay = new OnScreenDisplayProperty(0, null, amdManager);
 
-            // Build properties list (conditionally add DefaultGameProfile if available)
+            // Build properties list
             var propertyList = new List<FunctionalProperty>
             {
                 systemManager.RunningGame,
@@ -1358,10 +1253,8 @@ namespace XboxGamingBarHelper
                 systemManager.DisplayOrientation,
                 systemManager.HDRSupported,
                 systemManager.HDREnabled,
+                systemManager.AutoSdrEnabled,
                 systemManager.AdaptiveBrightnessMode,
-                systemManager.CPUCoreConfig,
-                systemManager.CPUCoreActiveConfig,
-                systemManager.CoreParkingPercent,
                 systemManager.TrackedGame,
                 rtssManager.RTSSInstalled,
                 rtssManager.OSDConfig,
@@ -1614,29 +1507,12 @@ namespace XboxGamingBarHelper
                 legionManager.DeviceHasScrollWheel,
                 legionManager.DeviceHasDetachableControllers,
                 legionManager.DeviceHasTouchpad,
-                autoTDPManager.Enabled,
-                autoTDPManager.TargetFPS,
-                autoTDPManager.CurrentFPS,
-                autoTDPManager.MinTDP,
-                autoTDPManager.MaxTDP,
-                autoTDPManager.TDPLimits,
-                autoTDPManager.UseMLMode,
-                autoTDPManager.ControllerType,  // 0=PID, 1=Q-Learning, 2=SARSA
-                autoTDPManager.MLStatus,
-                autoTDPManager.LearnedGameData,
-                autoTDPManager.ResetML,
-                autoTDPManager.PauseWhenUnfocused,
-                systemManager.ForceParkMode,
-                performanceManager.TDPBoostEnabled,
-                performanceManager.TDPBoostSPPT,
-                performanceManager.TDPBoostFPPT,
+                // TDP Boost removed — boost is always on (SPL/SPPT/FPPT set directly in Custom mode).
                 // performanceManager.WinRing0AvailableProperty, // WinRing0 removed - deprecated
                 performanceManager.PawnIOAvailableProperty,
                 performanceManager.PawnIOInstalledProperty,
                 performanceManager.InstallPawnIOProperty
             };
-
-            // Note: DefaultGameProfileManager properties are added dynamically in background task
 
             // Initialize properties
             properties = new HelperProperties(propertyList.ToArray());
@@ -1647,7 +1523,6 @@ namespace XboxGamingBarHelper
             systemManager.PowerSourceChanged += SystemManager_PowerSourceChanged;
             profileManager.PerGameProfile.PropertyChanged += PerGameProfile_PropertyChanged;
             performanceManager.TDP.PropertyChanged += TDP_PropertyChanged;
-            performanceManager.TDPBoostEnabled.PropertyChanged += TDPBoostEnabled_PropertyChanged;
             powerManager.CPUBoost.PropertyChanged += CPUBoost_PropertyChanged;
             powerManager.CPUEPP.PropertyChanged += CPUEPP_PropertyChanged;
             powerManager.MaxCPUState.PropertyChanged += CPUState_PropertyChanged;
@@ -1719,17 +1594,6 @@ namespace XboxGamingBarHelper
                 legionManager.LegionPowerLight.PropertyChanged += LegionControllerSetting_PropertyChanged;
             }
 
-            // AutoTDP settings (per-game AutoTDP profiles)
-            if (autoTDPManager != null)
-            {
-                autoTDPManager.Enabled.PropertyChanged += AutoTDPSetting_PropertyChanged;
-                autoTDPManager.TargetFPS.PropertyChanged += AutoTDPSetting_PropertyChanged;
-                autoTDPManager.MinTDP.PropertyChanged += AutoTDPSetting_PropertyChanged;
-                autoTDPManager.MaxTDP.PropertyChanged += AutoTDPSetting_PropertyChanged;
-                autoTDPManager.UseMLMode.PropertyChanged += AutoTDPSetting_PropertyChanged;  // Legacy
-                autoTDPManager.ControllerType.PropertyChanged += AutoTDPSetting_PropertyChanged;
-                autoTDPManager.PauseWhenUnfocused.PropertyChanged += AutoTDPSetting_PropertyChanged;
-            }
 
             initTimer.Stop();
             Logger.Info($"[TIMING] Helper initialization (managers + properties): {initTimer.ElapsedMilliseconds}ms");

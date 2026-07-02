@@ -30,8 +30,6 @@ using XboxGamingBarHelper.Profile;
 using XboxGamingBarHelper.RTSS;
 using XboxGamingBarHelper.Settings;
 using XboxGamingBarHelper.Systems;
-using XboxGamingBarHelper.AutoTDP;
-using XboxGamingBarHelper.DefaultGameProfiles;
 using XboxGamingBarHelper.Labs;
 using Shared.Enums;
 

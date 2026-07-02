@@ -30,8 +30,6 @@ using XboxGamingBarHelper.Profile;
 using XboxGamingBarHelper.RTSS;
 using XboxGamingBarHelper.Settings;
 using XboxGamingBarHelper.Systems;
-using XboxGamingBarHelper.AutoTDP;
-using XboxGamingBarHelper.DefaultGameProfiles;
 using XboxGamingBarHelper.Labs;
 using Shared.Enums;
 
@@ -53,12 +51,10 @@ namespace XboxGamingBarHelper
             public static bool CPUState = true;
             public static bool AMDFeatures = false;
             public static bool FPSLimit = true;
-            public static bool AutoTDP = true;
             public static bool OSPowerMode = true;
             public static bool HDR = false;
             public static bool Resolution = false;
             public static bool RefreshRate = false;
-            public static bool StickyTDP = false;
             public static bool OverlayLevel = false;
             public static bool CPUAffinity = false;
             public static bool NintendoLayout = false;
@@ -79,12 +75,10 @@ namespace XboxGamingBarHelper
                 if (cfg.TryGetValue("CPUState", out var v4)) ProfileSaveFlagsState.CPUState = v4;
                 if (cfg.TryGetValue("AMDFeatures", out var v5)) ProfileSaveFlagsState.AMDFeatures = v5;
                 if (cfg.TryGetValue("FPSLimit", out var v6)) ProfileSaveFlagsState.FPSLimit = v6;
-                if (cfg.TryGetValue("AutoTDP", out var v7)) ProfileSaveFlagsState.AutoTDP = v7;
                 if (cfg.TryGetValue("OSPowerMode", out var v8)) ProfileSaveFlagsState.OSPowerMode = v8;
                 if (cfg.TryGetValue("HDR", out var v9)) ProfileSaveFlagsState.HDR = v9;
                 if (cfg.TryGetValue("Resolution", out var v10)) ProfileSaveFlagsState.Resolution = v10;
                 if (cfg.TryGetValue("RefreshRate", out var v11)) ProfileSaveFlagsState.RefreshRate = v11;
-                if (cfg.TryGetValue("StickyTDP", out var v12)) ProfileSaveFlagsState.StickyTDP = v12;
                 if (cfg.TryGetValue("OverlayLevel", out var v13)) ProfileSaveFlagsState.OverlayLevel = v13;
                 if (cfg.TryGetValue("CPUAffinity", out var v14)) ProfileSaveFlagsState.CPUAffinity = v14;
                 if (cfg.TryGetValue("NintendoLayout", out var v15)) ProfileSaveFlagsState.NintendoLayout = v15;
@@ -94,7 +88,7 @@ namespace XboxGamingBarHelper
                 Logger.Info("Applied ProfileSaveFlags from widget "
                     + $"(TDP={ProfileSaveFlagsState.TDP}, CPUBoost={ProfileSaveFlagsState.CPUBoost}, "
                     + $"CPUEPP={ProfileSaveFlagsState.CPUEPP}, CPUState={ProfileSaveFlagsState.CPUState}, "
-                    + $"AutoTDP={ProfileSaveFlagsState.AutoTDP}, NintendoLayout={ProfileSaveFlagsState.NintendoLayout}, "
+                    + $"NintendoLayout={ProfileSaveFlagsState.NintendoLayout}, "
                     + $"Vibration={ProfileSaveFlagsState.Vibration}, Lighting={ProfileSaveFlagsState.Lighting}, "
                     + $"ButtonMappings={ProfileSaveFlagsState.ButtonMappings})");
             }
@@ -119,77 +113,6 @@ namespace XboxGamingBarHelper
             {
                 Logger.Info($"Saving {settingName} to global (per-game capture disabled)");
                 onGlobal(profileManager.GlobalProfile);
-            }
-        }
-
-        private static void AutoTDPSetting_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            // Skip during profile application to prevent cross-contamination
-            if (isApplyingProfile)
-            {
-                Logger.Debug("Skipping AutoTDPSetting_PropertyChanged - already applying profile");
-                return;
-            }
-
-            // Skip stale widget messages during cooldown after profile switch
-            if (IsInProfileSwitchCooldown())
-            {
-                Logger.Debug("Skipping AutoTDPSetting_PropertyChanged - in profile switch cooldown");
-                return;
-            }
-
-            if (profileManager?.CurrentProfile == null || autoTDPManager == null)
-                return;
-
-            // All AutoTDP* settings share a single flag (ProfileSaveAutoTDP). When it's false the
-            // writes land in GlobalProfile so a disabled toggle in-game doesn't sit on top of a
-            // stale enabled-True in GlobalProfile that then resurfaces on reboot.
-            bool saveToProfile = ProfileSaveFlagsState.AutoTDP;
-
-            if (sender == autoTDPManager.Enabled)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPEnabled",
-                    cur => cur.AutoTDPEnabled = autoTDPManager.Enabled.Value,
-                    glo => glo.AutoTDPEnabled = autoTDPManager.Enabled.Value);
-            }
-            else if (sender == autoTDPManager.TargetFPS)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPTargetFPS",
-                    cur => cur.AutoTDPTargetFPS = autoTDPManager.TargetFPS.Value,
-                    glo => glo.AutoTDPTargetFPS = autoTDPManager.TargetFPS.Value);
-            }
-            else if (sender == autoTDPManager.MinTDP)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPMinTDP",
-                    cur => cur.AutoTDPMinTDP = autoTDPManager.MinTDP.Value,
-                    glo => glo.AutoTDPMinTDP = autoTDPManager.MinTDP.Value);
-            }
-            else if (sender == autoTDPManager.MaxTDP)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPMaxTDP",
-                    cur => cur.AutoTDPMaxTDP = autoTDPManager.MaxTDP.Value,
-                    glo => glo.AutoTDPMaxTDP = autoTDPManager.MaxTDP.Value);
-            }
-            else if (sender == autoTDPManager.UseMLMode)
-            {
-                // Legacy: sync UseMLMode to profile for backwards compatibility
-                RouteProfileSave(saveToProfile, "AutoTDPUseMLMode",
-                    cur => cur.AutoTDPUseMLMode = autoTDPManager.UseMLMode.Value,
-                    glo => glo.AutoTDPUseMLMode = autoTDPManager.UseMLMode.Value);
-            }
-            else if (sender == autoTDPManager.ControllerType)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPControllerType",
-                    cur => { cur.AutoTDPControllerType = autoTDPManager.ControllerType.Value;
-                             cur.AutoTDPUseMLMode = autoTDPManager.ControllerType.Value > 0; },
-                    glo => { glo.AutoTDPControllerType = autoTDPManager.ControllerType.Value;
-                             glo.AutoTDPUseMLMode = autoTDPManager.ControllerType.Value > 0; });
-            }
-            else if (sender == autoTDPManager.PauseWhenUnfocused)
-            {
-                RouteProfileSave(saveToProfile, "AutoTDPPauseWhenUnfocused",
-                    cur => cur.AutoTDPPauseWhenUnfocused = autoTDPManager.PauseWhenUnfocused.Value,
-                    glo => glo.AutoTDPPauseWhenUnfocused = autoTDPManager.PauseWhenUnfocused.Value);
             }
         }
 
@@ -390,49 +313,6 @@ namespace XboxGamingBarHelper
             }
         }
 
-        private static void ApplyAutoTDPSettingsFromProfile()
-        {
-            if (profileManager?.CurrentProfile == null || autoTDPManager == null)
-                return;
-
-            var profile = profileManager.CurrentProfile;
-            var profileName = profile.GameId.Name;
-
-            Logger.Info($"Applying AutoTDP settings from profile: {profileName}");
-
-            // Apply AutoTDP settings from profile
-            // Use ForceSetValue for Enabled to ensure the pipe message is ALWAYS sent to the widget.
-            // If the global profile was corrupted (AutoTDPEnabled=true from a previous bug),
-            // SetValue would skip NotifyPropertyChanged when the value hasn't changed (e.g., game
-            // profile had AutoTDP=true and corrupted global also has true), leaving the widget
-            // with the wrong toggle state.
-            Logger.Debug($"Applying AutoTDPEnabled: {profile.AutoTDPEnabled}");
-            autoTDPManager.Enabled.ForceSetValue(profile.AutoTDPEnabled);
-
-            Logger.Debug($"Applying AutoTDPTargetFPS: {profile.AutoTDPTargetFPS}");
-            autoTDPManager.TargetFPS.SetValue(profile.AutoTDPTargetFPS);
-
-            Logger.Debug($"Applying AutoTDPMinTDP: {profile.AutoTDPMinTDP}");
-            autoTDPManager.MinTDP.SetValue(profile.AutoTDPMinTDP);
-
-            Logger.Debug($"Applying AutoTDPMaxTDP: {profile.AutoTDPMaxTDP}");
-            autoTDPManager.MaxTDP.SetValue(profile.AutoTDPMaxTDP);
-
-            Logger.Debug($"Applying AutoTDPPauseWhenUnfocused: {profile.AutoTDPPauseWhenUnfocused}");
-            autoTDPManager.PauseWhenUnfocused.SetValue(profile.AutoTDPPauseWhenUnfocused);
-
-            // Apply controller type (0=PID, 1=Q-Learning, 2=SARSA)
-            // Try new property first, fall back to legacy UseMLMode for migration
-            int controllerType = profile.AutoTDPControllerType;
-            if (controllerType == 0 && profile.AutoTDPUseMLMode)
-            {
-                // Legacy migration: UseMLMode=true -> Q-Learning (1)
-                controllerType = 1;
-            }
-            Logger.Debug($"Applying AutoTDPControllerType: {controllerType} (PID=0, Q-Learning=1, SARSA=2)");
-            autoTDPManager.ControllerType.SetValue(controllerType);
-            autoTDPManager.UseMLMode.SetValue(controllerType > 0);  // Legacy sync
-        }
 
         /// <summary>
         /// Restores global profile settings (TDP, AutoTDP, Legion mode, etc.)
@@ -453,14 +333,6 @@ namespace XboxGamingBarHelper
 
             Logger.Info($"Applying global profile settings: TDP={profileManager.GlobalProfile.TDP}, CPUBoost={profileManager.GlobalProfile.CPUBoost}, EPP={profileManager.GlobalProfile.CPUEPP}");
 
-            // IMPORTANT: Disable AutoTDP FIRST, before setting TDP.
-            // TDPProperty.NotifyPropertyChanged() skips hardware apply when IsAutoTDPActive is true.
-            // If we set TDP while AutoTDP is still active, the TDP value never gets applied to hardware.
-            ApplyAutoTDPSettingsFromProfile();
-            // Clear the AutoTDP active flag immediately so the TDP set below applies to hardware.
-            // The AutoTDP tick will also clear this on its next iteration, but we can't wait for that.
-            performanceManager.IsAutoTDPActive = false;
-
             // Restore LegionPerformanceMode from global profile if set
             if (legionManager != null)
             {
@@ -477,7 +349,6 @@ namespace XboxGamingBarHelper
             }
 
             performanceManager.TDP.SetProfileValue(profileManager.GlobalProfile.TDP);
-            performanceManager.TDPBoostEnabled.SetValue(profileManager.GlobalProfile.TDPBoostEnabled);
             powerManager.CPUBoost.SetValue(profileManager.GlobalProfile.CPUBoost);
             powerManager.CPUEPP.SetValue(profileManager.GlobalProfile.CPUEPP);
             powerManager.MaxCPUState.SetValue(profileManager.GlobalProfile.MaxCPUState);
@@ -542,17 +413,9 @@ namespace XboxGamingBarHelper
                             }
                         }
 
-                        // Apply AutoTDP settings FIRST, before TDP.
-                        // TDPProperty.NotifyPropertyChanged() skips hardware apply when IsAutoTDPActive is true.
-                        // Applying AutoTDP first ensures IsAutoTDPActive is cleared when disabling AutoTDP,
-                        // so the subsequent TDP.SetProfileValue applies to hardware.
-                        ApplyAutoTDPSettingsFromProfile();
-                        performanceManager.IsAutoTDPActive = false;
-
                         // Use SetProfileValue to ensure profile TDP takes precedence over in-flight widget messages
                         // All settings applied atomically under lock to prevent cross-contamination
                         performanceManager.TDP.SetProfileValue(profileManager.CurrentProfile.TDP);
-                        performanceManager.TDPBoostEnabled.SetValue(profileManager.CurrentProfile.TDPBoostEnabled);
                         powerManager.CPUBoost.SetValue(profileManager.CurrentProfile.CPUBoost);
                         powerManager.CPUEPP.SetValue(profileManager.CurrentProfile.CPUEPP);
                         powerManager.MaxCPUState.SetValue(profileManager.CurrentProfile.MaxCPUState);
@@ -608,13 +471,6 @@ namespace XboxGamingBarHelper
                     Logger.Info($"Enable per-game profile for {systemManager.RunningGame.Value.GameId}");
                     gameProfile.Use = true;
 
-                    // Disable DefaultGameProfile when per-game profile is enabled
-                    if (defaultGameProfileManager != null && defaultGameProfileManager.ProfileEnabled.Value)
-                    {
-                        Logger.Info("Disabling DefaultGameProfile since per-game profile is now enabled");
-                        defaultGameProfileManager.ProfileEnabled.SetValue(false);
-                    }
-
                     // Apply saved LegionPerformanceMode from game profile, or default to Custom (255) for new profiles.
                     // Previously this always switched to Custom, which overrode user-saved preset modes.
                     if (legionManager != null)
@@ -644,11 +500,7 @@ namespace XboxGamingBarHelper
                     // must apply settings explicitly here (same pattern as RestoreGlobalProfileSettings).
                     profileManager.CurrentProfile.SetValue(gameProfile);
 
-                    ApplyAutoTDPSettingsFromProfile();
-                    performanceManager.IsAutoTDPActive = false;
-
                     performanceManager.TDP.SetProfileValue(gameProfile.TDP);
-                    performanceManager.TDPBoostEnabled.SetValue(gameProfile.TDPBoostEnabled);
                     powerManager.CPUBoost.SetValue(gameProfile.CPUBoost);
                     powerManager.CPUEPP.SetValue(gameProfile.CPUEPP);
                     powerManager.MaxCPUState.SetValue(gameProfile.MaxCPUState);
@@ -724,13 +576,6 @@ namespace XboxGamingBarHelper
                 return;
             }
 
-            // Skip when default game profile is active - don't overwrite user's saved profile
-            if (defaultGameProfileManager != null && defaultGameProfileManager.ProfileEnabled.Value)
-            {
-                Logger.Debug($"Skipping TDP_PropertyChanged - Default Game Profile is active (TDP={performanceManager.TDP})");
-                return;
-            }
-
             // TEST [ProfileSaveFlags-TDP]: With ProfileSaveTDP unchecked in the widget, change
             // TDP while a per-game profile is active. Expect the change to land in GlobalProfile
             // (and the per-game TDP to remain whatever was saved before). Pre-flag baseline:
@@ -738,39 +583,6 @@ namespace XboxGamingBarHelper
             RouteProfileSave(ProfileSaveFlagsState.TDP, "TDP",
                 cur => cur.TDP = performanceManager.TDP,
                 glo => glo.TDP = performanceManager.TDP);
-        }
-
-        private static void TDPBoostEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            // Skip during profile application to prevent cross-contamination
-            if (isApplyingProfile)
-            {
-                Logger.Debug($"Skipping TDPBoostEnabled_PropertyChanged - already applying profile");
-                return;
-            }
-
-            // Skip stale widget messages during cooldown after profile switch
-            if (IsInProfileSwitchCooldown())
-            {
-                Logger.Debug($"Skipping TDPBoostEnabled_PropertyChanged - in profile switch cooldown");
-                return;
-            }
-
-            // Skip when default game profile is active - don't overwrite user's saved profile
-            if (defaultGameProfileManager != null && defaultGameProfileManager.ProfileEnabled.Value)
-            {
-                Logger.Debug($"Skipping TDPBoostEnabled_PropertyChanged - Default Game Profile is active");
-                return;
-            }
-
-            // TEST [ProfileSaveFlags-TDP]: TDPBoost (CPU long/short-term boost FPPT/SPPT) is
-            // grouped under the TDP flag — there's no separate ProfileSaveTDPBoost checkbox,
-            // and StickyTDP in the widget refers to a different feature (auto-restore TDP after
-            // mode change). With ProfileSaveTDP unchecked, toggle TDP Boost in-game and verify
-            // the change goes to GlobalProfile, not the per-game profile.
-            RouteProfileSave(ProfileSaveFlagsState.TDP, "TDPBoostEnabled",
-                cur => cur.TDPBoostEnabled = performanceManager.TDPBoostEnabled.Value,
-                glo => glo.TDPBoostEnabled = performanceManager.TDPBoostEnabled.Value);
         }
 
         private static void RunningGame_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -825,11 +637,7 @@ namespace XboxGamingBarHelper
                                 }
                             }
 
-                            ApplyAutoTDPSettingsFromProfile();
-                            performanceManager.IsAutoTDPActive = false;
-
                             performanceManager.TDP.SetProfileValue(runningGameProfile.TDP);
-                            performanceManager.TDPBoostEnabled.SetValue(runningGameProfile.TDPBoostEnabled);
                             powerManager.CPUBoost.SetValue(runningGameProfile.CPUBoost);
                             powerManager.CPUEPP.SetValue(runningGameProfile.CPUEPP);
                             powerManager.MaxCPUState.SetValue(runningGameProfile.MaxCPUState);
@@ -840,7 +648,7 @@ namespace XboxGamingBarHelper
                                 ApplyLegionControllerSettingsFromProfile();
                             }
 
-                            Logger.Info($"Applied per-game profile settings for {systemManager.RunningGame.Value.GameId.Name}: TDP={runningGameProfile.TDP}, AutoTDP={runningGameProfile.AutoTDPEnabled}");
+                            Logger.Info($"Applied per-game profile settings for {systemManager.RunningGame.Value.GameId.Name}: TDP={runningGameProfile.TDP}");
                         }
                         else
                         {
@@ -862,9 +670,6 @@ namespace XboxGamingBarHelper
                         Logger.Info($"Previous game had per-game profile active, restoring global profile for {systemManager.RunningGame.GameId}");
                         RestoreGlobalProfileSettings();
                     }
-
-                    // Apply CPU core affinity to the new game
-                    systemManager.ApplyAffinityToRunningGame();
 
                     // Switch Lossless Scaling profile for the detected game
                     if (losslessScalingManager.LosslessScalingInstalled.Value)

@@ -1,7 +1,6 @@
 using LibreHardwareMonitor.Hardware;
 using NLog;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,74 +18,6 @@ using XboxGamingBarHelper.Settings;
 
 namespace XboxGamingBarHelper.Performance
 {
-    internal class HardwareSensors : IDictionary<string, HardwareSensor>
-    {
-        HardwareSensor IDictionary<string, HardwareSensor>.this[string key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-        ICollection<string> IDictionary<string, HardwareSensor>.Keys => throw new NotImplementedException();
-
-        ICollection<HardwareSensor> IDictionary<string, HardwareSensor>.Values => throw new NotImplementedException();
-
-        int ICollection<KeyValuePair<string, HardwareSensor>>.Count => throw new NotImplementedException();
-
-        bool ICollection<KeyValuePair<string, HardwareSensor>>.IsReadOnly => throw new NotImplementedException();
-
-        void IDictionary<string, HardwareSensor>.Add(string key, HardwareSensor value)
-        {
-            throw new NotImplementedException();
-        }
-
-        void ICollection<KeyValuePair<string, HardwareSensor>>.Add(KeyValuePair<string, HardwareSensor> item)
-        {
-            throw new NotImplementedException();
-        }
-
-        void ICollection<KeyValuePair<string, HardwareSensor>>.Clear()
-        {
-            throw new NotImplementedException();
-        }
-
-        bool ICollection<KeyValuePair<string, HardwareSensor>>.Contains(KeyValuePair<string, HardwareSensor> item)
-        {
-            throw new NotImplementedException();
-        }
-
-        bool IDictionary<string, HardwareSensor>.ContainsKey(string key)
-        {
-            throw new NotImplementedException();
-        }
-
-        void ICollection<KeyValuePair<string, HardwareSensor>>.CopyTo(KeyValuePair<string, HardwareSensor>[] array, int arrayIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        IEnumerator<KeyValuePair<string, HardwareSensor>> IEnumerable<KeyValuePair<string, HardwareSensor>>.GetEnumerator()
-        {
-            throw new NotImplementedException();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            throw new NotImplementedException();
-        }
-
-        bool IDictionary<string, HardwareSensor>.Remove(string key)
-        {
-            throw new NotImplementedException();
-        }
-
-        bool ICollection<KeyValuePair<string, HardwareSensor>>.Remove(KeyValuePair<string, HardwareSensor> item)
-        {
-            throw new NotImplementedException();
-        }
-
-        bool IDictionary<string, HardwareSensor>.TryGetValue(string key, out HardwareSensor value)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
     internal class PerformanceManager : Manager
     {
         // Native methods for fast PawnIO driver detection
@@ -260,32 +191,11 @@ namespace XboxGamingBarHelper.Performance
             get { return currentTdp; }
         }
 
-        // TDP Boost properties
-        private TDPBoostEnabledProperty tdpBoostEnabled;
-        public TDPBoostEnabledProperty TDPBoostEnabled
-        {
-            get { return tdpBoostEnabled; }
-        }
-
-        private TDPBoostSPPTProperty tdpBoostSPPT;
-        public TDPBoostSPPTProperty TDPBoostSPPT
-        {
-            get { return tdpBoostSPPT; }
-        }
-
-        private TDPBoostFPPTProperty tdpBoostFPPT;
-        public TDPBoostFPPTProperty TDPBoostFPPT
-        {
-            get { return tdpBoostFPPT; }
-        }
-
         // Current TDP limits (for OSD display)
         public int CurrentSPL { get; private set; }
         public int CurrentSPPT { get; private set; }
         public int CurrentFPPT { get; private set; }
 
-        // Flag to indicate AutoTDP is managing TDP - when true, widget TDP updates are ignored
-        public bool IsAutoTDPActive { get; set; }
 
         /// <summary>
         /// Returns true if the device is in Custom TDP mode (Legion mode 255).
@@ -498,7 +408,27 @@ namespace XboxGamingBarHelper.Performance
         public void SetLegionManager(LegionManager manager)
         {
             legionManager = manager;
+            if (manager != null)
+            {
+                // Refresh the "Limits" readout (currentTdp) immediately after each accepted Custom
+                // limit write, so the widget's live SPL/SPPT/FPPT label tracks the WMI-applied values
+                // without waiting for the 2 s poll. -= first guards against a double-subscribe.
+                manager.CustomTDPApplied -= OnLegionCustomTDPApplied;
+                manager.CustomTDPApplied += OnLegionCustomTDPApplied;
+            }
             Logger.Info($"LegionManager reference set. Legion detected: {manager?.LegionGoDetected?.Value ?? false}");
+        }
+
+        private void OnLegionCustomTDPApplied()
+        {
+            try
+            {
+                UpdateCurrentTDP(null, null);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"OnLegionCustomTDPApplied refresh failed: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -715,11 +645,8 @@ namespace XboxGamingBarHelper.Performance
             currentTdp = new CurrentTDPProperty(initialCurrentTDP, null, this);
             lastTdpString = initialCurrentTDP;
 
-            // Initialize TDP Boost properties (defaults: enabled=false, SPPT=1W, FPPT=3W)
-            tdpBoostEnabled = new TDPBoostEnabledProperty(false, this);
-            tdpBoostSPPT = new TDPBoostSPPTProperty(1, this);
-            tdpBoostFPPT = new TDPBoostFPPTProperty(3, this);
-            Logger.Info("TDP Boost properties initialized (defaults: enabled=false, SPPT=1W, FPPT=3W)");
+            // TDP Boost removed: boost is always on — in Custom mode the user sets SPL/SPPT/FPPT
+            // directly (all three are always applied via Lenovo WMI). No separate boost toggle.
 
             // Set up timer to update current TDP every 3 seconds
             currentTdpTimer = new System.Timers.Timer(NormalTimerInterval);
@@ -1366,21 +1293,13 @@ namespace XboxGamingBarHelper.Performance
                 TdpMethod tdpMethod = settingsManager?.TdpMethod?.Method ?? TdpMethod.ManufacturerWMI;
                 bool legionDetected = legionManager?.LegionGoDetected?.Value ?? false;
 
-                // Calculate actual TDP values based on TDP Boost settings
-                // When boost is enabled: SPPT = TDP + boost_sppt, FPPT = TDP + boost_fppt
-                // SPL/STAPM stays at base TDP value
+                // This master-TDP path drives a single flat value (SPL=SPPT=FPPT=tdp) — used by
+                // generic (non-Legion) devices and the PawnIO method. On Legion in Custom mode the
+                // three independent SPL/SPPT/FPPT limits are owned by the dedicated widget sliders and
+                // re-asserted from cache below, so this flat value is intentionally bypassed there.
                 int spl = tdp;
                 int sppt = tdp;
                 int fppt = tdp;
-
-                if (tdpBoostEnabled?.Value == true)
-                {
-                    int spptBoost = tdpBoostSPPT?.Value ?? 1;
-                    int fpptBoost = tdpBoostFPPT?.Value ?? 3;
-                    sppt = tdp + spptBoost;
-                    fppt = tdp + fpptBoost;
-                    Logger.Info($"TDP Boost enabled: SPL={spl}W, SPPT={sppt}W (+{spptBoost}), FPPT={fppt}W (+{fpptBoost})");
-                }
 
                 // Note: CurrentSPL/SPPT/FPPT are now updated from actual hardware values
                 // in UpdateCurrentTDP, which is called via ScheduleVerificationRead after SetTDP
@@ -1393,6 +1312,18 @@ namespace XboxGamingBarHelper.Performance
                     case TdpMethod.ManufacturerWMI:
                         if (legionDetected && legionManager != null)
                         {
+                            // On Legion in Custom mode the three explicit SPL/SPPT/FPPT limits (driven
+                            // by the TDP / SPPT Boost / FPPT Boost sliders) are authoritative. A single
+                            // master-TDP write here must NOT collapse them to tdp/tdp/tdp — the
+                            // ReapplyTDP / power-source / global-profile paths all funnel through SetTDP
+                            // carrying the (Legion-meaningless) master value, which would otherwise slam
+                            // the console back to ~15W. Re-assert the cached Custom triplet instead.
+                            if (legionManager.IsInCustomMode)
+                            {
+                                legionManager.ReassertCustomTDP();
+                                ScheduleVerificationRead();
+                                return;
+                            }
                             // Note: SetCustomTDP will automatically switch to Custom mode (255) if needed
                             Logger.Info($"Using Legion WMI to set TDP (SPL={spl}W, SPPL={sppt}W, FPPT={fppt}W)");
                             legionManager.SetCustomTDP(spl, sppt, fppt);

@@ -37,18 +37,6 @@ namespace XboxGamingBarHelper.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool SidebarMenuEnabled {
-            get {
-                return ((bool)(this["SidebarMenuEnabled"]));
-            }
-            set {
-                this["SidebarMenuEnabled"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public int AutoHibernateMode {
             get {

@@ -35,7 +35,7 @@ namespace XboxGamingBarHelper.Devices
         /// <summary>
         /// Package family name for constructing LocalState path
         /// </summary>
-        private const string PackageFamilyName = "PlayandBuildCustom.10365195AA1EC_8edemd50ez3gg";
+        private const string PackageFamilyName = Shared.Constants.PackageConstants.PackageFamilyName;
 
         /// <summary>
         /// Debug override file name

@@ -49,9 +49,9 @@ namespace XboxGamingBar
         // Level 3 (Full): All options - 1 column
         private Dictionary<int, Dictionary<string, bool>> osdLevelConfig = new Dictionary<int, Dictionary<string, bool>>
         {
-            { 1, new Dictionary<string, bool> { { "AppName", false }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", false }, { "Memory", false }, { "VRAM", false }, { "CPU", false }, { "CPUClock", false }, { "GPU", false }, { "GPUClock", false }, { "FrameBudget", false }, { "Fan", false }, { "AutoTDP", false }, { "FrametimeGraph", false } } },
-            { 2, new Dictionary<string, bool> { { "AppName", false }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", false }, { "Memory", false }, { "VRAM", false }, { "CPU", true }, { "CPUClock", false }, { "GPU", true }, { "GPUClock", false }, { "FrameBudget", true }, { "Fan", true }, { "AutoTDP", false }, { "FrametimeGraph", true } } },
-            { 3, new Dictionary<string, bool> { { "AppName", true }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", true }, { "Memory", true }, { "VRAM", true }, { "CPU", true }, { "CPUClock", true }, { "GPU", true }, { "GPUClock", true }, { "FrameBudget", true }, { "Fan", true }, { "AutoTDP", true }, { "FrametimeGraph", true } } }
+            { 1, new Dictionary<string, bool> { { "AppName", false }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", false }, { "Memory", false }, { "VRAM", false }, { "CPU", false }, { "CPUClock", false }, { "GPU", false }, { "GPUClock", false }, { "FrameBudget", false }, { "Fan", false }, { "FrametimeGraph", false } } },
+            { 2, new Dictionary<string, bool> { { "AppName", false }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", false }, { "Memory", false }, { "VRAM", false }, { "CPU", true }, { "CPUClock", false }, { "GPU", true }, { "GPUClock", false }, { "FrameBudget", true }, { "Fan", true }, { "FrametimeGraph", true } } },
+            { 3, new Dictionary<string, bool> { { "AppName", true }, { "Time", true }, { "FPS", true }, { "Battery", true }, { "ControllerBattery", true }, { "Memory", true }, { "VRAM", true }, { "CPU", true }, { "CPUClock", true }, { "GPU", true }, { "GPUClock", true }, { "FrameBudget", true }, { "Fan", true }, { "FrametimeGraph", true } } }
         };
 
         private Dictionary<int, string> osdCustomTags = new Dictionary<int, string>
@@ -75,9 +75,9 @@ namespace XboxGamingBar
         // Per-level item order (list of item IDs in display order)
         private Dictionary<int, List<string>> osdLevelOrder = new Dictionary<int, List<string>>
         {
-            { 1, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
-            { 2, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } },
-            { 3, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" } }
+            { 1, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "TDPLimits", "FrametimeGraph" } },
+            { 2, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "TDPLimits", "FrametimeGraph" } },
+            { 3, new List<string> { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "TDPLimits", "FrametimeGraph" } }
         };
 
         // Per-level item label colors (DEFAULT = use global text color)
@@ -92,7 +92,7 @@ namespace XboxGamingBar
         private static readonly Dictionary<string, string> osdItemDisplayNames = new Dictionary<string, string>
         {
             { "AppName", "App Name (D3D11, Vulkan, etc.)" },
-            { "Time", "Time (12-hour)" },
+            { "Time", "Time (24-hour)" },
             { "FPS", "FPS & Frametime" },
             { "Battery", "Battery" },
             { "ControllerBattery", "Controller Battery (L/R)" },
@@ -104,7 +104,6 @@ namespace XboxGamingBar
             { "GPUClock", "GPU Clock Speed" },
             { "FrameBudget", "Frame Budget (CPU/GPU bound %)" },
             { "Fan", "Fan Speed" },
-            { "AutoTDP", "AutoTDP Status" },
             { "TDPLimits", "TDP Limits (SPL/SPPT/FPPT)" },
             { "FrametimeGraph", "Frametime Graph" }
         };
@@ -167,28 +166,12 @@ namespace XboxGamingBar
             { "Performance", new int[] { 30, 35, 40, 45, 50, 60, 70, 80, 90, 100 } }, // Performance
             { "MaxCooling", new int[] { 40, 45, 50, 55, 60, 70, 80, 90, 100, 100 } }  // Max Cooling
         };
-        private string currentFanCurvePreset = "Custom";
         private bool isFanCurvePresetLoading = false;
-        private bool isTDPExtrasExpanded = false;
         private bool isCPUExtrasExpanded = false;
         private bool isDebugExpanded = false;
-        private bool isLoadingTDPLimits = false;
-        private bool isLoadingPowerPlans = false;
-        private List<PowerPlanItem> availablePowerPlans = new List<PowerPlanItem>();
-        private Guid acPowerPlanGuid = Guid.Empty;
-        private Guid dcPowerPlanGuid = Guid.Empty;
-        private bool powerPlanAutoSwitch = false; // Default to OFF - will be loaded from settings
         private int deviceTDPMin = 4;
         private int deviceTDPMax = 35;
-        private DispatcherTimer tdpLimitsDebounceTimer;
-        private const int TDP_LIMITS_DEBOUNCE_MS = 300;
 
-        // TDP Custom Presets
-        private bool useCustomTDPPresets = false;
-        private bool useLenovoModes = true; // Default to using Lenovo hardware modes for built-in presets
-        private List<Shared.Data.TdpPreset> tdpPresets = new List<Shared.Data.TdpPreset>();
-        private Shared.Data.TdpPreset editingPreset = null;
-        private int editingPresetIndex = -1;
 
         private bool isLoadingOSDConfig = false;
 
@@ -559,7 +542,7 @@ namespace XboxGamingBar
             try
             {
                 var settings = ApplicationData.Current.LocalSettings;
-                var itemKeys = new[] { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "AutoTDP", "TDPLimits", "FrametimeGraph" };
+                var itemKeys = new[] { "AppName", "Time", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "TDPLimits", "FrametimeGraph" };
 
                 foreach (var level in new[] { 1, 2, 3 })
                 {
@@ -1002,27 +985,17 @@ namespace XboxGamingBar
 
             // Tell helper whether to push CPU temp/RPM updates
             legionFanCurveVisible?.SetVisible(isFanCurveExpanded);
-        }
-        private void TDPExtrasExpandToggle_Click(object sender, RoutedEventArgs e)
-        {
-            isTDPExtrasExpanded = !isTDPExtrasExpanded;
 
-            if (TDPExtrasContent != null)
+            // RPM/temp only stream while expanded; clear the live header readout on collapse so
+            // it never shows a stale value, and refresh the "editing X" hint on expand.
+            if (!isFanCurveExpanded)
             {
-                TDPExtrasContent.Visibility = isTDPExtrasExpanded ? Visibility.Visible : Visibility.Collapsed;
+                if (FanRPMLabel != null) FanRPMLabel.Text = "-- RPM";
+                if (FanHeaderTempLabel != null) FanHeaderTempLabel.Text = "--°C";
             }
-
-            if (TDPExtrasExpandIcon != null)
+            else
             {
-                // E70D = ChevronDown, E70E = ChevronUp
-                TDPExtrasExpandIcon.Glyph = isTDPExtrasExpanded ? "\uE70E" : "\uE70D";
-            }
-
-            // Update XY focus chain based on expanded state
-            if (TDPExtrasExpandToggle != null && OSPowerModeComboBox != null)
-            {
-                TDPExtrasExpandToggle.XYFocusDown = isTDPExtrasExpanded ? (DependencyObject)TDPBoostToggle : OSPowerModeComboBox;
-                OSPowerModeComboBox.XYFocusUp = isTDPExtrasExpanded ? (DependencyObject)StickyTDPToggle : TDPExtrasExpandToggle;
+                UpdateActiveModeLabel();
             }
         }
         private void CPUExtrasExpandToggle_Click(object sender, RoutedEventArgs e)
@@ -1343,29 +1316,6 @@ namespace XboxGamingBar
             }
         }
 
-        private void LoadForceDefaultGameProfileSetting()
-        {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                if (settings.Values.TryGetValue("ForceDefaultGameProfile", out object val) && val is bool enabled)
-                {
-                    if (ForceDefaultGameProfileToggle != null)
-                    {
-                        ForceDefaultGameProfileToggle.IsOn = enabled;
-                    }
-                    // Send to helper on startup
-                    forceDefaultGameProfile?.SetValue(enabled);
-                    Logger.Info($"Loaded Force Default Game Profile setting: {enabled}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading Force Default Game Profile setting: {ex.Message}");
-            }
-        }
-
         private void ColorSettingsExpandButton_Click(object sender, RoutedEventArgs e)
         {
             isColorSettingsExpanded = !isColorSettingsExpanded;
@@ -1382,134 +1332,11 @@ namespace XboxGamingBar
             }
         }
 
-        private void TDPLimitsMinSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (isLoadingTDPLimits) return;
-            if (TDPLimitsMinSlider == null || TDPLimitsMaxSlider == null) return;
-
-            int minValue = (int)Math.Round(e.NewValue);
-
-            // Ensure min doesn't exceed max
-            if (minValue > TDPLimitsMaxSlider.Value)
-            {
-                TDPLimitsMinSlider.Value = TDPLimitsMaxSlider.Value;
-                return;
-            }
-
-            deviceTDPMin = minValue;
-
-            if (TDPLimitsMinValue != null)
-            {
-                TDPLimitsMinValue.Text = $"{minValue}W";
-            }
-
-            // Update TDP slider bounds immediately (for UI responsiveness)
-            UpdateTDPSliderBounds();
-
-            // Debounce save and send to helper
-            StartTDPLimitsDebounce();
-        }
-
-        private void TDPLimitsMaxSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (isLoadingTDPLimits) return;
-            if (TDPLimitsMinSlider == null || TDPLimitsMaxSlider == null) return;
-
-            int maxValue = (int)Math.Round(e.NewValue);
-
-            // Ensure max doesn't go below min
-            if (maxValue < TDPLimitsMinSlider.Value)
-            {
-                TDPLimitsMaxSlider.Value = TDPLimitsMinSlider.Value;
-                return;
-            }
-
-            deviceTDPMax = maxValue;
-
-            if (TDPLimitsMaxValue != null)
-            {
-                TDPLimitsMaxValue.Text = $"{maxValue}W";
-            }
-
-            // Update TDP slider bounds immediately (for UI responsiveness)
-            UpdateTDPSliderBounds();
-
-            // Debounce save and send to helper
-            StartTDPLimitsDebounce();
-        }
-
-        private void StartTDPLimitsDebounce()
-        {
-            // Initialize debounce timer if needed
-            if (tdpLimitsDebounceTimer == null)
-            {
-                tdpLimitsDebounceTimer = new DispatcherTimer();
-                tdpLimitsDebounceTimer.Interval = TimeSpan.FromMilliseconds(TDP_LIMITS_DEBOUNCE_MS);
-                tdpLimitsDebounceTimer.Tick += TDPLimitsDebounceTimer_Tick;
-            }
-
-            // Restart the debounce timer
-            tdpLimitsDebounceTimer.Stop();
-            tdpLimitsDebounceTimer.Start();
-        }
-
-        private void TDPLimitsDebounceTimer_Tick(object sender, object e)
-        {
-            tdpLimitsDebounceTimer?.Stop();
-
-            // Save and send to helper after debounce
-            SaveTDPLimitsToStorage();
-            SendTDPLimitsToHelper();
-        }
-
-        private void UpdateTDPSliderBounds()
-        {
-            // Update Performance tab TDP slider
-            if (TDPSlider != null)
-            {
-                TDPSlider.Minimum = deviceTDPMin;
-                TDPSlider.Maximum = deviceTDPMax;
-
-                // Clamp current value if out of bounds
-                if (TDPSlider.Value < deviceTDPMin)
-                    TDPSlider.Value = deviceTDPMin;
-                else if (TDPSlider.Value > deviceTDPMax)
-                    TDPSlider.Value = deviceTDPMax;
-            }
-
-            // Update AutoTDP Min slider bounds
-            if (AutoTDPMinSlider != null)
-            {
-                AutoTDPMinSlider.Minimum = deviceTDPMin;
-                AutoTDPMinSlider.Maximum = deviceTDPMax;
-
-                // Clamp current value if out of bounds
-                if (AutoTDPMinSlider.Value < deviceTDPMin)
-                    AutoTDPMinSlider.Value = deviceTDPMin;
-                else if (AutoTDPMinSlider.Value > deviceTDPMax)
-                    AutoTDPMinSlider.Value = deviceTDPMax;
-            }
-
-            // Update AutoTDP Max slider bounds
-            if (AutoTDPMaxSlider != null)
-            {
-                AutoTDPMaxSlider.Minimum = deviceTDPMin;
-                AutoTDPMaxSlider.Maximum = deviceTDPMax;
-
-                // Clamp current value if out of bounds
-                if (AutoTDPMaxSlider.Value < deviceTDPMin)
-                    AutoTDPMaxSlider.Value = deviceTDPMin;
-                else if (AutoTDPMaxSlider.Value > deviceTDPMax)
-                    AutoTDPMaxSlider.Value = deviceTDPMax;
-            }
-        }
-
         private void ApplyTDPLimits()
         {
-            // Update TDP slider bounds
-            UpdateTDPSliderBounds();
-
-            // Send limits to helper for AutoTDP
+            // Master TDP slider removed — the Custom power-limit sliders use fixed ranges
+            // (TDP 5-35W, boosts +0..+10 / +0..+15), so device min/max no longer reshapes a slider.
+            // Still inform the helper of the device limits (used for OSD / clamping).
             SendTDPLimitsToHelper();
         }
 
@@ -1544,7 +1371,6 @@ namespace XboxGamingBar
 
         private void LoadTDPLimitsFromStorage()
         {
-            isLoadingTDPLimits = true;
             try
             {
                 var settings = ApplicationData.Current.LocalSettings;
@@ -1559,22 +1385,7 @@ namespace XboxGamingBar
                     deviceTDPMax = max;
                 }
 
-                // Update UI
-                if (TDPLimitsMinSlider != null)
-                {
-                    TDPLimitsMinSlider.Value = deviceTDPMin;
-                    if (TDPLimitsMinValue != null)
-                        TDPLimitsMinValue.Text = $"{deviceTDPMin}W";
-                }
-
-                if (TDPLimitsMaxSlider != null)
-                {
-                    TDPLimitsMaxSlider.Value = deviceTDPMax;
-                    if (TDPLimitsMaxValue != null)
-                        TDPLimitsMaxValue.Text = $"{deviceTDPMax}W";
-                }
-
-                // Apply to TDP slider
+                // Apply to TDP slider bounds
                 ApplyTDPLimits();
 
                 Logger.Info($"Loaded TDP limits: Min={deviceTDPMin}W, Max={deviceTDPMax}W");
@@ -1582,10 +1393,6 @@ namespace XboxGamingBar
             catch (Exception ex)
             {
                 Logger.Error($"Failed to load TDP limits: {ex.Message}");
-            }
-            finally
-            {
-                isLoadingTDPLimits = false;
             }
         }
         private void OSDLayoutOption_Changed(object sender, SelectionChangedEventArgs e)

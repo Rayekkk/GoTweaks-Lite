@@ -266,11 +266,13 @@
         TDPBoostSPPT,               // int - additional watts for SPPT (0-10, default 1)
         TDPBoostFPPT,               // int - additional watts for FPPT (0-15, default 3)
 
-        // CPU Core Configuration
-        CPUCoreConfig,              // string - "pCores,eCores,isHybrid" format (e.g., "3,5,true") - helper to widget (detection)
-        CPUCoreActiveConfig,        // string - "activePCores,activeECores" format (e.g., "2,4") - widget to helper (user selection)
-        CoreParkingPercent,         // int - CPMAXCORES percentage (0-100), 100 = all cores active, 50 = half parked
-        ForceParkMode,              // bool - Force affinity on ALL processes (aggressive mode)
+        // CPU Core Configuration — RESERVED/LEGACY: the Performance→Advanced panel (core parking,
+        // core affinity, Force Park Mode) was removed for GoTweaks Lite. Ordinals kept for wire +
+        // old-profile compatibility (never reorder/delete). No longer sent or handled by either side.
+        CPUCoreConfig,              // (reserved) was: "pCores,eCores,isHybrid" detection, helper→widget
+        CPUCoreActiveConfig,        // (reserved) was: "activePCores,activeECores" selection, widget→helper
+        CoreParkingPercent,         // (reserved) was: CPMAXCORES percentage (0-100)
+        ForceParkMode,              // (reserved) was: force affinity on ALL processes (aggressive)
 
         // OS Power Mode (Windows 11 power slider)
         OSPowerMode,                // int - 0=Best Power Efficiency, 1=Balanced, 2=Best Performance
@@ -278,11 +280,13 @@
         // System Actions
         RefreshDisplaySettings,     // Action: re-query display resolution, refresh rate, HDR status
 
-        // Default Game Profile (Microsoft Gaming Services profiles)
-        DefaultGameProfileAvailable,    // bool - whether current game has a default profile
-        DefaultGameProfileData,         // string - serialized DefaultGameProfile XML
-        DefaultGameProfileEnabled,      // bool - user's toggle state for current game
-        ForceDefaultGameProfile,        // bool - force DGP feature on non-Z1/Z2 Extreme devices
+        // RESERVED/LEGACY — Default Game Profiles feature removed. Do NOT delete or reuse these
+        // ordinals: they are positional wire ids; removing them shifts every later id and breaks
+        // the pipe protocol + old profile files. Kept as reserved placeholders.
+        DefaultGameProfileAvailable,    // reserved (was: bool - current game has a default profile)
+        DefaultGameProfileData,         // reserved (was: string - serialized DefaultGameProfile XML)
+        DefaultGameProfileEnabled,      // reserved (was: bool - user's toggle state for current game)
+        ForceDefaultGameProfile,        // reserved (was: bool - force DGP on non-Z1/Z2 Extreme devices)
 
         // Profile Detection Settings
         ProfileMatchByExe,              // bool - match profiles by exe path instead of window title
@@ -299,7 +303,7 @@
         Labs_LegionButtonRemap,         // Button (0=Disabled, 1=Legion L, 2=Legion R), Action (0=Xbox Guide, 1=Shortcut), Shortcut (string)
         Labs_LegionScrollRemap,         // Direction (Up/Down/Click), Enabled, Action, Shortcut - back scroll wheel remap
         Labs_FocusWidget,               // Trigger: helper sends to widget to focus itself
-        Debug_ExportDGPs,               // Trigger: widget requests helper to export DGPs to Desktop
+        Debug_ExportDGPs,               // RESERVED/LEGACY (Default Game Profiles feature removed) - kept as reserved wire id
         Debug_ExportProfiles,           // Trigger: widget requests helper to export per-game profiles to Desktop
 
         // ViGEmBus Driver
@@ -511,5 +515,12 @@
         // can show "Calibrated 2 min ago, X +0.05, Y -0.03, Z +0.08 deg/s". Content is JSON:
         //   { "x":<deg/s>, "y":<deg/s>, "z":<deg/s>, "at":<UTC ticks>, "valid":<bool> }
         GyroBiasOffset,                                     // string JSON - see format above
+
+        // Auto SDR (Go2HDR integration) — when true AND HDR is active, the helper continuously
+        // matches the panel's SDR white level to the current screen brightness via the built-in
+        // brightness→nits curve (so SDR content isn't washed out at low/high brightness in HDR).
+        // No-op while HDR is off. Persisted helper-side (LocalSettingsHelper); applied by
+        // AutoSdrManager through User32.SetSdrWhiteLevelNits. LegionGo2-only feature.
+        AutoSdrEnabled,                                     // bool - master toggle for auto SDR white-level matching
     }
 }

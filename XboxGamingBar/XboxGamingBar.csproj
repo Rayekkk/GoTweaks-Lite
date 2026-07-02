@@ -257,10 +257,7 @@
     <Compile Include="Data\Device\DeviceHasScrollWheelProperty.cs" />
     <Compile Include="Data\Device\DeviceHasDetachableControllersProperty.cs" />
     <Compile Include="Data\Device\DeviceHasTouchpadProperty.cs" />
-    <Compile Include="Data\Profile\DefaultGameProfileAvailableProperty.cs" />
-    <Compile Include="Data\Profile\DefaultGameProfileDataProperty.cs" />
-    <Compile Include="Data\Profile\DefaultGameProfileEnabledProperty.cs" />
-    <Compile Include="Data\AutoTDP\AutoTDPProperties.cs" />
+    <Compile Include="Data\Performance\PerformanceProperties.cs" />
     <Compile Include="Data\OnScreenDisplayProviderProperty.cs" />
     <Compile Include="Data\PerGameProfileProperty.cs" />
     <Compile Include="Data\OSDProperty.cs" />
@@ -272,6 +269,7 @@
     <Compile Include="Data\DisplayOrientationProperty.cs" />
     <Compile Include="Data\HDRSupportedProperty.cs" />
     <Compile Include="Data\HDREnabledProperty.cs" />
+    <Compile Include="Data\AutoSdrEnabledProperty.cs" />
     <Compile Include="Data\AdaptiveBrightnessModeProperty.cs" />
     <Compile Include="Data\RTSSInstalledProperty.cs" />
     <Compile Include="Data\FPSLimitProperty.cs" />
@@ -341,9 +339,6 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Performance\GamingWidget.PowerSource.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Performance\GamingWidget.StickyTDP.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Performance\GamingWidget.PowerSourceEvents.cs">
@@ -418,12 +413,6 @@
     <Compile Include="Features\Performance\GamingWidget.TdpCustomPresets.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Features\Performance\GamingWidget.TdpBoost.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Performance\GamingWidget.Advanced.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Features\Devices\GamingWidget.GpdTabCallbacks.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
@@ -470,9 +459,6 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Labs\GamingWidget.Labs.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Performance\GamingWidget.AutoTDP.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\QuickSettings\GamingWidget.QuickSettings.cs">

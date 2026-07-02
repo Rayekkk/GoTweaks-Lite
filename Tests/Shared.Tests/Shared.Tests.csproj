@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unit tests for the hardware-independent logic in the Shared project.
+    Runs on a plain dev box (no Game Bar / handheld / AMD hardware needed).
+
+    TFM is net*-windows because Shared uses built-in WinRT (it references the raw
+    Windows.winmd for Windows.Foundation.Collections.ValueSet); a non-windows TFM
+    can't reference such an assembly (NETSDK1149). The tested types here
+    (PipeMessage JSON, StickTrigger* math) never touch ValueSet, so no WinRT type
+    is resolved at runtime.
+
+    Uses xunit.v3 in Microsoft Testing Platform mode (OutputType=Exe):
+    run with "dotnet run" pointed at this project, or run the built exe.
+    Intentionally NOT added to XboxGamingBar.sln to avoid disturbing the
+    production build / open Visual Studio instance.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Shared.Tests</AssemblyName>
+    <RootNamespace>Shared.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Shared.csproj" />
+  </ItemGroup>
+
+  <!--
+    Shared copy-locals its Windows.winmd reference, so it flows into this project's
+    output and deps.json. A .winmd listed as a runtime assembly lands in the CoreCLR
+    TPA and makes the runtime fail to start ("Failed to create CoreCLR, HRESULT:
+    0x80070057"). winmd is compile-time metadata only. Strip it from the copy-local
+    set and from the generated deps.json.
+  -->
+  <Target Name="StripWinmdCopyLocal"
+          AfterTargets="ResolveAssemblyReferences"
+          BeforeTargets="GenerateBuildDependencyFile">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(Extension)' == '.winmd'" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="StripWinmdFromDeps" AfterTargets="Build">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\strip-winmd-deps.ps1&quot; -DepsPath &quot;$(TargetDir)$(AssemblyName).deps.json&quot;"
+          ContinueOnError="true" />
+  </Target>
+
+</Project>

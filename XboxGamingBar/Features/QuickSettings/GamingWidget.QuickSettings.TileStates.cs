@@ -324,42 +324,8 @@ namespace XboxGamingBar
                     string modeText;
                     SolidColorBrush tdpModeBrush;
 
-                    // Use custom presets if enabled
-                    if (useCustomTDPPresets && tdpPresets != null && tdpPresets.Count > 0)
+                    // Mode display (Quiet/Balanced/Performance/Custom)
                     {
-                        if (selectedIndex < tdpPresets.Count)
-                        {
-                            var preset = tdpPresets[selectedIndex];
-                            modeText = $"{preset.Name} ({preset.TdpWatts}W)";
-
-                            // Color based on LegionModeValue or default to purple for custom
-                            switch (preset.LegionModeValue)
-                            {
-                                case 1: // Quiet - Desaturated Blue
-                                    tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 35, 45, 60));
-                                    break;
-                                case 2: // Balanced - Grey
-                                    tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 50, 55));
-                                    break;
-                                case 3: // Performance - Desaturated Red
-                                    tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 60, 40, 40));
-                                    break;
-                                default: // Custom preset (no LegionModeValue) - Purple
-                                    tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 42, 58));
-                                    break;
-                            }
-                        }
-                        else
-                        {
-                            // Custom mode (last item, slider-controlled)
-                            int currentTdp = (int)(TDPSlider?.Value ?? 15);
-                            modeText = $"Custom ({currentTdp}W)";
-                            tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 42, 58));
-                        }
-                    }
-                    else
-                    {
-                        // Default hardcoded mode display
                         int mode;
                         if (isLegion && legionPerformanceMode != null)
                         {
@@ -387,7 +353,9 @@ namespace XboxGamingBar
                                 tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 60, 40, 40));
                                 break;
                             case 255: // Custom - Desaturated Purple
-                                int currentTdp = (int)(TDPSlider?.Value ?? 15);
+                                // The tile shows the sustained limit (SPL) = the Custom TDP slider.
+                                // (The master TDP slider was removed.)
+                                int currentTdp = (int)(CustomTDPSlowSlider?.Value ?? 15);
                                 modeText = $"Custom ({currentTdp}W)";
                                 tdpModeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 42, 58));
                                 break;
@@ -403,41 +371,16 @@ namespace XboxGamingBar
                     tdpTile.TileButton.Background = tdpModeBrush;
                 }
 
-                // AutoTDP tile
-                if (qsTileMap.TryGetValue("AutoTDP", out var autoTdpTile) && autoTdpTile.TileButton != null)
-                {
-                    bool enabled = AutoTDPToggle?.IsOn ?? false;
-                    int targetFps = (int)(AutoTDPTargetFPSSlider?.Value ?? 60);
-                    string stateText = enabled ? $"{targetFps} FPS" : "Off";
-                    autoTdpTile.StateText.Text = stateText;
-                    autoTdpTile.StateText.Foreground = enabled ? accentForeground : offForeground;
-                    autoTdpTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
-                }
-
                 // Profile tile
                 if (qsTileMap.TryGetValue("Profile", out var profileTile) && profileTile.TileButton != null)
                 {
                     bool perGame = perGameProfile?.Value ?? false;
-                    bool defaultProfileActive = defaultGameProfileEnabled?.Value ?? false;
                     string gameName = (runningGame != null && runningGame.Value.IsValid()) ? runningGame.Value.GameId.Name : "Per-Game";
 
-                    // Show game name with gradient when default game profile is active
-                    string profileName;
-                    if (defaultProfileActive)
-                    {
-                        // Use game name from current profile or running game
-                        profileName = currentDefaultGameProfile?.GameName ?? gameName;
-                        profileTile.StateText.Text = profileName;
-                        profileTile.StateText.Foreground = accentForeground;
-                        profileTile.TileButton.Background = tileDefaultProfileBrush;
-                    }
-                    else
-                    {
-                        profileName = perGame ? gameName : "Global";
-                        profileTile.StateText.Text = profileName;
-                        profileTile.StateText.Foreground = perGame ? accentForeground : offForeground;
-                        profileTile.TileButton.Background = perGame ? tileOnBrush : tileOffBrush;
-                    }
+                    string profileName = perGame ? gameName : "Global";
+                    profileTile.StateText.Text = profileName;
+                    profileTile.StateText.Foreground = perGame ? accentForeground : offForeground;
+                    profileTile.TileButton.Background = perGame ? tileOnBrush : tileOffBrush;
 
                     // Update scroll animation for long profile names (per-tile loop
                     // below also runs this for every tile, but re-running it here
@@ -528,6 +471,16 @@ namespace XboxGamingBar
                     hdrTile.StateText.Text = !supported ? "N/A" : (enabled ? "On" : "Off");
                     hdrTile.StateText.Foreground = enabled ? accentForeground : offForeground;
                     hdrTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
+                }
+
+                // Auto SDR tile (Go2HDR). Reflects the toggle's enabled state; the helper
+                // only writes the SDR white level while HDR is actually active.
+                if (qsTileMap.TryGetValue("AutoSDR", out var autoSdrTile) && autoSdrTile.TileButton != null)
+                {
+                    bool enabled = autoSdrEnabled?.Value ?? false;
+                    autoSdrTile.StateText.Text = enabled ? "On" : "Off";
+                    autoSdrTile.StateText.Foreground = enabled ? accentForeground : offForeground;
+                    autoSdrTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
                 }
 
                 // Lossless Scaling tile

@@ -77,7 +77,11 @@
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>GoTweaks.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="GoTweaks.ico" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="HidSharp, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\HidSharp.2.1.0\lib\net35\HidSharp.dll</HintPath>
@@ -494,7 +498,6 @@
     <Compile Include="Performance\Sensors\NetworkDownloadSensor.cs" />
     <Compile Include="Performance\Sensors\NetworkUploadSensor.cs" />
     <Compile Include="Performance\TDPProperty.cs" />
-    <Compile Include="Performance\TDPBoostProperties.cs" />
     <Compile Include="Performance\CurrentTDPProperty.cs" />
     <Compile Include="Performance\UpdateVisitor.cs" />
     <Compile Include="Power\CPUBoostProperty.cs" />
@@ -519,17 +522,6 @@
     <Compile Include="Services\ScheduledTaskService.cs" />
     <Compile Include="Services\SystemRestoreService.cs" />
     <Compile Include="IPC\NamedPipeServer.cs" />
-    <Compile Include="Sidebar\SidebarTab.cs" />
-    <Compile Include="Sidebar\QuickTab.cs" />
-    <Compile Include="Sidebar\PerformanceTab.cs" />
-    <Compile Include="Sidebar\ProfilesTab.cs" />
-    <Compile Include="Sidebar\DisplayTab.cs" />
-    <Compile Include="Sidebar\LegionTab.cs" />
-    <Compile Include="Sidebar\SidebarWindow.cs" />
-    <Compile Include="Sidebar\SidebarManager.cs" />
-    <Compile Include="Sidebar\SidebarInputHandler.cs" />
-    <Compile Include="Sidebar\Audio\CoreAudioInterop.cs" />
-    <Compile Include="Sidebar\Audio\AudioManager.cs" />
     <Compile Include="Sidebar\BrightnessManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Startup\Program.PackageLifecycle.cs" />
@@ -553,7 +545,6 @@
     <Compile Include="RTSS\OSDItems\OSDItemBattery.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemControllerBattery.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemCPU.cs" />
-    <Compile Include="RTSS\OSDItems\OSDItemAutoTDP.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemFan.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemFPS.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemFrameBudget.cs" />
@@ -620,22 +611,14 @@
     <Compile Include="Systems\ForegroundAppProperty.cs" />
     <Compile Include="PawnIO\PawnIOWrapper.cs" />
     <Compile Include="PawnIO\RyzenSmuService.cs" />
-    <Compile Include="AutoTDP\AutoTDPManager.cs" />
-    <Compile Include="AutoTDP\AutoTDPProperties.cs" />
-    <Compile Include="AutoTDP\QLearningController.cs" />
-    <Compile Include="AutoTDP\SARSAController.cs" />
-    <Compile Include="AutoTDP\LearnedGameTDPStore.cs" />
-    <Compile Include="AutoTDP\TDPLimitsProperty.cs" />
     <Compile Include="RTSS\DisplayOSDConfigProperty.cs" />
     <Compile Include="Systems\HDREnabledProperty.cs" />
     <Compile Include="Systems\DisplayOrientationProperty.cs" />
     <Compile Include="Systems\HDRSupportedProperty.cs" />
     <Compile Include="Systems\AdaptiveBrightnessModeProperty.cs" />
     <Compile Include="Systems\AdaptiveBrightnessManager.cs" />
-    <Compile Include="Systems\CPUCoreConfigProperty.cs" />
-    <Compile Include="Systems\CPUCoreActiveConfigProperty.cs" />
-    <Compile Include="Systems\CoreParkingPercentProperty.cs" />
-    <Compile Include="Systems\ForceParkModeProperty.cs" />
+    <Compile Include="Systems\AutoSdrManager.cs" />
+    <Compile Include="Systems\AutoSdrEnabledProperty.cs" />
     <Compile Include="Systems\RefreshRateProperty.cs" />
     <Compile Include="Systems\RefreshRatesProperty.cs" />
     <Compile Include="Systems\ResolutionProperty.cs" />
@@ -689,12 +672,6 @@
     <Compile Include="ControllerEmulation\GyroBiasEstimator.cs" />
     <Compile Include="ControllerEmulation\GyroSourceAdapters.cs" />
     <Compile Include="ControllerEmulation\PlayerSpaceGyro.cs" />
-    <Compile Include="DefaultGameProfiles\CpuDetector.cs" />
-    <Compile Include="DefaultGameProfiles\ProfileParser.cs" />
-    <Compile Include="DefaultGameProfiles\BundledProfileExporter.cs" />
-    <Compile Include="DefaultGameProfiles\DefaultGameProfileService.cs" />
-    <Compile Include="DefaultGameProfiles\DefaultGameProfileProperties.cs" />
-    <Compile Include="DefaultGameProfiles\DefaultGameProfileManager.cs" />
     <Compile Include="Labs\ViGEmController.cs" />
     <Compile Include="Labs\LegionButtonMonitor.cs" />
     <Compile Include="Labs\LegionInputButtons.cs" />
@@ -785,8 +762,6 @@
          port indexed access (0x2e/0x2f or 0x4e/0x4f) — used to drive the Legion
          Go 2 EC mailbox protocol for direct fan RPM override (Rodpad-style). -->
     <EmbeddedResource Include="Resources\PawnIO\LpcIO.bin" />
-    <!-- Bundled default game profiles for systems without Xbox FSE -->
-    <EmbeddedResource Include="Resources\DefaultGameProfiles\bundled_profiles.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

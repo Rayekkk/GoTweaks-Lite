@@ -14,6 +14,30 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     internal partial class LegionManager
     {
         private int touchpadVibrationLevel = 3;  // 1=Off, 2=Low, 3=Medium, 4=High
+        private const string TouchpadVibrationKey = "TouchpadVibrationLevel";
+
+        /// <summary>
+        /// Restores the persisted touchpad vibration level into <see cref="touchpadVibrationLevel"/>.
+        /// Called once at startup BEFORE the LegionTouchpadVibration property is built so the widget
+        /// sees the saved value (not the hard default). The helper owns persistence here because the
+        /// widget keeps no profile entry for this GLOBAL setting.
+        /// </summary>
+        private void LoadTouchpadVibrationLevel()
+        {
+            try
+            {
+                if (XboxGamingBarHelper.Settings.LocalSettingsHelper.TryGetValue<int>(TouchpadVibrationKey, out var saved)
+                    && saved >= 1 && saved <= 4)
+                {
+                    touchpadVibrationLevel = saved;
+                    Logger.Info($"Touchpad vibration restored from storage: level {saved}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to restore touchpad vibration level: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Sets the touchpad vibration (haptic feedback) level.
@@ -42,6 +66,10 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 if (success)
                 {
                     touchpadVibrationLevel = level;
+                    // Persist so the GLOBAL setting survives a console/helper restart (the widget
+                    // keeps no profile entry for it, so the helper is the source of truth).
+                    try { XboxGamingBarHelper.Settings.LocalSettingsHelper.SetValue(TouchpadVibrationKey, level); }
+                    catch (Exception ex) { Logger.Warn($"Failed to persist touchpad vibration level: {ex.Message}"); }
                     string levelName = level switch
                     {
                         1 => "Off",

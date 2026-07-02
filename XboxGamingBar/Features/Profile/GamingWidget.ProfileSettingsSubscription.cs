@@ -47,7 +47,8 @@ namespace XboxGamingBar
         private void SubscribeToSettingsChanges()
         {
             // Performance settings
-            TDPSlider.ValueChanged += SettingChanged;
+            // (Master TDP slider removed — the Custom power-limit sliders self-save via their own
+            //  ValueChanged handlers → OnCustomTDPSliderChanged → SaveCurrentSettingsToProfile.)
             CPUBoostToggle.Toggled += SettingChanged;
             CPUEPPSlider.ValueChanged += SettingChanged;
             MinCPUStateComboBox.SelectionChanged += SettingChanged;
@@ -174,20 +175,12 @@ namespace XboxGamingBar
 
         private void SettingChanged(object sender, object e)
         {
-            // Update Sticky TDP target if TDP slider changed and Sticky TDP is enabled
-            // But ONLY if the change is from the user, not from helper sync/updates
-            if (sender == TDPSlider && StickyTDPToggle?.IsOn == true && !isApplyingHelperUpdate)
-            {
-                targetTDPLimit = TDPSlider.Value;
-                Logger.Info($"Sticky TDP target updated to: {targetTDPLimit}W (user change)");
-            }
-
             // Don't save during profile loading, switching, initial sync, when helper is updating values,
-            // when any property is syncing from helper pipe, or when Default Game Profile is active
+            // or when any property is syncing from helper pipe
             if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync
-                || WidgetSliderProperty.HelperSyncCount > 0 || defaultGameProfileEnabled?.Value == true)
+                || WidgetSliderProperty.HelperSyncCount > 0)
             {
-                Logger.Debug($"Skipping auto-save during profile operation (loading={isLoadingProfile}, switching={isSwitchingProfile}, helperUpdate={isApplyingHelperUpdate}, initialSync={isInitialSync}, defaultGameProfile={defaultGameProfileEnabled?.Value})");
+                Logger.Debug($"Skipping auto-save during profile operation (loading={isLoadingProfile}, switching={isSwitchingProfile}, helperUpdate={isApplyingHelperUpdate}, initialSync={isInitialSync})");
                 return;
             }
 
