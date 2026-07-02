@@ -11,14 +11,6 @@ A stripped-down, **Lenovo Legion Go 2**-focused fork of [GoTweaks](https://githu
 
 > **Installing differs from upstream** — use the [`Installer/`](Installer/) folder (run **Install GoTweaks.bat**) instead of the original install steps further down.
 
----
-
-*Everything below is the original upstream README, kept for reference.*
-
-# GoTweaks Widget
-
-A powerful Game Bar widget for controlling gaming settings with your controller. Designed for handheld gaming PCs with deep integration for Legion Go, AMD Radeon GPUs, and performance tuning.
-
 ## Features
 
 ### Quick Settings
