@@ -59,6 +59,9 @@ CLAUDE.md
 AGENTS.md
 **/AGENTS.md
 
+# ── Local release-notes working file (not published to the repo) ─
+releases.md
+
 # ── Release staging produced by Build-Release.ps1 ───────────────
 dist/
 

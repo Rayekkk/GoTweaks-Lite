@@ -16,7 +16,7 @@ namespace Shared.Constants
     public static class UpdateConstants
     {
         /// <summary>GitHub "owner/repo" to query for releases. Empty = updates disabled.</summary>
-        public const string Repo = "";
+        public const string Repo = "Rayekkk/GoTweaks-Lite";
 
         /// <summary>True when a release repo is configured (update checks/installs allowed).</summary>
         public static bool UpdatesEnabled => !string.IsNullOrWhiteSpace(Repo);

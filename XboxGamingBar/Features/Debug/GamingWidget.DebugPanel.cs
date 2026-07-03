@@ -310,6 +310,20 @@ namespace XboxGamingBar
             return false; // Versions are equal
         }
 
+        /// <summary>
+        /// Pulls the dotted build version out of a release asset filename
+        /// ("GoTweaks_0.3.2491.0.zip" → "0.3.2491.0"). Returns "" when the name
+        /// carries no parsable version. The comparison against the installed MSIX
+        /// version uses THIS, not the release tag — so the tag (e.g. "1.0") is a
+        /// free-form cosmetic label and never drives the numeric check.
+        /// </summary>
+        private static string ExtractVersionFromFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return "";
+            var m = System.Text.RegularExpressions.Regex.Match(fileName, @"(\d+\.\d+\.\d+(?:\.\d+)?)");
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
         private async void CheckForUpdateButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -321,14 +335,15 @@ namespace XboxGamingBar
                 UpdateButton.Visibility = Visibility.Collapsed;
                 _pendingUpdateZipUrl = null;
                 _pendingUpdateVersion = null;
+                _pendingUpdateIsRemote = false;
+
+                var pv = Package.Current.Id.Version;
+                var cv = $"v{pv.Major}.{pv.Minor}.{pv.Build}.{pv.Revision}";
 
                 // Updates are disabled while no release repo is configured (see
-                // Shared.Constants.UpdateConstants). Never query the upstream repo so the
-                // app does not self-update to the official build.
+                // Shared.Constants.UpdateConstants).
                 if (!Shared.Constants.UpdateConstants.UpdatesEnabled)
                 {
-                    var pv = Package.Current.Id.Version;
-                    var cv = $"v{pv.Major}.{pv.Minor}.{pv.Build}.{pv.Revision}";
                     UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
                     UpdateStatusText.Text = $"You're up to date! ({cv})";
                     CheckForUpdateButton.Content = "Check for Update";
@@ -336,60 +351,59 @@ namespace XboxGamingBar
                     return;
                 }
 
-                using (var httpClient = new HttpClient())
+                // Consolidated update path: the helper's GoTweaksUpdateService is the SINGLE
+                // brain — it checks GitHub, compares by the .msixbundle asset-filename build
+                // version (not the cosmetic release tag), and installs silently via
+                // Add-AppxPackage. This button now just asks it (ForceRefresh) and renders the
+                // result, so the manual check and the Quick-tab startup banner share one path.
+                if (!App.IsConnected)
                 {
-                    httpClient.DefaultRequestHeaders.Add("User-Agent", "GoTweaks-UpdateChecker");
-                    var response = await httpClient.GetStringAsync(Shared.Constants.UpdateConstants.LatestReleaseApiUrl);
+                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                    UpdateStatusText.Text = "Helper not connected — can't check for updates.";
+                    CheckForUpdateButton.Content = "Check for Update";
+                    CheckForUpdateButton.IsEnabled = true;
+                    return;
+                }
 
-                    // Parse JSON response using Windows.Data.Json
-                    var jsonObject = Windows.Data.Json.JsonObject.Parse(response);
-                    var latestVersion = jsonObject.GetNamedString("tag_name", "");
+                var req = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "CheckGoTweaksUpdate", true },
+                    { "ForceRefresh", true },
+                };
+                var resp = await App.SendMessageAsync(req);
 
-                    // Get current version from package
-                    var packageVersion = Package.Current.Id.Version;
-                    var currentVersion = $"v{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
+                string payload = null;
+                if (resp != null && resp.TryGetValue("GoTweaksUpdate", out object p))
+                    payload = p?.ToString();
 
-                    Logger.Info($"Update check: current={currentVersion}, latest={latestVersion}");
+                if (string.IsNullOrEmpty(payload) || !Windows.Data.Json.JsonObject.TryParse(payload, out var root))
+                {
+                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                    UpdateStatusText.Text = "Update check failed (no response from helper).";
+                }
+                else
+                {
+                    bool isUpdate = root.GetNamedBoolean("isUpdateAvailable", false);
+                    string latest = root.GetNamedString("latestVersion", "");
+                    string tag = root.GetNamedString("latestTag", "");
+                    string url = root.GetNamedString("downloadUrl", "");
+                    string label = string.IsNullOrWhiteSpace(tag) ? latest : tag;
 
-                    if (!string.IsNullOrEmpty(latestVersion) && IsNewerVersion(latestVersion, currentVersion))
+                    Logger.Info($"Update check (via helper): current={cv}, update={isUpdate}, label={label}, url={(string.IsNullOrEmpty(url) ? "(none)" : "ok")}");
+
+                    if (isUpdate && !string.IsNullOrWhiteSpace(url))
                     {
-                        // Find the .zip asset download URL
-                        string zipUrl = null;
-                        if (jsonObject.ContainsKey("assets"))
-                        {
-                            var assets = jsonObject.GetNamedArray("assets");
-                            foreach (var asset in assets)
-                            {
-                                var assetObj = asset.GetObject();
-                                var name = assetObj.GetNamedString("name", "");
-                                if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    zipUrl = assetObj.GetNamedString("browser_download_url", "");
-                                    break;
-                                }
-                            }
-                        }
-
                         UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
-                        UpdateStatusText.Text = $"New version available: {latestVersion}\nCurrent: {currentVersion}";
-
-                        if (!string.IsNullOrEmpty(zipUrl))
-                        {
-                            _pendingUpdateZipUrl = zipUrl;
-                            _pendingUpdateVersion = latestVersion;
-                            UpdateButton.Visibility = Visibility.Visible;
-                            Logger.Info($"Update zip URL found: {zipUrl}");
-                        }
-                        else
-                        {
-                            UpdateStatusText.Text += "\n(No zip asset found in release)";
-                            Logger.Warn("No zip asset found in latest release");
-                        }
+                        UpdateStatusText.Text = $"New version available: {label}\nCurrent: {cv}";
+                        _goTweaksDownloadUrl = url;          // .msixbundle URL — unified install
+                        _pendingUpdateVersion = label;
+                        _pendingUpdateIsRemote = true;
+                        UpdateButton.Visibility = Visibility.Visible;
                     }
                     else
                     {
                         UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
-                        UpdateStatusText.Text = $"You're up to date! ({currentVersion})";
+                        UpdateStatusText.Text = $"You're up to date! ({cv})";
                     }
                 }
 
@@ -408,50 +422,90 @@ namespace XboxGamingBar
 
         private async void UpdateButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_pendingUpdateZipUrl))
+            if (!App.IsConnected)
             {
-                Logger.Warn("Update clicked but no pending update URL");
+                UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                UpdateStatusText.Text = "Helper not connected";
                 return;
             }
 
             try
             {
                 UpdateButton.IsEnabled = false;
+
+                // REMOTE GitHub update → unified helper install (download the .msixbundle +
+                // silent Add-AppxPackage). Same path the Quick-tab banner uses.
+                if (_pendingUpdateIsRemote)
+                {
+                    if (string.IsNullOrEmpty(_goTweaksDownloadUrl))
+                    {
+                        Logger.Warn("Update clicked but no pending download URL");
+                        UpdateButton.IsEnabled = true;
+                        return;
+                    }
+
+                    UpdateButton.Content = "Installing...";
+                    UpdateStatusText.Text = $"Installing {_pendingUpdateVersion}...";
+
+                    var request = new Windows.Foundation.Collections.ValueSet
+                    {
+                        { "InstallGoTweaksUpdate", _goTweaksDownloadUrl },
+                    };
+                    var response = await App.SendMessageAsync(request);
+
+                    string message = "Installing update — the widget will reload when finished.";
+                    if (response != null
+                        && response.TryGetValue("GoTweaksUpdateInstallResult", out object payloadObj)
+                        && payloadObj is string payload
+                        && Windows.Data.Json.JsonObject.TryParse(payload, out var root))
+                    {
+                        string msg = root.GetNamedString("message", "");
+                        if (!string.IsNullOrWhiteSpace(msg)) message = msg;
+                        bool ok = root.GetNamedBoolean("success", true);
+                        if (!ok)
+                        {
+                            UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                            UpdateStatusText.Text = message;
+                            UpdateButton.Content = "Update";
+                            UpdateButton.IsEnabled = true;
+                            return;
+                        }
+                    }
+                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
+                    UpdateStatusText.Text = message;
+                    return;
+                }
+
+                // LOCAL dev build (AppPackages probe) → extract/shell-open path via InstallUpdate.
+                if (string.IsNullOrEmpty(_pendingUpdateZipUrl))
+                {
+                    Logger.Warn("Update clicked but no pending update URL");
+                    UpdateButton.IsEnabled = true;
+                    return;
+                }
+
                 UpdateButton.Content = "Downloading...";
                 UpdateStatusText.Text = $"Downloading {_pendingUpdateVersion}...";
 
-                if (App.IsConnected)
-                {
-                    var message = new Windows.Foundation.Collections.ValueSet();
-                    message.Add("Command", (int)Shared.Enums.Command.Set);
-                    message.Add("Function", (int)Shared.Enums.Function.InstallUpdate);
-                    message.Add("Content", _pendingUpdateZipUrl);
-                    var result = await App.SendMessageAsync(message);
+                var message2 = new Windows.Foundation.Collections.ValueSet();
+                message2.Add("Command", (int)Shared.Enums.Command.Set);
+                message2.Add("Function", (int)Shared.Enums.Function.InstallUpdate);
+                message2.Add("Content", _pendingUpdateZipUrl);
+                var result = await App.SendMessageAsync(message2);
 
-                    if (result != null)
+                if (result != null && result.TryGetValue("UpdateStatus", out object status))
+                {
+                    var statusStr = status?.ToString() ?? "";
+                    if (statusStr == "Installing")
                     {
-                        if (result.TryGetValue("UpdateStatus", out object status))
-                        {
-                            var statusStr = status?.ToString() ?? "";
-                            if (statusStr == "Installing")
-                            {
-                                UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
-                                UpdateStatusText.Text = "Installing update... Please follow the installer prompts.";
-                                UpdateButton.Content = "Installing...";
-                            }
-                            else if (statusStr.StartsWith("Error"))
-                            {
-                                UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                                UpdateStatusText.Text = statusStr;
-                                UpdateButton.Content = "Update";
-                                UpdateButton.IsEnabled = true;
-                            }
-                        }
+                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
+                        UpdateStatusText.Text = "Installing update... Please follow the installer prompts.";
+                        UpdateButton.Content = "Installing...";
                     }
-                    else
+                    else if (statusStr.StartsWith("Error"))
                     {
                         UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                        UpdateStatusText.Text = "Failed to communicate with helper";
+                        UpdateStatusText.Text = statusStr;
                         UpdateButton.Content = "Update";
                         UpdateButton.IsEnabled = true;
                     }
@@ -459,7 +513,7 @@ namespace XboxGamingBar
                 else
                 {
                     UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
-                    UpdateStatusText.Text = "Helper not connected";
+                    UpdateStatusText.Text = "Failed to communicate with helper";
                     UpdateButton.Content = "Update";
                     UpdateButton.IsEnabled = true;
                 }
@@ -513,45 +567,11 @@ namespace XboxGamingBar
                 var packageVersion = Package.Current.Id.Version;
                 var currentVersion = $"v{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
 
-                string remoteVersion = null;
-                string remoteZipUrl = null;
-                // Only query the remote repo when one is configured (see
-                // Shared.Constants.UpdateConstants). Disabled by default so the app does
-                // not self-update to the upstream build; the local AppPackages probe below
-                // still runs for the local dev iteration loop.
-                if (Shared.Constants.UpdateConstants.UpdatesEnabled)
-                {
-                    try
-                    {
-                        using (var httpClient = new HttpClient())
-                        {
-                            httpClient.DefaultRequestHeaders.Add("User-Agent", "GoTweaks-UpdateChecker");
-                            var response = await httpClient.GetStringAsync(Shared.Constants.UpdateConstants.LatestReleaseApiUrl);
-
-                            var jsonObject = Windows.Data.Json.JsonObject.Parse(response);
-                            remoteVersion = jsonObject.GetNamedString("tag_name", "");
-
-                            if (jsonObject.ContainsKey("assets"))
-                            {
-                                var assets = jsonObject.GetNamedArray("assets");
-                                foreach (var asset in assets)
-                                {
-                                    var assetObj = asset.GetObject();
-                                    var name = assetObj.GetNamedString("name", "");
-                                    if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        remoteZipUrl = assetObj.GetNamedString("browser_download_url", "");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn($"Startup update check: remote check failed: {ex.Message}");
-                    }
-                }
+                // REMOTE startup update notification is now owned entirely by the helper's
+                // GoTweaksUpdateService → Quick-tab banner (HandleGoTweaksUpdatePush). This
+                // startup path only probes the LOCAL AppPackages folder for the dev
+                // build → install iteration loop, so there's a single remote banner instead
+                // of the widget and helper both hitting GitHub and both raising a banner.
 
                 // Probe the helper's local AppPackages folder for a newer debug build so the
                 // developer iteration loop (build → install) surfaces an update banner without
@@ -586,43 +606,25 @@ namespace XboxGamingBar
                     Logger.Warn($"Startup update check: local debug probe failed: {ex.Message}");
                 }
 
-                Logger.Info($"Startup update check: current={currentVersion}, remote={remoteVersion ?? "(n/a)"}, local={(localVersionStr != null ? "v" + localVersionStr : "(n/a)")}");
+                Logger.Info($"Startup update check: current={currentVersion}, local={(localVersionStr != null ? "v" + localVersionStr : "(n/a)")} (remote handled by helper Quick-tab banner)");
 
-                // Pick whichever source is newer than current and newer than the other source.
-                // Local debug wins ties against remote — the developer who has a fresher build
-                // in AppPackages almost always wants to test that first.
-                bool remoteIsNewer = !string.IsNullOrEmpty(remoteVersion) && IsNewerVersion(remoteVersion, currentVersion);
+                // Only the LOCAL dev build can raise the System-tab banner here — remote updates
+                // are surfaced by the helper's Quick-tab banner instead (single remote path).
                 bool localIsNewer = !string.IsNullOrEmpty(localVersionStr)
                     && Version.TryParse(localVersionStr, out var localParsed)
                     && localParsed > new Version(packageVersion.Major, packageVersion.Minor, packageVersion.Build, packageVersion.Revision);
 
-                // Tie-breaking on equal versions: prefer local. IsNewerVersion returns false
-                // for equal versions, so we use !IsNewerVersion(remote, local) which is
-                // true when remote ≤ local (i.e., local wins on ties).
-                bool preferLocal = localIsNewer && (!remoteIsNewer
-                    || string.IsNullOrEmpty(remoteVersion)
-                    || !IsNewerVersion(remoteVersion, "v" + localVersionStr));
-
-                if (preferLocal)
+                if (localIsNewer)
                 {
                     var localBannerVersion = $"v{localVersionStr} [Debug]";
                     await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                     {
                         _pendingUpdateZipUrl = localMsixPath; // local .msixbundle
                         _pendingUpdateVersion = localBannerVersion;
+                        _pendingUpdateIsRemote = false;       // local install path (Function.InstallUpdate)
                         ShowUpdateBanner(localBannerVersion);
                     });
                     Logger.Info($"Update available (local debug): {localBannerVersion}, folder={localFolderName}, path={localMsixPath}");
-                }
-                else if (remoteIsNewer)
-                {
-                    await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-                    {
-                        _pendingUpdateZipUrl = remoteZipUrl;
-                        _pendingUpdateVersion = remoteVersion;
-                        ShowUpdateBanner(remoteVersion);
-                    });
-                    Logger.Info($"Update available (remote): {remoteVersion}, zip URL: {remoteZipUrl ?? "not found"}");
                 }
                 else
                 {

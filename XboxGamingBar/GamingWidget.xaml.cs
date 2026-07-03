@@ -538,6 +538,10 @@ namespace XboxGamingBar
         // Update check
         private string _pendingUpdateZipUrl = null;
         private string _pendingUpdateVersion = null;
+        // True when the System-tab "Check for Update" result is a REMOTE GitHub update
+        // (install via the unified helper path — download .msixbundle + silent Add-AppxPackage).
+        // False = a LOCAL AppPackages dev build (install via Function.InstallUpdate / local path).
+        private bool _pendingUpdateIsRemote = false;
 
         // Helper launch guard - prevents duplicate launches and UAC prompts
         private static bool isLaunchingHelper = false;

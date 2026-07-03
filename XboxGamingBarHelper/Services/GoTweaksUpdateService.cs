@@ -121,8 +121,18 @@ namespace XboxGamingBarHelper.Services
                     }
                 }
 
-                result.IsUpdateAvailable = IsNewer(result.LatestVersion, currentVersion);
-                Logger.Info($"GoTweaks update check: current={currentVersion}, latest={result.LatestVersion}, update={result.IsUpdateAvailable}, asset={result.AssetName}");
+                // Compare by the BUILD version embedded in the .msixbundle asset filename
+                // (e.g. "GoTweaks_0.3.2491.0.msixbundle" -> 0.3.2491.0), NOT the release tag.
+                // Release tags are a cosmetic label in this fork (e.g. "1.0") and must never
+                // drive the numeric comparison against the installed MSIX version — otherwise a
+                // "1.0" tag always parses as newer than a "0.3.xxxx" build and loops forever.
+                // Fall back to the tag only if the asset name has no parsable version.
+                string compareVersion = ExtractVersionFromFileName(result.AssetName);
+                if (string.IsNullOrEmpty(compareVersion))
+                    compareVersion = result.LatestVersion;
+
+                result.IsUpdateAvailable = IsNewer(compareVersion, currentVersion);
+                Logger.Info($"GoTweaks update check: current={currentVersion}, tag={result.LatestTag}, bundleVersion={compareVersion}, update={result.IsUpdateAvailable}, asset={result.AssetName}");
             }
             catch (Exception ex)
             {
@@ -190,7 +200,10 @@ namespace XboxGamingBarHelper.Services
             // widget will disappear on its own once the app is reinstalled.
             try
             {
-                string psCommand = $"Add-AppxPackage -Path '{target.Replace("'", "''")}' -ForceApplicationShutdown";
+                // -ForceUpdateFromAnyVersion mirrors the manual installer (Install GoTweaks.ps1):
+                // it lets the reinstall proceed even if the bundle's version isn't strictly higher
+                // (e.g. a re-published release), so a self-update can never wedge on a version check.
+                string psCommand = $"Add-AppxPackage -Path '{target.Replace("'", "''")}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion";
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -207,6 +220,19 @@ namespace XboxGamingBarHelper.Services
                 Logger.Warn($"GoTweaks install launch failed: {ex.Message}");
                 return "{\"success\":false,\"message\":\"Install failed: " + ex.Message.Replace("\"", "'") + "\"}";
             }
+        }
+
+        /// <summary>
+        /// Pulls the dotted build version out of a release asset filename
+        /// ("GoTweaks_0.3.2491.0.msixbundle" → "0.3.2491.0"). Returns "" when the
+        /// name carries no parsable version. This is what we compare against the
+        /// installed MSIX version, so the release *tag* stays a free-form label.
+        /// </summary>
+        private static string ExtractVersionFromFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return "";
+            var m = System.Text.RegularExpressions.Regex.Match(fileName, @"(\d+\.\d+\.\d+(?:\.\d+)?)");
+            return m.Success ? m.Groups[1].Value : "";
         }
 
         /// <summary>Strips the leading "v" GitHub tags often carry ("v0.3.2" → "0.3.2").</summary>
