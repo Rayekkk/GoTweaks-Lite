@@ -522,5 +522,14 @@
         // No-op while HDR is off. Persisted helper-side (LocalSettingsHelper); applied by
         // AutoSdrManager through User32.SetSdrWhiteLevelNits. LegionGo2-only feature.
         AutoSdrEnabled,                                     // bool - master toggle for auto SDR white-level matching
+
+        // Legion "Task View pops up on desktop focus" phantom-input fix (LegionGo2, optional Labs).
+        // On some setups that boot with a USB hub attached, the Legion controller composite latches
+        // a stale USB state at boot and Windows then re-opens Task View whenever the desktop gains
+        // focus. When enabled, the helper re-enumerates the controller composite once per boot via a
+        // software USB port power-cycle (IOCTL_USB_HUB_CYCLE_PORT) — the software equivalent of
+        // physically replugging a pad. Persisted helper-side; see Labs/TaskViewFixManager.
+        Labs_TaskViewFixStatus,     // Get → 0 = disabled, 1 = enabled (persisted helper-side)
+        Labs_TaskViewFixControl,    // Set Content → 0 = disable, 1 = enable, 2 = run once now
     }
 }

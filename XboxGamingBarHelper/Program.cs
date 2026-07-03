@@ -1603,6 +1603,11 @@ namespace XboxGamingBarHelper
             _managersReady = true;
             Logger.Info("Managers ready - BatchGet requests will now be processed");
 
+            // Optional Legion Labs "Task View fix": if the user enabled it, re-enumerate the
+            // controller composite once per boot to clear the boot-time USB phantom that makes
+            // Task View pop up on desktop focus. No-op when disabled or on non-Legion hardware.
+            Labs.TaskViewFixManager.RunOncePerBootIfEnabled();
+
             // #66: bring up PresentMon integration after managers are ready. Lifecycle is
             // driven from RunningGame_PropertyChanged → OnRunningGameChangedForPresentMon.
             InitializePresentMon();

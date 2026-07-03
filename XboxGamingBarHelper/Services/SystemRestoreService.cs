@@ -54,6 +54,11 @@ namespace XboxGamingBarHelper.Services
             public bool? OriginalDAServiceEnabled { get; set; }
             public bool DAServiceSaved { get; set; } = false;
 
+            // OEM Game Bar widget (Legion) original GamingConfiguration registration.
+            // Removed alongside DAService disable; restored on uninstall if it was present.
+            public string OriginalOEMWidgetValue { get; set; }
+            public bool OEMWidgetSaved { get; set; } = false;
+
             // Scheduled task was created
             public bool ScheduledTaskCreated { get; set; } = false;
         }
@@ -180,6 +185,36 @@ namespace XboxGamingBarHelper.Services
             Save();
 
             Logger.Info($"Saved original DAService state: Enabled={wasEnabled}");
+        }
+
+        /// <summary>
+        /// Saves the original OEM Game Bar widget (Legion) registration value before it is
+        /// removed, so a clean uninstall can restore it. Saved once.
+        /// </summary>
+        public static void SaveOriginalOEMWidgetState(string originalValue)
+        {
+            Initialize();
+
+            if (_restoreData.OEMWidgetSaved)
+            {
+                Logger.Debug("OEM widget original state already saved, skipping");
+                return;
+            }
+
+            _restoreData.OriginalOEMWidgetValue = originalValue;
+            _restoreData.OEMWidgetSaved = true;
+            Save();
+
+            Logger.Info($"Saved original OEM widget registration: '{originalValue}'");
+        }
+
+        /// <summary>
+        /// Returns the saved original OEM widget registration value, or null if none was saved.
+        /// </summary>
+        public static string GetOriginalOEMWidgetValue()
+        {
+            Initialize();
+            return _restoreData.OEMWidgetSaved ? _restoreData.OriginalOEMWidgetValue : null;
         }
 
         /// <summary>
@@ -319,6 +354,27 @@ namespace XboxGamingBarHelper.Services
             else
             {
                 results.AppendLine("- DAService: No original state saved (was not modified)");
+            }
+
+            // 5. Restore the OEM Game Bar widget (Legion) registration if we removed it.
+            if (_restoreData.OEMWidgetSaved && !string.IsNullOrEmpty(_restoreData.OriginalOEMWidgetValue))
+            {
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(
+                        @"SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration"))
+                    {
+                        key?.SetValue("OEMGameBarwidget", _restoreData.OriginalOEMWidgetValue,
+                            Microsoft.Win32.RegistryValueKind.String);
+                    }
+                    Logger.Info($"Uninstall: restored OEM Game Bar widget registration '{_restoreData.OriginalOEMWidgetValue}'");
+                    results.AppendLine("✓ OEM Game Bar widget (Legion) registration restored");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Uninstall: Failed to restore OEM widget: {ex.Message}");
+                    results.AppendLine($"✗ Failed to restore OEM widget: {ex.Message}");
+                }
             }
 
             results.AppendLine();

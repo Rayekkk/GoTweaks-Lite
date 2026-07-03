@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using NLog;
 using Shared.Constants;
 using Shared.Data;
@@ -38,8 +39,15 @@ namespace XboxGamingBarHelper
     internal partial class Program
     {
         /// <summary>
-        /// Get the current status of DAService (Legion Space service).
-        /// Returns: 0 = Stopped, 1 = Running, 2 = Not Found, 3 = Stopping, 4 = Starting
+        /// Get the current status of DAService (Legion Space service). Reports the startup
+        /// state, NOT the transient run state (StartType is set instantly by sc.exe, so this
+        /// is accurate immediately).
+        ///   1 = Enabled  → auto-starts at boot (StartType == Automatic).
+        ///   0 = Disabled → won't auto-start at boot. We use Manual ("demand"), NOT Windows-
+        ///                  Disabled, so the user can still launch Legion Space on demand; the
+        ///                  service just doesn't return after a reboot. (Windows-Disabled would
+        ///                  also read as 0 here, for back-compat with older installs.)
+        ///   2 = Not Found.
         /// </summary>
         private static int GetDAServiceStatus()
         {
@@ -47,19 +55,9 @@ namespace XboxGamingBarHelper
             {
                 using (var sc = new ServiceController("DAService"))
                 {
-                    var status = sc.Status;
-                    Logger.Debug($"Labs: DAService status = {status}");
-                    switch (status)
-                    {
-                        case ServiceControllerStatus.Running:
-                            return 1;
-                        case ServiceControllerStatus.StopPending:
-                            return 3; // Stopping
-                        case ServiceControllerStatus.StartPending:
-                            return 4; // Starting
-                        default:
-                            return 0; // Stopped or other
-                    }
+                    var startType = sc.StartType;
+                    Logger.Debug($"Labs: DAService StartType = {startType}, Status = {sc.Status}");
+                    return startType == ServiceStartMode.Automatic ? 1 : 0;
                 }
             }
             catch (InvalidOperationException)
@@ -75,21 +73,30 @@ namespace XboxGamingBarHelper
         }
 
         /// <summary>
-        /// Control DAService (Legion Space service).
-        /// Action: 0 = Stop and Disable, 1 = Enable and Start
+        /// Control DAService (Legion Space service) startup type.
+        /// Action: 0 = Disable auto-start — set startup to Manual ("demand") + stop the running
+        ///         instance. The daemon no longer runs at boot and does NOT return after a reboot,
+        ///         but Legion Space can STILL start it on demand (unlike Windows-Disabled, which
+        ///         blocks launching it entirely). 1 = Enable — set startup to auto + start now.
+        ///
+        /// The startup-type change (sc.exe config) is applied synchronously and is fast — that's
+        /// the part GetDAServiceStatus reports. The actual stop/start of the running instance is
+        /// kicked off on a background task so we never block the pipe handler thread on
+        /// WaitForStatus (which could exceed the widget's 10 s request timeout and wedge the pipe).
         /// </summary>
         private static void ControlDAService(int action)
         {
             try
             {
-                if (action == 0) // Stop and Disable
+                if (action == 0) // Disable auto-start (Manual/demand)
                 {
-                    // Save original state before first modification (for clean uninstall)
+                    // Save the original ENABLED (auto-start) state before the first modification
+                    // so a clean uninstall can restore it correctly.
                     try
                     {
                         using (var sc = new ServiceController("DAService"))
                         {
-                            bool wasEnabled = sc.Status == ServiceControllerStatus.Running;
+                            bool wasEnabled = sc.StartType == ServiceStartMode.Automatic;
                             Services.SystemRestoreService.SaveOriginalDAServiceState(wasEnabled);
                         }
                     }
@@ -98,70 +105,169 @@ namespace XboxGamingBarHelper
                         Logger.Warn($"Failed to save original DAService state: {ex.Message}");
                     }
 
-                    // First stop the service
-                    using (var sc = new ServiceController("DAService"))
-                    {
-                        if (sc.Status == ServiceControllerStatus.Running)
-                        {
-                            Logger.Info("Labs: Stopping DAService...");
-                            sc.Stop();
-                            sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
-                            Logger.Info("Labs: DAService stopped");
-                        }
-                    }
+                    // Set startup to Manual ("demand"): won't auto-start at boot (so it doesn't
+                    // return after a reboot), but stays launchable on demand by Legion Space.
+                    SetDAServiceStartType("demand");
 
-                    // Then disable the service startup type using sc.exe
-                    Logger.Info("Labs: Disabling DAService startup...");
-                    var disableProcess = new Process
+                    // Also remove the Lenovo OEM Game Bar widget registration so it goes away
+                    // together with the service (restored on Enable / clean uninstall).
+                    RemoveOEMWidget();
+
+                    // Then stop the running instance in the background (best-effort).
+                    System.Threading.Tasks.Task.Run(() =>
                     {
-                        StartInfo = new ProcessStartInfo
+                        try
                         {
-                            FileName = "sc.exe",
-                            Arguments = "config DAService start= disabled",
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                            RedirectStandardOutput = true
+                            using (var sc = new ServiceController("DAService"))
+                            {
+                                if (sc.Status == ServiceControllerStatus.Running)
+                                {
+                                    Logger.Info("Labs: Stopping DAService (background)...");
+                                    sc.Stop();
+                                    sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(15));
+                                    Logger.Info("Labs: DAService stopped");
+                                }
+                            }
                         }
-                    };
-                    disableProcess.Start();
-                    disableProcess.WaitForExit(5000);
-                    Logger.Info($"Labs: DAService startup disabled (exit code: {disableProcess.ExitCode})");
+                        catch (Exception ex)
+                        {
+                            Logger.Warn($"Labs: background DAService stop failed: {ex.Message}");
+                        }
+                    });
                 }
-                else // Enable and Start
+                else // Enable auto-start
                 {
-                    // First enable the service startup type using sc.exe
-                    Logger.Info("Labs: Enabling DAService startup...");
-                    var enableProcess = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = "sc.exe",
-                            Arguments = "config DAService start= auto",
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                            RedirectStandardOutput = true
-                        }
-                    };
-                    enableProcess.Start();
-                    enableProcess.WaitForExit(5000);
-                    Logger.Info($"Labs: DAService startup enabled (exit code: {enableProcess.ExitCode})");
+                    // Restore the startup type to auto.
+                    SetDAServiceStartType("auto");
 
-                    // Then start the service
-                    using (var sc = new ServiceController("DAService"))
+                    // Restore the Lenovo OEM Game Bar widget registration removed on Disable.
+                    RestoreOEMWidget();
+
+                    // Then start the service in the background (best-effort).
+                    System.Threading.Tasks.Task.Run(() =>
                     {
-                        if (sc.Status == ServiceControllerStatus.Stopped)
+                        try
                         {
-                            Logger.Info("Labs: Starting DAService...");
-                            sc.Start();
-                            sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
-                            Logger.Info("Labs: DAService started");
+                            using (var sc = new ServiceController("DAService"))
+                            {
+                                if (sc.Status == ServiceControllerStatus.Stopped)
+                                {
+                                    Logger.Info("Labs: Starting DAService (background)...");
+                                    sc.Start();
+                                    sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
+                                    Logger.Info("Labs: DAService started");
+                                }
+                            }
                         }
-                    }
+                        catch (Exception ex)
+                        {
+                            Logger.Warn($"Labs: background DAService start failed: {ex.Message}");
+                        }
+                    });
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error($"Labs: Error controlling DAService: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Sets DAService's startup type via sc.exe ("demand" = Manual, or "auto"). Synchronous
+        /// and fast; this is the startup state GetDAServiceStatus reports.
+        /// </summary>
+        private static void SetDAServiceStartType(string startMode)
+        {
+            try
+            {
+                Logger.Info($"Labs: Setting DAService startup to {startMode}...");
+                using (var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "sc.exe",
+                        Arguments = $"config DAService start= {startMode}",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true
+                    }
+                })
+                {
+                    proc.Start();
+                    proc.WaitForExit(5000);
+                    Logger.Info($"Labs: DAService startup set to {startMode} (exit code: {proc.ExitCode})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Labs: Failed to set DAService startup to {startMode}: {ex.Message}");
+            }
+        }
+
+        // Lenovo OEM Game Bar widget registration. Present = the OEM Legion widget shows in the
+        // Game Bar widget list. We remove it when disabling Legion Space (and restore it on enable /
+        // clean uninstall) so it goes away together with the service.
+        private const string GamingConfigKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration";
+        private const string OEMWidgetValueName = "OEMGameBarwidget";
+        private const string OEMWidgetDefaultValue = "LegionGoGameBarWidget_ra2g5j82mn5h8";
+
+        /// <summary>
+        /// Removes the Lenovo OEM Game Bar widget registration from GamingConfiguration (saving its
+        /// original value first for restore). The widget disappears from the Game Bar widget list
+        /// the next time it's opened. No-op if already absent. Helper runs elevated → HKLM write ok.
+        /// </summary>
+        private static void RemoveOEMWidget()
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(GamingConfigKeyPath, writable: true))
+                {
+                    if (key == null)
+                    {
+                        Logger.Warn("Labs: GamingConfiguration key not found; can't remove OEM widget");
+                        return;
+                    }
+                    var current = key.GetValue(OEMWidgetValueName) as string;
+                    if (string.IsNullOrEmpty(current))
+                    {
+                        Logger.Info("Labs: OEM Game Bar widget already absent");
+                        return;
+                    }
+                    // Persist the original value so a clean uninstall can restore it.
+                    Services.SystemRestoreService.SaveOriginalOEMWidgetState(current);
+                    key.DeleteValue(OEMWidgetValueName, throwOnMissingValue: false);
+                    Logger.Info($"Labs: removed OEM Game Bar widget registration (was '{current}')");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Labs: failed to remove OEM widget: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Restores the Lenovo OEM Game Bar widget registration — the original saved value if we
+        /// have one, otherwise the known Legion Go default.
+        /// </summary>
+        private static void RestoreOEMWidget()
+        {
+            try
+            {
+                string value = Services.SystemRestoreService.GetOriginalOEMWidgetValue() ?? OEMWidgetDefaultValue;
+                using (var key = Registry.LocalMachine.CreateSubKey(GamingConfigKeyPath))
+                {
+                    if (key == null)
+                    {
+                        Logger.Warn("Labs: can't open GamingConfiguration to restore OEM widget");
+                        return;
+                    }
+                    key.SetValue(OEMWidgetValueName, value, RegistryValueKind.String);
+                    Logger.Info($"Labs: restored OEM Game Bar widget registration ('{value}')");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Labs: failed to restore OEM widget: {ex.Message}");
             }
         }
 

@@ -187,7 +187,9 @@ namespace XboxGamingBar
 
         private void OnDAServiceStatusReceived(int status)
         {
-            // Status: 0 = Stopped/Disabled, 1 = Running, 2 = Not Found, 3 = Stopping, 4 = Starting
+            // Status reflects the startup state: 0 = Disabled (no boot auto-start; Legion Space
+            // still launchable on demand), 1 = Enabled (auto-starts at boot), 2 = Not Found.
+            // (3/4 are legacy transient codes the helper no longer sends.)
             _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 if (DAServiceStatusText == null || ToggleDAServiceButton == null)
@@ -195,16 +197,16 @@ namespace XboxGamingBar
 
                 switch (status)
                 {
-                    case 0: // Stopped/Disabled
+                    case 0: // Disabled (no auto-start; still launchable on demand)
                         daServiceIsRunning = false;
-                        DAServiceStatusText.Text = "Service disabled - Legion L/R buttons disabled";
+                        DAServiceStatusText.Text = "Auto-start off - Legion Space won't run at boot (still launchable)";
                         DAServiceStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 200, 83)); // Green
                         ToggleDAServiceButton.Content = "Enable";
                         ToggleDAServiceButton.IsEnabled = true;
                         break;
-                    case 1: // Running
+                    case 1: // Enabled (auto-starts at boot)
                         daServiceIsRunning = true;
-                        DAServiceStatusText.Text = "Service running - Legion Space controls buttons";
+                        DAServiceStatusText.Text = "Auto-start on - Legion Space runs at boot";
                         DAServiceStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 170, 0)); // Orange
                         ToggleDAServiceButton.Content = "Disable";
                         ToggleDAServiceButton.IsEnabled = true;
@@ -268,6 +270,122 @@ namespace XboxGamingBar
                 Logger.Error($"Failed to control DAService: {ex.Message}");
                 // Reset UI on error
                 UpdateDAServiceStatus();
+            }
+        }
+
+        // ---- Labs: Task View bug fix (optional USB phantom-input re-plug) ----
+
+        private async void UpdateTaskViewFixStatus()
+        {
+            if (!App.IsConnected)
+                return;
+
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet();
+                request.Add("Command", (int)Command.Get);
+                request.Add("Function", (int)Function.Labs_TaskViewFixStatus);
+                var response = await App.SendMessageAsync(request);
+
+                if (response != null && response.TryGetValue("Content", out object statusObj))
+                {
+                    int status = Convert.ToInt32(statusObj);
+                    OnTaskViewFixStatusReceived(status);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to request Task View fix status: {ex.Message}");
+            }
+        }
+
+        private void OnTaskViewFixStatusReceived(int status)
+        {
+            // 0 = disabled, 1 = enabled (runs once per boot).
+            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (TaskViewFixStatusText == null || ToggleTaskViewFixButton == null)
+                    return;
+
+                if (status == 1)
+                {
+                    taskViewFixEnabled = true;
+                    TaskViewFixStatusText.Text = "Enabled — runs once automatically after every restart";
+                    TaskViewFixStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 200, 83)); // Green
+                    ToggleTaskViewFixButton.Content = "Disable";
+                }
+                else
+                {
+                    taskViewFixEnabled = false;
+                    TaskViewFixStatusText.Text = "Disabled";
+                    TaskViewFixStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160)); // Gray
+                    ToggleTaskViewFixButton.Content = "Enable";
+                }
+                ToggleTaskViewFixButton.IsEnabled = true;
+            });
+        }
+
+        private async void ToggleTaskViewFixButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!App.IsConnected)
+                return;
+
+            try
+            {
+                ToggleTaskViewFixButton.Content = "...";
+                ToggleTaskViewFixButton.IsEnabled = false;
+
+                // 0 = disable (permanent), 1 = enable (runs once per boot).
+                int action = taskViewFixEnabled ? 0 : 1;
+                var request = new Windows.Foundation.Collections.ValueSet();
+                request.Add("Command", (int)Command.Set);
+                request.Add("Function", (int)Function.Labs_TaskViewFixControl);
+                request.Add("Content", action);
+                var response = await App.SendMessageAsync(request);
+
+                if (response != null && response.TryGetValue("Content", out object statusObj))
+                    OnTaskViewFixStatusReceived(Convert.ToInt32(statusObj));
+                else
+                    UpdateTaskViewFixStatus();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to toggle Task View fix: {ex.Message}");
+                UpdateTaskViewFixStatus();
+            }
+        }
+
+        private async void TaskViewFixRunNowButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!App.IsConnected)
+                return;
+
+            try
+            {
+                if (TaskViewFixRunNowButton != null) TaskViewFixRunNowButton.IsEnabled = false;
+                if (TaskViewFixStatusText != null)
+                {
+                    TaskViewFixStatusText.Text = "Running fix (controllers will briefly re-connect)...";
+                    TaskViewFixStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 200, 0)); // Yellow
+                }
+
+                // Content 2 = run once now (does not change the enabled toggle).
+                var request = new Windows.Foundation.Collections.ValueSet();
+                request.Add("Command", (int)Command.Set);
+                request.Add("Function", (int)Function.Labs_TaskViewFixControl);
+                request.Add("Content", 2);
+                await App.SendMessageAsync(request);
+
+                // Give the controllers a moment to re-enumerate, then reflect the persisted state.
+                await Task.Delay(1500);
+                if (TaskViewFixRunNowButton != null) TaskViewFixRunNowButton.IsEnabled = true;
+                UpdateTaskViewFixStatus();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to run Task View fix: {ex.Message}");
+                if (TaskViewFixRunNowButton != null) TaskViewFixRunNowButton.IsEnabled = true;
+                UpdateTaskViewFixStatus();
             }
         }
 

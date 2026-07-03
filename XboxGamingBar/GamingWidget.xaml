@@ -8141,6 +8141,40 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Fix Task View Bug Card (optional USB phantom-input fix) -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Fix Task View Bug" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Optional — enable only if you have this bug: with a USB hub attached, after every boot Task View keeps opening (with a controller vibration) whenever you return to the desktop, until you replug a controller. Enable runs a one-time controller re-plug automatically after each restart to clear it."
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button x:Name="ToggleTaskViewFixButton"
+                                            Grid.Column="1"
+                                            Content="Enable"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource ModernButtonStyle}"
+                                            Click="ToggleTaskViewFixButton_Click"/>
+                                </Grid>
+                                <TextBlock x:Name="TaskViewFixStatusText"
+                                           Text="Checking..."
+                                           FontSize="14"
+                                           Foreground="#A0A0A0"
+                                           Margin="0,8,0,0"/>
+                                <Button x:Name="TaskViewFixRunNowButton"
+                                        Content="Run fix now (one-time)"
+                                        Margin="0,8,0,0"
+                                        Style="{StaticResource ModernButtonStyle}"
+                                        Click="TaskViewFixRunNowButton_Click"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Driver Updates Card (Lenovo): machine type + installed BIOS +
                              direct link to the correct Lenovo downloads page, with a
                              best-effort live driver list fetched from pcsupport.lenovo.com -->

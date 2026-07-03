@@ -232,15 +232,6 @@ Required for per-game profiles:
 2. Find the **GoTweaks** widget
 3. Enable **"Know which game or app is in focus"**
 
-### Removing the Legion Space OEM Widget
-The Legion Space widget, if undesired, can be removed by running this from an elevated PowerShell shell:
-
-```reg delete "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration" /v OEMGameBarwidget /f```
-
-Then remove the widget via Settings → Apps → Uninstall LegionGoWidget. To re-add:
-
-```reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration" /v OEMGameBarwidget /t REG_SZ /d "LegionGoGameBarWidget_ra2g5j82mn5h8" /f```
-
 ---
 
 ## Requirements

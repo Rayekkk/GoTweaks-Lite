@@ -972,6 +972,16 @@ namespace XboxGamingBarHelper
                 {
                     response = HandleLabsDAServiceControl(request);
                 }
+                // Labs: Task View fix status request
+                else if (functionValue == (int)Function.Labs_TaskViewFixStatus)
+                {
+                    response = HandleLabsTaskViewFixStatus(request);
+                }
+                // Labs: Task View fix control (enable/disable/run-now)
+                else if (functionValue == (int)Function.Labs_TaskViewFixControl)
+                {
+                    response = HandleLabsTaskViewFixControl(request);
+                }
                 // Labs: Legion Button Remap
                 else if (functionValue == (int)Function.Labs_LegionButtonRemap)
                 {
@@ -1144,13 +1154,45 @@ namespace XboxGamingBarHelper
             {
                 int action = Convert.ToInt32(request.Content);
                 ControlDAService(action);
-                System.Threading.Thread.Sleep(500);
+                // No sleep needed: ControlDAService applies the permanent startup-type change
+                // synchronously (the background task only handles the slow stop/start), and
+                // GetDAServiceStatus reports that StartType — so it's already accurate here.
                 int status = GetDAServiceStatus();
                 response = new global::Windows.Foundation.Collections.ValueSet();
                 response.Add(nameof(Function), (int)Function.Labs_DAServiceStatus);
                 response.Add("Content", status);
                 response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
                 Logger.Info($"Pipe: Labs DAService control action={action}, new status={status}");
+            }
+            return response;
+        }
+
+        // Labs: Task View fix status request
+        private static global::Windows.Foundation.Collections.ValueSet HandleLabsTaskViewFixStatus(Shared.IPC.PipeMessage request)
+        {
+            int status = Labs.TaskViewFixManager.GetStatus();
+            var response = new global::Windows.Foundation.Collections.ValueSet();
+            response.Add(nameof(Function), (int)Function.Labs_TaskViewFixStatus);
+            response.Add("Content", status);
+            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
+            Logger.Info($"Pipe: Labs TaskViewFix status = {status}");
+            return response;
+        }
+
+        // Labs: Task View fix control — Content 0 = disable, 1 = enable, 2 = run once now.
+        private static global::Windows.Foundation.Collections.ValueSet HandleLabsTaskViewFixControl(Shared.IPC.PipeMessage request)
+        {
+            global::Windows.Foundation.Collections.ValueSet response = null;
+            if (request.Content != null)
+            {
+                int action = Convert.ToInt32(request.Content);
+                Labs.TaskViewFixManager.Control(action);
+                int status = Labs.TaskViewFixManager.GetStatus();
+                response = new global::Windows.Foundation.Collections.ValueSet();
+                response.Add(nameof(Function), (int)Function.Labs_TaskViewFixStatus);
+                response.Add("Content", status);
+                response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
+                Logger.Info($"Pipe: Labs TaskViewFix control action={action}, status={status}");
             }
             return response;
         }

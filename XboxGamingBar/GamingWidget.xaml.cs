@@ -532,6 +532,9 @@ namespace XboxGamingBar
         private bool daServiceIsRunning = false;
         private bool labsSectionInitialized = false;
 
+        // Labs section - Task View bug fix (USB phantom-input re-plug) enabled state
+        private bool taskViewFixEnabled = false;
+
         // Update check
         private string _pendingUpdateZipUrl = null;
         private string _pendingUpdateVersion = null;
