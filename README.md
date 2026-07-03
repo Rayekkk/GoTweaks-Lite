@@ -29,6 +29,7 @@ This is the fork's identity. Everything below is what GoTweaks Lite changes rela
 ### Added
 - **Auto SDR** — while HDR is on, automatically matches the SDR white level to screen brightness so SDR content (desktop, most games) doesn't look washed out. (Ported from the sibling Go2HDR project.)
 - **PresentMon-based OSD metrics** — real rendered vs displayed FPS, a `[FG]` frame-generation badge, and a frame-budget readout.
+- **Fix Task View Bug** (Labs, opt-in) — a targeted fix for the Legion Go bug where, after a restart with a USB hub attached, focusing the desktop pops open Task View (Win+Tab) and buzzes the controller. It re-enumerates the controller's USB port once per boot — the software equivalent of physically replugging a pad. Enable it only if you have this bug.
 
 ### Reliability fixes
 - Correct **system-tray icon** (was the generic Windows icon).
