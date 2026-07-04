@@ -114,7 +114,7 @@ namespace XboxGamingBarHelper
                     // what wakes the controller's gamepad at boot — removing it left the pad dead
                     // (D-Pad / sticks / ABXY / triggers / bumpers) until Legion Space was launched
                     // by hand. Upstream GoTweaks never touches this value, and disabling only the
-                    // DAService keeps the pad working. Do NOT re-add a RemoveOEMWidget() call here.
+                    // DAService keeps the pad working. Do NOT reintroduce OEM-widget removal here.
 
                     // Then stop the running instance in the background (best-effort).
                     System.Threading.Tasks.Task.Run(() =>
@@ -144,7 +144,7 @@ namespace XboxGamingBarHelper
                     SetDAServiceStartType("auto");
 
                     // Do NOT touch the Lenovo OEM Game Bar widget registration here either.
-                    // RestoreOEMWidget() only ever had a hardcoded fallback value, so on a device
+                    // Restoring it would only write a hardcoded fallback value, so on a device
                     // whose real OEM widget name differs it would clobber the correct Lenovo value
                     // and break the pad. Matching upstream, we leave the OEMGameBarwidget key alone
                     // in both directions.
@@ -207,73 +207,6 @@ namespace XboxGamingBarHelper
             catch (Exception ex)
             {
                 Logger.Error($"Labs: Failed to set DAService startup to {startMode}: {ex.Message}");
-            }
-        }
-
-        // Lenovo OEM Game Bar widget registration. Present = the OEM Legion widget shows in the
-        // Game Bar widget list. We remove it when disabling Legion Space (and restore it on enable /
-        // clean uninstall) so it goes away together with the service.
-        private const string GamingConfigKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\GamingConfiguration";
-        private const string OEMWidgetValueName = "OEMGameBarwidget";
-        private const string OEMWidgetDefaultValue = "LegionGoGameBarWidget_ra2g5j82mn5h8";
-
-        /// <summary>
-        /// Removes the Lenovo OEM Game Bar widget registration from GamingConfiguration (saving its
-        /// original value first for restore). The widget disappears from the Game Bar widget list
-        /// the next time it's opened. No-op if already absent. Helper runs elevated → HKLM write ok.
-        /// </summary>
-        private static void RemoveOEMWidget()
-        {
-            try
-            {
-                using (var key = Registry.LocalMachine.OpenSubKey(GamingConfigKeyPath, writable: true))
-                {
-                    if (key == null)
-                    {
-                        Logger.Warn("Labs: GamingConfiguration key not found; can't remove OEM widget");
-                        return;
-                    }
-                    var current = key.GetValue(OEMWidgetValueName) as string;
-                    if (string.IsNullOrEmpty(current))
-                    {
-                        Logger.Info("Labs: OEM Game Bar widget already absent");
-                        return;
-                    }
-                    // Persist the original value so a clean uninstall can restore it.
-                    Services.SystemRestoreService.SaveOriginalOEMWidgetState(current);
-                    key.DeleteValue(OEMWidgetValueName, throwOnMissingValue: false);
-                    Logger.Info($"Labs: removed OEM Game Bar widget registration (was '{current}')");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Labs: failed to remove OEM widget: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Restores the Lenovo OEM Game Bar widget registration — the original saved value if we
-        /// have one, otherwise the known Legion Go default.
-        /// </summary>
-        private static void RestoreOEMWidget()
-        {
-            try
-            {
-                string value = Services.SystemRestoreService.GetOriginalOEMWidgetValue() ?? OEMWidgetDefaultValue;
-                using (var key = Registry.LocalMachine.CreateSubKey(GamingConfigKeyPath))
-                {
-                    if (key == null)
-                    {
-                        Logger.Warn("Labs: can't open GamingConfiguration to restore OEM widget");
-                        return;
-                    }
-                    key.SetValue(OEMWidgetValueName, value, RegistryValueKind.String);
-                    Logger.Info($"Labs: restored OEM Game Bar widget registration ('{value}')");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Labs: failed to restore OEM widget: {ex.Message}");
             }
         }
 
