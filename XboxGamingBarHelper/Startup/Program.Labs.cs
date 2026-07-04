@@ -109,9 +109,12 @@ namespace XboxGamingBarHelper
                     // return after a reboot), but stays launchable on demand by Legion Space.
                     SetDAServiceStartType("demand");
 
-                    // Also remove the Lenovo OEM Game Bar widget registration so it goes away
-                    // together with the service (restored on Enable / clean uninstall).
-                    RemoveOEMWidget();
+                    // REGRESSION FIX: we deliberately do NOT remove the Lenovo OEM Game Bar widget
+                    // registration (OEMGameBarwidget = LegionGoGameBarWidget_...). That widget is
+                    // what wakes the controller's gamepad at boot — removing it left the pad dead
+                    // (D-Pad / sticks / ABXY / triggers / bumpers) until Legion Space was launched
+                    // by hand. Upstream GoTweaks never touches this value, and disabling only the
+                    // DAService keeps the pad working. Do NOT re-add a RemoveOEMWidget() call here.
 
                     // Then stop the running instance in the background (best-effort).
                     System.Threading.Tasks.Task.Run(() =>
@@ -140,8 +143,11 @@ namespace XboxGamingBarHelper
                     // Restore the startup type to auto.
                     SetDAServiceStartType("auto");
 
-                    // Restore the Lenovo OEM Game Bar widget registration removed on Disable.
-                    RestoreOEMWidget();
+                    // Do NOT touch the Lenovo OEM Game Bar widget registration here either.
+                    // RestoreOEMWidget() only ever had a hardcoded fallback value, so on a device
+                    // whose real OEM widget name differs it would clobber the correct Lenovo value
+                    // and break the pad. Matching upstream, we leave the OEMGameBarwidget key alone
+                    // in both directions.
 
                     // Then start the service in the background (best-effort).
                     System.Threading.Tasks.Task.Run(() =>
