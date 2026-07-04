@@ -90,9 +90,6 @@ upstream, and why.
 - **One unified update path** — a single check in the elevated helper looks at this repo's latest
   release and installs the signed `.msixbundle` silently. The **Check for updates on start** toggle
   and the **Check for Update** button in Settings both use it.
-- **Release number ≠ build number, and that's fine** — releases carry a friendly label (e.g. `1.0`)
-  while the package has an auto-incrementing build version (e.g. `0.3.2492.0`). The updater compares
-  the _build_ version, so the friendly release tag never confuses it.
 
 ---
 
