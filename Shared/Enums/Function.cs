@@ -531,5 +531,17 @@
         // physically replugging a pad. Persisted helper-side; see Labs/TaskViewFixManager.
         Labs_TaskViewFixStatus,     // Get → 0 = disabled, 1 = enabled (persisted helper-side)
         Labs_TaskViewFixControl,    // Set Content → 0 = disable, 1 = enable, 2 = run once now
+
+        // Built-in display (panel) brightness, 0-100 %. Backed by the OS WMI brightness path
+        // (WmiMonitorBrightness / WmiMonitorBrightnessMethods) via the helper's BrightnessManager.
+        // Optional Quick-tab slider (hidden by default, revealed under Customize). Helper seeds the
+        // real current brightness on BatchGet; widget Set drags apply it live via WMI.
+        PanelBrightness,            // int 0-100 - built-in screen brightness percentage
+
+        // Whether the built-in panel brightness is currently controllable (WmiMonitorBrightness
+        // returns an instance). False when the internal panel is off/disconnected (e.g. docked to
+        // an external monitor with the built-in display disabled) → widget grays out + blocks the
+        // brightness slider. Helper re-reads it (with PanelBrightness) on each RefreshPanelBrightness.
+        PanelBrightnessSupported,   // bool - is the built-in panel brightness controllable right now
     }
 }

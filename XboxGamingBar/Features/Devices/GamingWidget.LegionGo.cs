@@ -2106,11 +2106,19 @@ namespace XboxGamingBar
         private void CustomTDPFastSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
             if (isUpdatingCustomTDPSliders) return;
-            // Block SPPT Boost from exceeding FPPT Boost (effective SPPT <= FPPT).
+            // Raising SPPT Boost above FPPT Boost drags FPPT Boost UP to match (keeps SPPT <= FPPT).
+            // FPPT Boost's max is always >= SPPT Boost's max (same SPL headroom, higher static cap),
+            // so FPPT can match any value SPPT is allowed to reach.
             if (CustomTDPPeakSlider != null && e.NewValue > CustomTDPPeakSlider.Value)
             {
                 isUpdatingCustomTDPSliders = true;
-                try { CustomTDPFastSlider.Value = CustomTDPPeakSlider.Value; }
+                try
+                {
+                    CustomTDPPeakSlider.Value = e.NewValue;
+                    // Safety net: if FPPT got clamped by its own Maximum below SPPT, pull SPPT back down.
+                    if (CustomTDPPeakSlider.Value < CustomTDPFastSlider.Value)
+                        CustomTDPFastSlider.Value = CustomTDPPeakSlider.Value;
+                }
                 finally { isUpdatingCustomTDPSliders = false; }
             }
             UpdateCustomTDPValueLabels();

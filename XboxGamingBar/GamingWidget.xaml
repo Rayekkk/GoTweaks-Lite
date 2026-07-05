@@ -556,6 +556,38 @@
                             <Grid x:Name="QuickMetricsGrid"/>
                         </Border>
 
+                        <!-- Optional Built-in Display Brightness slider (hidden by default; -->
+                        <!-- revealed under Customize. Sits under the metrics row, or in its -->
+                        <!-- place when metrics are hidden. Background matches the metrics row; -->
+                        <!-- the slider itself uses the active system accent color by default. -->
+                        <Border x:Name="PanelBrightnessRow"
+                                Background="#1A1C1E"
+                                CornerRadius="12"
+                                Padding="12,8"
+                                Margin="0,0,0,8"
+                                BorderBrush="#50555C"
+                                BorderThickness="1"
+                                Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0"
+                                          Glyph="&#xE706;"
+                                          FontSize="16"
+                                          Foreground="#FFFFFF"
+                                          Margin="0,0,10,0"
+                                          VerticalAlignment="Center"/>
+                                <Slider x:Name="PanelBrightnessSlider"
+                                        Grid.Column="1"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        StepFrequency="1"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
                         <!-- Dynamic Tiles Container - tiles generated in code-behind -->
                         <StackPanel x:Name="QuickSettingsTilesContainer"/>
 
@@ -627,6 +659,27 @@
                                                   OffContent=""
                                                   OnContent=""
                                                   Toggled="QuickMetricsToggle_Toggled"/>
+                                </Grid>
+
+                                <!-- Show Brightness Slider Toggle -->
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Show Brightness Slider"
+                                                   Foreground="#FFFFFF"
+                                                   FontSize="13"/>
+                                        <TextBlock Text="Built-in screen brightness"
+                                                   Foreground="#666666"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="PanelBrightnessToggle"
+                                                  Grid.Column="1"
+                                                  OffContent=""
+                                                  OnContent=""
+                                                  Toggled="PanelBrightnessToggle_Toggled"/>
                                 </Grid>
 
                                 <!-- Metrics Selection (visible when toggle is on) -->

@@ -67,6 +67,14 @@ namespace XboxGamingBar
                 Logger.Info($"GamingWidget_VisibleChanged: Visible={isVisible}, DisplayMode={sender?.GameBarDisplayMode.ToString() ?? "Unknown"}");
                 UpdateGameBarForegroundSignal("VisibleChanged");
 
+                // Re-read the built-in panel brightness on every open so the optional brightness
+                // slider always shows the true current value (it may have changed from another
+                // source) and grays out when the internal panel is off.
+                if (isVisible)
+                {
+                    RefreshPanelBrightness();
+                }
+
                 // Resize to full height on first activation.
                 // Delay to let Game Bar finish restoring its cached layout first.
                 if (isVisible && !hasAppliedInitialSize && sender != null)

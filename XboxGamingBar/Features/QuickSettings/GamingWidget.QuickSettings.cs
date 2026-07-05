@@ -93,6 +93,10 @@ namespace XboxGamingBar
         private DispatcherTimer screenSaverCountdownTimer;
         private const string QuickMetricsEnabledKey = "QS_MetricsEnabled";
         private const string QuickMetricsSelectionKey = "QS_MetricsSelection";
+
+        // Optional built-in display brightness slider (hidden by default, revealed under Customize)
+        private bool brightnessSliderEnabled = false;
+        private const string BrightnessSliderEnabledKey = "QS_BrightnessSliderEnabled";
         private const int MaxSelectedMetrics = 6;
 
         // Available metric types with their display properties
@@ -469,6 +473,12 @@ namespace XboxGamingBar
                     quickMetricsEnabled = metricsEnabled;
                 }
 
+                // Load Brightness Slider toggle state
+                if (settings.Values.TryGetValue(BrightnessSliderEnabledKey, out object brightVal) && brightVal is bool brightEnabled)
+                {
+                    brightnessSliderEnabled = brightEnabled;
+                }
+
                 // Load Screen Saver toggle state
                 if (settings.Values.TryGetValue(ScreenSaverEnabledKey, out object ssVal) && ssVal is bool ssEnabled)
                 {
@@ -505,6 +515,12 @@ namespace XboxGamingBar
                     QuickMetricsRow.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
                 if (MetricsSelectionPanel != null)
                     MetricsSelectionPanel.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+                // Update Brightness Slider UI
+                if (PanelBrightnessToggle != null)
+                    PanelBrightnessToggle.IsOn = brightnessSliderEnabled;
+                if (PanelBrightnessRow != null)
+                    PanelBrightnessRow.Visibility = brightnessSliderEnabled ? Visibility.Visible : Visibility.Collapsed;
 
                 // Update checkboxes and rebuild metrics grid
                 UpdateMetricCheckboxes();

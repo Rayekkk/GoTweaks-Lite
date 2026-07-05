@@ -192,6 +192,15 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // Widget fires this on each panel open so the brightness slider always shows the
+                // real current value (in case brightness was changed from another source) and grays
+                // out when the built-in panel is off (external monitor). Helper re-reads WMI live.
+                if (pipeMsg.Extra.ContainsKey("RefreshPanelBrightness"))
+                {
+                    HandleRefreshPanelBrightness(pipeMsg);
+                    return;
+                }
+
                 // Handle gyro-calibration request. Widget fires this as a one-shot while
                 // the user holds the Legion controllers still; helper sends the HID
                 // output report to the controllers' firmware to capture a fresh bias.
@@ -861,6 +870,33 @@ namespace XboxGamingBarHelper
             catch (Exception ex)
             {
                 Logger.Warn($"Pipe: ReapplyTDP threw: {ex.Message}");
+            }
+            SendPipeAck(pipeMsg.RequestId);
+        }
+
+        // RefreshPanelBrightness: re-read the built-in panel brightness + availability from WMI and
+        // push both to the widget, so the slider always reflects the true current value (even if it
+        // was changed elsewhere) and grays out when the internal panel is off. ForceSetValue pushes
+        // even when unchanged so the widget re-asserts its state every panel open.
+        private static void HandleRefreshPanelBrightness(Shared.IPC.PipeMessage pipeMsg)
+        {
+            try
+            {
+                if (systemManager != null)
+                {
+                    bool supported = XboxGamingBarHelper.Sidebar.BrightnessManager.IsSupported();
+                    systemManager.PanelBrightnessSupported.ForceSetValue(supported);
+                    if (supported)
+                    {
+                        int fresh = XboxGamingBarHelper.Sidebar.BrightnessManager.GetBrightness();
+                        systemManager.PanelBrightness.ForceSetValue(fresh);
+                    }
+                    Logger.Info($"Pipe: RefreshPanelBrightness -> supported={supported}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Pipe: RefreshPanelBrightness threw: {ex.Message}");
             }
             SendPipeAck(pipeMsg.RequestId);
         }

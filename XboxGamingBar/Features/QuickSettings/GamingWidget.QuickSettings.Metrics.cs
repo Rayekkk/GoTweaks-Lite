@@ -45,6 +45,52 @@ namespace XboxGamingBar
     {
 
         /// <summary>
+        /// Ask the helper to re-read the built-in panel brightness + availability from WMI and push
+        /// them back, so the slider always reflects the true current value (in case brightness was
+        /// changed from another source) and grays out when the panel is off. Fired on each panel open.
+        /// Fire-and-forget: the helper replies via the normal property push (PanelBrightness /
+        /// PanelBrightnessSupported), which updates the slider value + enabled state.
+        /// </summary>
+        private async void RefreshPanelBrightness()
+        {
+            try
+            {
+                if (!App.IsConnected) return;
+                var request = new Windows.Foundation.Collections.ValueSet();
+                request.Add("RefreshPanelBrightness", true);
+                await App.SendMessageAsync(request);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"RefreshPanelBrightness request failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Handle Brightness Slider visibility toggle (Customize panel). Widget-only: the
+        /// PanelBrightness property is always synced, this just shows/hides the slider row.
+        /// </summary>
+        private void PanelBrightnessToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                brightnessSliderEnabled = PanelBrightnessToggle.IsOn;
+
+                var settings = ApplicationData.Current.LocalSettings;
+                settings.Values[BrightnessSliderEnabledKey] = brightnessSliderEnabled;
+
+                if (PanelBrightnessRow != null)
+                    PanelBrightnessRow.Visibility = brightnessSliderEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+                Logger.Info($"Brightness slider toggle set to: {brightnessSliderEnabled}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error handling Brightness slider toggle: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Handle Quick Metrics toggle change
         /// </summary>
         private async void QuickMetricsToggle_Toggled(object sender, RoutedEventArgs e)

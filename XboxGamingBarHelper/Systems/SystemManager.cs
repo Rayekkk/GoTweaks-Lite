@@ -167,6 +167,18 @@ namespace XboxGamingBarHelper.Systems
             get { return adaptiveBrightnessMode; }
         }
 
+        private readonly PanelBrightnessProperty panelBrightness;
+        public PanelBrightnessProperty PanelBrightness
+        {
+            get { return panelBrightness; }
+        }
+
+        private readonly PanelBrightnessSupportedProperty panelBrightnessSupported;
+        public PanelBrightnessSupportedProperty PanelBrightnessSupported
+        {
+            get { return panelBrightnessSupported; }
+        }
+
         private readonly AdaptiveBrightnessManager adaptiveBrightnessManager = new AdaptiveBrightnessManager();
         private const string AdaptiveBrightnessRequestedKey = "AdaptiveBrightnessRequested";
         private bool adaptiveBrightnessRequested;
@@ -231,6 +243,8 @@ namespace XboxGamingBarHelper.Systems
             displayOrientation = new DisplayOrientationProperty(User32.GetCurrentOrientation(), this);
 
             adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(this);
+            panelBrightness = new PanelBrightnessProperty(this);
+            panelBrightnessSupported = new PanelBrightnessSupportedProperty(this);
             // Master AB toggle lives inside the OSD/Display bundle and is only re-sent on
             // widget change — so a helper restart loses the in-memory "requested" flag.
             // Persist it locally and re-apply on startup so mode flips work after restarts.

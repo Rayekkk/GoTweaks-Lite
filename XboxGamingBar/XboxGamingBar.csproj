@@ -271,6 +271,8 @@
     <Compile Include="Data\HDRSupportedProperty.cs" />
     <Compile Include="Data\HDREnabledProperty.cs" />
     <Compile Include="Data\AutoSdrEnabledProperty.cs" />
+    <Compile Include="Data\PanelBrightnessProperty.cs" />
+    <Compile Include="Data\PanelBrightnessSupportedProperty.cs" />
     <Compile Include="Data\AdaptiveBrightnessModeProperty.cs" />
     <Compile Include="Data\RTSSInstalledProperty.cs" />
     <Compile Include="Data\FPSLimitProperty.cs" />

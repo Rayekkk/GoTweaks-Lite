@@ -630,6 +630,8 @@ namespace XboxGamingBar
         private readonly AMDImageSharpeningSharpnessProperty amdImageSharpeningSharpness;
         private readonly AMDDisplayBrightnessSupportedProperty amdDisplayBrightnessSupported;
         private readonly AMDDisplayBrightnessProperty amdDisplayBrightness;
+        private readonly PanelBrightnessProperty panelBrightness;
+        private readonly PanelBrightnessSupportedProperty panelBrightnessSupported;
         private readonly AMDDisplayContrastSupportedProperty amdDisplayContrastSupported;
         private readonly AMDDisplayContrastProperty amdDisplayContrast;
         private readonly AMDDisplaySaturationSupportedProperty amdDisplaySaturationSupported;
@@ -1277,6 +1279,8 @@ namespace XboxGamingBar
             amdImageSharpeningSharpness = new AMDImageSharpeningSharpnessProperty(AMDImageSharpeningSlider, this);
             amdDisplayBrightnessSupported = new AMDDisplayBrightnessSupportedProperty(AMDDisplayBrightnessSlider, this);
             amdDisplayBrightness = new AMDDisplayBrightnessProperty(AMDDisplayBrightnessSlider, this);
+            panelBrightness = new PanelBrightnessProperty(PanelBrightnessSlider, this);
+            panelBrightnessSupported = new PanelBrightnessSupportedProperty(PanelBrightnessSlider, PanelBrightnessRow, this);
             amdDisplayContrastSupported = new AMDDisplayContrastSupportedProperty(AMDDisplayContrastSlider, this);
             amdDisplayContrast = new AMDDisplayContrastProperty(AMDDisplayContrastSlider, this);
             amdDisplaySaturationSupported = new AMDDisplaySaturationSupportedProperty(AMDDisplaySaturationSlider, this);
@@ -1662,6 +1666,8 @@ namespace XboxGamingBar
                 amdImageSharpeningSharpness,
                 amdDisplayBrightnessSupported,
                 amdDisplayBrightness,
+                panelBrightness,
+                panelBrightnessSupported,
                 amdDisplayContrastSupported,
                 amdDisplayContrast,
                 amdDisplaySaturationSupported,
