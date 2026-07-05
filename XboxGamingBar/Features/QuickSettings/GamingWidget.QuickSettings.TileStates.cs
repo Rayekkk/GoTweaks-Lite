@@ -313,7 +313,11 @@ namespace XboxGamingBar
 
             try
             {
-                var accentForeground = new SolidColorBrush((Windows.UI.Color)Application.Current.Resources["SystemAccentColorLight2"]);
+                // Tile subtitle ("state") text is pinned to the DEFAULT Windows 11 accent blue,
+                // NOT the user's chosen Windows accent color. #0078D4 is the default accent; #76B9ED
+                // is its Light2 tint (same tint the code used to pull from SystemAccentColorLight2),
+                // readable on the dark tile background regardless of the user's accent setting.
+                var accentForeground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x76, 0xB9, 0xED));
                 var offForeground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
 
                 // TDP Mode tile - color-coded backgrounds based on preset or mode

@@ -413,7 +413,9 @@ namespace XboxGamingBar
                 {
                     Glyph = info.Glyph,
                     FontSize = 14,
-                    Foreground = new SolidColorBrush((Windows.UI.Color)Application.Current.Resources["SystemAccentColorLight2"]),
+                    // Pinned to the DEFAULT Windows 11 accent blue (#0078D4 -> Light2 tint #76B9ED),
+                    // NOT the user's chosen Windows accent color. Matches the shortcut-tile subtitle color.
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x76, 0xB9, 0xED)),
                     Margin = new Thickness(0, 0, 4, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 };
