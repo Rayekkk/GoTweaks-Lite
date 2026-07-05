@@ -59,6 +59,12 @@ namespace XboxGamingBar
                 }
             }
 
+            // Quick tab - optional built-in brightness slider + its Customize toggle
+            PanelBrightnessSlider.GotFocus += Control_GotFocus;
+            PanelBrightnessSlider.LostFocus += Control_LostFocus;
+            PanelBrightnessToggle.GotFocus += StandaloneControl_GotFocus;
+            QuickMetricsToggle.GotFocus += StandaloneControl_GotFocus;
+
             // Register GotFocus/LostFocus on interactive controls
             // Performance tab - Active Profile card
             PerGameProfileToggle.GotFocus += Control_GotFocus;
@@ -328,7 +334,10 @@ namespace XboxGamingBar
 
         private void Control_GotFocus(object sender, RoutedEventArgs e)
         {
-            // Card focus highlighting disabled - only controls show focus visuals
+            // Card focus highlighting disabled - only controls show focus visuals.
+            // Ensure the focused control scrolls into view so gamepad navigation down a long
+            // tab never leaves the focus ring off-screen.
+            BringFocusedControlIntoView(sender);
         }
 
         private void Control_LostFocus(object sender, RoutedEventArgs e)
@@ -347,6 +356,25 @@ namespace XboxGamingBar
         {
             // Clear card highlight when standalone controls (not in cards) get focus
             ClearCardFocus();
+            BringFocusedControlIntoView(sender);
+        }
+
+        /// <summary>
+        /// Scrolls the just-focused control into view within its ScrollViewer. Keeps the gamepad
+        /// focus ring visible when navigating down long tabs. StartBringIntoView is a no-op when
+        /// the element is already fully visible, so this is safe to call on every GotFocus.
+        /// </summary>
+        private void BringFocusedControlIntoView(object sender)
+        {
+            try
+            {
+                (sender as FrameworkElement)?.StartBringIntoView(new BringIntoViewOptions
+                {
+                    AnimationDesired = false,
+                    VerticalAlignmentRatio = 0.5 // center the control in the viewport
+                });
+            }
+            catch { /* best-effort scroll assist */ }
         }
 
         private void ClearCardFocus()

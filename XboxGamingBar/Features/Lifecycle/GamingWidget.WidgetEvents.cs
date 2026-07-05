@@ -73,6 +73,17 @@ namespace XboxGamingBar
                 if (isVisible)
                 {
                     RefreshPanelBrightness();
+
+                    // Put gamepad focus on the active tab so the pad can navigate immediately on
+                    // open — but only if nothing in the widget is focused yet (don't steal focus
+                    // if the user is already interacting). Deferred so layout has settled.
+                    var ignoreFocus = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () =>
+                    {
+                        if (FocusManager.GetFocusedElement() == null)
+                        {
+                            FocusActiveNavItem();
+                        }
+                    });
                 }
 
                 // Resize to full height on first activation.

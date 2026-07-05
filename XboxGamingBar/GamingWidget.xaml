@@ -210,11 +210,23 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="ManipulationMode" Value="None"/>
             <Setter Property="IsFocusEngagementEnabled" Value="True"/>
+            <!-- High-visibility white focus ring for gamepad navigation (matches ModernToggleStyle) -->
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Modern ComboBox Style - System style with minor customizations -->
         <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBoxStyle}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <!-- High-visibility white focus ring for gamepad navigation -->
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Override ComboBox border colors to prevent highlight on focus/hover -->
@@ -225,35 +237,74 @@
         <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#30343A"/>
         <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="#30343A"/>
 
+        <!-- Reusable high-visibility white focus-ring setters for gamepad navigation.
+             Merged into the interactive-control styles below so every button/toggle/checkbox
+             shows the same clear white ring when focused with the pad. -->
+
         <!-- Modern Button Style - System style -->
         <Style x:Key="ModernButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Standalone Button Style - System style -->
         <Style x:Key="StandaloneButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Standalone ToggleButton Style - System style -->
         <Style x:Key="StandaloneToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Checkbox with system style -->
         <Style x:Key="FocusableCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource DefaultCheckBoxStyle}">
             <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Default Button Style Override - uses system style -->
         <Style TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Default ToggleButton Style Override - uses system style -->
         <Style TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Default CheckBox Style Override - uses system style -->
         <Style TargetType="CheckBox" BasedOn="{StaticResource DefaultCheckBoxStyle}">
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
         <!-- Section Header Style - Tooth Theme -->
@@ -581,6 +632,7 @@
                                           VerticalAlignment="Center"/>
                                 <Slider x:Name="PanelBrightnessSlider"
                                         Grid.Column="1"
+                                        Style="{StaticResource ModernSliderStyle}"
                                         Minimum="0"
                                         Maximum="100"
                                         StepFrequency="1"
