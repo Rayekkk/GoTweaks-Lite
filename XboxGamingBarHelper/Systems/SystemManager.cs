@@ -401,6 +401,21 @@ namespace XboxGamingBarHelper.Systems
                 var currentOrientation = User32.GetCurrentOrientation();
                 Logger.Info($"Display orientation: {currentOrientation}");
                 displayOrientation.SetValue(currentOrientation);
+
+                // Refresh built-in panel brightness availability + value. Dock/undock changes whether
+                // the internal panel is in the active display config, so the optional brightness
+                // slider must enable/disable to match WITHOUT needing the GoTweaks panel reopened.
+                // ForceSetValue guarantees the widget re-asserts its enabled/grayed state.
+                if (panelBrightnessSupported != null)
+                {
+                    bool brightnessSupported = XboxGamingBarHelper.Sidebar.BrightnessManager.IsSupported();
+                    Logger.Info($"Panel brightness supported after display change: {brightnessSupported}");
+                    panelBrightnessSupported.ForceSetValue(brightnessSupported);
+                    if (brightnessSupported && panelBrightness != null)
+                    {
+                        panelBrightness.ForceSetValue(XboxGamingBarHelper.Sidebar.BrightnessManager.GetBrightness());
+                    }
+                }
             }
             catch (Exception ex)
             {

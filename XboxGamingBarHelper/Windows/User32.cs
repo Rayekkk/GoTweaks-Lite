@@ -1380,6 +1380,42 @@ namespace XboxGamingBarHelper.Windows
         }
 
         /// <summary>
+        /// Is the built-in (internal) panel part of the CURRENT active display configuration?
+        /// Uses QueryDisplayConfig(ONLY_ACTIVE_PATHS) and looks for a target whose output technology
+        /// is INTERNAL — the same reliable signal SetSdrWhiteLevelNits uses to find the built-in panel.
+        /// In "show only on 2 (external)" mode the internal panel has NO active path, so this returns
+        /// false even though WmiMonitorBrightness still enumerates its (inactive) instance.
+        /// Returns null when the query itself fails (caller should fall back to a WMI check).
+        /// </summary>
+        public static bool? IsInternalPanelActive()
+        {
+            try
+            {
+                int result = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out uint pathCount, out uint modeCount);
+                if (result != ERROR_SUCCESS) { Logger.Warn($"IsInternalPanelActive: GetDisplayConfigBufferSizes failed with error {result}"); return null; }
+
+                var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+                var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+                result = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+                if (result != ERROR_SUCCESS) { Logger.Warn($"IsInternalPanelActive: QueryDisplayConfig failed with error {result}"); return null; }
+
+                for (int i = 0; i < pathCount; i++)
+                {
+                    if (paths[i].targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"IsInternalPanelActive failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Set the SDR White Level (paper-white nits) on the built-in panel while HDR is active.
         /// Re-implements the same packet that Windows Settings → HDR → "SDR content brightness" writes.
         /// nits is clamped to [80, 480]; values outside the panel's range are ignored by the driver.
