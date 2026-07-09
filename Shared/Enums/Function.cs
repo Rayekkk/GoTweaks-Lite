@@ -96,7 +96,8 @@
         LosslessScalingMaxFrameLatency,  // int 0..4
 
         Settings_AutoStartRTSS,
-        Settings_OnScreenDisplayProvider,
+        Settings_OnScreenDisplayProvider, // RESERVED: the AMD-Adrenalin OSD backend option was removed
+                                          // (unmaintained dead toggle, RTSS is the only real OSD path). Ordinal kept.
         Settings_UseManufacturerWMI,    // DEPRECATED: bool - use manufacturer WMI for TDP instead of RyzenAdj
         Settings_TdpMethod,             // int (TdpMethod enum) - TDP control method (ManufacturerWMI=0, PawnIO=1, WinRing0=2)
         TdpMethod_WinRing0Available,    // bool - whether WinRing0 files exist in C:\GoTweaks

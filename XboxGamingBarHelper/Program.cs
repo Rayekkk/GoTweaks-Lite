@@ -115,7 +115,6 @@ namespace XboxGamingBarHelper
         private static List<IManager> Managers;
 
         public static OnScreenDisplayProperty onScreenDisplay;
-        public static List<OnScreenDisplayManager> onScreenDisplayProviders;
 
         // Properties
         private static HelperProperties properties;
@@ -1256,8 +1255,6 @@ namespace XboxGamingBarHelper
 
             Logger.Info("Initialize properties.");
             onScreenDisplay = new OnScreenDisplayProperty(0, null, rtssManager);
-            onScreenDisplayProviders = new List<OnScreenDisplayManager>() { rtssManager, amdManager };
-            //onScreenDisplay = new OnScreenDisplayProperty(0, null, amdManager);
 
             // Build properties list
             var propertyList = new List<FunctionalProperty>
@@ -1345,7 +1342,6 @@ namespace XboxGamingBarHelper
                 settingsManager.AutoStartRTSS,
                 settingsManager.AutoHibernateEnabled,
                 settingsManager.AutoHibernateIdleMinutes,
-                settingsManager.OnScreenDisplayProvider,
                 settingsManager.UseManufacturerWMI,
                 settingsManager.TdpMethod,
                 settingsManager.EmulationBackend,

@@ -19,7 +19,6 @@ namespace XboxGamingBar
         private XboxGameBarWidget widget = null;
 
         private readonly AutoStartRTSSProperty autoStartRTSS;
-        private readonly OnScreenDisplayProviderProperty onScreenDisplayProvider;
 
         private readonly WidgetProperties properties;
 
@@ -31,7 +30,6 @@ namespace XboxGamingBar
             this.InitializeComponent();
 
             autoStartRTSS = new AutoStartRTSSProperty(AutoStartRTSSToggle, this);
-            onScreenDisplayProvider = new OnScreenDisplayProviderProperty(OnScreenDisplayProviderRadioButtons, this);
             properties = new WidgetProperties(autoStartRTSS);
         }
 

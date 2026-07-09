@@ -37,12 +37,6 @@ namespace XboxGamingBarHelper.Settings
             get { return autoHibernateIdleMinutes; }
         }
 
-        private readonly OnScreenDisplayProviderProperty onScreenDisplayProvider;
-        public OnScreenDisplayProviderProperty OnScreenDisplayProvider
-        {
-            get { return onScreenDisplayProvider; }
-        }
-
         private readonly IsForegroundProperty isForeground;
         public IsForegroundProperty IsForeground
         {
@@ -240,7 +234,6 @@ namespace XboxGamingBarHelper.Settings
             autoStartRTSS = new AutoStartRTSSProperty(this);
             autoHibernateEnabled = new AutoHibernateEnabledProperty(this);
             autoHibernateIdleMinutes = new AutoHibernateIdleMinutesProperty(this);
-            onScreenDisplayProvider = new OnScreenDisplayProviderProperty(this);
             isForeground = new IsForegroundProperty(this);
             useManufacturerWMI = new UseManufacturerWMIProperty(this);
             tdpMethod = new TdpMethodProperty(this);

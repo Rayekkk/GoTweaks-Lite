@@ -260,7 +260,6 @@
     <Compile Include="Data\Device\DeviceHasDetachableControllersProperty.cs" />
     <Compile Include="Data\Device\DeviceHasTouchpadProperty.cs" />
     <Compile Include="Data\Performance\PerformanceProperties.cs" />
-    <Compile Include="Data\OnScreenDisplayProviderProperty.cs" />
     <Compile Include="Data\PerGameProfileProperty.cs" />
     <Compile Include="Data\OSDProperty.cs" />
     <Compile Include="Data\AMD\AMDRadeonSuperResolutionSupportedProperty.cs" />

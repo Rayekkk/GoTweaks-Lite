@@ -74,13 +74,17 @@ namespace XboxGamingBar
                 AboutExpandIcon.Glyph = isAboutExpanded ? "\uE70E" : "\uE70D";
             }
 
-            // Update version text dynamically
+            // Update version text dynamically. Friendly release number (bumped by hand once
+            // per release, matches the GitHub tag / releases.md) is the headline; the raw
+            // auto-incrementing MSIX build number stays visible in parentheses for support/
+            // debugging (pinpoints the exact build between two releases).
             if (isAboutExpanded && AboutVersionText != null)
             {
                 try
                 {
                     var version = Windows.ApplicationModel.Package.Current.Id.Version;
-                    AboutVersionText.Text = $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+                    string build = $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+                    AboutVersionText.Text = $"{Shared.Constants.UpdateConstants.FriendlyVersion} (build {build})";
                 }
                 catch
                 {
@@ -338,14 +342,17 @@ namespace XboxGamingBar
                 _pendingUpdateIsRemote = false;
 
                 var pv = Package.Current.Id.Version;
+                // Raw MSIX build version — used for the actual comparison/logging, never shown
+                // to the user directly (see FriendlyVersion doc comment for why).
                 var cv = $"v{pv.Major}.{pv.Minor}.{pv.Build}.{pv.Revision}";
+                var friendlyCurrent = Shared.Constants.UpdateConstants.FriendlyVersion;
 
                 // Updates are disabled while no release repo is configured (see
                 // Shared.Constants.UpdateConstants).
                 if (!Shared.Constants.UpdateConstants.UpdatesEnabled)
                 {
                     UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
-                    UpdateStatusText.Text = $"You're up to date! ({cv})";
+                    UpdateStatusText.Text = $"You're up to date! ({friendlyCurrent})";
                     CheckForUpdateButton.Content = "Check for Update";
                     CheckForUpdateButton.IsEnabled = true;
                     return;
@@ -394,7 +401,7 @@ namespace XboxGamingBar
                     if (isUpdate && !string.IsNullOrWhiteSpace(url))
                     {
                         UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
-                        UpdateStatusText.Text = $"New version available: {label}\nCurrent: {cv}";
+                        UpdateStatusText.Text = $"New version available: {label}\nCurrent: {friendlyCurrent}";
                         _goTweaksDownloadUrl = url;          // .msixbundle URL — unified install
                         _pendingUpdateVersion = label;
                         _pendingUpdateIsRemote = true;
@@ -403,7 +410,7 @@ namespace XboxGamingBar
                     else
                     {
                         UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 160, 160, 160));
-                        UpdateStatusText.Text = $"You're up to date! ({cv})";
+                        UpdateStatusText.Text = $"You're up to date! ({friendlyCurrent})";
                     }
                 }
 
