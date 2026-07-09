@@ -105,6 +105,7 @@ Copy-Item $cer.FullName    (Join-Path $dist $cerOut)
 Copy-Item "$repo\Installer\Install GoTweaks.ps1" $dist
 Copy-Item "$repo\Installer\Install GoTweaks.bat" $dist
 Copy-Item "$repo\Installer\README.md"            $dist
+Copy-Item "$repo\scripts\Uninstall-GoTweaks.ps1" $dist
 
 Write-Step "Staged release in dist/"
 Get-ChildItem $dist | Select-Object Name, @{n='Size';e={'{0:N0} KB' -f ($_.Length/1KB)}} | Format-Table -AutoSize

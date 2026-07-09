@@ -543,5 +543,22 @@
         // an external monitor with the built-in display disabled) → widget grays out + blocks the
         // brightness slider. Helper re-reads it (with PanelBrightness) on each RefreshPanelBrightness.
         PanelBrightnessSupported,   // bool - is the built-in panel brightness controllable right now
+
+        // Helper -> widget push of setup/environment health warnings (missing drivers on
+        // hardware that needs them). Content is a JSON array:
+        //   [ { "id":"pawnio", "msg":"<user-facing text>", "action":"<optional: pawnio>" } ]
+        // Empty array = all clear. Widget shows a dismissible warning banner; dismissal is
+        // keyed on the array content so NEW warnings resurface it.
+        SetupWarnings,              // string JSON - see format above
+
+        // Alternate gyro convention (single toggle, target-aware; ported from upstream
+        // 6ec5de2 — upstream inserted it mid-enum, we append at the END per the
+        // positional-wire-id rule; code routes by name so the ordinal difference vs
+        // upstream is irrelevant). Gyro only (accel always pass-through).
+        // DS4/DualSense/DSEdge default yaw=+gz/roll=-gy (verified native gyro aim);
+        // alt yaw=-gz/roll=+gy. SteamDeck/SwitchPro default is 90deg-about-X rotated
+        // gyro (matches Steam's direct-HID reading); alt is plain pass-through (1:1
+        // via SDL3's internal driver remap).
+        Viiper_AlternateGyroConvention, // bool - see above
     }
 }

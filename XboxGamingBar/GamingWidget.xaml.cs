@@ -854,6 +854,7 @@ namespace XboxGamingBar
         private readonly ViiperMirrorLightbarToStickProperty viiperMirrorLightbarToStick;
         private readonly ViiperStickGyroEnabledProperty viiperStickGyroEnabled;
         private readonly ViiperJoyconGyroPerHalfProperty viiperJoyconGyroPerHalf;
+        private readonly ViiperAlternateGyroConventionProperty viiperAlternateGyroConvention;
         private readonly ViiperRumbleIntensityProperty viiperRumbleIntensity;
         private readonly ViiperStringComboProperty viiperGyroAxisMapX;
         private readonly ViiperStringComboProperty viiperGyroAxisMapY;
@@ -865,6 +866,7 @@ namespace XboxGamingBar
         private readonly PawnIOAvailableProperty pawnIOAvailable;
         private readonly PawnIOInstalledProperty pawnIOInstalled;
         private readonly InstallPawnIOProperty installPawnIO;
+        private readonly SetupWarningsProperty setupWarnings;
         private readonly ViGEmBusInstalledProperty vigemBusInstalled;
         private readonly InstallViGEmBusProperty installViGEmBus;
         private readonly HidHideInstalledProperty hidHideInstalled;
@@ -1517,6 +1519,7 @@ namespace XboxGamingBar
             viiperMirrorLightbarToStick = new ViiperMirrorLightbarToStickProperty(ViiperMirrorLightbarToStickToggle, this);
             viiperStickGyroEnabled = new ViiperStickGyroEnabledProperty(ViiperStickGyroEnabledToggle, this);
             viiperJoyconGyroPerHalf = new ViiperJoyconGyroPerHalfProperty(ViiperJoyconGyroPerHalfToggle, this);
+            viiperAlternateGyroConvention = new ViiperAlternateGyroConventionProperty(ViiperAlternateGyroConventionToggle, this);
             viiperRumbleIntensity = new ViiperRumbleIntensityProperty(100, ViiperRumbleIntensitySlider, this);
             viiperGyroAxisMapX = new ViiperStringComboProperty("X", Shared.Enums.Function.Viiper_GyroAxisMapX, ViiperGyroAxisMapXComboBox, this);
             viiperGyroAxisMapY = new ViiperStringComboProperty("Y", Shared.Enums.Function.Viiper_GyroAxisMapY, ViiperGyroAxisMapYComboBox, this);
@@ -1551,6 +1554,7 @@ namespace XboxGamingBar
             pawnIOAvailable = new PawnIOAvailableProperty();
             pawnIOInstalled = new PawnIOInstalledProperty(this);
             installPawnIO = new InstallPawnIOProperty(this);
+            setupWarnings = new SetupWarningsProperty(this) { OnWarningsChanged = OnSetupWarningsChanged };
             vigemBusInstalled = new ViGEmBusInstalledProperty(this);
             installViGEmBus = new InstallViGEmBusProperty(this);
             hidHideInstalled = new HidHideInstalledProperty(this);
@@ -1775,6 +1779,7 @@ namespace XboxGamingBar
                 viiperMirrorLightbarToStick,
                 viiperStickGyroEnabled,
                 viiperJoyconGyroPerHalf,
+                viiperAlternateGyroConvention,
                 viiperGyroAxisMapX,
                 viiperGyroAxisMapY,
                 viiperGyroAxisMapZ,
@@ -1785,6 +1790,7 @@ namespace XboxGamingBar
                 pawnIOAvailable,
                 pawnIOInstalled,
                 installPawnIO,
+                setupWarnings,
                 vigemBusInstalled,
                 installViGEmBus,
                 hidHideInstalled,

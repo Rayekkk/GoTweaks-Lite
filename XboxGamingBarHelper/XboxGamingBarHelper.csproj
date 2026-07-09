@@ -461,6 +461,7 @@
     <Compile Include="AMD\Settings\AMDDisplayCustomColorSetting.cs" />
     <Compile Include="Core\HelperProperties.cs" />
     <Compile Include="Core\HelperProperty.cs" />
+    <Compile Include="Core\TimedWebClient.cs" />
     <Compile Include="Core\HotkeyManager.cs" />
     <Compile Include="Core\ControllerHotkeyMonitor.cs" />
     <Compile Include="Core\IManager.cs" />
@@ -519,6 +520,8 @@
     <Compile Include="Services\HelperDeploymentService.cs" />
     <Compile Include="Services\LenovoDriverCheckService.cs" />
     <Compile Include="Services\GoTweaksUpdateService.cs" />
+    <Compile Include="Services\SetupHealthService.cs" />
+    <Compile Include="Services\UninstallService.cs" />
     <Compile Include="Services\ScheduledTaskService.cs" />
     <Compile Include="Services\SystemRestoreService.cs" />
     <Compile Include="IPC\NamedPipeServer.cs" />
@@ -570,6 +573,7 @@
     <Compile Include="Settings\EmulationBackendProperty.cs" />
     <Compile Include="ControllerEmulation\Viiper\LibViiper.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperService.cs" />
+    <Compile Include="ControllerEmulation\Viiper\UsbipCli.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperModels.cs" />
     <Compile Include="ControllerEmulation\Viiper\VirtualButtonNames.cs" />
     <Compile Include="ControllerEmulation\Viiper\InputStateSnapshot.cs" />
@@ -585,6 +589,7 @@
     <Compile Include="Settings\ViiperInputSourceProperty.cs" />
     <Compile Include="Settings\ViiperGyroSourceProperty.cs" />
     <Compile Include="Settings\ViiperJoyconGyroPerHalfProperty.cs" />
+    <Compile Include="Settings\ViiperAlternateGyroConventionProperty.cs" />
     <Compile Include="Settings\ViiperSteamSubDeviceProperty.cs" />
     <Compile Include="Settings\ViiperSonySubDeviceProperty.cs" />
     <Compile Include="Settings\ViiperNintendoSubDeviceProperty.cs" />

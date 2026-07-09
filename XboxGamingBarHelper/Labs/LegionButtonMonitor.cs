@@ -2576,6 +2576,14 @@ namespace XboxGamingBarHelper.Labs
             int reconnectDelayMs = 1000;
             const int MAX_RECONNECT_DELAY_MS = 10000;
             const uint READ_TIMEOUT_MS = 100; // Short timeout so we can check isRunning frequently
+            // Consecutive read TIMEOUTS (handle still valid but no reports arriving). A timeout
+            // is NOT a read error, so the failure-based reconnect below never fires on it — the
+            // monitor could sit dead for ~100s when a HidHide cycle-port (fired by controller
+            // emulation to hide the physical pad) re-enumerates the Legion USB composite and
+            // stales our MI_02 handle. After ~2s of silence force a reconnect so the LegionHid
+            // input source + battery/status polling recover in a couple seconds instead.
+            int consecutiveReadTimeouts = 0;
+            const int READ_TIMEOUTS_BEFORE_RECONNECT = 20; // 20 x 100ms = ~2s of no reports
 
             // Controller heartbeat - send init command every 3 seconds to keep controller in initialized mode
             // Legion Space uses 5 second timeout, so 3 seconds gives us margin
@@ -2643,8 +2651,29 @@ namespace XboxGamingBarHelper.Labs
 
                             if (waitResult == WAIT_TIMEOUT)
                             {
-                                // Timeout - cancel and check if we should continue
+                                // Timeout - cancel the pending read.
                                 CancelIo(hidHandle);
+
+                                // Prolonged read starvation: the handle still looks valid but
+                                // the device has stopped delivering reports (typically after a
+                                // HidHide cycle-port re-enumerated the Legion USB composite during
+                                // controller emulation, staling this MI_02 handle). A timeout is
+                                // not a read error, so the failure-based reconnect never fires and
+                                // the monitor sits dead until the device happens to resume (~100s
+                                // observed). After ~2s of silence, drop the handle so the loop top
+                                // reconnects (reopens the current device instance + re-inits it).
+                                if (++consecutiveReadTimeouts >= READ_TIMEOUTS_BEFORE_RECONNECT)
+                                {
+                                    Logger.Warn($"LegionButtonMonitor: no HID reports for ~{consecutiveReadTimeouts * READ_TIMEOUT_MS / 1000.0:0.#}s (handle likely staled by a HidHide cycle-port) — forcing reconnect");
+                                    if (hidHandle != null && !hidHandle.IsInvalid)
+                                    {
+                                        hidHandle.Close();
+                                    }
+                                    hidHandle = null;
+                                    _hasWriteAccess = false;
+                                    _highQualityGyroConfigured = false;
+                                    consecutiveReadTimeouts = 0;
+                                }
                                 continue;
                             }
                             else if (waitResult == WAIT_OBJECT_0)
@@ -2692,6 +2721,7 @@ namespace XboxGamingBarHelper.Labs
                         if (readResult && bytesRead >= 1)
                         {
                             consecutiveFailures = 0; // Reset on successful read
+                            consecutiveReadTimeouts = 0; // reports flowing again — clear the starvation counter
 
                             // Diagnostic: measure actual HID report arrival rate.
                             // Counts every successful ReadFile completion and emits
@@ -3089,10 +3119,21 @@ namespace XboxGamingBarHelper.Labs
                 return;
             }
 
-            // High-quality IMU payload:
-            // - 04:00:A1 reports start at offset 32
-            // - 04:3C:74 reports start at offset 34
+            // High-quality IMU payload block base:
+            // - 04:00:A1 (initialized) reports: base = 32, int16 fields LITTLE-endian
+            // - 04:3C:74 (detached/uninitialized) reports: base = 34 (+2, like buttons/touch),
+            //   int16 fields BIG-endian.
+            // The endianness difference is the root cause of the long-standing "gyro goes wild
+            // during VIIPER emulation" bug (emulation's HidHide cycle-port drops the controller
+            // into the detached layout; without emulation it stays initialized and gyro was
+            // clean). Reading the detached block little-endian produced values quantized to
+            // +/-256 multiples that were misattributed to firmware torn reads. Verified from an
+            // on-device capture (2026-07-09): big-endian decoding of the detached block yields
+            // +/-1..3 LSB gyro noise and a clean ~1 g gravity vector (4096 LSB/g) at rest, and
+            // a smooth single-axis wave during a controlled slow rotation; the same bytes read
+            // little-endian are garbage (low byte always 0x00/0xFF).
             int imuBase = isInitializedHeader ? 32 : 34;
+            bool imuBigEndian = isUninitializedHeader;
             int touchBase = isInitializedHeader ? 24 : 26;
             long sampleTimestampUtc = DateTime.UtcNow.Ticks;
 
@@ -3175,41 +3216,41 @@ namespace XboxGamingBarHelper.Labs
                 // uses BMI260's native convention directly.
                 if (leftHighQualityActive)
                 {
-                    short lgX = ReadInt16LittleEndian(buffer, leftBase + 7);
-                    short lgY = ReadInt16LittleEndian(buffer, leftBase + 11);
-                    short lgZ = ReadInt16LittleEndian(buffer, leftBase + 9);
+                    short lgX = ReadImuInt16(buffer, leftBase + 7, imuBigEndian);
+                    short lgY = ReadImuInt16(buffer, leftBase + 11, imuBigEndian);
+                    short lgZ = ReadImuInt16(buffer, leftBase + 9, imuBigEndian);
                     LogGyroSpikeIfAny("L", buffer, leftBase, lgX, lgY, lgZ); // log raw, before filter, so the audit log keeps showing torn reads even after we mask them
-                    // See FilterTornGyroValue comment for torn-read background.
-                    short flgX = FilterTornGyroValue(lgX, ref _leftPrevGX1, ref _leftPrevGX2, ref _leftConsecGX, ref _leftTornReadSubstitutions);
-                    short flgY = FilterTornGyroValue(lgY, ref _leftPrevGY1, ref _leftPrevGY2, ref _leftConsecGY, ref _leftTornReadSubstitutions);
-                    short flgZ = FilterTornGyroValue(lgZ, ref _leftPrevGZ1, ref _leftPrevGZ2, ref _leftConsecGZ, ref _leftTornReadSubstitutions);
+                    // See GyroSpikeFilter comment for torn-read background.
+                    short flgX = _leftGXFilter.Filter(lgX);
+                    short flgY = _leftGYFilter.Filter(lgY);
+                    short flgZ = _leftGZFilter.Filter(lgZ);
                     leftSample = new LegionGyroSample(
                         -flgX * GYRO_SCALE_DEG_PER_SECOND,
                         -flgY * GYRO_SCALE_DEG_PER_SECOND,
                          flgZ * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, leftBase + 1) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, leftBase + 5) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, leftBase + 3) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, leftBase + 1, imuBigEndian) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, leftBase + 5, imuBigEndian) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, leftBase + 3, imuBigEndian) * ACCEL_SCALE_G,
                         sampleTimestampUtc);
                     hasLeftSample = true;
                 }
 
                 if (rightHighQualityActive)
                 {
-                    short rgX = ReadInt16LittleEndian(buffer, rightBase + 9);
-                    short rgY = ReadInt16LittleEndian(buffer, rightBase + 11);
-                    short rgZ = ReadInt16LittleEndian(buffer, rightBase + 7);
+                    short rgX = ReadImuInt16(buffer, rightBase + 9, imuBigEndian);
+                    short rgY = ReadImuInt16(buffer, rightBase + 11, imuBigEndian);
+                    short rgZ = ReadImuInt16(buffer, rightBase + 7, imuBigEndian);
                     LogGyroSpikeIfAny("R", buffer, rightBase, rgX, rgY, rgZ);
-                    short frgX = FilterTornGyroValue(rgX, ref _rightPrevGX1, ref _rightPrevGX2, ref _rightConsecGX, ref _rightTornReadSubstitutions);
-                    short frgY = FilterTornGyroValue(rgY, ref _rightPrevGY1, ref _rightPrevGY2, ref _rightConsecGY, ref _rightTornReadSubstitutions);
-                    short frgZ = FilterTornGyroValue(rgZ, ref _rightPrevGZ1, ref _rightPrevGZ2, ref _rightConsecGZ, ref _rightTornReadSubstitutions);
+                    short frgX = _rightGXFilter.Filter(rgX);
+                    short frgY = _rightGYFilter.Filter(rgY);
+                    short frgZ = _rightGZFilter.Filter(rgZ);
                     rightSample = new LegionGyroSample(
                         frgX * GYRO_SCALE_DEG_PER_SECOND,
                         frgY * GYRO_SCALE_DEG_PER_SECOND,
                         frgZ * GYRO_SCALE_DEG_PER_SECOND,
-                        ReadInt16LittleEndian(buffer, rightBase + 3) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, rightBase + 5) * ACCEL_SCALE_G,
-                        ReadInt16LittleEndian(buffer, rightBase + 1) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, rightBase + 3, imuBigEndian) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, rightBase + 5, imuBigEndian) * ACCEL_SCALE_G,
+                        ReadImuInt16(buffer, rightBase + 1, imuBigEndian) * ACCEL_SCALE_G,
                         sampleTimestampUtc);
                     hasRightSample = true;
                 }
@@ -3525,54 +3566,58 @@ namespace XboxGamingBarHelper.Labs
         private static long _lastSpikeLogLeftTicks;
         private static long _lastSpikeLogRightTicks;
 
-        // Torn-read filter state. The Legion firmware occasionally publishes a non-atomic gyro
-        // register read in the HID report (low/high byte updated independently inside the
-        // controller MCU before the report is assembled). Accel stays clean across these
-        // frames so it is specifically the gyro path. The artifact manifests as an isolated
-        // single-frame jump landing at exactly +/-255 or +/-256 raw LSB (the partial-update
-        // bit patterns 0x00FF / 0xFF00 / 0xFF01 / 0x0100), surrounded by quiet noise-floor
-        // samples. The 2026-05-30 capture audit confirmed this on Diego's Legion Go 2: every
-        // spike was an isolated frame, accel was always intact, and the values were always
-        // one of the four torn-read int16 patterns. We can't fix the firmware so we filter
-        // here. Filter rules:
-        //   * Substitute curr with mean(prev1, prev2) only when both neighbours are within
-        //     STABLE_LSB (~1.8 deg/s) of each other AND curr differs from each by more than
-        //     JUMP_LSB (~6 deg/s). Real motion would push prev1 vs prev2 apart and disarm.
-        //   * Bail out after 3 consecutive substitutions on the same axis: that is the
-        //     signature of an actual fast motion onset, not a torn read. Letting the raw
-        //     value through resyncs the history within 2-3 frames.
-        // Net cost on real motion: at most ~24 ms (3 frames at 125 Hz) of onset delay if the
-        // user yanks the controller from a dead stop into > 6 deg/s in a single sample, which
-        // is well below the noise floor of human-perceptible aim latency.
-        private const int TORN_READ_JUMP_LSB = 100;
-        private const int TORN_READ_STABLE_LSB = 30;
-        private const int TORN_READ_MAX_CONSEC = 3;
-        private static short _leftPrevGX1, _leftPrevGX2, _leftPrevGY1, _leftPrevGY2, _leftPrevGZ1, _leftPrevGZ2;
-        private static short _rightPrevGX1, _rightPrevGX2, _rightPrevGY1, _rightPrevGY2, _rightPrevGZ1, _rightPrevGZ2;
-        private static byte _leftConsecGX, _leftConsecGY, _leftConsecGZ;
-        private static byte _rightConsecGX, _rightConsecGY, _rightConsecGZ;
-        private static long _leftTornReadSubstitutions;
-        private static long _rightTornReadSubstitutions;
+        // Torn-read filter. The Legion controller firmware publishes non-atomic gyro register
+        // reads (a byte updated mid-report inside the MCU before the report is assembled),
+        // producing an int16 that lands at the torn-read boundaries (~+/-256 raw LSB — the high
+        // byte off by one) on top of the true reading. Accel stays clean, so it is specifically
+        // the gyro path. Under VIIPER emulation the controller streams the 04:3C:74 detached
+        // layout and the torn-read rate is very high (observed ~40-50% on an axis) — this is the
+        // "random self-moving aim" the user sees.
+        //
+        // Filter: a straight per-axis running MEDIAN over a short window. A median removes
+        // isolated single-frame impulses (torn reads) completely, at rest AND during motion,
+        // while reproducing genuine continuous rotation faithfully (the median of a smooth ramp
+        // is just the ramp delayed by ~window/2 frames — it does NOT clip or attenuate real
+        // motion). Window=5 tolerates up to 2 torn frames inside the window and adds ~2 frames
+        // (~16 ms) of group delay at 125 Hz, imperceptible for aim.
+        //
+        // NOTE: the earlier median+MAD "substitute only when the window is quiet" gate was the
+        // wrong design — it disarmed during motion (MAD high), which is exactly when the jitter
+        // is felt. A plain always-on median is both simpler and correct here.
+        private const int GYRO_FILTER_WINDOW = 5; // odd; tolerates up to (N-1)/2 torn frames, ~N/2 frame lag
+        private static readonly GyroSpikeFilter _leftGXFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly GyroSpikeFilter _leftGYFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly GyroSpikeFilter _leftGZFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly GyroSpikeFilter _rightGXFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly GyroSpikeFilter _rightGYFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly GyroSpikeFilter _rightGZFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
 
-        private static short FilterTornGyroValue(short curr, ref short prev1, ref short prev2, ref byte consec, ref long substCounter)
+        /// <summary>
+        /// Per-axis running-median gyro spike/torn-read filter. Not thread-safe; each instance
+        /// is owned by the single monitor read loop and touched only from there.
+        /// </summary>
+        private sealed class GyroSpikeFilter
         {
-            short result = curr;
-            if (consec < TORN_READ_MAX_CONSEC
-                && Math.Abs(curr - prev1) > TORN_READ_JUMP_LSB
-                && Math.Abs(curr - prev2) > TORN_READ_JUMP_LSB
-                && Math.Abs(prev1 - prev2) < TORN_READ_STABLE_LSB)
+            private readonly short[] _ring;
+            private readonly short[] _scratch;
+            private int _count;
+            private int _pos;
+
+            public GyroSpikeFilter(int window)
             {
-                result = (short)((prev1 + prev2) / 2);
-                substCounter++;
-                consec++;
+                _ring = new short[window];
+                _scratch = new short[window];
             }
-            else
+
+            public short Filter(short raw)
             {
-                consec = 0;
+                _ring[_pos] = raw;
+                _pos = (_pos + 1) % _ring.Length;
+                if (_count < _ring.Length) _count++;
+                Array.Copy(_ring, _scratch, _count);
+                Array.Sort(_scratch, 0, _count);
+                return _scratch[_count / 2];
             }
-            prev2 = prev1;
-            prev1 = result;
-            return result;
         }
         private static void LogGyroSpikeIfAny(string sideTag, byte[] buffer, int baseOffset, short gX, short gY, short gZ)
         {
@@ -3645,6 +3690,18 @@ namespace XboxGamingBarHelper.Labs
             int high = buffer[offset];
             int low = buffer[offset + 1];
             return unchecked((short)((high << 8) | low));
+        }
+
+        /// <summary>
+        /// HQ-IMU field reader. Initialized (04:00:A1) reports encode IMU int16s
+        /// little-endian; detached (04:3C:74) reports encode them BIG-endian — see the
+        /// endianness note at the imuBase selection in TryParseAndStoreGyroSamples.
+        /// </summary>
+        private static short ReadImuInt16(byte[] buffer, int offset, bool bigEndian)
+        {
+            return bigEndian
+                ? ReadInt16BigEndian(buffer, offset)
+                : ReadInt16LittleEndian(buffer, offset);
         }
 
         private static bool TryCommitDebouncedButtonState(

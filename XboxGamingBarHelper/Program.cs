@@ -230,6 +230,14 @@ namespace XboxGamingBarHelper
         private const int ScreenSaverCheckIntervalMs = 5000; // Check every 5 seconds
 
         /// <summary>
+        /// Setup/environment health re-check (PawnIO can be installed mid-session).
+        /// Push is change-gated inside SendSetupWarningsToWidget so a 2-min cadence
+        /// costs almost nothing and usually no pipe traffic.
+        /// </summary>
+        private static System.Threading.Timer setupHealthTimer;
+        private const int SetupHealthCheckIntervalMs = 2 * 60 * 1000;
+
+        /// <summary>
         /// Auto hibernate idle monitoring - hibernates after inactivity timeout
         /// </summary>
         private static volatile bool autoHibernateEnabled = false;
@@ -381,6 +389,19 @@ namespace XboxGamingBarHelper
                 }
                 catch { }
             };
+
+            // Uninstall restoration mode: stop peers, clear our HidHide rules,
+            // sweep phantom pads, remove the scheduled task + deployed copy,
+            // optionally uninstall the driver stack (--remove-drivers), then EXIT.
+            // Runnable from the deployed helper even after the MSIX package is
+            // gone — this is what Uninstall-GoTweaks.ps1 invokes.
+            if (args.Contains("--uninstall"))
+            {
+                Logger.Info("=== Uninstall Mode ===");
+                Services.UninstallService.Run(removeDrivers: args.Contains("--remove-drivers"));
+                LogManager.Flush();
+                return;
+            }
 
             // Check for setup mode FIRST (before anything else)
             // Setup mode: deploy files, create scheduled task, run task, then EXIT
@@ -795,10 +816,20 @@ namespace XboxGamingBarHelper
                     // status text in the widget reflects the saved state immediately on connect.
                     try { SendGyroBiasOffsetToWidget(); }
                     catch (Exception ex) { Logger.Warn($"Failed to push gyro bias offset on connect: {ex.Message}"); }
+                    // Setup/environment health (missing PawnIO) — force so a freshly-
+                    // connected widget always gets current state.
+                    try { SendSetupWarningsToWidget(force: true); }
+                    catch (Exception ex) { Logger.Warn($"Failed to push setup warnings on connect: {ex.Message}"); }
                 };
                 pipeServer.Disconnected += (s, e) => Logger.Info("Widget disconnected from Named Pipe");
                 pipeServer.Start();
                 Logger.Info($"Named Pipe server started: {IPC.NamedPipeServer.FullPipePath}");
+
+                // Periodic setup-health re-check; push is change-gated so this is quiet
+                // unless something actually changes (e.g. PawnIO installed mid-session).
+                setupHealthTimer = new System.Threading.Timer(
+                    _ => SendSetupWarningsToWidget(),
+                    null, SetupHealthCheckIntervalMs, SetupHealthCheckIntervalMs);
             }
             catch (Exception ex)
             {
@@ -1334,6 +1365,7 @@ namespace XboxGamingBarHelper
                 settingsManager.ViiperMirrorLightbarToStick,
                 settingsManager.ViiperStickGyroEnabled,
                 settingsManager.ViiperJoyconGyroPerHalf,
+                settingsManager.ViiperAlternateGyroConvention,
                 settingsManager.ViiperGyroAxisMapX,
                 settingsManager.ViiperGyroAxisMapY,
                 settingsManager.ViiperGyroAxisMapZ,

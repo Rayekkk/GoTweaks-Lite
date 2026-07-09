@@ -127,6 +127,7 @@
     <Compile Include="Data\ViiperMirrorLightbarToStickProperty.cs" />
     <Compile Include="Data\ViiperStickGyroEnabledProperty.cs" />
     <Compile Include="Data\ViiperJoyconGyroPerHalfProperty.cs" />
+    <Compile Include="Data\ViiperAlternateGyroConventionProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerConfigProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerPreviewEnabledProperty.cs" />
     <Compile Include="Data\ViiperStickTriggerLiveSampleProperty.cs" />
@@ -134,6 +135,7 @@
     <Compile Include="Data\PawnIOAvailableProperty.cs" />
     <Compile Include="Data\PawnIOInstalledProperty.cs" />
     <Compile Include="Data\InstallPawnIOProperty.cs" />
+    <Compile Include="Data\SetupWarningsProperty.cs" />
     <Compile Include="Data\ViGEmBusInstalledProperty.cs" />
     <Compile Include="Data\InstallViGEmBusProperty.cs" />
     <Compile Include="Data\HidHideInstalledProperty.cs" />
@@ -357,6 +359,9 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Connection\GamingWidget.ConnectionBanner.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Features\Connection\GamingWidget.SetupWarnings.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Connection\GamingWidget.ApplyProfileTDP.cs">
