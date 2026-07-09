@@ -205,8 +205,6 @@ namespace XboxGamingBarHelper.Labs
         private DateTime pendingLegionLStateSince = DateTime.MinValue;
         private DateTime pendingLegionRStateSince = DateTime.MinValue;
 
-        private ViGEmController vigemController;
-        private bool ownsViGEmController = false;  // True if we created the controller
         private Action<bool> onButtonStateChanged;
 
         // Battery monitoring - parsed from the same HID reports
@@ -232,7 +230,6 @@ namespace XboxGamingBarHelper.Labs
         // Track when output reports are sent to skip button detection (prevents false triggers)
         private DateTime _lastOutputReportTime = DateTime.MinValue;
         private const int OUTPUT_REPORT_IGNORE_MS = 100;  // Ignore button reads for 100ms after output
-        private const int GUIDE_ROUTE_RECONCILE_INTERVAL_MS = 500;
 
         // Detected device info
         private ushort _detectedVid = 0;
@@ -240,7 +237,6 @@ namespace XboxGamingBarHelper.Labs
 
         // Flag to prevent spamming "controller not found" log (only log once until found)
         private bool _loggedControllerNotFound = false;
-        private DateTime _lastGuideRouteReconcileTimeUtc = DateTime.MinValue;
 
         // Cached device path for faster reconnection (persisted to settings)
         private static string _cachedDevicePath = null;
@@ -931,9 +927,8 @@ namespace XboxGamingBarHelper.Labs
             Logger.Info($"LegionButtonMonitor: Configured {buttonName} - Enabled: {enabled}, Action: {actionName}");
 
             // Notify so VIIPER can spin up / tear down its guide-only pad when the
-            // mapped Guide action changes. NotifyGuideRouteChanged also calls
-            // ForceReconcileGuideRoute → EnsureViGEmController, which handles the
-            // legacy-backend fallback in one place.
+            // mapped Guide action changes (sole owner of the Guide route since the
+            // ViGEm retirement).
             try { Program.NotifyGuideRouteChanged(); }
             catch (Exception ex) { Logger.Debug($"ConfigureButton: NotifyGuideRouteChanged threw: {ex.Message}"); }
         }
@@ -1021,120 +1016,9 @@ namespace XboxGamingBarHelper.Labs
         }
 
         /// <summary>
-        /// Ensures ViGEmController is created and connected if Xbox Guide action is configured.
-        /// Call this after ConfigureButton or when button config changes.
-        /// </summary>
-        public bool EnsureViGEmController()
-        {
-            if (!NeedsViGEm)
-            {
-                if (vigemController != null && ownsViGEmController)
-                {
-                    try
-                    {
-                        vigemController.Dispose();
-                    }
-                    catch
-                    {
-                        // Best-effort cleanup only.
-                    }
-
-                    vigemController = null;
-                    ownsViGEmController = false;
-                    Logger.Info("LegionButtonMonitor: Released dedicated ViGEm controller (controller emulation handles guide)");
-                }
-
-                return true; // Not needed
-            }
-
-            if (ControllerEmulationManager.CanHandleExternalGuide())
-            {
-                Logger.Info("LegionButtonMonitor: Skipping dedicated ViGEm controller (controller emulation virtual Xbox is active)");
-                return true;
-            }
-
-            if (vigemController != null)
-            {
-                return true; // Already exists
-            }
-
-            Logger.Info("LegionButtonMonitor: Creating ViGEmController (Xbox Guide action configured)");
-            vigemController = new ViGEmController();
-            ownsViGEmController = true;
-
-            if (!vigemController.Connect())
-            {
-                Logger.Error("LegionButtonMonitor: Failed to connect to ViGEmBus");
-                vigemController = null;
-                ownsViGEmController = false;
-                return false;
-            }
-
-            if (!vigemController.PlugIn())
-            {
-                Logger.Error("LegionButtonMonitor: Failed to plug in virtual controller");
-                vigemController.Dispose();
-                vigemController = null;
-                ownsViGEmController = false;
-                return false;
-            }
-
-            Logger.Info("LegionButtonMonitor: ViGEmController created and plugged in successfully");
-            return true;
-        }
-
-        /// <summary>
-        /// Force an immediate dedicated-Guide-pad reconciliation. Called from outside the
-        /// monitor loop (e.g. when VIIPER emulation toggles or the legacy emulation manager
-        /// fires EmulationEnabledChanged) so a dangling virtual pad is torn down without
-        /// waiting for the next ~500ms reconcile tick.
-        /// </summary>
-        public void ForceReconcileGuideRoute()
-        {
-            if (!isRunning) return;
-            try
-            {
-                _lastGuideRouteReconcileTimeUtc = DateTime.MinValue; // bypass the interval gate
-                EnsureViGEmController();
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"LegionButtonMonitor.ForceReconcileGuideRoute threw: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Reconcile dedicated Guide ViGEm ownership without forcing creation retries.
-        /// This keeps only one virtual Xbox controller active when controller emulation is handling Guide.
-        /// </summary>
-        private void ReconcileGuideRoute()
-        {
-            if (!HasGuideActionConfigured)
-            {
-                return;
-            }
-
-            bool controllerEmulationHandlesGuide = ControllerEmulationManager.CanHandleExternalGuide();
-            if (vigemController == null && !controllerEmulationHandlesGuide)
-            {
-                // Avoid create retries in the monitor loop. Dedicated ViGEm is created on explicit config/start paths.
-                return;
-            }
-
-            DateTime nowUtc = DateTime.UtcNow;
-            if ((nowUtc - _lastGuideRouteReconcileTimeUtc).TotalMilliseconds < GUIDE_ROUTE_RECONCILE_INTERVAL_MS)
-            {
-                return;
-            }
-
-            _lastGuideRouteReconcileTimeUtc = nowUtc;
-            EnsureViGEmController();
-        }
-
-        /// <summary>
         /// Get whether any user-mapped action is configured to fire the Xbox Guide button.
         /// Exposed so ViiperEmulationManager can decide whether to spin up its Guide-only
-        /// virtual pad when the master Controller-Emulation toggle is off but backend=VIIPER.
+        /// virtual pad (sole owner of the Guide route since the ViGEm retirement).
         /// </summary>
         public bool HasGuideActionConfigured =>
             (legionLEnabled && legionLActionType == LegionButtonAction.XboxGuide) ||
@@ -1142,20 +1026,6 @@ namespace XboxGamingBarHelper.Labs
             (scrollUpEnabled && scrollUpActionType == LegionButtonAction.XboxGuide) ||
             (scrollDownEnabled && scrollDownActionType == LegionButtonAction.XboxGuide) ||
             (scrollClickEnabled && scrollClickActionType == LegionButtonAction.XboxGuide);
-
-        /// <summary>
-        /// A dedicated Guide-only ViGEm pad is only needed when a Guide action is mapped
-        /// AND no emulation backend is ready to deliver the press through its own virtual
-        /// pad. Three backends can claim Guide: the legacy ControllerEmulationManager
-        /// (when CE master toggle is on with backend=Legacy), the full VIIPER input forwarder
-        /// (CE on + backend=VIIPER), and the new VIIPER guide-only mode (CE off + backend=VIIPER
-        /// + Guide configured). When any of those owns Guide, the dedicated ViGEm pad is torn
-        /// down so we don't leave a dangling virtual Xbox controller in joy.cpl / Steam.
-        /// </summary>
-        public bool NeedsViGEm => HasGuideActionConfigured
-            && !ControllerEmulationManager.CanHandleExternalGuide()
-            && !XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperInputForwarder.CanHandleExternalGuide()
-            && !XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.IsGuideOnlyActive;
 
         /// <summary>
         /// Get whether any button is configured.
@@ -1184,13 +1054,9 @@ namespace XboxGamingBarHelper.Labs
         public bool IsDetachedMode => isDetachedMode;
 
         /// <summary>
-        /// Check if ViGEm controller needs to be (re)initialized based on current configuration.
-        /// Returns true if we need ViGEm but don't have a controller, or have one but don't need it.
-        /// </summary>
-        public bool NeedsViGEmRestart => (NeedsViGEm && vigemController == null) || (!NeedsViGEm && vigemController != null);
-
-        /// <summary>
         /// Start monitoring the configured Legion buttons (L and/or R).
+        /// Guide-mapped actions are delivered through VIIPER (full forwarder or
+        /// guide-only pad) — no dedicated ViGEm pad since the phase-2 retirement.
         /// </summary>
         public bool Start()
         {
@@ -1202,26 +1068,6 @@ namespace XboxGamingBarHelper.Labs
             {
                 Logger.Warn("LegionButtonMonitor: No buttons or scroll configured, not starting");
                 return false;
-            }
-
-            // Initialize ViGEmBus controller only if any action is Xbox Guide
-            if (NeedsViGEm)
-            {
-                vigemController = new ViGEmController();
-                ownsViGEmController = true;
-                if (!vigemController.Connect())
-                {
-                    Logger.Error("LegionButtonMonitor: Failed to connect to ViGEmBus");
-                    return false;
-                }
-
-                if (!vigemController.PlugIn())
-                {
-                    Logger.Error("LegionButtonMonitor: Failed to plug in virtual controller");
-                    vigemController.Dispose();
-                    vigemController = null;
-                    return false;
-                }
             }
 
             // Try to find and open Legion controller HID device
@@ -1296,10 +1142,11 @@ namespace XboxGamingBarHelper.Labs
                 monitorThread = null;
             }
 
-            // Release Guide button if either was pressed
-            if ((lastLegionLState || lastLegionRState) && vigemController != null)
+            // Release Guide button if either was pressed (VIIPER guide-only pad
+            // owns the route since the ViGEm retirement).
+            if (lastLegionLState || lastLegionRState)
             {
-                vigemController.SetGuide(false);
+                try { XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager.TrySetGuideFromLabs(false); } catch { }
                 lastLegionLState = false;
                 lastLegionRState = false;
                 pendingLegionLState = null;
@@ -1317,14 +1164,6 @@ namespace XboxGamingBarHelper.Labs
             }
             _hasWriteAccess = false;
             _highQualityGyroConfigured = false;
-
-            // Dispose ViGEmBus controller only if we created it
-            if (vigemController != null && ownsViGEmController)
-            {
-                vigemController.Dispose();
-            }
-            vigemController = null;
-            ownsViGEmController = false;
 
             Logger.Info("LegionButtonMonitor: Stopped");
         }
@@ -1631,13 +1470,11 @@ namespace XboxGamingBarHelper.Labs
                         Logger.Info($"LegionButtonMonitor: Routed scroll XboxGuide to VIIPER guide-only pad ({actionName})");
                         break;
                     }
-                    if (vigemController != null)
-                    {
-                        // Press and release Guide button quickly for scroll actions
-                        vigemController.SetGuide(true);
-                        Thread.Sleep(50);
-                        vigemController.SetGuide(false);
-                    }
+                    // No further fallback — the dedicated ViGEm pad was retired
+                    // (phase 2). If neither VIIPER tier took the press, the
+                    // guide-only pad is offline (usbip missing) and the setup
+                    // banner is already telling the user what to install.
+                    Logger.Warn($"LegionButtonMonitor: No virtual pad available for scroll XboxGuide ({actionName}) — is usbip-win2 installed?");
                     break;
 
                 case LegionButtonAction.KeyboardShortcut:
@@ -2500,35 +2337,8 @@ namespace XboxGamingBarHelper.Labs
                 pendingLegionLStateSince = DateTime.MinValue;
                 pendingLegionRStateSince = DateTime.MinValue;
 
-                // Create ViGEm controller if needed but not yet created
-                // This handles the case where monitor was started for battery only,
-                // then button config was added later with Xbox Guide action
-                if (NeedsViGEm && vigemController == null)
-                {
-                    Logger.Info("LegionButtonMonitor: Creating ViGEmController on reconnect (Xbox Guide action configured)");
-                    vigemController = new ViGEmController();
-                    ownsViGEmController = true;
-                    if (vigemController.Connect())
-                    {
-                        if (vigemController.PlugIn())
-                        {
-                            Logger.Info("LegionButtonMonitor: ViGEmController created and plugged in successfully");
-                        }
-                        else
-                        {
-                            Logger.Warn("LegionButtonMonitor: Failed to plug in ViGEmController on reconnect");
-                            vigemController.Dispose();
-                            vigemController = null;
-                            ownsViGEmController = false;
-                        }
-                    }
-                    else
-                    {
-                        Logger.Warn("LegionButtonMonitor: Failed to connect ViGEmController on reconnect");
-                        vigemController = null;
-                        ownsViGEmController = false;
-                    }
-                }
+                // (ViGEm retirement: the dedicated Guide pad is gone — VIIPER's
+                // guide-only pad reconciles itself via NotifyGuideRouteChanged.)
 
                 return true;
             }
@@ -2605,8 +2415,6 @@ namespace XboxGamingBarHelper.Labs
                     loopIteration++;
                     try
                     {
-                        ReconcileGuideRoute();
-
                         // If no valid handle, try to reconnect
                         if (hidHandle == null || hidHandle.IsInvalid)
                         {
@@ -3558,67 +3366,31 @@ namespace XboxGamingBarHelper.Labs
             return (short)scaled;
         }
 
-        // Diagnostic: when an HQ-parsed gyro reading is implausibly large (device should be
-        // at rest most of the time, and even held-handheld motion rarely exceeds a couple
-        // hundred deg/s), dump the raw int16 and the surrounding 16-byte HQ block so we can
-        // see which byte is going wild. Rate-limited to once per 5 s per side so logs stay sane.
-        private const double GYRO_SPIKE_THRESHOLD_RAW = 200.0; // raw int16 ~= 12 deg/s
+        // Diagnostic: when an HQ-parsed gyro reading is implausibly large, dump the raw int16
+        // and the surrounding 16-byte HQ block so we can see which byte is going wild. Logged
+        // at Debug (not Info) because low thresholds are trivially exceeded by ordinary
+        // gyro-aim motion during gameplay now that the detached-layout endianness bug is fixed
+        // (see lego2-detached-imu-endianness memory) — at Info this spammed the production log
+        // on every VIIPER emulation session. Threshold raised from the original 200 (~12 deg/s,
+        // constantly hit during normal aim) to flag only genuine anomalies. Rate-limited to
+        // once per 5 s per side.
+        private const double GYRO_SPIKE_THRESHOLD_RAW = 2000.0; // raw int16 ~= 122 deg/s
         private static long _lastSpikeLogLeftTicks;
         private static long _lastSpikeLogRightTicks;
 
-        // Torn-read filter. The Legion controller firmware publishes non-atomic gyro register
-        // reads (a byte updated mid-report inside the MCU before the report is assembled),
-        // producing an int16 that lands at the torn-read boundaries (~+/-256 raw LSB — the high
-        // byte off by one) on top of the true reading. Accel stays clean, so it is specifically
-        // the gyro path. Under VIIPER emulation the controller streams the 04:3C:74 detached
-        // layout and the torn-read rate is very high (observed ~40-50% on an axis) — this is the
-        // "random self-moving aim" the user sees.
-        //
-        // Filter: a straight per-axis running MEDIAN over a short window. A median removes
-        // isolated single-frame impulses (torn reads) completely, at rest AND during motion,
-        // while reproducing genuine continuous rotation faithfully (the median of a smooth ramp
-        // is just the ramp delayed by ~window/2 frames — it does NOT clip or attenuate real
-        // motion). Window=5 tolerates up to 2 torn frames inside the window and adds ~2 frames
-        // (~16 ms) of group delay at 125 Hz, imperceptible for aim.
-        //
-        // NOTE: the earlier median+MAD "substitute only when the window is quiet" gate was the
-        // wrong design — it disarmed during motion (MAD high), which is exactly when the jitter
-        // is felt. A plain always-on median is both simpler and correct here.
+        // Torn-read filter. See Shared.Data.GyroSpikeFilter for the full rationale (extracted
+        // there so the pure median-filter logic is unit-testable without a Win32/HID host —
+        // same pattern as Shared.Data.PropertyUpdateArbiter). Window=5 tolerates up to 2 torn
+        // frames inside the window and adds ~2 frames (~16 ms) of group delay at 125 Hz,
+        // imperceptible for aim.
         private const int GYRO_FILTER_WINDOW = 5; // odd; tolerates up to (N-1)/2 torn frames, ~N/2 frame lag
-        private static readonly GyroSpikeFilter _leftGXFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
-        private static readonly GyroSpikeFilter _leftGYFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
-        private static readonly GyroSpikeFilter _leftGZFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
-        private static readonly GyroSpikeFilter _rightGXFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
-        private static readonly GyroSpikeFilter _rightGYFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
-        private static readonly GyroSpikeFilter _rightGZFilter = new GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _leftGXFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _leftGYFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _leftGZFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _rightGXFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _rightGYFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
+        private static readonly Shared.Data.GyroSpikeFilter _rightGZFilter = new Shared.Data.GyroSpikeFilter(GYRO_FILTER_WINDOW);
 
-        /// <summary>
-        /// Per-axis running-median gyro spike/torn-read filter. Not thread-safe; each instance
-        /// is owned by the single monitor read loop and touched only from there.
-        /// </summary>
-        private sealed class GyroSpikeFilter
-        {
-            private readonly short[] _ring;
-            private readonly short[] _scratch;
-            private int _count;
-            private int _pos;
-
-            public GyroSpikeFilter(int window)
-            {
-                _ring = new short[window];
-                _scratch = new short[window];
-            }
-
-            public short Filter(short raw)
-            {
-                _ring[_pos] = raw;
-                _pos = (_pos + 1) % _ring.Length;
-                if (_count < _ring.Length) _count++;
-                Array.Copy(_ring, _scratch, _count);
-                Array.Sort(_scratch, 0, _count);
-                return _scratch[_count / 2];
-            }
-        }
         private static void LogGyroSpikeIfAny(string sideTag, byte[] buffer, int baseOffset, short gX, short gY, short gZ)
         {
             int aX = Math.Abs(gX), aY = Math.Abs(gY), aZ = Math.Abs(gZ);
@@ -3643,7 +3415,7 @@ namespace XboxGamingBarHelper.Labs
                 if (i > pre) preSb.Append(' ');
                 preSb.Append(buffer[i].ToString("X2"));
             }
-            Logger.Info($"GyroSpike[{sideTag}] base={baseOffset} gX={gX} gY={gY} gZ={gZ} | pre[{pre}..{baseOffset - 1}]={preSb} block[{baseOffset}..{end - 1}]={sb}");
+            Logger.Debug($"GyroSpike[{sideTag}] base={baseOffset} gX={gX} gY={gY} gZ={gZ} | pre[{pre}..{baseOffset - 1}]={preSb} block[{baseOffset}..{end - 1}]={sb}");
         }
 
         private static bool HasHighQualityImuSample(byte[] buffer, int baseOffset)
@@ -3665,44 +3437,13 @@ namespace XboxGamingBarHelper.Labs
             return false;
         }
 
-        private static short ReadInt16LittleEndian(byte[] buffer, int offset)
-        {
-            if (buffer == null || offset < 0 || offset + 1 >= buffer.Length)
-            {
-                return 0;
-            }
-
-            int low = buffer[offset];
-            int high = buffer[offset + 1];
-            return unchecked((short)(low | (high << 8)));
-        }
-
-        // Big-endian sibling — used by the IMU parser. The Legion controller
-        // HID layout encodes IMU samples as (short)(data[i] << 8 | data[i+1]),
-        // i.e. BE: high byte first.
-        private static short ReadInt16BigEndian(byte[] buffer, int offset)
-        {
-            if (buffer == null || offset < 0 || offset + 1 >= buffer.Length)
-            {
-                return 0;
-            }
-
-            int high = buffer[offset];
-            int low = buffer[offset + 1];
-            return unchecked((short)((high << 8) | low));
-        }
-
-        /// <summary>
-        /// HQ-IMU field reader. Initialized (04:00:A1) reports encode IMU int16s
-        /// little-endian; detached (04:3C:74) reports encode them BIG-endian — see the
-        /// endianness note at the imuBase selection in TryParseAndStoreGyroSamples.
-        /// </summary>
+        // Endian-aware HQ-IMU int16 reader moved to Shared.Data.LegionImuByteOrder (unit-tested
+        // there — same pure-logic-extraction pattern as Shared.Data.PropertyUpdateArbiter).
+        // Initialized (04:00:A1) reports encode IMU int16s little-endian; detached (04:3C:74)
+        // reports encode them BIG-endian — see the endianness note at the imuBase selection in
+        // TryParseAndStoreGyroSamples.
         private static short ReadImuInt16(byte[] buffer, int offset, bool bigEndian)
-        {
-            return bigEndian
-                ? ReadInt16BigEndian(buffer, offset)
-                : ReadInt16LittleEndian(buffer, offset);
-        }
+            => Shared.Data.LegionImuByteOrder.ReadImuInt16(buffer, offset, bigEndian);
 
         private static bool TryCommitDebouncedButtonState(
             bool rawState,
@@ -3752,12 +3493,6 @@ namespace XboxGamingBarHelper.Labs
         {
             Logger.Info($"LegionButtonMonitor: {buttonName} {(pressed ? "PRESSED" : "RELEASED")} - action={actionType}");
 
-            if (actionType == LegionButtonAction.XboxGuide)
-            {
-                // Reconcile dedicated ViGEm lifetime as controller emulation mode changes.
-                EnsureViGEmController();
-            }
-
             try
             {
                 onButtonStateChanged?.Invoke(pressed);
@@ -3795,29 +3530,11 @@ namespace XboxGamingBarHelper.Labs
                             break;
                         }
 
-                        if (vigemController != null)
-                        {
-                            Logger.Info($"LegionButtonMonitor: Calling SetGuide(true) for {buttonName}");
-                            try
-                            {
-                                if (!vigemController.SetGuide(true))
-                                {
-                                    Logger.Warn($"LegionButtonMonitor: SetGuide(true) failed for {buttonName}");
-                                }
-                                else
-                                {
-                                    Logger.Info($"LegionButtonMonitor: SetGuide(true) succeeded for {buttonName}");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Error($"LegionButtonMonitor: SetGuide(true) exception for {buttonName}: {ex.Message}\n{ex.StackTrace}");
-                            }
-                        }
-                        else
-                        {
-                            Logger.Warn($"LegionButtonMonitor: vigemController is null, cannot send Xbox Guide for {buttonName}");
-                        }
+                        // No further fallback — the dedicated ViGEm pad was retired
+                        // (phase 2). All delivery tiers declined, which means the
+                        // VIIPER guide-only pad is offline (usbip-win2 missing);
+                        // the setup banner is already pointing the user at it.
+                        Logger.Warn($"LegionButtonMonitor: No virtual pad available for Xbox Guide press ({buttonName}) — is usbip-win2 installed?");
                         break;
 
                     case LegionButtonAction.KeyboardShortcut:
@@ -3885,19 +3602,7 @@ namespace XboxGamingBarHelper.Labs
                     {
                         Logger.Info($"LegionButtonMonitor: Routed SetGuide(false) to controller emulation virtual pad for {buttonName}");
                     }
-                    else if (vigemController != null)
-                    {
-                        Logger.Info($"LegionButtonMonitor: Calling SetGuide(false) for {buttonName}");
-                        try
-                        {
-                            vigemController.SetGuide(false);
-                            Logger.Info($"LegionButtonMonitor: SetGuide(false) completed for {buttonName}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error($"LegionButtonMonitor: SetGuide(false) exception for {buttonName}: {ex.Message}\n{ex.StackTrace}");
-                        }
-                    }
+                    // (No ViGEm fallback — dedicated Guide pad retired in phase 2.)
                 }
             }
 

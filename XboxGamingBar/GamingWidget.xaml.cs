@@ -867,8 +867,7 @@ namespace XboxGamingBar
         private readonly PawnIOInstalledProperty pawnIOInstalled;
         private readonly InstallPawnIOProperty installPawnIO;
         private readonly SetupWarningsProperty setupWarnings;
-        private readonly ViGEmBusInstalledProperty vigemBusInstalled;
-        private readonly InstallViGEmBusProperty installViGEmBus;
+        private readonly InstallUsbipProperty installUsbip;
         private readonly HidHideInstalledProperty hidHideInstalled;
         private readonly InstallHidHideProperty installHidHide;
         private readonly AutoHibernateEnabledProperty autoHibernateEnabled;
@@ -1544,7 +1543,7 @@ namespace XboxGamingBar
                 ViiperGuideButtonModeComboBox.SelectionChanged += (s, e) => UpdateViiperLegionLDisabledHint();
             // Show USBIP install card only when VIIPER toggle is on AND driver is missing
             emulationBackend.PropertyChanged += (s, e) => { UpdateUsbipCardVisibility(); UpdateViiperConfigVisibility(); UpdateViiperLegionLDisabledHint(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
-            usbipInstalled.PropertyChanged += (s, e) => UpdateUsbipCardVisibility();
+            usbipInstalled.PropertyChanged += (s, e) => { UpdateUsbipCardVisibility(); UpdateLabsUsbipUI(usbipInstalled.Value); };
             // Show Steam sub-device picker only when a Steam device type is selected
             viiperDeviceType.PropertyChanged += (s, e) => { UpdateViiperConfigVisibility(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
             // Re-evaluate sub-device-dependent panels (e.g. Joy-Con Pair per-half gyro) when the Nintendo sub-device changes.
@@ -1555,8 +1554,7 @@ namespace XboxGamingBar
             pawnIOInstalled = new PawnIOInstalledProperty(this);
             installPawnIO = new InstallPawnIOProperty(this);
             setupWarnings = new SetupWarningsProperty(this) { OnWarningsChanged = OnSetupWarningsChanged };
-            vigemBusInstalled = new ViGEmBusInstalledProperty(this);
-            installViGEmBus = new InstallViGEmBusProperty(this);
+            installUsbip = new InstallUsbipProperty(this);
             hidHideInstalled = new HidHideInstalledProperty(this);
             installHidHide = new InstallHidHideProperty(this);
             autoHibernateEnabled = new AutoHibernateEnabledProperty(AutoHibernateToggle, this);
@@ -1565,7 +1563,6 @@ namespace XboxGamingBar
             // Set up callbacks for TDP method availability
             winRing0Available.SetAvailabilityCallback(UpdateWinRing0Visibility);
             pawnIOInstalled.SetInstalledCallback(UpdatePawnIOInstalledUI);
-            vigemBusInstalled.SetInstalledCallback(UpdateViGEmBusInstalledUI);
             hidHideInstalled.SetInstalledCallback(UpdateHidHideInstalledUI);
 
             tdpLimits = new TDPLimitsProperty("4,35");
@@ -1791,8 +1788,7 @@ namespace XboxGamingBar
                 pawnIOInstalled,
                 installPawnIO,
                 setupWarnings,
-                vigemBusInstalled,
-                installViGEmBus,
+                installUsbip,
                 hidHideInstalled,
                 installHidHide,
                 autoHibernateEnabled,

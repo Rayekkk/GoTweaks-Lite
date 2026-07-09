@@ -560,5 +560,9 @@
         // gyro (matches Steam's direct-HID reading); alt is plain pass-through (1:1
         // via SDL3's internal driver remap).
         Viiper_AlternateGyroConvention, // bool - see above
+
+        // One-click usbip-win2 installer (ported from upstream 1422a30; upstream inserted
+        // it mid-enum, we append at the END per the positional-wire-id rule).
+        Viiper_InstallUsbip,        // string - write "install" to trigger silent usbip-win2 download + install (helper runs the pinned InnoSetup installer elevated)
     }
 }

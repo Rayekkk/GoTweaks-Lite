@@ -189,7 +189,7 @@ namespace XboxGamingBarHelper.Core
                 try
                 {
                     // Poll all 4 possible controller slots and process input from any with button activity
-                    // This handles cases where ViGEmController is on a different slot than the real controller
+                    // This handles cases where the emulated pad is on a different slot than the real controller
                     for (uint i = 0; i < 4; i++)
                     {
                         uint result = XInputGetState(i, ref state);

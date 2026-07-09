@@ -43,7 +43,8 @@ namespace XboxGamingBarHelper.Services
         /// </summary>
         /// <param name="supportsControllerFeatures">Unused in the Lite build (kept for
         /// call-site parity); the Legion Space process check that used it was removed.</param>
-        public static string EvaluateJson(bool isLegionDevice, bool supportsControllerFeatures, bool pawnIOInstalled)
+        public static string EvaluateJson(bool isLegionDevice, bool supportsControllerFeatures, bool pawnIOInstalled,
+                                          bool usbipNeeded, bool usbipInstalled)
         {
             try
             {
@@ -56,6 +57,21 @@ namespace XboxGamingBarHelper.Services
                         Id = "pawnio",
                         Message = "PawnIO driver is not installed. Custom TDP and fan control need it.",
                         Action = "pawnio",
+                    });
+                }
+
+                // VIIPER is the only emulation backend since the ViGEm retirement,
+                // and it also serves the Legion-button Guide route; without
+                // usbip-win2 both stay offline silently, so surface the
+                // prerequisite prominently instead of relying on the user finding
+                // the install card inside the CE tab.
+                if (usbipNeeded && !usbipInstalled)
+                {
+                    warnings.Add(new Warning
+                    {
+                        Id = "usbip",
+                        Message = "usbip-win2 driver is not installed. Controller emulation needs it (a reboot may be required after install).",
+                        Action = "usbip",
                     });
                 }
 

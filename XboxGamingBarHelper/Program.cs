@@ -1350,6 +1350,7 @@ namespace XboxGamingBarHelper
                 settingsManager.TdpMethod,
                 settingsManager.EmulationBackend,
                 settingsManager.UsbipInstalled,
+                settingsManager.InstallUsbip,
                 settingsManager.ViiperDeviceType,
                 settingsManager.ViiperInputSource,
                 settingsManager.ViiperGyroSource,

@@ -136,8 +136,7 @@
     <Compile Include="Data\PawnIOInstalledProperty.cs" />
     <Compile Include="Data\InstallPawnIOProperty.cs" />
     <Compile Include="Data\SetupWarningsProperty.cs" />
-    <Compile Include="Data\ViGEmBusInstalledProperty.cs" />
-    <Compile Include="Data\InstallViGEmBusProperty.cs" />
+    <Compile Include="Data\InstallUsbipProperty.cs" />
     <Compile Include="Data\HidHideInstalledProperty.cs" />
     <Compile Include="Data\InstallHidHideProperty.cs" />
     <Compile Include="Data\CPUBoostProperty.cs" />

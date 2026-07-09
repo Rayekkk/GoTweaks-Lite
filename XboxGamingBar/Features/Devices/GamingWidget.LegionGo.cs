@@ -1333,9 +1333,11 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Updates the ViGEmBus install button state based on driver installation status.
+        /// Labs Guide-remap prerequisite: usbip-win2 status + one-click install.
+        /// Drives the repurposed ViGEmBusStatusText / ViGEmBusInstallButton pair
+        /// in the Labs section (control names kept from the ViGEm era).
         /// </summary>
-        private void UpdateViGEmBusInstalledUI(bool installed)
+        private void UpdateLabsUsbipUI(bool installed)
         {
             if (ViGEmBusStatusText != null)
             {
@@ -1347,87 +1349,30 @@ namespace XboxGamingBar
 
             if (ViGEmBusInstallButton != null)
             {
-                ViGEmBusInstallButton.Content = installed ? "Installed" : "Install ViGEmBus";
+                ViGEmBusInstallButton.Content = installed ? "Installed" : "Install usbip-win2";
                 ViGEmBusInstallButton.IsEnabled = !installed;
             }
-
-            if (ControllerEmulationViGEmBusStatusText != null)
-            {
-                ControllerEmulationViGEmBusStatusText.Text = installed ? "ViGEmBus: Installed" : "ViGEmBus: Not Installed";
-                ControllerEmulationViGEmBusStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
-                    : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
-            }
-
-            if (ControllerEmulationViGEmBusInstallButton != null)
-            {
-                ControllerEmulationViGEmBusInstallButton.Content = installed ? "Installed" : "Install ViGEmBus";
-                ControllerEmulationViGEmBusInstallButton.IsEnabled = !installed;
-            }
-
-            Logger.Info($"ViGEmBus install UI updated: installed={installed}");
         }
 
-        /// <summary>
-        /// Handles the ViGEmBus install button click.
-        /// </summary>
-        private async void ViGEmBusInstallButton_Click(object sender, RoutedEventArgs e)
+        private void LabsUsbipInstallButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                Logger.Info("ViGEmBusInstallButton clicked - triggering ViGEmBus installation");
-
-                // Update button to show installing state
+                Logger.Info("Labs usbip install button clicked - triggering usbip-win2 installation");
+                installUsbip?.TriggerInstall();
                 if (ViGEmBusInstallButton != null)
                 {
                     ViGEmBusInstallButton.Content = "Installing...";
                     ViGEmBusInstallButton.IsEnabled = false;
                 }
-
-                if (ControllerEmulationViGEmBusInstallButton != null)
-                {
-                    ControllerEmulationViGEmBusInstallButton.Content = "Installing...";
-                    ControllerEmulationViGEmBusInstallButton.IsEnabled = false;
-                }
-
                 if (ViGEmBusStatusText != null)
                 {
                     ViGEmBusStatusText.Text = "Status: Installing...";
                 }
-
-                if (ControllerEmulationViGEmBusStatusText != null)
-                {
-                    ControllerEmulationViGEmBusStatusText.Text = "ViGEmBus: Installing...";
-                }
-
-                // Trigger the installation via the property
-                installViGEmBus?.TriggerInstall();
-
-                // The helper will send an updated status after installation completes
-                Logger.Info("ViGEmBus installation triggered, waiting for helper response...");
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error during ViGEmBus installation: {ex.Message}");
-                // Reset button state on error
-                if (ViGEmBusInstallButton != null)
-                {
-                    ViGEmBusInstallButton.Content = "Install ViGEmBus";
-                    ViGEmBusInstallButton.IsEnabled = true;
-                }
-                if (ControllerEmulationViGEmBusInstallButton != null)
-                {
-                    ControllerEmulationViGEmBusInstallButton.Content = "Install ViGEmBus";
-                    ControllerEmulationViGEmBusInstallButton.IsEnabled = true;
-                }
-                if (ViGEmBusStatusText != null)
-                {
-                    ViGEmBusStatusText.Text = "Status: Error";
-                }
-                if (ControllerEmulationViGEmBusStatusText != null)
-                {
-                    ControllerEmulationViGEmBusStatusText.Text = "ViGEmBus: Error";
-                }
+                Logger.Error($"Error during usbip installation: {ex.Message}");
             }
         }
 

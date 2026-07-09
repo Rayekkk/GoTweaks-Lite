@@ -72,6 +72,11 @@ upstream, and why.
   restart with a USB hub attached, focusing the desktop pops open Task View (Win+Tab) and buzzes
   the controller. It re-enumerates the controller's USB port once per boot — the software
   equivalent of physically replugging a pad. Enable it only if you have this bug.
+- **VIIPER controller emulation** — emulate a DualSense, DualSense Edge, DS4, Xbox 360, Switch Pro,
+  Joy-Con pair, or Steam Controller with real motion (gyro/accel) forwarded from the Legion Go's
+  own IMU, so games and Steam Input see native gyro aim instead of the stick-to-gyro workaround.
+  Replaces the old ViGEm-based emulation entirely — see [Requirements](#-requirements) for the
+  one-time `usbip-win2` driver it needs.
 
 ### 🔧 Reliability fixes
 
@@ -157,6 +162,23 @@ Deep support for the Legion Go 2 (and other Legion Go handhelds) with automatic 
 **Other**
 - Touchpad toggle
 - Battery charge limit
+
+### 🎮 Controller Emulation (VIIPER)
+
+Present the Legion Go's controls as a different virtual gamepad — useful for games or Steam Input
+profiles that expect a specific pad type, or that support native gyro aim only on certain
+controllers.
+
+- **Virtual device types** — Xbox 360, DualShock 4, DualSense, DualSense Edge, Switch Pro, Joy-Con
+  pair, or Steam Controller
+- **Native gyro/accel forwarding** — the Legion Go's own motion sensors drive the emulated pad's
+  gyro, so games read real hardware motion instead of a stick-to-gyro conversion
+- **Alternate Gyro Convention** toggle — flips gyro polarity per target if a game's aim feels
+  inverted
+- **Guide-button remap** — map a Legion button to Xbox Guide independent of whether full emulation
+  is on
+- Requires the free **usbip-win2** driver — install it once from the in-app prompt (Controller
+  Emulation tab or the setup-warning banner)
 
 ### 🔴 AMD Radeon Features
 
@@ -257,7 +279,7 @@ Required for per-game profiles:
 | --- | --- |
 | **OS** | Windows 10 / 11 |
 | **Required** | Xbox Game Bar |
-| **Optional** | [RivaTuner Statistics Server](https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/) (OSD overlay) · [PawnIO](https://github.com/SuporteTI/PawnIO) (extended sensors: fan speed, GPU power) · AMD GPU (Radeon features) · Legion Go 2 / Legion Go (device features) · Lossless Scaling (scaling integration) |
+| **Optional** | [RivaTuner Statistics Server](https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/) (OSD overlay) · [PawnIO](https://github.com/SuporteTI/PawnIO) (extended sensors: fan speed, GPU power) · [usbip-win2](https://github.com/vadimgrn/usbip-win2/releases) (controller emulation / VIIPER — installable in-app) · AMD GPU (Radeon features) · Legion Go 2 / Legion Go (device features) · Lossless Scaling (scaling integration) |
 
 > [!IMPORTANT]
 > **Smart App Control** may interfere with this application. If it doesn't work correctly, you may
@@ -277,6 +299,7 @@ Free and open source. Built with C#.
 | **RTSSSharedMemoryNET** | Custom build with frametime-graph support, tuned for low CPU/memory use |
 | **ADLX** | AMD Display Library for Radeon features |
 | **PresentMon** | Rendered / displayed FPS and frame-generation metrics |
+| **libviiper** (usbip-win2) | USBIP-based virtual controller emulation with native gyro |
 
 ---
 

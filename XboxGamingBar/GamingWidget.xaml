@@ -3346,31 +3346,13 @@
                                         <TextBlock Text="Driver dependencies"
                                                    FontSize="11"
                                                    Foreground="#AAAAAA"/>
-                                        <TextBlock Text="ViGEmBus powers virtual controllers. HidHide avoids double-input from stock controllers."
+                                        <TextBlock Text="usbip-win2 powers virtual controllers. HidHide avoids double-input from stock controllers."
                                                    FontSize="11"
                                                    Foreground="#888888"
                                                    TextWrapping="Wrap"
                                                    Margin="0,2,0,0"/>
 
-                                        <Grid Margin="0,8,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="ControllerEmulationViGEmBusStatusText"
-                                                       Text="ViGEmBus: Checking..."
-                                                       FontSize="11"
-                                                       Foreground="#888888"
-                                                       VerticalAlignment="Center"/>
-                                            <Button x:Name="ControllerEmulationViGEmBusInstallButton"
-                                                    Grid.Column="1"
-                                                    Content="Install ViGEmBus"
-                                                    Style="{StaticResource ModernButtonStyle}"
-                                                    FontSize="11"
-                                                    Padding="10,4"
-                                                    Margin="12,0,0,0"
-                                                    Click="ViGEmBusInstallButton_Click"/>
-                                        </Grid>
+                                        <!-- (ViGEmBus dependency row removed — ViGEm backend retired.) -->
 
                                         <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
@@ -5189,18 +5171,21 @@
                                                       Toggled="EnableDebugToolsToggle_Toggled"/>
                                     </Grid>
 
-                                    <!-- VIIPER Emulation Backend Toggle (experimental) -->
+                                    <!-- VIIPER backend info. The Legacy/VIIPER toggle is retired — VIIPER
+                                         is the only emulation backend (ViGEm retirement final). The hidden
+                                         ToggleSwitch stays for the property binding; the helper clamps any
+                                         Legacy value back to VIIPER regardless. -->
                                     <Grid Margin="0,16,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Use VIIPER emulation (Experimental)" FontSize="14" Foreground="#FFC107"/>
-                                            <TextBlock Text="Replaces the legacy ViGEm controller emulation with VIIPER (USBIP-based). Requires usbip-win2." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Controller emulation backend: VIIPER" FontSize="14" Foreground="#FFC107"/>
+                                            <TextBlock Text="USBIP-based virtual controllers. Requires the usbip-win2 driver." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
                                             <!-- Always-visible USBIP status. Driven from helper-side detection
                                                  (XboxGamingBarHelper/Settings/UsbipInstalledProperty.cs) so users
-                                                 know the prerequisite state without having to flip the toggle. -->
+                                                 know the prerequisite state at a glance. -->
                                             <TextBlock x:Name="UsbipPrereqStatusLine"
                                                        FontSize="11"
                                                        Margin="0,4,0,0"
@@ -5210,10 +5195,11 @@
                                         <ToggleSwitch x:Name="ViiperEmulationToggle"
                                                       Grid.Column="1"
                                                       OnContent="" OffContent=""
-                                                      IsOn="False"/>
+                                                      IsOn="True"
+                                                      Visibility="Collapsed"/>
                                     </Grid>
 
-                                    <!-- USBIP prerequisite card, visible only when VIIPER toggle is on and usbip-win2 is not installed -->
+                                    <!-- USBIP prerequisite card, visible only when usbip-win2 is not installed -->
                                     <Border x:Name="UsbipInstallCard"
                                             Visibility="Collapsed"
                                             Background="#3A2A10"
@@ -5224,11 +5210,23 @@
                                             Margin="0,8,0,0">
                                         <StackPanel>
                                             <TextBlock Text="⚠ usbip-win2 required" FontSize="13" FontWeight="SemiBold" Foreground="#FFC107"/>
-                                            <TextBlock Text="VIIPER emulation needs the usbip-win2 kernel driver. Install it once, reboot, then come back here."
+                                            <TextBlock Text="Controller emulation needs the usbip-win2 kernel driver. Install it once, reboot, then come back here."
                                                        FontSize="11" Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,4,0,8"/>
-                                            <HyperlinkButton x:Name="UsbipInstallLink"
-                                                             Content="Open usbip-win2 releases"
-                                                             NavigateUri="https://github.com/vadimgrn/usbip-win2/releases"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button x:Name="UsbipInstallButton"
+                                                        Content="Install usbip-win2"
+                                                        Padding="12,4"
+                                                        FontSize="12"
+                                                        Background="#AA8800"
+                                                        Foreground="White"
+                                                        Click="UsbipInstallButton_Click"/>
+                                                <HyperlinkButton x:Name="UsbipInstallLink"
+                                                                 Content="or download manually"
+                                                                 FontSize="11"
+                                                                 Margin="12,0,0,0"
+                                                                 VerticalAlignment="Center"
+                                                                 NavigateUri="https://github.com/vadimgrn/usbip-win2/releases"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
 
@@ -7911,18 +7909,20 @@
                                                    Margin="0,8,0,0"/>
                                     </StackPanel>
 
-                                    <!-- ViGEmBus Note -->
+                                    <!-- Guide remap prerequisite note. Since the ViGEm retirement the
+                                         Guide route is served by VIIPER's guide-only pad, which needs
+                                         usbip-win2 (not ViGEmBus). Control names kept from the ViGEm era. -->
                                     <Border Background="#1A1A2E" CornerRadius="4" Padding="10" Margin="0,16,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="Xbox Guide remap requires ViGEmBus driver"
+                                            <TextBlock Text="Xbox Guide remap requires the usbip-win2 driver"
                                                        FontSize="11" Foreground="#AAAAAA" TextWrapping="Wrap"/>
                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                 <TextBlock x:Name="ViGEmBusStatusText" Text="Status: Checking..."
                                                            FontSize="11" Foreground="#888888" VerticalAlignment="Center"/>
-                                                <Button x:Name="ViGEmBusInstallButton" Content="Install ViGEmBus"
+                                                <Button x:Name="ViGEmBusInstallButton" Content="Install usbip-win2"
                                                         Style="{StaticResource ModernButtonStyle}"
                                                         FontSize="11" Padding="10,4" Margin="12,0,0,0"
-                                                        Click="ViGEmBusInstallButton_Click"/>
+                                                        Click="LabsUsbipInstallButton_Click"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>

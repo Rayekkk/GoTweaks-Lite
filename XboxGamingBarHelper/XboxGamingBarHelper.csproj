@@ -101,9 +101,6 @@
     <Reference Include="RTSSSharedMemoryNET">
       <HintPath>.\RTSSSharedMemoryNET.dll</HintPath>
     </Reference>
-    <Reference Include="Nefarius.ViGEm.Client">
-      <HintPath>..\packages\Nefarius.ViGEm.Client.1.21.256\lib\netstandard2.0\Nefarius.ViGEm.Client.dll</HintPath>
-    </Reference>
     <Reference Include="Nefarius.Drivers.HidHide">
       <HintPath>..\packages\Nefarius.Drivers.HidHide.1.8.59\lib\netstandard2.0\Nefarius.Drivers.HidHide.dll</HintPath>
     </Reference>
@@ -590,6 +587,7 @@
     <Compile Include="Settings\ViiperGyroSourceProperty.cs" />
     <Compile Include="Settings\ViiperJoyconGyroPerHalfProperty.cs" />
     <Compile Include="Settings\ViiperAlternateGyroConventionProperty.cs" />
+    <Compile Include="Settings\InstallUsbipProperty.cs" />
     <Compile Include="Settings\ViiperSteamSubDeviceProperty.cs" />
     <Compile Include="Settings\ViiperSonySubDeviceProperty.cs" />
     <Compile Include="Settings\ViiperNintendoSubDeviceProperty.cs" />
@@ -679,13 +677,11 @@
     <Compile Include="ControllerEmulation\GyroBiasEstimator.cs" />
     <Compile Include="ControllerEmulation\GyroSourceAdapters.cs" />
     <Compile Include="ControllerEmulation\PlayerSpaceGyro.cs" />
-    <Compile Include="Labs\ViGEmController.cs" />
     <Compile Include="Labs\LegionButtonMonitor.cs" />
     <Compile Include="Labs\LegionInputButtons.cs" />
     <Compile Include="Labs\LegionLightingManager.cs" />
     <Compile Include="Labs\GoTweaksHapticManager.cs" />
     <Compile Include="Labs\TaskViewFixManager.cs" />
-    <Compile Include="Labs\ViGEmBusProperties.cs" />
     <Compile Include="Labs\HidHideProperties.cs" />
     <Compile Include="Icons\GameIconHelper.cs" />
   </ItemGroup>

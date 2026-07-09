@@ -1071,16 +1071,10 @@ namespace XboxGamingBarHelper
                 {
                     response = HandleAutoHibernateMode(request);
                 }
-                // ViGEmBus: Check installed status
-                else if (functionValue == (int)Function.ViGEmBusInstalled)
-                {
-                    response = HandleViGEmBusInstalled(request);
-                }
-                // ViGEmBus: Install request - only install when explicitly requested with Set command and "install" content
-                else if (functionValue == (int)Function.InstallViGEmBus)
-                {
-                    response = HandleInstallViGEmBus(request);
-                }
+                // (ViGEmBusInstalled / InstallViGEmBus handlers removed — ViGEm
+                // backend retired. The Function enum entries stay so the wire
+                // values of later entries don't shift; unknown functions from
+                // any stale sender are simply ignored.)
                 // HidHide: Check installed status
                 else if (functionValue == (int)Function.HidHideInstalled)
                 {
@@ -1458,53 +1452,6 @@ namespace XboxGamingBarHelper
                 XboxGamingBarHelper.Settings.LocalSettingsHelper.SetValue("AutoHibernateMode", mode);
                 Logger.Info($"Pipe: Auto Hibernate mode set to: {mode} ({(mode == 0 ? "Always" : mode == 1 ? "AC Only" : "DC Only")})");
             }
-            return response;
-        }
-
-        // ViGEmBus: Check installed status
-        private static global::Windows.Foundation.Collections.ValueSet HandleViGEmBusInstalled(Shared.IPC.PipeMessage request)
-        {
-            global::Windows.Foundation.Collections.ValueSet response = null;
-            int functionValue = (int)request.Function;
-            bool installed = XboxGamingBarHelper.Labs.ViGEmBusHelper.IsInstalled();
-            response = new global::Windows.Foundation.Collections.ValueSet();
-            response.Add(nameof(Function), functionValue);
-            response.Add("Content", installed);
-            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
-            Logger.Info($"Pipe: ViGEmBus installed status: {installed}");
-            return response;
-        }
-
-        // ViGEmBus: Install request - only install when explicitly requested with Set + "install"
-        private static global::Windows.Foundation.Collections.ValueSet HandleInstallViGEmBus(Shared.IPC.PipeMessage request)
-        {
-            global::Windows.Foundation.Collections.ValueSet response = null;
-            // Check if this is a Set command with "install" content
-            bool shouldInstall = request.Command == Shared.Enums.Command.Set && request.Content == "install";
-
-            if (!shouldInstall)
-            {
-                Logger.Debug("Pipe: InstallViGEmBus - Ignoring non-install request (Get or empty content)");
-                return null;
-            }
-
-            Logger.Info("Pipe: ViGEmBus installation requested from widget");
-            _ = Task.Run(() =>
-            {
-                bool success = XboxGamingBarHelper.Labs.ViGEmBusHelper.Install();
-                bool installed = XboxGamingBarHelper.Labs.ViGEmBusHelper.IsInstalled();
-                // Send updated status via pipe
-                var updateMsg = new Shared.IPC.PipeMessage
-                {
-                    Command = Shared.Enums.Command.Set,
-                    Function = Function.ViGEmBusInstalled,
-                    Content = installed.ToString()
-                };
-                SendPipeMessage(updateMsg);
-                Logger.Info($"Pipe: ViGEmBus installation complete, sent updated status: {installed}");
-            });
-            response = new global::Windows.Foundation.Collections.ValueSet();
-            response.Add("Content", true); // Acknowledge request started
             return response;
         }
 
@@ -2264,8 +2211,14 @@ namespace XboxGamingBarHelper
                 bool controllerFeatures = (legionManager?.DetectedDevice?.SupportsControllerRemap ?? false)
                                        || (legionManager?.DetectedDevice?.SupportsGyro ?? false);
                 bool pawnIO = performanceManager?.IsPawnIOInstalled ?? true; // assume fine when unknown
+                // usbip is needed when VIIPER is the selected backend OR a Legion
+                // button maps to Xbox Guide (VIIPER's guide-only pad serves that
+                // route on every backend since the ViGEm retirement).
+                bool usbipNeeded = (settingsManager?.EmulationBackend?.Value ?? false)
+                                || (legionButtonMonitor?.HasGuideActionConfigured ?? false);
+                bool usbip = settingsManager?.UsbipInstalled?.Value ?? true; // assume fine when unknown
 
-                string json = Services.SetupHealthService.EvaluateJson(isLegion, controllerFeatures, pawnIO);
+                string json = Services.SetupHealthService.EvaluateJson(isLegion, controllerFeatures, pawnIO, usbipNeeded, usbip);
                 if (!force && string.Equals(json, lastSetupWarningsJson, StringComparison.Ordinal)) return;
                 lastSetupWarningsJson = json;
 

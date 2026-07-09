@@ -5,7 +5,7 @@ namespace XboxGamingBarHelper.Settings
 {
     /// <summary>
     /// Property to select controller emulation backend.
-    /// Currently a binary toggle: false = Legacy ViGEm (default), true = VIIPER.
+    /// Currently a binary toggle: false = Legacy ViGEm (deprecated), true = VIIPER (default).
     /// Global setting, persisted to LocalSettings.
     /// </summary>
     internal class EmulationBackendProperty : HelperProperty<bool, SettingsManager>
@@ -20,12 +20,19 @@ namespace XboxGamingBarHelper.Settings
 
         private static bool LoadFromSettings()
         {
-            // Stored as int so future enum expansion stays compatible.
-            if (LocalSettingsHelper.TryGetValue<int>(SettingsKey, out var value))
+            // ViGEm retirement FINAL: the legacy ViGEm backend is unreachable —
+            // VIIPER is the only emulation backend. Stored legacy choices are
+            // intentionally ignored (with a log so migrated users' reports are
+            // explainable); ViiperEmulationManager.ApplyBackend(true) keeps the
+            // legacy manager permanently suppressed via SetSuppressedByViiper.
+            // Migration prerequisites shipped ahead of this: one-click usbip
+            // installer + setup-warnings banner (phase 2 stage A).
+            if (LocalSettingsHelper.TryGetValue<int>(SettingsKey, out var value)
+                && value != (int)EmulationBackend.Viiper)
             {
-                return value == (int)EmulationBackend.Viiper;
+                Logger.Warn("EmulationBackend: stored Legacy choice ignored — the ViGEm backend is retired, using VIIPER. Install usbip-win2 if controller emulation stays offline.");
             }
-            return false; // Default to Legacy.
+            return true;
         }
 
         private void SaveToSettings()
@@ -39,6 +46,17 @@ namespace XboxGamingBarHelper.Settings
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"Emulation backend changed to {Backend}");
             SaveToSettings();
+
+            // Clamp: the legacy backend is retired. A stale widget (or old
+            // LocalSettings echo) pushing Legacy is bounced straight back so
+            // the mutual-exclusion suppression of the legacy manager never
+            // lifts. One-hop recursion: the SetValue below re-enters this
+            // method once with Value=true and stops.
+            if (!Value)
+            {
+                Logger.Warn("EmulationBackend: Legacy requested but the ViGEm backend is retired — re-asserting VIIPER");
+                SetValue(true);
+            }
         }
 
         public EmulationBackend Backend => Value ? EmulationBackend.Viiper : EmulationBackend.Legacy;
