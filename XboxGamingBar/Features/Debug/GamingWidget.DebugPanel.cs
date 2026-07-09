@@ -558,6 +558,8 @@ namespace XboxGamingBar
                     {
                         AutoUpdateCheckToggle.IsOn = autoCheckEnabled;
                     }
+                    // From here on, Toggled events are real user input.
+                    _autoUpdateToggleLoaded = true;
                 });
 
                 if (!autoCheckEnabled)
@@ -742,6 +744,12 @@ namespace XboxGamingBar
             HideUpdateBanner();
         }
 
+        // Guard: same pattern used elsewhere for programmatic-vs-user toggle writes.
+        // Programmatic IsOn writes (XAML parse, the startup load above) fire Toggled
+        // just like user clicks; saving from those stomped the stored value on every
+        // launch (upstream #94).
+        private bool _autoUpdateToggleLoaded;
+
         /// <summary>
         /// Handles the auto-update check toggle change.
         /// </summary>
@@ -749,6 +757,12 @@ namespace XboxGamingBar
         {
             if (AutoUpdateCheckToggle == null)
                 return;
+
+            if (!_autoUpdateToggleLoaded)
+            {
+                Logger.Debug("AutoUpdateCheckToggle_Toggled before load; not saving");
+                return;
+            }
 
             var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
             settings.Values["AutoUpdateCheckEnabled"] = AutoUpdateCheckToggle.IsOn;

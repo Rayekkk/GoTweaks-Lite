@@ -13,8 +13,9 @@ profiles, and an OSD — rebuilt into a clean, predictable base tuned specifical
 </div>
 
 > [!NOTE]
-> **Installation differs from the original.** Use the [`Installer/`](Installer/) folder
-> (run **`Install GoTweaks.bat`**) — not the upstream download-and-run-`Install.ps1` steps.
+> **Installation differs from the original.** Download the latest release and run
+> **`Install GoTweaks.bat`** — see [Installation](#-installation) below — not the upstream
+> download-and-run-`Install.ps1` steps.
 
 ---
 
@@ -247,8 +248,19 @@ installer first tells Windows to trust that certificate.
 4. Click **Yes** on the UAC prompt — needed only to trust the certificate.
 5. Wait for **“Done — GoTweaks Lite installed.”**
 
-> If double-clicking the `.bat` is blocked, right-click **`Install GoTweaks.ps1`** →
-> **Run with PowerShell**.
+> [!NOTE]
+> **Windows may show a "Windows protected your PC" SmartScreen warning** the first time you run
+> the `.bat` — this is normal for a freshly downloaded, unsigned script and not specific to
+> GoTweaks Lite. Click **More info** → **Run anyway** to continue.
+
+> If double-clicking the `.bat` does nothing (or SmartScreen blocks it entirely), open PowerShell
+> in the same folder (Shift + right-click the folder → **Open PowerShell window here**) and run:
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File ".\Install GoTweaks.ps1"
+> ```
+> Right-click → **Run with PowerShell** does **not** work here — it skips the `-ExecutionPolicy
+> Bypass` the script needs, and fails with a "running scripts is disabled" error on most default
+> Windows setups.
 
 The installer trusts the certificate, closes blocking processes, and installs/updates the widget in
 place — your profiles and settings are kept.

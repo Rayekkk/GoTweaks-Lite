@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Security.Principal;
 using System.Threading;
@@ -29,14 +28,6 @@ namespace XboxGamingBarHelper
         /// </summary>
         public static bool EnsureElevated(string[] args)
         {
-            // Debug: Write immediately to see if we even get here
-            try
-            {
-                var debugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "elevation_debug.txt");
-                File.AppendAllText(debugPath, $"{DateTime.Now}: EnsureElevated called, IsAdmin={IsRunningAsAdmin()}\n");
-            }
-            catch { }
-
             try
             {
                 string exePath = Process.GetCurrentProcess().MainModule?.FileName;
@@ -69,30 +60,9 @@ namespace XboxGamingBarHelper
                 Logger.Info($"Running from deployed location: {HelperDeploymentService.IsRunningFromDeployedLocation()}");
                 LogManager.Flush(); // Ensure logs are written before checks
 
-                // Debug: Write to a simple file to diagnose non-admin path
-                try
-                {
-                    var debugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "elevation_debug.txt");
-                    var debugInfo = $"{DateTime.Now}: ExePath={exePath}\n" +
-                                   $"HelperFolder={HelperDeploymentService.HelperFolder}\n" +
-                                   $"DeployedExePath={HelperDeploymentService.DeployedExePath}\n" +
-                                   $"DeployedExeExists={File.Exists(HelperDeploymentService.DeployedExePath)}\n";
-                    File.AppendAllText(debugPath, debugInfo);
-                }
-                catch { }
-
                 bool deploymentValid = HelperDeploymentService.IsDeploymentValid();
                 bool deploymentNeeded = HelperDeploymentService.IsDeploymentNeeded();
                 bool taskConfigured = ScheduledTaskService.IsTaskConfiguredCorrectly();
-
-                // Debug: Write check results
-                try
-                {
-                    var debugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "elevation_debug.txt");
-                    var debugInfo = $"DeploymentValid={deploymentValid}, DeploymentNeeded={deploymentNeeded}, TaskConfigured={taskConfigured}\n\n";
-                    File.AppendAllText(debugPath, debugInfo);
-                }
-                catch { }
 
                 Logger.Info($"Deployment valid: {deploymentValid}, Deployment needed: {deploymentNeeded}, Task configured: {taskConfigured}");
                 LogManager.Flush(); // Ensure logs are written before decision
@@ -281,65 +251,49 @@ namespace XboxGamingBarHelper
         /// </summary>
         public static bool PerformSetup()
         {
-            // Debug file for tracing setup issues (independent of NLog)
-            var debugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "setup_debug.txt");
-            void DebugLog(string msg) { try { File.AppendAllText(debugPath, $"{DateTime.Now}: {msg}\n"); } catch { } }
-
             try
             {
-                DebugLog($"PerformSetup started, IsAdmin={IsRunningAsAdmin()}");
-
                 if (!IsRunningAsAdmin())
                 {
                     Logger.Error("PerformSetup called without admin privileges");
-                    DebugLog("ERROR: Not admin");
                     return false;
                 }
 
                 Logger.Info("=== Starting Setup ===");
-                DebugLog($"Source: {HelperDeploymentService.GetSourceDirectory()}");
-                DebugLog($"Target: {HelperDeploymentService.HelperFolder}");
-                DebugLog($"Version: {HelperDeploymentService.GetCurrentPackageVersion()}");
                 Logger.Info($"Source directory: {HelperDeploymentService.GetSourceDirectory()}");
                 Logger.Info($"Target directory: {HelperDeploymentService.HelperFolder}");
                 Logger.Info($"Package version: {HelperDeploymentService.GetCurrentPackageVersion()}");
 
                 // Step 1: Deploy helper files
                 Logger.Info("Step 1: Deploying helper files...");
-                DebugLog("Step 1: Deploying...");
                 if (!HelperDeploymentService.DeployHelper())
                 {
                     Logger.Error("Failed to deploy helper files");
-                    DebugLog("ERROR: DeployHelper returned false");
                     return false;
                 }
                 Logger.Info("Helper files deployed successfully");
-                DebugLog($"Deployed OK, DeployedExePath exists: {File.Exists(HelperDeploymentService.DeployedExePath)}");
 
                 // Step 2: Create scheduled task
                 Logger.Info("Step 2: Creating scheduled task...");
-                DebugLog("Step 2: Creating task...");
                 if (!ScheduledTaskService.CreateOrUpdateTask())
                 {
                     Logger.Error("Failed to create scheduled task");
-                    DebugLog("ERROR: CreateOrUpdateTask returned false");
                     return false;
                 }
                 Logger.Info("Scheduled task created successfully");
-                DebugLog("Task created OK");
 
-                // Note: After setup, we EXIT and let the widget relaunch the helper.
-                // The relaunched helper will detect setup is complete and run via scheduled task.
-                // This is cleaner than having the UAC-launched helper continue running.
-                Logger.Info("Setup complete - will exit and let widget relaunch");
+                // Note: the caller (Program.cs's --setup branch) proactively runs the newly
+                // created task right after this returns true, so the real elevated helper starts
+                // immediately rather than waiting on the widget to notice and relaunch. The
+                // widget's own retry/heartbeat-watcher logic (GamingWidget.PipeConnection.cs) is
+                // a backup for slow-UAC edge cases, not the primary path.
+                Logger.Info("Setup complete");
                 Logger.Info("=== Setup Complete ===");
-                DebugLog("=== Setup Complete ===");
                 return true;
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Error during setup");
-                DebugLog($"EXCEPTION: {ex.Message}\n{ex.StackTrace}");
                 return false;
             }
         }

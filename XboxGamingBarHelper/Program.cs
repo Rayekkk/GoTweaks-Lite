@@ -421,17 +421,11 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Could not acquire setup-in-progress mutex: {ex.Message} — continuing anyway");
                 }
 
-                // Debug file for tracing setup issues (independent of NLog)
-                var setupDebugPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "setup_debug.txt");
-                void SetupDebugLog(string msg) { try { File.AppendAllText(setupDebugPath, $"{DateTime.Now}: [Main] {msg}\n"); } catch { } }
-
-                SetupDebugLog($"Setup mode entered, args={string.Join(" ", args)}");
+                Logger.Info($"Setup mode entered, args={string.Join(" ", args)}");
                 Logger.Info("=== Setup Mode ===");
                 try
                 {
-                    SetupDebugLog("Calling PerformSetup...");
                     bool success = ElevationBootstrapper.PerformSetup();
-                    SetupDebugLog($"PerformSetup returned: {success}");
                     Logger.Info($"Setup completed with result: {success}");
 
                     if (success)
@@ -439,30 +433,22 @@ namespace XboxGamingBarHelper
                         // Run the scheduled task to start the elevated helper
                         // This helper will connect to the widget
                         Logger.Info("Running scheduled task to start elevated helper...");
-                        SetupDebugLog("Running scheduled task...");
 
                         // CRITICAL: Shutdown NLog to release the log file BEFORE starting the elevated helper
                         // Otherwise the elevated helper's Wave1 initialization logs (including AMDManager/ADLX)
-                        // will be blocked because this process still has the log file open
+                        // will be blocked because this process still has the log file open. This means
+                        // RunTaskNow's own result below can't be logged here — the newly started elevated
+                        // helper's own log entries (or Task Scheduler's history for "GoTweaks\GoTweaksHelper")
+                        // are the source of truth for whether the launch actually succeeded.
                         LogManager.Shutdown();
-
-                        if (Services.ScheduledTaskService.RunTaskNow())
-                        {
-                            SetupDebugLog("Task started OK");
-                        }
-                        else
-                        {
-                            SetupDebugLog("Task failed to start");
-                        }
+                        Services.ScheduledTaskService.RunTaskNow();
                     }
 
-                    SetupDebugLog("Exiting setup mode");
                     return;
                 }
                 catch (Exception ex)
                 {
                     Logger.Error(ex, "Setup failed with exception");
-                    SetupDebugLog($"EXCEPTION in setup: {ex.Message}\n{ex.StackTrace}");
                     LogManager.Flush();
                     return; // Exit on setup failure
                 }

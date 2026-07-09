@@ -666,7 +666,11 @@ namespace XboxGamingBarHelper.Performance
             pawnIOAvailableProperty = new TdpMethodAvailableProperty(pawnIOAvailable, Function.TdpMethod_PawnIOAvailable, this);
             pawnIOInstalledProperty = new TdpMethodAvailableProperty(pawnIOInstalled, Function.TdpMethod_PawnIOInstalled, this);
             installPawnIOProperty = new InstallPawnIOProperty(this);
-            Logger.Info($"TDP method availability: PawnIO={pawnIOAvailable}, PawnIOInstalled={pawnIOInstalled}");
+            // pawnIOAvailable is always false here — InitializePawnIO() runs
+            // after manager init (Program.cs) and logs "PawnIO availability
+            // updated" with the real value. Label this line accordingly so a
+            // "PawnIO=False" at startup isn't misread as a broken install.
+            Logger.Info($"TDP method availability (pre-init snapshot): PawnIO={pawnIOAvailable}, PawnIOInstalled={pawnIOInstalled} — final availability logged after InitializePawnIO");
         }
 
         /// <summary>
@@ -1337,11 +1341,30 @@ namespace XboxGamingBarHelper.Performance
                     case TdpMethod.PawnIO:
                         if (pawnIOAvailable && ryzenSmuService != null && ryzenSmuService.IsInitialized)
                         {
+                            if (legionDetected)
+                            {
+                                // Marctraider report: SMU writes on Legion devices get
+                                // re-asserted by the embedded controller within seconds —
+                                // his log showed SetAllLimits(35W) "succeeding" while the
+                                // EC kept SPL at 25W. The write is accepted by the SMU
+                                // but the platform owns the power table.
+                                Logger.Warn("PawnIO TDP method selected on a Legion device: the Lenovo EC typically re-asserts its own power limits over SMU writes within seconds. Lenovo WMI is the supported method on this hardware.");
+                            }
                             Logger.Info($"Using PawnIO/RyzenSMU to set TDP (SPL={spl}W, SPPT={sppt}W, FPPT={fppt}W)");
                             if (ryzenSmuService.SetAllLimits(spl, sppt, fppt))
                             {
-                                Logger.Info($"PawnIO: TDP set successfully");
-                                // Update current limits for OSD display (PawnIO can't read back values)
+                                Logger.Info($"PawnIO: TDP set commands accepted");
+                                if (legionDetected && legionManager != null)
+                                {
+                                    // On Legion hardware the WMI read shows what the EC
+                                    // actually enforces — let the verification read fill
+                                    // Current* so the OSD/widget report the truth instead
+                                    // of echoing the requested values.
+                                    ScheduleLegionPawnIOVerificationRead();
+                                    return;
+                                }
+                                // No independent read-back path on non-Legion hardware —
+                                // assume the requested values took effect.
                                 CurrentSPL = spl;
                                 CurrentSPPT = sppt;
                                 CurrentFPPT = fppt;
@@ -1404,6 +1427,50 @@ namespace XboxGamingBarHelper.Performance
                 catch (Exception ex)
                 {
                     Logger.Debug($"ScheduleVerificationRead: Error during verification read: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Delayed Legion-WMI read used specifically after a PawnIO/RyzenSMU write on Legion
+        /// hardware, where the Lenovo EC silently re-asserts its own power table over the SMU
+        /// write within seconds. Deliberately does NOT go through UpdateCurrentTDP — that method
+        /// only reads Legion WMI when TdpMethod==ManufacturerWMI (its "Priority 1" gate), so
+        /// calling it here (TdpMethod==PawnIO) would hit the dead WinRing0-removed fallback and
+        /// silently do nothing, leaving the OSD stuck on the last value instead of showing what
+        /// the EC actually enforces.
+        /// </summary>
+        private void ScheduleLegionPawnIOVerificationRead()
+        {
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    await System.Threading.Tasks.Task.Delay(VerificationDelayMs);
+                    if (legionManager == null) return;
+
+                    var (slow, fast, peak) = legionManager.GetCurrentTDPValues();
+                    if (!slow.HasValue || !fast.HasValue || !peak.HasValue)
+                    {
+                        Logger.Debug("ScheduleLegionPawnIOVerificationRead: Could not read all TDP values from Legion WMI");
+                        return;
+                    }
+
+                    CurrentSPL = slow.Value;
+                    CurrentSPPT = fast.Value;
+                    CurrentFPPT = peak.Value;
+
+                    var newTdpString = $"SPL:{slow}W SPPT:{fast}W FPPT:{peak}W";
+                    if (newTdpString != lastTdpString)
+                    {
+                        Logger.Info($"ScheduleLegionPawnIOVerificationRead: EC-enforced TDP is '{newTdpString}' (PawnIO write may not have stuck)");
+                        currentTdp.SetValue(newTdpString);
+                        lastTdpString = newTdpString;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"ScheduleLegionPawnIOVerificationRead: Error during verification read: {ex.Message}");
                 }
             });
         }
