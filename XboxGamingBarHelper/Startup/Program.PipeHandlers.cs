@@ -101,6 +101,43 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // Minimize the desktop app window instead of letting it close.
+                // Closing the last visible window suspends the UWP process and
+                // kills the active Game Bar widget; the UWP view can't minimize
+                // itself, so it asks us. Restored from the tray icon's
+                // "Open GoTweaks" or by relaunching the app.
+                if (pipeMsg.Extra.ContainsKey("HideAppWindow"))
+                {
+                    bool hidden = false;
+                    try
+                    {
+                        hidden = XboxGamingBarHelper.Windows.User32.HideAppFrameWindow("GoTweaks Lite");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Pipe: HideAppWindow threw: {ex.Message}");
+                    }
+                    Logger.Info($"Pipe: HideAppWindow request - hidden={hidden}");
+                    return;
+                }
+
+                // Re-show a previously minimized desktop app window (sent by the
+                // widget's OnLaunched so a Start-menu relaunch un-hides it).
+                if (pipeMsg.Extra.ContainsKey("ShowAppWindow"))
+                {
+                    bool shown = false;
+                    try
+                    {
+                        shown = XboxGamingBarHelper.Windows.User32.ShowAppFrameWindow("GoTweaks Lite");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Pipe: ShowAppWindow threw: {ex.Message}");
+                    }
+                    Logger.Info($"Pipe: ShowAppWindow request - shown={shown}");
+                    return;
+                }
+
                 // Handle export profiles request
                 if (pipeMsg.Extra.ContainsKey("ExportProfiles"))
                 {

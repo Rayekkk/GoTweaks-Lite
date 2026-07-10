@@ -4,7 +4,10 @@ using System;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
+using Windows.ApplicationModel.ExtendedExecution;
 using Windows.Foundation.Collections;
+using Windows.UI.Core.Preview;
+using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -275,6 +278,10 @@ namespace XboxGamingBar
                             Logger.Info($"GamingWidget navigated: {gamingWidget?.GetHashCode()}");
 
                             Window.Current.Closed += GamingWidgetWindow_Closed;
+
+                            // Keep the process alive while the widget exists - see
+                            // EnsureWidgetKeepAliveSessionAsync for why.
+                            _ = EnsureWidgetKeepAliveSessionAsync("widget launch activation");
                         }
                         catch (Exception ex)
                         {
@@ -335,6 +342,10 @@ namespace XboxGamingBar
                             Window.Current.Closed -= GamingWidgetWindow_Closed; // Remove if already registered
                             Window.Current.Closed += GamingWidgetWindow_Closed;
 
+                            // Keep the process alive while the widget exists - see
+                            // EnsureWidgetKeepAliveSessionAsync for why.
+                            _ = EnsureWidgetKeepAliveSessionAsync("widget upgrade activation");
+
                             Logger.Info("Calling Window.Current.Activate() for upgrade...");
                             Window.Current.Activate();
                             Logger.Info("Successfully upgraded from app mode to Game Bar widget mode.");
@@ -389,6 +400,8 @@ namespace XboxGamingBar
             gamingXboxGameBarWidget = null;
             gamingWidget = null;
             Window.Current.Closed -= GamingWidgetWindow_Closed;
+            // No widget left to keep alive - let normal suspend policy apply.
+            ReleaseWidgetKeepAliveSession("widget window closed");
         }
 
         private void GamingSettingsWidgetWindow_Closed(object sender, Windows.UI.Core.CoreWindowEventArgs e)
@@ -410,16 +423,10 @@ namespace XboxGamingBar
 
             // The package is also a normal Start-menu-launchable app (uap:VisualElements).
             // If it's launched directly while the Game Bar widget is already active, the
-            // widget has its OWN CoreWindow so both UIs genuinely coexist - but while the
-            // desktop window is up the overlay is closed, so the widget view is invisible;
-            // closing the desktop window then leaves zero visible views and Windows
-            // terminates the whole process. Game Bar shows a transient "Something went
-            // wrong with this widget" card and relaunches the widget cleanly a few seconds
-            // later. This is OS lifecycle policy, not something fixable by changing what
-            // OnLaunched does here - an earlier attempt to no-op this launch while the
-            // widget is active just hung the launch on its own splash screen instead (the
-            // shell creates the window before OnLaunched runs, so returning early leaves
-            // it stuck empty). Not worth "fixing" further; Game Bar's auto-recovery covers it.
+            // widget has its OWN CoreWindow so both UIs genuinely coexist - the desktop
+            // window closing is handled by DesktopView_CloseRequested below (minimize
+            // instead of closing, kept alive by EnsureWidgetKeepAliveSessionAsync) so it
+            // no longer kills the widget's connection.
             Frame rootFrame = Window.Current.Content as Frame;
 
             // Do not repeat app initialization when the Window already has content,
@@ -451,6 +458,147 @@ namespace XboxGamingBar
                 }
                 // Ensure the current window is active
                 Window.Current.Activate();
+
+                // If the window was minimized-to-tray via the helper, UWP's Activate()
+                // alone won't un-minimize the Win32-level window - ask the helper to
+                // re-show it. Harmless no-op when it wasn't hidden.
+                if (IsConnected && PipeClient != null)
+                {
+                    try
+                    {
+                        PipeClient.SendValueSet(new ValueSet { { "ShowAppWindow", true } });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"ShowAppWindow request on launch failed: {ex.Message}");
+                    }
+                }
+
+                // With the confirmAppClose capability, X on this desktop window raises
+                // CloseRequested instead of terminating outright. While a Game Bar widget
+                // is alive we minimize this window via the helper instead, so the process
+                // - and the widget - survive.
+                if (!desktopCloseRequestedRegistered)
+                {
+                    SystemNavigationManagerPreview.GetForCurrentView().CloseRequested += DesktopView_CloseRequested;
+                    desktopCloseRequestedRegistered = true;
+                }
+            }
+        }
+
+        private bool desktopCloseRequestedRegistered;
+
+        // UWP does not count the Game Bar-hosted widget view as visible, so whenever our
+        // last desktop window goes away the process suspends - and if the overlay is
+        // displaying the widget at that moment, Game Bar watches its widget's process
+        // suspend mid-session and shows "Something went wrong with this widget". An
+        // ExtendedExecutionSession ("run while minimized") held while a widget is alive
+        // prevents that suspend. Revocation (battery saver / resource pressure) degrades
+        // to the old behavior: suspend, error card, Game Bar relaunches us.
+        private ExtendedExecutionSession widgetKeepAliveSession;
+
+        private async Task EnsureWidgetKeepAliveSessionAsync(string reason)
+        {
+            if (widgetKeepAliveSession != null)
+            {
+                return;
+            }
+
+            try
+            {
+                var session = new ExtendedExecutionSession
+                {
+                    Reason = ExtendedExecutionReason.Unspecified,
+                    Description = "Keep the Game Bar widget connected while no desktop window is visible",
+                };
+                session.Revoked += WidgetKeepAliveSession_Revoked;
+                var result = await session.RequestExtensionAsync();
+                if (result == ExtendedExecutionResult.Allowed)
+                {
+                    widgetKeepAliveSession = session;
+                    Logger.Info($"Widget keep-alive extended execution granted ({reason})");
+                }
+                else
+                {
+                    session.Dispose();
+                    Logger.Warn($"Widget keep-alive extended execution DENIED ({reason}) - widget will suspend when no window is visible");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Widget keep-alive extended execution request threw ({reason}): {ex.Message}");
+            }
+        }
+
+        private void WidgetKeepAliveSession_Revoked(object sender, ExtendedExecutionRevokedEventArgs args)
+        {
+            Logger.Warn($"Widget keep-alive extended execution revoked: {args.Reason} - widget may suspend until re-granted");
+            try { widgetKeepAliveSession?.Dispose(); } catch { }
+            widgetKeepAliveSession = null;
+        }
+
+        private void ReleaseWidgetKeepAliveSession(string reason)
+        {
+            if (widgetKeepAliveSession == null)
+            {
+                return;
+            }
+
+            try { widgetKeepAliveSession.Dispose(); } catch { }
+            widgetKeepAliveSession = null;
+            Logger.Info($"Widget keep-alive extended execution released ({reason})");
+        }
+
+        private async void DesktopView_CloseRequested(object sender, SystemNavigationCloseRequestedPreviewEventArgs e)
+        {
+            // No widget alive -> this is a plain desktop app close; let it through.
+            if (gamingXboxGameBarWidget == null)
+            {
+                Logger.Info("Desktop window close: no active widget, closing normally");
+                return;
+            }
+
+            var deferral = e.GetDeferral();
+            try
+            {
+                // MINIMIZE instead of close. Closing (even via TryConsolidateAsync)
+                // leaves zero visible views - the widget's Game Bar-hosted view doesn't
+                // count - and Windows suspends the process, revoking extended execution
+                // with SystemPolicy at the same instant. A minimized window is the state
+                // our keep-alive ExtendedExecutionSession is designed to survive, so the
+                // process keeps running and the widget stays connected. The UWP view
+                // can't minimize itself; the full-trust helper does it via
+                // ShowWindow(SW_MINIMIZE) on our ApplicationFrameHost window. Restored
+                // from the helper's tray icon or a Start relaunch.
+                if (IsConnected && PipeClient != null)
+                {
+                    e.Handled = true;
+                    var message = new ValueSet { { "HideAppWindow", true } };
+                    PipeClient.SendValueSet(message);
+                    Logger.Info("Desktop window close intercepted while widget active: requested minimize via helper");
+                }
+                else
+                {
+                    // No helper to minimize us - fall back to consolidating the view.
+                    // The process will suspend and Game Bar will relaunch the widget,
+                    // which beats a window that refuses to close.
+                    e.Handled = true;
+                    bool consolidated = await ApplicationView.GetForCurrentView().TryConsolidateAsync();
+                    Logger.Info($"Desktop window close intercepted (helper unavailable): consolidated={consolidated}");
+                    if (!consolidated)
+                    {
+                        e.Handled = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"CloseRequested handling threw: {ex.Message}; closing normally");
+                e.Handled = false;
+            }
+            finally
+            {
+                deferral.Complete();
             }
         }
 

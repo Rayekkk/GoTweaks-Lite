@@ -286,7 +286,7 @@ Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction Silent
                         {
                             using (var notifyIcon = new global::System.Windows.Forms.NotifyIcon())
                             {
-                                notifyIcon.Text = "GoTweaks Helper";
+                                notifyIcon.Text = "GoTweaks Lite Helper";
                                 notifyIcon.Icon = trayIcon;
                                 notifyIcon.ContextMenuStrip = menu;
                                 notifyIcon.Visible = true;

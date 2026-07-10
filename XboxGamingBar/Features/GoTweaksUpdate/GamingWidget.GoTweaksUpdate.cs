@@ -146,7 +146,7 @@ namespace XboxGamingBar
                     if (QuickGoTweaksUpdateTile != null)
                         QuickGoTweaksUpdateTile.Visibility = showBanner ? Visibility.Visible : Visibility.Collapsed;
                     if (QuickGoTweaksTitleText != null && isUpdate)
-                        QuickGoTweaksTitleText.Text = $"GoTweaks {latest} available";
+                        QuickGoTweaksTitleText.Text = $"GoTweaks Lite {latest} available";
                     if (QuickGoTweaksSubtitleText != null)
                         QuickGoTweaksSubtitleText.Text = "Tap to install";
                 });

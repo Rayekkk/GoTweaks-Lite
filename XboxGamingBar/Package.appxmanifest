@@ -16,7 +16,7 @@
   <mp:PhoneIdentity PhoneProductId="c2dd2cd0-7156-428e-b305-d3dd3505b10d" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>GoTweaks</DisplayName>
+    <DisplayName>GoTweaks Lite</DisplayName>
     <PublisherDisplayName>Play and Build</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -34,10 +34,10 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="XboxGamingBar.App">
       <uap:VisualElements
-        DisplayName="GoTweaks"
+        DisplayName="GoTweaks Lite"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="GoTweaks widget for changing system settings during game sessions with gamepad."
+        Description="GoTweaks Lite widget for changing system settings during game sessions with gamepad."
         BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
         <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#171717" />
@@ -46,8 +46,8 @@
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension Name="microsoft.gameBarUIExtension"
                              Id="GamingWidget"
-                             DisplayName="GoTweaks"
-                             Description="GoTweaks widget for changing system settings during game sessions with gamepad."
+                             DisplayName="GoTweaks Lite"
+                             Description="GoTweaks Lite widget for changing system settings during game sessions with gamepad."
                              PublicFolder="Assets">
             <uap3:Properties>
               <GameBarWidget Type="Standard">
@@ -76,8 +76,8 @@
 		<uap3:Extension Category="windows.appExtension">
 			<uap3:AppExtension Name="microsoft.gameBarUIExtension"
 							Id="GamingWidgetSettings"
-							DisplayName="GoTweaks Settings"
-							Description="GoTweaks settings."
+							DisplayName="GoTweaks Lite Settings"
+							Description="GoTweaks Lite settings."
 							PublicFolder="Assets">
 				<uap3:Properties>
 					<GameBarWidget Type="Settings">
@@ -136,5 +136,6 @@
     <Capability Name="internetClient" />
 	<rescap:Capability Name="appDiagnostics" />
 	<rescap:Capability Name="broadFileSystemAccess" />
+	<rescap:Capability Name="confirmAppClose" />
   </Capabilities>
 </Package>

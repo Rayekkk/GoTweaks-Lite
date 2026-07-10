@@ -844,7 +844,7 @@ namespace XboxGamingBar
                 if (manifestFile == null)
                 {
                     var warningDialog = new Windows.UI.Popups.MessageDialog(
-                        "The selected folder doesn't appear to be a valid GoTweaks backup.\n\n" +
+                        "The selected folder doesn't appear to be a valid GoTweaks Lite backup.\n\n" +
                         "Please select a folder created by 'Export All Data' (e.g., GoTweaks_Backup_2024-...).",
                         "Invalid Backup Folder");
                     await warningDialog.ShowAsync();

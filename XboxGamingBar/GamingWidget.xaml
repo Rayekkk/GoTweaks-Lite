@@ -581,7 +581,7 @@
                                 <FontIcon Grid.Column="0" Glyph="&#xE896;" FontSize="20" Foreground="#7EB6FF" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="QuickGoTweaksTitleText"
-                                               Text="GoTweaks update available"
+                                               Text="GoTweaks Lite update available"
                                                FontSize="14"
                                                FontWeight="SemiBold"
                                                Foreground="#F0F0F0"/>
@@ -2955,7 +2955,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuAKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -2991,7 +2991,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuBKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3027,7 +3027,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuXKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3063,7 +3063,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuYKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3099,7 +3099,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuDpadUpKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3135,7 +3135,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuDpadDownKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3171,7 +3171,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuDpadLeftKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -3207,7 +3207,7 @@
                                                 <ComboBoxItem Content="Alt+F4" Tag="6"/>
                                                 <ComboBoxItem Content="Open Keyboard" Tag="7"/>
                                                 <ComboBoxItem Content="Task Manager" Tag="9"/>
-                                                <ComboBoxItem Content="Focus GoTweaks" Tag="10"/>
+                                                <ComboBoxItem Content="Focus GoTweaks Lite" Tag="10"/>
                                             </ComboBox>
                                         </Grid>
                                         <StackPanel x:Name="HotkeyMenuDpadRightKeyPanel" Orientation="Horizontal" Margin="80,4,0,0" Visibility="Collapsed">
@@ -5082,7 +5082,7 @@
                                                 Click="RestartHelperButton_Click"/>
                                         <Button x:Name="KillGoTweaksButton"
                                                 Grid.Column="2"
-                                                Content="Kill GoTweaks"
+                                                Content="Kill GoTweaks Lite"
                                                 HorizontalAlignment="Stretch"
                                                 Style="{StaticResource StandaloneButtonStyle}"
                                                 Click="KillGoTweaksButton_Click"/>
@@ -5118,7 +5118,7 @@
                                               Checked="GoTweaksUpdateOnStartCheckbox_Changed"
                                               Unchecked="GoTweaksUpdateOnStartCheckbox_Changed"/>
                                     <CheckBox x:Name="GoTweaksHideBannerCheckbox"
-                                              Content="Hide GoTweaks update banner on Quick tab"
+                                              Content="Hide GoTweaks Lite update banner on Quick tab"
                                               IsChecked="False"
                                               FontSize="12"
                                               Foreground="#AAAAAA"
@@ -7689,7 +7689,7 @@
                                             <ComboBoxItem Content="Guide"/>
                                             <ComboBoxItem Content="Keyboard Shortcut"/>
                                             <ComboBoxItem Content="Run Command"/>
-                                            <ComboBoxItem Content="Focus GoTweaks"/>
+                                            <ComboBoxItem Content="Focus GoTweaks Lite"/>
                                         </ComboBox>
                                     </Grid>
 
@@ -7743,7 +7743,7 @@
                                             <ComboBoxItem Content="Xbox Guide"/>
                                             <ComboBoxItem Content="Keyboard Shortcut"/>
                                             <ComboBoxItem Content="Run Command"/>
-                                            <ComboBoxItem Content="Focus GoTweaks"/>
+                                            <ComboBoxItem Content="Focus GoTweaks Lite"/>
                                         </ComboBox>
                                     </Grid>
 
@@ -7813,7 +7813,7 @@
                                             <ComboBoxItem Content="Xbox Guide"/>
                                             <ComboBoxItem Content="Keyboard Shortcut"/>
                                             <ComboBoxItem Content="Run Command"/>
-                                            <ComboBoxItem Content="Focus GoTweaks"/>
+                                            <ComboBoxItem Content="Focus GoTweaks Lite"/>
                                         </ComboBox>
                                     </Grid>
 
@@ -7868,7 +7868,7 @@
                                             <ComboBoxItem Content="Xbox Guide"/>
                                             <ComboBoxItem Content="Keyboard Shortcut"/>
                                             <ComboBoxItem Content="Run Command"/>
-                                            <ComboBoxItem Content="Focus GoTweaks"/>
+                                            <ComboBoxItem Content="Focus GoTweaks Lite"/>
                                         </ComboBox>
                                     </Grid>
 

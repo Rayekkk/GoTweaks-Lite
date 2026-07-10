@@ -78,6 +78,92 @@ namespace XboxGamingBarHelper.Windows
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        private const int SW_SHOW = 5;
+        private const int SW_MINIMIZE = 6;
+        private const int SW_RESTORE = 9;
+
+        /// <summary>
+        /// Finds the ApplicationFrameHost window whose title matches
+        /// <paramref name="title"/> exactly. The Game Bar-hosted widget window
+        /// is not an ApplicationFrameWindow, so the class filter keeps these
+        /// helpers from ever touching it.
+        /// </summary>
+        private static IntPtr FindAppFrameWindow(string title, bool visibleOnly)
+        {
+            IntPtr found = IntPtr.Zero;
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (visibleOnly && !IsWindowVisible(hWnd)) return true;
+
+                var classBuf = new StringBuilder(64);
+                if (GetClassName(hWnd, classBuf, classBuf.Capacity) == 0) return true;
+                if (classBuf.ToString() != "ApplicationFrameWindow") return true;
+
+                int len = GetWindowTextLength(hWnd);
+                if (len <= 0) return true;
+                var titleBuf = new StringBuilder(len + 1);
+                GetWindowText(hWnd, titleBuf, titleBuf.Capacity);
+                if (titleBuf.ToString() != title) return true;
+
+                found = hWnd;
+                return false; // stop enumeration
+            }, 0);
+            return found;
+        }
+
+        /// <summary>
+        /// Minimizes the desktop app window. Used by the widget's close path:
+        /// the UWP process can't minimize its own window, and closing it
+        /// instead suspends the whole process — killing the Game Bar widget.
+        /// Restore via <see cref="ShowAppFrameWindow"/>.
+        ///
+        /// Why minimize and not hide-to-tray: every hide/style variant
+        /// (SW_HIDE, minimize-then-hide, WS_EX_TOOLWINDOW + DeleteTab) ends
+        /// with ApplicationFrameHost re-presenting the window, because it
+        /// re-syncs its frame to the still-alive CoreWindow (alive by design —
+        /// the keep-alive session is what saves the widget). Minimize is the
+        /// one externally-applied state it respects. True close-to-tray needs
+        /// the app and widget split into separate processes.
+        /// </summary>
+        public static bool HideAppFrameWindow(string title)
+        {
+            IntPtr hWnd = FindAppFrameWindow(title, visibleOnly: true);
+            if (hWnd == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            return ShowWindow(hWnd, SW_MINIMIZE);
+        }
+
+        /// <summary>
+        /// Re-shows (and foregrounds) a desktop app window previously hidden by
+        /// <see cref="HideAppFrameWindow"/>, or restores it if minimized.
+        /// Returns false when no such window exists (app view never created —
+        /// caller should launch the app instead).
+        /// </summary>
+        public static bool ShowAppFrameWindow(string title)
+        {
+            IntPtr hWnd = FindAppFrameWindow(title, visibleOnly: false);
+            if (hWnd == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            ShowWindow(hWnd, IsIconic(hWnd) ? SW_RESTORE : SW_SHOW);
+            SetForegroundWindow(hWnd);
+            return true;
+        }
+
         // UWP child-window resolution: ApplicationFrameHost.exe hosts the visible frame for
         // packaged (MSIX/UWP) apps. The window we see via GetForegroundWindow is the frame
         // host's, so GetWindowThreadProcessId returns ApplicationFrameHost's PID, not the
