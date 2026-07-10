@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="XboxGamingBarPackage/Images/GoTweaks-1024.png" width="128" height="128" alt="GoTweaks Lite icon" />
+
 # 🎮 GoTweaks Lite
 
 **A stripped-down, Lenovo Legion Go 2–focused fork of [GoTweaks](https://github.com/corando98/GoTweaks).**
@@ -24,6 +26,7 @@ profiles, and an OSD — rebuilt into a clean, predictable base tuned specifical
 - [What's different from the original](#-whats-different-from-the-original)
 - [Features](#-features)
 - [Installation](#-installation)
+- [Uninstalling](#uninstalling)
 - [Requirements](#-requirements)
 - [Technology](#-technology)
 - [Credits & License](#-credits)
@@ -54,7 +57,7 @@ upstream, and why.
 - **AutoTDP** (the Q-learning / SARSA power controller), **Sticky TDP**, the **TDP Boost** toggle,
   **Custom TDP Presets**, and the **Device Min/Max TDP** panel — the single _TDP Mode_ selector
   replaces them all.
-- The beta **Sidebar overlay** — _Focus GoTweaks_ now simply opens the Game Bar.
+- The beta **Sidebar overlay** — _Focus GoTweaks Lite_ now simply opens the Game Bar.
 - **Microsoft / bundled Default Game Profiles** — only your own per-game profiles remain.
 - The **Advanced panel** (core parking / affinity), the **AC/DC Power Plan** selector, and the debug
   **Themes** selector — niche or no-ops on the Legion Go 2.
@@ -67,35 +70,25 @@ upstream, and why.
 - **Auto SDR** — while HDR is on, automatically matches the SDR white level to screen brightness
   so SDR content (desktop, most games) doesn't look washed out. _(Ported from the sibling Go2HDR
   project.)_
-- **PresentMon-based OSD metrics** — real rendered vs displayed FPS, a `[FG]` frame-generation
-  badge, and a frame-budget readout.
 - **Fix Task View Bug** _(Labs, opt-in)_ — a targeted fix for the Legion Go bug where, after a
   restart with a USB hub attached, focusing the desktop pops open Task View (Win+Tab) and buzzes
   the controller. It re-enumerates the controller's USB port once per boot — the software
   equivalent of physically replugging a pad. Enable it only if you have this bug.
-- **VIIPER controller emulation** — emulate a DualSense, DualSense Edge, DS4, Xbox 360, Switch Pro,
-  Joy-Con pair, or Steam Controller with real motion (gyro/accel) forwarded from the Legion Go's
-  own IMU, so games and Steam Input see native gyro aim instead of the stick-to-gyro workaround.
-  Replaces the old ViGEm-based emulation entirely — see [Requirements](#-requirements) for the
-  one-time `usbip-win2` driver it needs.
 
 ### 🔧 Reliability fixes
 
 - Correct **system-tray icon** (was the generic Windows icon).
 - Fixed **swapped CPU/GPU wattage sensors** on the Legion Go 2 so OSD labels match Adrenalin.
 - More reliable **AFMF toggle**, **fan-curve temperature** (now true CPU Tctl, not the chipset
-  sensor), and **Fan Full Speed**.
+  sensor), and **Fan Full Speed** — a custom fan curve also survives sleep/hibernate now instead
+  of silently stopping.
 - **Controller vibration & lighting persistence** across restarts, a **24-hour OSD clock**, extra
   navigation / media keys in the remap pickers, and improved **Lossless Scaling** runtime
   detection & reliability.
-
-### 🔄 In-app updates (points at this fork)
-
-- **GoTweaks Lite updates itself from _this_ repo** — never the upstream (corando98) build. When a
-  newer release lands here, a banner offers to download and install it in place, in one tap.
-- **One unified update path** — a single check in the elevated helper looks at this repo's latest
-  release and installs the signed `.msixbundle` silently. The **Check for updates on start** toggle
-  and the **Check for Update** button in Settings both use it.
+- **Closing the app window no longer kills the active Game Bar widget.** GoTweaks Lite can also be
+  opened as a standalone window (Start menu / taskbar) alongside the Game Bar overlay; closing that
+  window used to silently kill the widget's connection — it's now minimized instead, and the widget
+  keeps running.
 
 ---
 
@@ -135,9 +128,9 @@ Automatically apply your preferred settings when each game launches.
   - Lossless Scaling configuration
   - Legion Go controller settings
 
-### 🕹️ Legion Go Support
+### 🕹️ Legion Go 2 Support
 
-Deep support for the Legion Go 2 (and other Legion Go handhelds) with automatic device detection.
+Deep support for the Legion Go 2 with automatic device detection.
 
 **Performance modes**
 - Quiet, Balanced, Performance, and Custom
@@ -269,7 +262,7 @@ place — your profiles and settings are kept.
 
 1. Open Xbox Game Bar (`Win + G`)
 2. Open the **widget menu**
-3. Find and enable **“GoTweaks”**
+3. Find and enable **“GoTweaks Lite”**
 
 > The **first launch shows one more UAC prompt** — the elevated helper that drives the hardware
 > (TDP, fans, RGB) needs administrator rights. After that it registers a scheduled task, so future
@@ -280,8 +273,22 @@ place — your profiles and settings are kept.
 Required for per-game profiles:
 
 1. Open Xbox Game Bar → **Settings** → **More Settings**
-2. Find the **GoTweaks** widget
+2. Find the **GoTweaks Lite** widget
 3. Enable **“Know which game or app is in focus”**
+
+### Uninstalling
+
+The release includes **`Uninstall-GoTweaks.ps1`**, which cleanly restores your system: it stops the
+helper, clears any HidHide controller-hiding rules it added (so a controller is never left hidden),
+sweeps leftover virtual controllers, removes the scheduled task, and then removes the app package
+itself. Shared drivers (PawnIO, ViGEmBus) are left installed by default since other tools may use
+them too — pass `-RemoveDrivers` to also uninstall those.
+
+Open **PowerShell as Administrator**, `cd` to the folder with the release files, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\Uninstall-GoTweaks.ps1"
+```
 
 ---
 
