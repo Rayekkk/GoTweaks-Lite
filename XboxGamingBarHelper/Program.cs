@@ -442,6 +442,19 @@ namespace XboxGamingBarHelper
                         // are the source of truth for whether the launch actually succeeded.
                         LogManager.Shutdown();
                         Services.ScheduledTaskService.RunTaskNow();
+
+                        // Terminate hard instead of returning from Main. A plain return
+                        // (and even Environment.Exit(0)) can deadlock here: the Task
+                        // Scheduler COM apartment used by PerformSetup()/RunTaskNow()'s
+                        // PowerShell/CIM calls can wedge the managed shutdown/finalization
+                        // path, leaving this setup instance running indefinitely as a
+                        // second, harmless-looking XboxGamingBarHelper process (upstream
+                        // field report: still alive 20+ minutes after "exiting setup
+                        // mode"). Kill() is TerminateProcess - no shutdown ceremony to
+                        // deadlock on - and by this point the deploy is done and logs
+                        // (NLog already shut down above) are flushed.
+                        System.Diagnostics.Process.GetCurrentProcess().Kill();
+                        return;
                     }
 
                     return;
