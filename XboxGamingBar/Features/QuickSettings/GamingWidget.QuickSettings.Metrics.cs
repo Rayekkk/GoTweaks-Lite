@@ -504,6 +504,13 @@ namespace XboxGamingBar
                 QuickMetricsRow.Visibility = Visibility.Visible;
             }
 
+            // The TextBlocks just created above are seeded with "--" and only get repainted
+            // by the next helper push (UpdateQuickMetrics). If a push isn't imminent (e.g. we
+            // just came back from an instance recreation, or the user is mid-reorder), the row
+            // would sit on "--" for a while. Repaint immediately from already-cached data so
+            // there's no visible gap when we have it.
+            UpdateMetricsDisplay();
+
             // Also rebuild the reorder list
             RebuildMetricsReorderList();
         }

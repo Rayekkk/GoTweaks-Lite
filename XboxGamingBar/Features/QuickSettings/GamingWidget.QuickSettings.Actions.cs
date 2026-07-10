@@ -132,6 +132,12 @@ namespace XboxGamingBar
                             case "LegionLightMode":
                                 CycleLegionLightMode();
                                 break;
+                            case "LegionVibration":
+                                CycleLegionVibration();
+                                break;
+                            case "LegionVibrationMode":
+                                CycleLegionVibrationMode();
+                                break;
                             case "LegionDesktopControls":
                                 ToggleLegionDesktopControls();
                                 break;
@@ -1085,6 +1091,28 @@ namespace XboxGamingBar
                 int nextMode = (currentMode + 1) % 5; // 0-4: Off, Static, Breathing, Rainbow, Spiral
                 legionLightMode.SetValue(nextMode);
                 Logger.Info($"Legion Light Mode cycled from {currentMode} to {nextMode}");
+            }
+        }
+
+        private void CycleLegionVibration()
+        {
+            if (legionGoDetected?.Value == true && legionVibration != null)
+            {
+                int currentLevel = legionVibration.Value;
+                int nextLevel = (currentLevel + 1) % 4; // 0-3: Off, Weak, Medium, Strong
+                legionVibration.SetValue(nextLevel);
+                Logger.Info($"Legion Vibration intensity cycled from {currentLevel} to {nextLevel}");
+            }
+        }
+
+        private void CycleLegionVibrationMode()
+        {
+            if (legionGoDetected?.Value == true && legionVibrationMode != null)
+            {
+                int currentMode = legionVibrationMode.Value;
+                int nextMode = (currentMode + 1) % 5; // 0-4: FPS, Racing, AVG, SPG, RPG
+                legionVibrationMode.SetValue(nextMode);
+                Logger.Info($"Legion Vibration mode cycled from {currentMode} to {nextMode}");
             }
         }
 

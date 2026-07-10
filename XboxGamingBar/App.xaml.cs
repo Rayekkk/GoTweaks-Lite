@@ -407,6 +407,19 @@ namespace XboxGamingBar
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
             Logger.Info("App launched");
+
+            // The package is also a normal Start-menu-launchable app (uap:VisualElements).
+            // If it's launched directly while the Game Bar widget is already active, the
+            // widget has its OWN CoreWindow so both UIs genuinely coexist - but while the
+            // desktop window is up the overlay is closed, so the widget view is invisible;
+            // closing the desktop window then leaves zero visible views and Windows
+            // terminates the whole process. Game Bar shows a transient "Something went
+            // wrong with this widget" card and relaunches the widget cleanly a few seconds
+            // later. This is OS lifecycle policy, not something fixable by changing what
+            // OnLaunched does here - an earlier attempt to no-op this launch while the
+            // widget is active just hung the launch on its own splash screen instead (the
+            // shell creates the window before OnLaunched runs, so returning early leaves
+            // it stuck empty). Not worth "fixing" further; Game Bar's auto-recovery covers it.
             Frame rootFrame = Window.Current.Content as Frame;
 
             // Do not repeat app initialization when the Window already has content,

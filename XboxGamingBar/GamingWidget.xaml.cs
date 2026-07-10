@@ -2958,6 +2958,22 @@ namespace XboxGamingBar
             App.RegisterActiveGamingWidget(this);
             Logger.Info("GamingWidget instance registered as active.");
 
+            // Re-bind this instance's pipe handlers unconditionally, even if the pipe is
+            // already connected. Game Bar can recreate the GamingWidget Page in place
+            // (display-mode/dock changes) without ever dropping the named pipe. When that
+            // happens the code below takes the "already connected" branch and never calls
+            // TryConnectPipeAsync — which is the ONLY other place these handlers get
+            // (re)subscribed. Without this, the new active instance never receives live
+            // pipe pushes (e.g. Function.QuickMetrics), so anything driven purely by push
+            // (like the Quick Metrics row) freezes at its last value / "--" until the
+            // widget is fully closed and reopened, forcing a real reconnect. -= before +=
+            // keeps this idempotent for the fresh-connect path, where TryConnectPipeAsync
+            // does the same subscription right after.
+            App.PipeMessageReceived -= PipeClient_MessageReceived;
+            App.PipeMessageReceived += PipeClient_MessageReceived;
+            App.PipeDisconnected -= PipeClient_Disconnected;
+            App.PipeDisconnected += PipeClient_Disconnected;
+
             //while (!System.Diagnostics.Debugger.IsAttached)
             //{
             //    await Task.Delay(500);

@@ -2931,6 +2931,21 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     vibrationLevel = level;
                     Logger.Info($"Vibration set to level {level} ({result.Message})");
+
+                    // The intensity HID command (05 06 67 02 ...) is a silent config write —
+                    // unlike SetVibrationMode's command (05 00 06 04 03 ...), the controller
+                    // firmware doesn't play a confirmation buzz for it. Re-issue the current
+                    // vibration mode (unchanged) right after so the user gets the same demo
+                    // pulse they'd feel from changing mode, now at the newly set intensity —
+                    // gives tactile feedback for the Quick-tab intensity tile. Skipped when
+                    // turning vibration Off, since a demo buzz there would contradict the
+                    // user's intent.
+                    if (level > 0)
+                    {
+                        try { SetVibrationMode(vibrationMode); }
+                        catch (Exception demoEx) { Logger.Debug($"Vibration demo pulse after intensity change failed: {demoEx.Message}"); }
+                    }
+
                     return true;
                 }
 

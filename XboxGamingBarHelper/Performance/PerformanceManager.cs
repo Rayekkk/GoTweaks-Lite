@@ -49,9 +49,6 @@ namespace XboxGamingBarHelper.Performance
 
         public CPUUsageSensor CPUUsage { get; }
         public CPUClockSensor CPUClock { get; }
-        // Wattage typed as base HardwareSensor so we can swap CPU<->GPU
-        // sources on devices where LibreHardwareMonitor reports them swapped
-        // (e.g. LeGo2 / Ryzen Z2 Extreme — see PerformanceManager constructor).
         public HardwareSensor CPUWattage { get; private set; }
         public CPUTemperatureSensor CPUTemperature { get; }
         public VRMTemperatureSensor VRMTemperature { get; }
@@ -60,6 +57,12 @@ namespace XboxGamingBarHelper.Performance
         public GPUClockSensor GPUClock { get; }
         public HardwareSensor GPUWattage { get; private set; }
         public GPUTemperatureSensor GPUTemperature { get; }
+
+        // The sensor object that always queries GPU-hardware power sensors, regardless of
+        // which public property (CPUWattage/GPUWattage) currently exposes it after the
+        // device-specific swap below. Used by the ADLX GPU fallback — see the swap comment
+        // in the constructor for why the GPUWattage property alone isn't a safe target.
+        private HardwareSensor gpuHardwareWattageSensor;
 
         public MemoryUsageSensor MemoryUsage { get; }
         public MemoryUsedSensor MemoryUsed { get; }
@@ -570,6 +573,14 @@ namespace XboxGamingBarHelper.Performance
             GPUTemperature = new GPUTemperatureSensor();
             GPUWattage = new GPUWattageSensor();
 
+            // Remember the sensor object that actually queries GPU hardware ("GPU Core" /
+            // "GPU Package" / "GPU Power") BEFORE the LeGo2 swap below can reassign the
+            // GPUWattage field to something else. FillGpuSensorsFromAdlxFallback needs this
+            // fixed reference — it fills in ADLX data specifically when the GPU-hardware LHM
+            // sensor is absent (a known LeGo2/Z2 gap), and must keep targeting that same
+            // sensor object regardless of which public property currently exposes it.
+            gpuHardwareWattageSensor = GPUWattage;
+
             // LeGo2 (Ryzen Z2 Extreme): LibreHardwareMonitor's CPU "Package" sensor
             // reports what AMD Adrenalin's overlay labels GPU Power, and the GPU
             // "GPU Core" sensor reports CPU package power — they're swapped vs.
@@ -577,6 +588,12 @@ namespace XboxGamingBarHelper.Performance
             // showed 25 W at the same time AMD Adrenalin showed 25 W on GPU).
             // Swap the two sensor references so OSD labels match what the user
             // expects (and what AMD's overlay shows).
+            //
+            // 2026-07-10: briefly reverted this swap based on a raw-LHM-log reading that
+            // looked plausible unswapped (Package 18-44W, GPU Core ~0W), but on-device
+            // testing showed the SWAPPED labeling is what's actually correct for this
+            // user's unit — reverted back. Don't re-attempt removing this from log
+            // inspection alone; only change it based on live on-device confirmation.
             try
             {
                 var detected = Devices.DeviceDetector.DetectDevice();
@@ -1135,7 +1152,7 @@ namespace XboxGamingBarHelper.Performance
             bool needAny =
                 IsMissing(pendingValues, GPUUsage) ||
                 IsMissing(pendingValues, GPUClock) ||
-                IsMissing(pendingValues, GPUWattage) ||
+                IsMissing(pendingValues, gpuHardwareWattageSensor) ||
                 IsMissing(pendingValues, GPUTemperature) ||
                 IsMissing(pendingValues, GPUMemoryClock);
             if (!needAny)
@@ -1160,9 +1177,9 @@ namespace XboxGamingBarHelper.Performance
                 pendingValues[GPUClock] = snap.GpuClockMHz;
                 filled++;
             }
-            if (IsMissing(pendingValues, GPUWattage) && snap.HasPowerW)
+            if (IsMissing(pendingValues, gpuHardwareWattageSensor) && snap.HasPowerW)
             {
-                pendingValues[GPUWattage] = (float)snap.GpuPowerW;
+                pendingValues[gpuHardwareWattageSensor] = (float)snap.GpuPowerW;
                 filled++;
             }
             if (IsMissing(pendingValues, GPUTemperature) && snap.HasTemperatureC)

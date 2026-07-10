@@ -179,6 +179,7 @@ namespace XboxGamingBarHelper.Labs
         private bool _hasWriteAccess = false;  // Track if we have write access for heartbeat
         private bool _highQualityGyroConfigured = false;
         private readonly object _hidLock = new object();  // Lock for HID operations to prevent race conditions
+        private readonly object startStopLock = new object();  // Serializes Start/StartForBatteryMonitoring/Stop (see Start)
         private Thread monitorThread;
         private volatile bool isRunning = false;
         private volatile bool isDisposed = false;
@@ -1060,14 +1061,29 @@ namespace XboxGamingBarHelper.Labs
         /// </summary>
         public bool Start()
         {
-            if (isRunning)
-                return true;
-
-            // Check if we have any button or scroll configured
-            if (!HasAnyButtonConfigured && !HasAnyScrollConfigured)
+            // Start/StartForBatteryMonitoring used to check isRunning, run the slow HID
+            // scan (seconds when a controller answers with the wrong report format, e.g.
+            // on first boot), and only then set isRunning — so the Legion L config, Legion
+            // R config, and battery-monitor startup calls arriving within ~400ms of each
+            // other could each pass the check and spawn their own MonitorLoop. Two loops
+            // double every scan/read/reconnect forever, and the second thread overwrites
+            // monitorThread so Stop() can only join one of them (matches the upstream
+            // report of "helper at constant CPU until reboot" — after a reboot the
+            // controller answers instantly, the race window vanishes). Claim isRunning
+            // under a lock before the scan so a concurrent caller bails at the check.
+            lock (startStopLock)
             {
-                Logger.Warn("LegionButtonMonitor: No buttons or scroll configured, not starting");
-                return false;
+                if (isRunning)
+                    return true;
+
+                // Check if we have any button or scroll configured
+                if (!HasAnyButtonConfigured && !HasAnyScrollConfigured)
+                {
+                    Logger.Warn("LegionButtonMonitor: No buttons or scroll configured, not starting");
+                    return false;
+                }
+
+                isRunning = true;
             }
 
             // Try to find and open Legion controller HID device
@@ -1079,7 +1095,6 @@ namespace XboxGamingBarHelper.Labs
             }
 
             // Start monitoring thread - it will handle reconnection if controller not found
-            isRunning = true;
             monitorThread = new Thread(MonitorLoop)
             {
                 IsBackground = true,
@@ -1121,6 +1136,10 @@ namespace XboxGamingBarHelper.Labs
         /// </summary>
         public void Stop()
         {
+            // Same lock as Start, so a concurrent Start can't interleave with teardown.
+            // MonitorLoop itself never takes this lock, so the Join below can't deadlock.
+            lock (startStopLock)
+            {
             if (!isRunning)
                 return;
 
@@ -1166,6 +1185,7 @@ namespace XboxGamingBarHelper.Labs
             _highQualityGyroConfigured = false;
 
             Logger.Info("LegionButtonMonitor: Stopped");
+            }
         }
 
         /// <summary>
@@ -1175,8 +1195,14 @@ namespace XboxGamingBarHelper.Labs
         /// <returns>True if successfully started</returns>
         public bool StartForBatteryMonitoring()
         {
-            if (isRunning)
-                return true;
+            // Same start race as Start() - see the comment there.
+            lock (startStopLock)
+            {
+                if (isRunning)
+                    return true;
+
+                isRunning = true;
+            }
 
             // Try to find and open Legion controller HID device
             // Even if not found initially, start the monitor thread which will retry
@@ -1187,7 +1213,6 @@ namespace XboxGamingBarHelper.Labs
             }
 
             // Start monitoring thread - it will handle reconnection if controller not found
-            isRunning = true;
             monitorThread = new Thread(MonitorLoop)
             {
                 IsBackground = true,
@@ -2631,10 +2656,17 @@ namespace XboxGamingBarHelper.Labs
                             {
                                 if (hasTabletReportHeader)
                                 {
-                                    // With heartbeat always active, we use 04:00:A1 header format
-                                    // Battery at bytes 3-6, connection status at bytes 10-11
-                                    int batteryOffset = 3;
-                                    int connOffset = 10;
+                                    // Battery/connection block shifts by +2 in detached mode, same as
+                                    // every other field in this report (buttons 16->18 via
+                                    // BUTTON_BYTE_ATTACHED/DETACHED, touch 24->26, IMU 32->34 — all
+                                    // confirmed via on-device capture). This offset was previously
+                                    // hardcoded to the attached-only values, so battery % silently
+                                    // read the wrong bytes (and usually "not connected") whenever the
+                                    // controllers were physically detached from the console.
+                                    // Attached (04:00:A1): battery at bytes 3-6, connection at 10-11.
+                                    // Detached (04:3C:74):  battery at bytes 5-8, connection at 12-13.
+                                    int batteryOffset = isDetachedMode ? 5 : 3;
+                                    int connOffset = isDetachedMode ? 12 : 10;
 
                                     // Connection status: 0x01=Off, 0x02=Attached, 0x03=Detached
                                     // Only 0x02 means the controller is actually connected

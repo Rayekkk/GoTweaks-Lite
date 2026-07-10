@@ -275,6 +275,8 @@ namespace XboxGamingBar
 
             // Row 7 - System/Device
             AddTileDefinition("LegionLightMode", "Light Mode", "\uE781", order: order++);
+            AddTileDefinition("LegionVibration", "Vibration", "\uE9CA", order: order++);
+            AddTileDefinition("LegionVibrationMode", "Vib. Mode", "\uE7FC", order: order++);
             AddTileDefinition("LegionPowerLight", "Power Light", "\uE7E8", order: order++);
             AddTileDefinition("LegionChargeLimit", "Charge Limit", "\uE83F", order: order++);
             AddTileDefinition("LegionFanFullSpeed", "Fan Max", "\uE9CA", order: order++);

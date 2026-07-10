@@ -617,6 +617,49 @@ namespace XboxGamingBar
                     }
                 }
 
+                // Legion Vibration intensity tile
+                if (qsTileMap.TryGetValue("LegionVibration", out var vibrationTile) && vibrationTile.TileButton != null)
+                {
+                    if (legionGoDetected?.Value == true)
+                    {
+                        int level = legionVibration?.Value ?? 0;
+                        string levelText;
+                        switch (level)
+                        {
+                            case 0: levelText = "Off"; break;
+                            case 1: levelText = "Weak"; break;
+                            case 2: levelText = "Medium"; break;
+                            case 3: levelText = "Strong"; break;
+                            default: levelText = "Off"; break;
+                        }
+                        vibrationTile.StateText.Text = levelText;
+                        vibrationTile.StateText.Foreground = level > 0 ? accentForeground : offForeground;
+                        vibrationTile.TileButton.Background = level > 0 ? tileOnBrush : tileOffBrush;
+                    }
+                }
+
+                // Legion Vibration Mode tile
+                if (qsTileMap.TryGetValue("LegionVibrationMode", out var vibrationModeTile) && vibrationModeTile.TileButton != null)
+                {
+                    if (legionGoDetected?.Value == true)
+                    {
+                        int vibMode = legionVibrationMode?.Value ?? 0;
+                        string vibModeText;
+                        switch (vibMode)
+                        {
+                            case 0: vibModeText = "FPS"; break;
+                            case 1: vibModeText = "Racing"; break;
+                            case 2: vibModeText = "AVG"; break;
+                            case 3: vibModeText = "SPG"; break;
+                            case 4: vibModeText = "RPG"; break;
+                            default: vibModeText = "FPS"; break;
+                        }
+                        vibrationModeTile.StateText.Text = vibModeText;
+                        vibrationModeTile.StateText.Foreground = accentForeground;
+                        vibrationModeTile.TileButton.Background = tileOnBrush;
+                    }
+                }
+
                 // Legion Desktop Controls tile
                 if (qsTileMap.TryGetValue("LegionDesktopControls", out var desktopTile) && desktopTile.TileButton != null)
                 {
