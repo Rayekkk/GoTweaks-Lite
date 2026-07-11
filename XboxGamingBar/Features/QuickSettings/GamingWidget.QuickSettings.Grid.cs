@@ -450,7 +450,8 @@ namespace XboxGamingBar
             if ((tile.Id == "LegionTouchpad" || tile.Id == "LegionLightMode" ||
                  tile.Id == "LegionDesktopControls" || tile.Id == "LegionRemapControls" ||
                  tile.Id == "LegionChargeLimit" || tile.Id == "LegionPowerLight" ||
-                 tile.Id == "LegionVibration" || tile.Id == "LegionVibrationMode") &&
+                 tile.Id == "LegionVibration" || tile.Id == "LegionVibrationMode" ||
+                 tile.Id == "Touchscreen") &&
                 (legionGoDetected?.Value != true))
             {
                 return true;

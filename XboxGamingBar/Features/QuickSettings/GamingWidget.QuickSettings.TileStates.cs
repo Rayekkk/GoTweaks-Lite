@@ -595,6 +595,18 @@ namespace XboxGamingBar
                     }
                 }
 
+                // Touchscreen tile
+                if (qsTileMap.TryGetValue("Touchscreen", out var touchscreenTile) && touchscreenTile.TileButton != null)
+                {
+                    if (legionGoDetected?.Value == true)
+                    {
+                        bool enabled = touchscreenEnabled?.Value ?? true;
+                        touchscreenTile.StateText.Text = enabled ? "On" : "Off";
+                        touchscreenTile.StateText.Foreground = enabled ? accentForeground : offForeground;
+                        touchscreenTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
+                    }
+                }
+
                 // Legion Light Mode tile
                 if (qsTileMap.TryGetValue("LegionLightMode", out var lightTile) && lightTile.TileButton != null)
                 {

@@ -267,6 +267,7 @@ namespace XboxGamingBar
             AddTileDefinition("ScreenSaver", "Idle Screen Off", "\uE7E8", order: order++);
             AddTileDefinition("Keyboard", "Keyboard", "\uE765", isTrigger: true, order: order++);
             AddTileDefinition("LegionTouchpad", "Touchpad", "\uE962", order: order++);
+            AddTileDefinition("Touchscreen", "Touchscreen", "\uE815", order: order++);
             AddTileDefinition("LegionRemapControls", "Remap", "\uE7FC", order: order++);
             AddTileDefinition("LegionDesktopControls", "Desktop", "\uE7F4", order: order++);
             // Quick toggle for the legacy controller emulation backend; state text shows

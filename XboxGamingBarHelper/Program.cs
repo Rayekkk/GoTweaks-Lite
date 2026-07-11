@@ -1284,6 +1284,7 @@ namespace XboxGamingBarHelper
                 systemManager.AdaptiveBrightnessMode,
                 systemManager.PanelBrightness,
                 systemManager.PanelBrightnessSupported,
+                systemManager.TouchscreenEnabled,
                 systemManager.TrackedGame,
                 rtssManager.RTSSInstalled,
                 rtssManager.OSDConfig,

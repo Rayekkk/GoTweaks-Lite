@@ -565,5 +565,10 @@
         // One-click usbip-win2 installer (ported from upstream 1422a30; upstream inserted
         // it mid-enum, we append at the END per the positional-wire-id rule).
         Viiper_InstallUsbip,        // string - write "install" to trigger silent usbip-win2 download + install (helper runs the pinned InnoSetup installer elevated)
+
+        // Enable/disable the built-in touch screen digitizer via SetupAPI device disable
+        // (Windows.Devices\HIDClass, matched by friendly name containing "touch screen").
+        // Not Legion-specific hardware, but only surfaced on Legion Go 2 for now.
+        TouchscreenEnabled,         // bool - true = touch input active, false = digitizer disabled
     }
 }
