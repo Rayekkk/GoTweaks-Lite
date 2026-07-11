@@ -1003,12 +1003,86 @@ namespace XboxGamingBar
             }
         }
 
+        /// <summary>
+        /// Dark, rounded Windows 11-style ContentDialog, replacing the legacy
+        /// Windows.UI.Popups.MessageDialog (which always renders with the OS light
+        /// system chrome regardless of app theme - looks like a Windows 10 dialog).
+        /// The dialog panel gets literal colors matching the widget's own card palette;
+        /// the Primary/Close buttons deliberately keep the system ContentDialog's own
+        /// default template (correct native size/padding/corner-radius/hover states) and
+        /// only get their Background/Foreground recolored via the documented named-parts
+        /// pattern (PrimaryButton/CloseButton, found post-Opened) - building a from-scratch
+        /// Button Style here previously produced mismatched proportions (too tall, uneven
+        /// widths between the two buttons) that didn't match the rest of the app's buttons.
+        /// </summary>
+        private ContentDialog BuildWin11Dialog(string title, string message, string primaryText, string closeText)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = new TextBlock
+                {
+                    Text = title,
+                    FontSize = 16,
+                    FontWeight = Windows.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Colors.White)
+                },
+                Content = new TextBlock
+                {
+                    Text = message,
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xD0, 0xD0, 0xD0)),
+                    TextWrapping = TextWrapping.Wrap
+                },
+                PrimaryButtonText = primaryText,
+                CloseButtonText = closeText,
+                DefaultButton = ContentDialogButton.Close,
+                RequestedTheme = ElementTheme.Dark,
+                Background = new SolidColorBrush(Color.FromArgb(0xFF, 0x30, 0x34, 0x3A)),
+                Foreground = new SolidColorBrush(Colors.White),
+                CornerRadius = new CornerRadius(8),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0x50, 0x55, 0x5C)),
+                BorderThickness = new Thickness(1)
+            };
+
+            dialog.Opened += (s, args) =>
+            {
+                if (!string.IsNullOrEmpty(primaryText) && dialog.FindName("PrimaryButton") is Button primaryBtn)
+                {
+                    primaryBtn.Background = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x78, 0xD4));
+                    primaryBtn.Foreground = new SolidColorBrush(Colors.White);
+                }
+                if (dialog.FindName("CloseButton") is Button closeBtn)
+                {
+                    closeBtn.Background = new SolidColorBrush(Color.FromArgb(0xFF, 0x3E, 0x43, 0x4B));
+                    closeBtn.Foreground = new SolidColorBrush(Colors.White);
+                }
+            };
+
+            return dialog;
+        }
+
+        /// <summary>Win11-styled confirm dialog. Returns true if the primary (non-Cancel) button was pressed.</summary>
+        private async Task<bool> ShowWin11ConfirmDialogAsync(string title, string message, string primaryText = "Continue", string closeText = "Cancel")
+        {
+            var dialog = BuildWin11Dialog(title, message, primaryText, closeText);
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary;
+        }
+
+        /// <summary>Win11-styled info dialog with a single "OK" button.</summary>
+        private async Task ShowWin11InfoDialogAsync(string title, string message)
+        {
+            var dialog = BuildWin11Dialog(title, message, primaryText: null, closeText: "OK");
+            await dialog.ShowAsync();
+        }
+
         private async void PrepareForUninstallButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 // Show confirmation dialog
-                var dialog = new Windows.UI.Popups.MessageDialog(
+                bool proceed = await ShowWin11ConfirmDialogAsync(
+                    "Prepare for Uninstall",
                     "This will:\n\n" +
                     "• Remove the scheduled task\n" +
                     "• Restore original CPU Boost, EPP, Max/Min CPU State and Power Mode settings\n" +
@@ -1018,16 +1092,9 @@ namespace XboxGamingBar
                     "• Stop controller emulation and clear HidHide rules\n\n" +
                     "This does not remove drivers (PawnIO, usbip-win2, HidHide) or the deployed " +
                     "helper copy - for a full cleanup, run Uninstall-GoTweaks.ps1 after uninstalling.\n\n" +
-                    "After this, you can safely uninstall the app.",
-                    "Prepare for Uninstall");
+                    "After this, you can safely uninstall the app.");
 
-                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Continue"));
-                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Cancel"));
-                dialog.DefaultCommandIndex = 1;
-                dialog.CancelCommandIndex = 1;
-
-                var result = await dialog.ShowAsync();
-                if (result.Label == "Cancel")
+                if (!proceed)
                     return;
 
                 PrepareForUninstallButton.IsEnabled = false;
@@ -1054,10 +1121,7 @@ namespace XboxGamingBar
                     Logger.Info($"PrepareForUninstall result:\n{resultText}");
 
                     // Show result in a dialog
-                    var resultDialog = new Windows.UI.Popups.MessageDialog(
-                        resultText,
-                        "Uninstall Preparation Complete");
-                    await resultDialog.ShowAsync();
+                    await ShowWin11InfoDialogAsync("Uninstall Preparation Complete", resultText);
 
                     PrepareForUninstallButton.Content = "Done!";
                 }
