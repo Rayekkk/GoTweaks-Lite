@@ -106,7 +106,7 @@ namespace XboxGamingBar
                 Background = isSelected
                     ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 120, 180))  // Highlight selected
                     : (tile.IsVisible
-                        ? tileOffBrush
+                        ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x45, 0x4A, 0x52))  // Lighter than the card background so it doesn't blend in
                         : new SolidColorBrush(Windows.UI.Color.FromArgb(128, 26, 28, 30))),  // Dimmed if hidden
                 BorderBrush = isSelected
                     ? new SolidColorBrush(Windows.UI.Colors.White)
@@ -320,7 +320,7 @@ namespace XboxGamingBar
                             btn.Background = isSelected
                                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 120, 180))
                                 : (tile.IsVisible
-                                    ? tileOffBrush
+                                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x45, 0x4A, 0x52))
                                     : new SolidColorBrush(Windows.UI.Color.FromArgb(128, 26, 28, 30)));
                             btn.BorderBrush = isSelected
                                 ? new SolidColorBrush(Windows.UI.Colors.White)
