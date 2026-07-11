@@ -428,18 +428,41 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Create columns for each selected metric
-            foreach (var _ in selectedMetrics)
+            // Create columns: one star column per metric, plus a thin Auto divider
+            // column between each pair of metrics.
+            for (int c = 0; c < selectedMetrics.Count; c++)
             {
+                if (c > 0) QuickMetricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 QuickMetricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             }
 
-            // Create UI for each selected metric
-            int colIndex = 0;
-            foreach (var metricType in selectedMetrics)
+            // Icon color: the user's live Windows accent color (unlike the Quick tab
+            // tile subtitle/state text, which stay pinned to the default Windows
+            // blue - this one deliberately follows the user's actual accent).
+            var metricIconBrush = new SolidColorBrush((Windows.UI.Color)Application.Current.Resources["SystemAccentColorLight2"]);
+
+            // Create UI for each selected metric: icon centered on top, value
+            // centered below the icon, gray label centered below the value.
+            int gridCol = 0;
+            for (int i = 0; i < selectedMetrics.Count; i++)
             {
+                var metricType = selectedMetrics[i];
                 if (!metricDefinitions.TryGetValue(metricType, out var info))
                     continue;
+
+                if (i > 0)
+                {
+                    // Thin gray divider between metrics.
+                    var divider = new Border
+                    {
+                        Width = 1,
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)),
+                        Margin = new Thickness(0, 2, 0, 2)
+                    };
+                    Grid.SetColumn(divider, gridCol);
+                    QuickMetricsGrid.Children.Add(divider);
+                    gridCol++;
+                }
 
                 // Create metric panel
                 var panel = new StackPanel
@@ -448,36 +471,26 @@ namespace XboxGamingBar
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
-                // Value row (icon + value)
-                var valueRow = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                };
-
                 var icon = new FontIcon
                 {
                     Glyph = info.Glyph,
-                    FontSize = 14,
-                    // Pinned to the DEFAULT Windows 11 accent blue (#0078D4 -> Light2 tint #76B9ED),
-                    // NOT the user's chosen Windows accent color. Matches the shortcut-tile subtitle color.
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x76, 0xB9, 0xED)),
-                    Margin = new Thickness(0, 0, 4, 0),
-                    VerticalAlignment = VerticalAlignment.Center
+                    FontSize = 16,
+                    Foreground = metricIconBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 3)
                 };
 
                 var valueText = new TextBlock
                 {
                     Text = "--",
-                    FontSize = 14,
+                    // Matches the Quick Settings tile name/title font size (see
+                    // CreateTileButton in GamingWidget.QuickSettings.TileStates.cs).
+                    FontSize = 13,
                     FontWeight = Windows.UI.Text.FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Windows.UI.Colors.White),
-                    VerticalAlignment = VerticalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center
                 };
                 info.ValueTextBlock = valueText;
-
-                valueRow.Children.Add(icon);
-                valueRow.Children.Add(valueText);
 
                 // Label
                 var labelText = new TextBlock
@@ -485,17 +498,19 @@ namespace XboxGamingBar
                     Text = info.Label,
                     FontSize = 10,
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136)), // #888888
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 2, 0, 0)
                 };
                 info.LabelTextBlock = labelText;
 
-                panel.Children.Add(valueRow);
+                panel.Children.Add(icon);
+                panel.Children.Add(valueText);
                 panel.Children.Add(labelText);
 
-                Grid.SetColumn(panel, colIndex);
+                Grid.SetColumn(panel, gridCol);
                 QuickMetricsGrid.Children.Add(panel);
 
-                colIndex++;
+                gridCol++;
             }
 
             // Show the row if we have metrics

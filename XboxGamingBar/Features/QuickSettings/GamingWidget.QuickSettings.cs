@@ -46,8 +46,29 @@ namespace XboxGamingBar
         // Tile brushes
         private SolidColorBrush tileOffBrush;
         private SolidColorBrush tileOnBrush;
-        private SolidColorBrush tileActiveBrush;
-        private SolidColorBrush tileTriggerBrush;
+
+        // Active-tile accent signal: the live Windows accent color shows up on the
+        // state text ("On") and the bottom accent bar; tile background/icon/name
+        // stay neutral/white always.
+        private SolidColorBrush tileAccentBrush;
+        private SolidColorBrush tileBarOffBrush;
+
+        // Action/trigger tiles (Keyboard, custom shortcuts, Task Mgr, Explorer, End
+        // Task, Hibernate - things that fire immediately rather than toggle) use their
+        // own distinct color for the subtitle + bottom bar, never the Win11 accent.
+        // Background/border stay identical to every other tile.
+        private SolidColorBrush tileActionBrush;
+
+        // Fixed severity colors for multi-state tiles (Battery, TDP Mode, Power Mode,
+        // EPP) - these are NEVER tied to the Windows accent color, so the meaning
+        // (green=light/safe, blue=balanced, red=heavy/hot, purple=custom) stays
+        // consistent regardless of what accent the user picked. Background stays
+        // neutral, state text stays the default gray - only the bottom bar uses
+        // these.
+        private SolidColorBrush tileSeverityGreenBrush;
+        private SolidColorBrush tileSeverityBlueBrush;
+        private SolidColorBrush tileSeverityRedBrush;
+        private SolidColorBrush tileSeverityPurpleBrush;
         private bool quickSettingsInitialized = false;
 
         // Tile definitions with visibility tracking
@@ -64,6 +85,8 @@ namespace XboxGamingBar
             public Button TileButton { get; set; }
             public TextBlock StateText { get; set; }
             public CheckBox VisibilityCheckBox { get; set; }
+            public FontIcon IconElement { get; set; }
+            public Border AccentBar { get; set; }
 
             // For scrolling text animation (Profile tile)
             public Canvas StateTextCanvas { get; set; }
@@ -167,22 +190,28 @@ namespace XboxGamingBar
                 qsEditMode = false;
                 qsSelectedTileForMove = null;
 
-                // Dark mode colors with sharp contrast for handheld devices
-                // On state: use desaturated system accent color for subtle indication
-                var accentDark3 = (Windows.UI.Color)Application.Current.Resources["SystemAccentColorDark3"];
-                // Blend accent with dark gray to reduce saturation (40% accent, 60% dark base)
-                var darkBase = Windows.UI.Color.FromArgb(255, 26, 28, 30); // Same as tile off
-                var desaturatedAccent = Windows.UI.Color.FromArgb(
-                    255,
-                    (byte)((accentDark3.R * 0.4) + (darkBase.R * 0.6)),
-                    (byte)((accentDark3.G * 0.4) + (darkBase.G * 0.6)),
-                    (byte)((accentDark3.B * 0.4) + (darkBase.B * 0.6)));
-                tileOnBrush = new SolidColorBrush(desaturatedAccent);
+                // Active-tile accent signal lives in the state text color and the
+                // bottom accent bar (see SetTileAccentBar) - tile background/icon/name
+                // stay neutral/white always.
+                var liveAccent = (Windows.UI.Color)Application.Current.Resources["SystemAccentColorLight2"];
 
-                // Other tile brushes - dark mode
-                tileOffBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 28, 30));   // #1A1C1E
-                tileActiveBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 37, 48)); // #1A2530 - dark blue
-                tileTriggerBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 32, 48)); // #252030 - dark purple
+                tileOffBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x35, 0x39, 0x3F)); // flat neutral gray
+                tileOnBrush = tileOffBrush;
+
+                tileAccentBrush = new SolidColorBrush(liveAccent);
+                // Same muted gray as the state text's "off" color, so the bar is
+                // always present (every tile) but reads as grayed-out when inactive.
+                tileBarOffBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+
+                // Light purple - distinct from the accent, used only by action/trigger tiles.
+                tileActionBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 150, 200));
+
+                // Fixed severity colors (Battery, TDP Mode, Power Mode, EPP) - never
+                // tied to the live accent.
+                tileSeverityGreenBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F));  // Fluent "Success" green
+                tileSeverityBlueBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x4C, 0xC2, 0xFF));   // Windows blue swatch
+                tileSeverityRedBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x6B, 0x6B));    // App's established warning red
+                tileSeverityPurpleBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xB4, 0xA0, 0xFF)); // Distinct from tileActionBrush
 
                 // Define all tiles
                 DefineQuickSettingsTiles();

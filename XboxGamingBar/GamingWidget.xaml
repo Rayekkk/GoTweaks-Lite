@@ -330,17 +330,17 @@
         <!-- Rest: normal background, Focus: rest + white stroke, Press: 10% darker, Focus+Press: press + stroke, Inactive: 50% darker -->
         <Style x:Key="QuickSettingsTileStyle" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource TileOffBackground}"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="#22FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="12,16"/>
+            <Setter Property="Padding" Value="10,7"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="MinWidth" Value="60"/>
-            <Setter Property="MinHeight" Value="90"/>
+            <Setter Property="MinHeight" Value="54"/>
             <Setter Property="UseSystemFocusVisuals" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -381,11 +381,12 @@
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
 
-                            <!-- Background with light border -->
+                            <!-- Background with a faint, constant Win11-style hairline
+                                 border (same on every tile, doesn't change with state) -->
                             <Border x:Name="BackgroundBorder"
                                     Background="{TemplateBinding Background}"
-                                    BorderBrush="#50555C"
-                                    BorderThickness="1"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="12"/>
 
                             <!-- Pressed overlay (10% darker) -->
@@ -596,11 +597,11 @@
 
                         <!-- Quick Metrics Row (compact stats display - dynamically populated) -->
                         <Border x:Name="QuickMetricsRow"
-                                Background="#1A1C1E"
+                                Background="#35393F"
                                 CornerRadius="12"
-                                Padding="12,8"
+                                Padding="4,9"
                                 Margin="0,0,0,8"
-                                BorderBrush="#50555C"
+                                BorderBrush="#22FFFFFF"
                                 BorderThickness="1"
                                 Visibility="Collapsed">
                             <!-- Dynamic metrics grid - populated in code-behind -->
