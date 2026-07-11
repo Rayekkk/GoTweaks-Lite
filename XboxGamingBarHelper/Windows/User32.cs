@@ -552,6 +552,56 @@ namespace XboxGamingBarHelper.Windows
             }, 0);
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        /// <summary>
+        /// Finds the top-level window with the largest client area belonging to the given
+        /// process ID, regardless of visibility. Unlike GetOpenWindows (which only surfaces
+        /// currently-visible windows for game-detection purposes), this also finds windows
+        /// an app has hidden to the system tray - ShowWindow can still restore/show a
+        /// hidden-but-valid HWND. Picking the largest window (rather than just the first
+        /// window with a non-empty title) skips small internal utility windows some UI
+        /// frameworks create for their own purposes - e.g. WPF-UI's hidden
+        /// "wpfui_th_&lt;pid&gt;_&lt;n&gt;" theme-change listener window, which has a real
+        /// title but no real content, and was being picked up as a false match.
+        /// </summary>
+        public static IntPtr GetMainWindowForProcess(int processId)
+        {
+            IntPtr best = IntPtr.Zero;
+            long bestArea = 0;
+            EnumWindows((hWnd, lParam) =>
+            {
+                GetWindowThreadProcessId(hWnd, out IntPtr windowProcessId);
+                if ((int)windowProcessId != processId) return true;
+
+                int titleLength = GetWindowTextLength(hWnd);
+                if (titleLength <= 0 || !GetWindowRect(hWnd, out RECT rect)) return true;
+
+                var title = new StringBuilder(titleLength + 1);
+                GetWindowText(hWnd, title, title.Capacity);
+                long area = (long)(rect.Right - rect.Left) * (rect.Bottom - rect.Top);
+                Logger.Debug($"GetMainWindowForProcess: candidate hWnd={hWnd} title=\"{title}\" size={rect.Right - rect.Left}x{rect.Bottom - rect.Top}");
+
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = hWnd;
+                }
+                return true; // Continue enumeration - keep looking for a bigger window
+            }, 0);
+            return best;
+        }
+
         private const int ENUM_CURRENT_SETTINGS = -1;
         private const int CDS_UPDATEREGISTRY = 0x01;
         private const int CDS_TEST = 0x02;

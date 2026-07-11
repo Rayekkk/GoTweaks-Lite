@@ -238,6 +238,7 @@
         <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#35393F"/>
         <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="#35393F"/>
 
+
         <!-- Reusable high-visibility white focus-ring setters for gamepad navigation.
              Merged into the interactive-control styles below so every button/toggle/checkbox
              shows the same clear white ring when focused with the pad. -->
@@ -269,6 +270,91 @@
             <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
             <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
             <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
+        </Style>
+
+        <!-- Accent-when-off ToggleButton Style (Scale button on the Scaling tab): a full custom
+             template, not just resource overrides, so the accent-on-idle / neutral-on-checked
+             coloring stays scoped to this one control instead of affecting every other
+             ToggleButton in the app (the many small expand/collapse chevron toggles). -->
+        <Style x:Key="ScaleToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="{StaticResource ButtonPadding}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="UseSystemFocusVisuals" Value="True"/>
+            <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
+            <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
+            <Setter Property="FocusVisualPrimaryThickness" Value="2"/>
+            <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="RootBorder"
+                                Background="{StaticResource SystemAccentBrush}"
+                                CornerRadius="{StaticResource ControlCornerRadius}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal"/>
+                                    <VisualState x:Name="PointerOver">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Opacity" To="0.85" Duration="0"/>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Opacity" To="0.7" Duration="0"/>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundDisabled}"/>
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Checked">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackground}"/>
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedPointerOver">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundPointerOver}"/>
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedPressed">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundPressed}"/>
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedDisabled">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundDisabled}"/>
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Padding="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Checkbox with system style -->
@@ -913,7 +999,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                         <TextBlock Text="Use per-game profile"
-                                                   FontSize="12"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <!--
                                             Detected-game name next to the per-game toggle.
@@ -1195,7 +1281,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="CPU Boost" FontSize="14" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="CPU Boost" FontSize="13" Foreground="#FFFFFF"/>
                                             <TextBlock Text="Higher boost clocks" FontSize="11" Foreground="#888888"/>
                                         </StackPanel>
                                         <ToggleSwitch x:Name="CPUBoostToggle"
@@ -1207,7 +1293,7 @@
                                     <!-- CPU EPP -->
                                     <StackPanel>
                                         <Grid>
-                                            <TextBlock Text="CPU EPP" FontSize="14" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="CPU EPP" FontSize="13" Foreground="#FFFFFF"/>
                                             <TextBlock x:Name="CPUEPPValueText"
                                                        Text="{Binding ElementName=CPUEPPSlider, Path=Value}"
                                                        Style="{StaticResource CardValueStyle}"/>
@@ -1227,7 +1313,7 @@
 
                                     <!-- CPU State -->
                                     <StackPanel>
-                                        <TextBlock Text="CPU State" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="CPU State" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Processor performance limits" FontSize="11" Foreground="#888888"/>
                                         <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
@@ -1327,7 +1413,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <TextBlock Text="Prefer executable"
-                                                       FontSize="12"
+                                                       FontSize="13"
                                                        Foreground="#FFFFFF"/>
                                             <TextBlock Text="Use .exe name, fall back to window title if unavailable"
                                                        FontSize="11"
@@ -1346,7 +1432,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <TextBlock Text="Games only"
-                                                       FontSize="12"
+                                                       FontSize="13"
                                                        Foreground="#FFFFFF"/>
                                             <TextBlock Text="Detect apps with FPS (RTSS) or added to Xbox Game Bar"
                                                        FontSize="11"
@@ -1377,7 +1463,7 @@
 
                                     <StackPanel>
                                         <TextBlock Text="Custom games"
-                                                   FontSize="12"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <TextBlock Text="Apps always treated as games"
                                                    FontSize="11"
@@ -1395,7 +1481,7 @@
 
                                     <StackPanel>
                                         <TextBlock Text="Blacklist"
-                                                   FontSize="12"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <TextBlock Text="Apps never treated as games"
                                                    FontSize="11"
@@ -2616,7 +2702,7 @@
                                             <TextBlock Text="OSD Provider"
                                                        Foreground="#FFFFFF"
                                                        VerticalAlignment="Center"
-                                                       FontSize="14"/>
+                                                       FontSize="13"/>
                                             <TextBlock Text="Select overlay source"
                                                        Foreground="#888888"
                                                        FontSize="11"/>
@@ -2645,7 +2731,7 @@
                                             <TextBlock Text="Overlay Level"
                                                        Foreground="#FFFFFF"
                                                        VerticalAlignment="Center"
-                                                       FontSize="14"/>
+                                                       FontSize="13"/>
                                             <ComboBox x:Name="OSDCustomizeLevelComboBox"
                                                       Style="{StaticResource ModernComboBoxStyle}"
                                                       Width="120"
@@ -3347,7 +3433,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Enable Controller Emulation" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Enable Controller Emulation" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Turn virtual emulation runtime on or off"
                                                    FontSize="11"
                                                    Foreground="#888888"/>
@@ -3500,7 +3586,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Improved Controller Emulation" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Improved Controller Emulation" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Use Legion HID gamepad reads instead of stock XInput reads (Legion Go / Go 2)"
                                                    FontSize="11"
                                                    Foreground="#888888"
@@ -3521,7 +3607,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Hide Stock Controller" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Hide Stock Controller" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Hide physical input when virtual controller modes are active"
                                                    FontSize="11"
                                                    Foreground="#888888"/>
@@ -3541,7 +3627,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Hide Target" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Hide Target" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Select which physical gamepad family to cloak"
                                                    FontSize="11"
                                                    Foreground="#888888"/>
@@ -4209,7 +4295,7 @@
                                              legacy CE). Separate from the Legion controller firmware calibration. -->
                                         <Border Background="#1F1F1F" CornerRadius="6" Padding="10" Margin="0,12,0,0">
                                             <StackPanel>
-                                                <TextBlock Text="Software gyro bias" FontSize="13" Foreground="#FFFFFF" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Software gyro bias" FontSize="14" Foreground="#FFFFFF" FontWeight="SemiBold"/>
                                                 <TextBlock Margin="0,4,0,0"
                                                            FontSize="11" Foreground="#B9C0CC" TextWrapping="Wrap"
                                                            Text="Lay the device flat on a still surface, then press Calibrate to zero out gyro drift. This is separate from the Legion controller firmware calibration."/>
@@ -5398,7 +5484,7 @@
                                     <!-- Version -->
                                     <Grid Margin="0,0,0,8">
                                         <TextBlock Text="Version"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock x:Name="AboutVersionText"
@@ -5412,7 +5498,7 @@
                                     <!-- Fork Author -->
                                     <Grid Margin="0,0,0,8">
                                         <TextBlock Text="Fork Author"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Text="Rayek"
@@ -5425,7 +5511,7 @@
                                     <!-- Original Author -->
                                     <Grid Margin="0,0,0,8">
                                         <TextBlock Text="Original Author"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Text="LtChipotle"
@@ -5438,7 +5524,7 @@
                                     <!-- Special Thanks -->
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock Text="Special Thanks"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Text="Mute, GameTechPlanet"
@@ -5484,9 +5570,7 @@
                                 </Grid>
                                 <TextBlock x:Name="LosslessScalingStatusText"
                                            Text="Not Installed"
-                                           FontSize="14"
-                                           Foreground="#B9C0CC"
-                                           Margin="0,8,0,0"/>
+                                           Style="{StaticResource CardCaptionStyle}"/>
                             </StackPanel>
                         </Border>
 
@@ -5503,7 +5587,8 @@
                                         <TextBlock x:Name="LosslessScalingCurrentProfileText"
                                                    Text="Default"
                                                    FontSize="14"
-                                                   Foreground="#00C8FF"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource SystemAccentBrush}"
                                                    Margin="0,4,0,0"/>
                                     </StackPanel>
                                     <Button x:Name="LosslessScalingCreateProfileButton"
@@ -5525,7 +5610,7 @@
                                       FontSize="16"
                                       FontWeight="SemiBold"
                                       Margin="0,10,0,0"
-                                      Style="{StaticResource StandaloneToggleButtonStyle}"/>
+                                      Style="{StaticResource ScaleToggleButtonStyle}"/>
 
                         <!-- Apply and Restart Button -->
                         <Button x:Name="LosslessScalingSaveSettingsButton"
@@ -5567,12 +5652,12 @@
                                 <StackPanel Visibility="{Binding ElementName=LosslessScalingAutoScaleToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Grid Margin="0,8,0,0">
                                         <TextBlock Text="AutoScale Delay (s)"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#B9C0CC"/>
                                         <TextBlock x:Name="LosslessScalingAutoScaleDelayValueText"
                                                    Text="{Binding ElementName=LosslessScalingAutoScaleDelaySlider, Path=Value}"
-                                                   FontSize="14"
-                                                   Foreground="#00C8FF"
+                                                   FontSize="13"
+                                                   Foreground="#B9C0CC"
                                                    HorizontalAlignment="Right"/>
                                     </Grid>
                                     <Slider x:Name="LosslessScalingAutoScaleDelaySlider"
@@ -5613,11 +5698,11 @@
                                 <!-- Sharpness Slider (for FSR, NIS, SGSR, BCAS) -->
                                 <StackPanel x:Name="LosslessScalingSharpnessPanel" Visibility="Collapsed" Margin="0,12,0,0">
                                     <Grid>
-                                        <TextBlock Text="Sharpness" FontSize="12" Foreground="#B9C0CC"/>
+                                        <TextBlock Text="Sharpness" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock x:Name="LosslessScalingSharpnessValueText"
                                                    Text="{Binding ElementName=LosslessScalingSharpnessSlider, Path=Value}"
-                                                   FontSize="12"
-                                                   Foreground="#00C8FF"
+                                                   FontSize="13"
+                                                   Foreground="#B9C0CC"
                                                    HorizontalAlignment="Right"/>
                                     </Grid>
                                     <Slider x:Name="LosslessScalingSharpnessSlider"
@@ -5635,7 +5720,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Optimize" FontSize="12" Foreground="#B9C0CC" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="0" Text="Optimize" FontSize="13" Foreground="#FFFFFF" VerticalAlignment="Center"/>
                                     <ToggleSwitch x:Name="LosslessScalingFSROptimizeToggle"
                                                   Grid.Column="1"
                                                   Style="{StaticResource ModernToggleStyle}"
@@ -5644,7 +5729,7 @@
 
                                 <!-- LS1 Type (LS1 only) — BALANCED vs PERFORMANCE -->
                                 <StackPanel x:Name="LosslessScalingLS1TypePanel" Visibility="Collapsed" Margin="0,12,0,0">
-                                    <TextBlock Text="LS1 Type" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                    <TextBlock Text="LS1 Type" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                     <ComboBox x:Name="LosslessScalingLS1TypeComboBox"
                                               PlaceholderText="Select Type"
                                               Width="Auto"
@@ -5663,7 +5748,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Resize Before Scale" FontSize="12" Foreground="#B9C0CC"/>
+                                        <TextBlock Text="Resize Before Scale" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Snap window to integer ratio before upscale"
                                                    FontSize="11" Foreground="#888888"/>
                                     </StackPanel>
@@ -5675,7 +5760,7 @@
 
                                 <!-- Anime4K Settings -->
                                 <StackPanel x:Name="LosslessScalingAnime4KPanel" Visibility="Collapsed" Margin="0,12,0,0">
-                                    <TextBlock Text="Size" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Size" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                     <ComboBox x:Name="LosslessScalingAnime4KSizeComboBox"
                                               PlaceholderText="Select Size"
                                               Width="Auto"
@@ -5693,7 +5778,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="VRS" FontSize="12" Foreground="#B9C0CC" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="0" Text="VRS" FontSize="13" Foreground="#FFFFFF" VerticalAlignment="Center"/>
                                         <ToggleSwitch x:Name="LosslessScalingAnime4KVRSToggle"
                                                       Grid.Column="1"
                                                       Style="{StaticResource ModernToggleStyle}"
@@ -5720,7 +5805,7 @@
 
                                 <!-- Auto Mode Settings -->
                                 <StackPanel x:Name="LosslessScalingAutoModePanel" Visibility="Collapsed" Margin="0,12,0,0">
-                                    <TextBlock Text="Aspect" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Aspect" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                     <ComboBox x:Name="LosslessScalingAspectRatioComboBox"
                                               PlaceholderText="Select Aspect"
                                               Width="Auto"
@@ -5735,11 +5820,11 @@
                                 <!-- Custom Mode Settings -->
                                 <StackPanel x:Name="LosslessScalingCustomModePanel" Visibility="Collapsed" Margin="0,12,0,0">
                                     <Grid>
-                                        <TextBlock Text="Scale Factor" FontSize="12" Foreground="#B9C0CC"/>
+                                        <TextBlock Text="Scale Factor" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock x:Name="LosslessScalingScaleFactorValueText"
                                                    Text="{Binding ElementName=LosslessScalingScaleFactorSlider, Path=Value}"
-                                                   FontSize="12"
-                                                   Foreground="#00C8FF"
+                                                   FontSize="13"
+                                                   Foreground="#B9C0CC"
                                                    HorizontalAlignment="Right"/>
                                     </Grid>
                                     <Slider x:Name="LosslessScalingScaleFactorSlider"
@@ -5777,7 +5862,7 @@
                                 <TextBlock Text="LSFG3 Settings" Style="{StaticResource CardTitleStyle}" Margin="0,0,0,8"/>
 
                                 <!-- LSFG3 Mode -->
-                                <TextBlock Text="Mode" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                <TextBlock Text="Mode" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="LosslessScalingLSFG3ModeComboBox"
                                           PlaceholderText="Select Mode"
                                           Width="Auto"
@@ -5792,7 +5877,7 @@
 
                                 <!-- LSFG3 Multiplier (hidden when Adaptive) -->
                                 <StackPanel x:Name="LosslessScalingLSFG3MultiplierPanel">
-                                    <TextBlock Text="Multiplier" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Multiplier" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                     <ComboBox x:Name="LosslessScalingLSFG3MultiplierComboBox"
                                               PlaceholderText="Select Multiplier"
                                               Width="Auto"
@@ -5808,11 +5893,11 @@
 
                                 <!-- LSFG3 Target FPS -->
                                 <Grid>
-                                    <TextBlock Text="Target FPS" FontSize="12" Foreground="#B9C0CC"/>
+                                    <TextBlock Text="Target FPS" FontSize="13" Foreground="#FFFFFF"/>
                                     <TextBlock x:Name="LosslessScalingLSFG3TargetValueText"
                                                Text="{Binding ElementName=LosslessScalingLSFG3TargetSlider, Path=Value}"
-                                               FontSize="12"
-                                               Foreground="#00C8FF"
+                                               FontSize="13"
+                                               Foreground="#B9C0CC"
                                                HorizontalAlignment="Right"/>
                                 </Grid>
                                 <Slider x:Name="LosslessScalingLSFG3TargetSlider"
@@ -5826,11 +5911,11 @@
 
                                 <!-- Flow Scale -->
                                 <Grid>
-                                    <TextBlock Text="Flow Scale" FontSize="12" Foreground="#B9C0CC"/>
+                                    <TextBlock Text="Flow Scale" FontSize="13" Foreground="#FFFFFF"/>
                                     <TextBlock x:Name="LosslessScalingFlowScaleValueText"
                                                Text="{Binding ElementName=LosslessScalingFlowScaleSlider, Path=Value}"
-                                               FontSize="12"
-                                               Foreground="#00C8FF"
+                                               FontSize="13"
+                                               Foreground="#B9C0CC"
                                                HorizontalAlignment="Right"/>
                                 </Grid>
                                 <Slider x:Name="LosslessScalingFlowScaleSlider"
@@ -5849,7 +5934,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Performance Mode" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Performance Mode" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Lighter model for less input lag"
                                                    FontSize="11"
                                                    Foreground="#B9C0CC"/>
@@ -5868,7 +5953,7 @@
                                 <TextBlock Text="LSFG2 Settings" Style="{StaticResource CardTitleStyle}" Margin="0,0,0,8"/>
 
                                 <!-- LSFG2 Mode -->
-                                <TextBlock Text="Mode" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                <TextBlock Text="Mode" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="LosslessScalingLSFG2ModeComboBox"
                                           PlaceholderText="Select Mode"
                                           Width="Auto"
@@ -5888,7 +5973,7 @@
                                 <TextBlock Text="Sync &amp; Display" Style="{StaticResource CardTitleStyle}" Margin="0,0,0,8"/>
 
                                 <!-- Sync Mode -->
-                                <TextBlock Text="Sync Mode" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                <TextBlock Text="Sync Mode" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="LosslessScalingSyncModeComboBox"
                                           PlaceholderText="Select Mode"
                                           Width="Auto"
@@ -5906,11 +5991,11 @@
 
                                 <!-- Max Frame Latency -->
                                 <Grid>
-                                    <TextBlock Text="Max Frame Latency" FontSize="12" Foreground="#B9C0CC"/>
+                                    <TextBlock Text="Max Frame Latency" FontSize="13" Foreground="#FFFFFF"/>
                                     <TextBlock x:Name="LosslessScalingMaxFrameLatencyValueText"
                                                Text="{Binding ElementName=LosslessScalingMaxFrameLatencySlider, Path=Value}"
-                                               FontSize="12"
-                                               Foreground="#00C8FF"
+                                               FontSize="13"
+                                               Foreground="#B9C0CC"
                                                HorizontalAlignment="Right"/>
                                 </Grid>
                                 <Slider x:Name="LosslessScalingMaxFrameLatencySlider"
@@ -5929,7 +6014,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="HDR Support" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="HDR Support" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Preserve HDR through scaling/FG"
                                                    FontSize="11" Foreground="#B9C0CC"/>
                                     </StackPanel>
@@ -5946,7 +6031,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="G-Sync / VRR Support" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="G-Sync / VRR Support" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="Improves pacing on VRR displays"
                                                    FontSize="11" Foreground="#B9C0CC"/>
                                     </StackPanel>
@@ -5964,7 +6049,7 @@
                                 <TextBlock Text="Capture &amp; Overlay" Style="{StaticResource CardTitleStyle}" Margin="0,0,0,8"/>
 
                                 <!-- Capture API -->
-                                <TextBlock Text="Capture API" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                <TextBlock Text="Capture API" FontSize="13" Foreground="#FFFFFF" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="LosslessScalingCaptureApiComboBox"
                                           PlaceholderText="Select API"
                                           Width="Auto"
@@ -5986,7 +6071,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Draw FPS Overlay" FontSize="14" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Draw FPS Overlay" FontSize="13" Foreground="#FFFFFF"/>
                                         <TextBlock Text="LS draws fps counter on top-left of scaled output"
                                                    FontSize="11" Foreground="#B9C0CC"/>
                                     </StackPanel>
@@ -6006,7 +6091,7 @@
                                            Foreground="#FFA500"/>
                                 <TextBlock x:Name="LSConflictWarningText"
                                            Text="AMD Fluid Motion Frames has been automatically disabled because it conflicts with Lossless Scaling Frame Generation."
-                                           FontSize="12"
+                                           FontSize="13"
                                            Foreground="#FFA500"
                                            TextWrapping="Wrap"
                                            Margin="0,8,0,0"/>
@@ -6286,7 +6371,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="GoTweaks Haptics" Foreground="#FFFFFF" FontSize="14"/>
+                                            <TextBlock Text="GoTweaks Haptics" Foreground="#FFFFFF" FontSize="13"/>
                                             <TextBlock Text="Tactile click on inputs, system-wide via the controller motors"
                                                        Foreground="#888888" FontSize="11" TextWrapping="Wrap"/>
                                         </StackPanel>
@@ -6381,7 +6466,7 @@
                         <!-- Lighting Section (hidden on devices without HID RGB lighting support) -->
                         <StackPanel x:Name="LightingSection">
                         <!-- Lighting Section Header -->
-                        <TextBlock Text="LIGHTING" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Lighting" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Lighting Card -->
                         <Border Style="{StaticResource CardStyle}">
@@ -6622,7 +6707,7 @@
                         <!-- Controller Remapping Section (hidden on devices without HID controller remap support) -->
                         <StackPanel x:Name="ControllerRemappingSection">
                         <!-- Controller Remapping Section Header -->
-                        <TextBlock Text="CONTROLLER REMAPPING" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Controller Remapping" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Per-Game Controller Profile Card -->
                         <Border Style="{StaticResource CardStyle}">
@@ -7657,7 +7742,7 @@
                                         <TextBlock Text="Legion L:"
                                                    Grid.Column="0"
                                                    VerticalAlignment="Center"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <ComboBox x:Name="LegionLActionComboBox"
                                                   Grid.Column="1"
@@ -7711,7 +7796,7 @@
                                         <TextBlock Text="Legion R:"
                                                    Grid.Column="0"
                                                    VerticalAlignment="Center"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <ComboBox x:Name="LegionRActionComboBox"
                                                   Grid.Column="1"
@@ -7780,7 +7865,7 @@
                                         <TextBlock Text="Scroll:"
                                                    Grid.Column="0"
                                                    VerticalAlignment="Center"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <ComboBox x:Name="ScrollActionComboBox"
                                                   Grid.Column="1"
@@ -7835,7 +7920,7 @@
                                         <TextBlock Text="Scroll Click:"
                                                    Grid.Column="0"
                                                    VerticalAlignment="Center"
-                                                   FontSize="14"
+                                                   FontSize="13"
                                                    Foreground="#FFFFFF"/>
                                         <ComboBox x:Name="ScrollClickActionComboBox"
                                                   Grid.Column="1"
@@ -7911,7 +7996,7 @@
                         </Border>
 
                         <!-- Performance Mode Section Header -->
-                        <TextBlock Text="PERFORMANCE MODE" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Performance Mode" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- The Legion-tab "Power Profile" dropdown was removed: the Performance tab's
                              TDP Mode dropdown (TDPModeComboBox) is now the single control for the
@@ -8192,7 +8277,7 @@
                         </Border>
 
                         <!-- Battery Section Header -->
-                        <TextBlock Text="BATTERY" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Battery" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Battery Charge Limit Card -->
                         <Border Style="{StaticResource CardStyle}">
@@ -8214,7 +8299,7 @@
                         </Border>
 
                         <!-- LABS Section Header -->
-                        <TextBlock Text="LABS" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Labs" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Labs Description -->
                         <TextBlock Text="Experimental features - use at your own risk"
@@ -8286,7 +8371,7 @@
                         <!-- Driver Updates Card (Lenovo): machine type + installed BIOS +
                              direct link to the correct Lenovo downloads page, with a
                              best-effort live driver list fetched from pcsupport.lenovo.com -->
-                        <TextBlock Text="DRIVER UPDATES" Style="{StaticResource SectionHeaderStyle}"/>
+                        <TextBlock Text="Driver Updates" Style="{StaticResource SectionHeaderStyle}"/>
                         <Border x:Name="DriverUpdatesCard" Style="{StaticResource CardStyle}">
                             <StackPanel>
                                 <Grid>
@@ -8449,7 +8534,7 @@
 
                         <!-- Fan Control Card (Win 5 specific) -->
                         <StackPanel x:Name="GPDFanControlSection" Visibility="Collapsed">
-                            <TextBlock Text="FAN CONTROL" Style="{StaticResource SectionHeaderStyle}"/>
+                            <TextBlock Text="Fan Control" Style="{StaticResource SectionHeaderStyle}"/>
 
                             <Border Style="{StaticResource CardStyle}">
                                 <StackPanel>
@@ -8467,7 +8552,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Fan Curve" Foreground="#FFFFFF" FontSize="14"/>
+                                            <TextBlock Text="Fan Curve" Foreground="#FFFFFF" FontSize="13"/>
                                             <TextBlock Text="Software-controlled fan curve based on CPU temperature"
                                                        FontSize="12" Foreground="#888888"/>
                                         </StackPanel>
@@ -8488,7 +8573,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Fan Mode" Foreground="#FFFFFF" FontSize="14"/>
+                                                <TextBlock Text="Fan Mode" Foreground="#FFFFFF" FontSize="13"/>
                                                 <TextBlock x:Name="GPDFanModeText"
                                                            Text="Auto"
                                                            FontSize="12"
@@ -8508,7 +8593,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Fan Speed" Grid.Column="0" Foreground="#FFFFFF" FontSize="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Fan Speed" Grid.Column="0" Foreground="#FFFFFF" FontSize="13" VerticalAlignment="Center"/>
                                                 <TextBlock x:Name="GPDFanSpeedValueText"
                                                            Grid.Column="1"
                                                            Text="50%"
@@ -8639,7 +8724,7 @@
 
                         <!-- Button Remapping Section (Win 5 specific) -->
                         <StackPanel x:Name="GPDButtonRemapSection" Visibility="Collapsed">
-                            <TextBlock Text="BUTTON REMAPPING" Style="{StaticResource SectionHeaderStyle}"/>
+                            <TextBlock Text="Button Remapping" Style="{StaticResource SectionHeaderStyle}"/>
 
                             <Border Style="{StaticResource CardStyle}">
                                 <StackPanel>
@@ -8668,7 +8753,7 @@
                                     <StackPanel x:Name="GPDButtonRemapContent" Spacing="8" Margin="0,12,0,0" Visibility="Collapsed">
 
                                         <!-- Face Buttons -->
-                                        <TextBlock Text="Face Buttons" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                        <TextBlock Text="Face Buttons" Foreground="#FFFFFF" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
@@ -8747,7 +8832,7 @@
                                         </Grid>
 
                                         <!-- D-Pad -->
-                                        <TextBlock Text="D-Pad" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                        <TextBlock Text="D-Pad" Foreground="#FFFFFF" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
@@ -8826,7 +8911,7 @@
                                         </Grid>
 
                                         <!-- Stick Buttons -->
-                                        <TextBlock Text="Stick Buttons" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                        <TextBlock Text="Stick Buttons" Foreground="#FFFFFF" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
@@ -8867,7 +8952,7 @@
                                         </Grid>
 
                                         <!-- Left Stick Directions -->
-                                        <TextBlock Text="Left Stick" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                        <TextBlock Text="Left Stick" Foreground="#FFFFFF" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
@@ -8908,7 +8993,7 @@
                                         </Grid>
 
                                         <!-- Back Paddles -->
-                                        <TextBlock Text="Back Paddles" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                        <TextBlock Text="Back Paddles" Foreground="#FFFFFF" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,4"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>

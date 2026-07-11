@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using NLog;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,7 @@ using Windows.System;
 using Windows.UI.Input.Preview.Injection;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.LosslessScaling.Properties;
+using XboxGamingBarHelper.Windows;
 
 namespace XboxGamingBarHelper.LosslessScaling
 {
@@ -553,24 +555,36 @@ namespace XboxGamingBarHelper.LosslessScaling
                     return;
                 }
 
-                foreach (var proc in processes)
+                var processIds = new HashSet<int>(processes.Select(p => p.Id));
+
+                // Process.MainWindowHandle is unreliable here - it's often IntPtr.Zero for
+                // Lossless Scaling. GetOpenWindows only surfaces currently-VISIBLE windows
+                // (fine for game-detection, but Lossless Scaling hides its window to the
+                // system tray rather than just iconic-minimizing it, so that filter would
+                // miss it entirely). Use the unfiltered, largest-window lookup instead -
+                // ShowWindow can restore/show a hidden-but-valid HWND just fine, and picking
+                // the largest window skips WPF-UI's internal "wpfui_th_*" theme-listener
+                // window (which has a real title but is not the actual app window).
+                foreach (var pid in processIds)
                 {
-                    IntPtr hWnd = proc.MainWindowHandle;
-                    if (hWnd != IntPtr.Zero)
+                    IntPtr hWnd = User32.GetMainWindowForProcess(pid);
+                    if (hWnd == IntPtr.Zero)
                     {
-                        // If window is minimized, restore it first
-                        if (IsIconic(hWnd))
-                        {
-                            ShowWindow(hWnd, SW_RESTORE);
-                        }
-                        else
-                        {
-                            ShowWindow(hWnd, SW_SHOW);
-                        }
-                        SetForegroundWindow(hWnd);
-                        Logger.Info("Lossless Scaling brought to foreground");
-                        return;
+                        continue;
                     }
+
+                    // If window is minimized, restore it first
+                    if (IsIconic(hWnd))
+                    {
+                        ShowWindow(hWnd, SW_RESTORE);
+                    }
+                    else
+                    {
+                        ShowWindow(hWnd, SW_SHOW);
+                    }
+                    SetForegroundWindow(hWnd);
+                    Logger.Info("Lossless Scaling brought to foreground");
+                    return;
                 }
 
                 Logger.Warn("Could not find Lossless Scaling window handle");

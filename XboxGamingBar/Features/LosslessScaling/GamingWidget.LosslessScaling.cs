@@ -74,23 +74,29 @@ namespace XboxGamingBar
                         if (!isInstalled)
                         {
                             LosslessScalingStatusText.Text = "Not Installed";
-                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Red);
+                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x6B, 0x6B));
                             LaunchLosslessScalingButton.Visibility = Visibility.Collapsed;
                             ShowLosslessScalingWindowButton.Visibility = Visibility.Collapsed;
                         }
                         else if (!isRunning)
                         {
                             LosslessScalingStatusText.Text = "Installed (Not Running)";
-                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xA5, 0x00));
                             LaunchLosslessScalingButton.Visibility = Visibility.Visible;
                             ShowLosslessScalingWindowButton.Visibility = Visibility.Collapsed;
                         }
                         else
                         {
                             LosslessScalingStatusText.Text = "Installed and Running";
-                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Green);
+                            LosslessScalingStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x4C, 0xAF, 0x50));
                             LaunchLosslessScalingButton.Visibility = Visibility.Collapsed;
-                            ShowLosslessScalingWindowButton.Visibility = Visibility.Visible;
+                            // "Show Window" is intentionally never surfaced: forcing Lossless
+                            // Scaling's window via ShowWindow/SetForegroundWindow from outside
+                            // the process desyncs its own WPF-UI visibility state (tray-hide
+                            // relies on the app's own show/hide routine), producing a blank,
+                            // unclosable window. There's no known safe way to un-hide it
+                            // externally, so we don't offer the button at all.
+                            ShowLosslessScalingWindowButton.Visibility = Visibility.Collapsed;
                         }
 
                         // Enable/disable all Lossless Scaling controls
