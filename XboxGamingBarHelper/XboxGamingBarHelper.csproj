@@ -548,6 +548,7 @@
     <Compile Include="RTSS\OSDItems\OSDItemFrameBudget.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemAppName.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemTime.cs" />
+    <Compile Include="RTSS\OSDItems\OSDItemTime12H.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemGPU.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemMemory.cs" />
     <Compile Include="RTSS\OSDItems\OSDItemVRAM.cs" />
