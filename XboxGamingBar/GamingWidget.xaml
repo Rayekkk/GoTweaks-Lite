@@ -22,27 +22,28 @@
         <!-- System Accent Color Brush (Light2 variant for dark theme text) -->
         <SolidColorBrush x:Key="SystemAccentBrush" Color="{ThemeResource SystemAccentColorLight2}"/>
 
-        <!-- Tooth Theme Colors -->
+        <!-- Win11 Theme Colors (promoted app-wide 2026-07-11 from the Performance-tab
+             pilot checkpoint; matches the already-shipped Quick Settings tile palette) -->
         <SolidColorBrush x:Key="PageBackgroundBrush" Color="#25282C"/>
-        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#30343A"/>
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#50555C"/>
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#35393F"/>
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#22FFFFFF"/>
         <SolidColorBrush x:Key="ButtonBackground" Color="#3E434B"/>
         <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#484E58"/>
         <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#3A3F47"/>
         <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#2C3035"/>
-        <SolidColorBrush x:Key="ButtonBorderBrush" Color="#6B7584"/>
-        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#6B7584"/>
-        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#555D69"/>
-        <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#3A3F46"/>
+        <SolidColorBrush x:Key="ButtonBorderBrush" Color="#22FFFFFF"/>
+        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#22FFFFFF"/>
+        <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#14FFFFFF"/>
         <CornerRadius x:Key="ControlCornerRadius">8,8,8,8</CornerRadius>
         <Thickness x:Key="ButtonPadding">15,10,15,11</Thickness>
 
-        <!-- Card Style - Tooth Theme -->
+        <!-- Card Style - Win11 -->
         <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,10,0,0"/>
-            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}"/>
         </Style>
@@ -147,10 +148,10 @@
             </Setter>
         </Style>
 
-        <!-- Card Title Style - Tooth Theme -->
+        <!-- Card Title Style - Win11 -->
         <Style x:Key="CardTitleStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
@@ -230,12 +231,12 @@
         </Style>
 
         <!-- Override ComboBox border colors to prevent highlight on focus/hover -->
-        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#50555C"/>
-        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#50555C"/>
-        <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="#50555C"/>
-        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#30343A"/>
-        <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#30343A"/>
-        <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="#30343A"/>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#35393F"/>
+        <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#35393F"/>
+        <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="#35393F"/>
 
         <!-- Reusable high-visibility white focus-ring setters for gamepad navigation.
              Merged into the interactive-control styles below so every button/toggle/checkbox
@@ -307,10 +308,10 @@
             <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
-        <!-- Section Header Style - Tooth Theme -->
+        <!-- Section Header Style - Win11 -->
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource SystemAccentBrush}"/>
             <Setter Property="Margin" Value="0,20,0,0"/>
         </Style>
@@ -613,11 +614,11 @@
                         <!-- place when metrics are hidden. Background matches the metrics row; -->
                         <!-- the slider itself uses the active system accent color by default. -->
                         <Border x:Name="PanelBrightnessRow"
-                                Background="#1A1C1E"
+                                Background="#35393F"
                                 CornerRadius="12"
                                 Padding="12,8"
                                 Margin="0,0,0,8"
-                                BorderBrush="#50555C"
+                                BorderBrush="#22FFFFFF"
                                 BorderThickness="1"
                                 Visibility="Collapsed">
                             <Grid>
@@ -875,12 +876,9 @@
 
                         <!-- Active Profile Indicator -->
                         <Border x:Name="ActiveProfileCard" Style="{StaticResource CardStyle}">
-                            <StackPanel>
+                            <StackPanel Spacing="10">
                                 <StackPanel>
-                                    <TextBlock Text="Using profile:"
-                                               FontSize="12"
-                                               Foreground="#AAAAAA"
-                                               Margin="4,1,0,0"/>
+                                    <TextBlock Text="Current Profile" Style="{StaticResource CardTitleStyle}"/>
                                     <!--
                                         Active profile name. Wrapped in a Canvas so long
                                         names (e.g. detected window titles like Windows
@@ -891,7 +889,6 @@
                                     -->
                                     <Canvas x:Name="ActiveProfileTextCanvas"
                                             Height="20"
-                                            Margin="4,4,0,0"
                                             HorizontalAlignment="Stretch">
                                         <Canvas.Clip>
                                             <RectangleGeometry Rect="0,0,0,20"/>
@@ -900,7 +897,7 @@
                                                    Text="Global Settings"
                                                    FontSize="14"
                                                    FontWeight="SemiBold"
-                                                   Foreground="#00C8FF">
+                                                   Foreground="{StaticResource SystemAccentBrush}">
                                             <TextBlock.RenderTransform>
                                                 <TranslateTransform x:Name="ActiveProfileTextTransform"/>
                                             </TextBlock.RenderTransform>
@@ -929,6 +926,7 @@
                                         <Canvas x:Name="DetectedGameTextCanvas"
                                                 Height="16"
                                                 MaxWidth="200"
+                                                Margin="0,4,0,0"
                                                 HorizontalAlignment="Left">
                                             <Canvas.Clip>
                                                 <RectangleGeometry Rect="0,0,200,16"/>
@@ -971,7 +969,7 @@
                                               Grid.Column="1"
                                               SelectionChanged="PerformanceOverlayComboBox_SelectionChanged"
                                               XYFocusUp="{x:Bind PerGameProfileToggle}"
-                                              XYFocusDown="{x:Bind TDPModeComboBox}"
+                                              XYFocusDown="{x:Bind FPSLimitToggle}"
                                               XYFocusLeft="{x:Bind PerformanceNavItem}">
                                         <ComboBoxItem Content="Off" Tag="0" IsSelected="True"/>
                                         <ComboBoxItem Content="Basic" Tag="1"/>
@@ -986,6 +984,49 @@
                                         Minimum="0" Maximum="3"
                                         Value="0"
                                         ValueChanged="PerformanceOverlaySlider_ValueChanged"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- FPS Limit Card -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="FPS Limit" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock x:Name="FPSLimitCaption"
+                                                   Text=""
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   Visibility="Collapsed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="FPSLimitValue"
+                                               Grid.Column="1"
+                                               Text=""
+                                               FontSize="14"
+                                               Foreground="#4CAF50"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"
+                                               Visibility="{x:Bind FPSLimitToggle.IsOn, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}"/>
+                                    <ToggleSwitch x:Name="FPSLimitToggle"
+                                                  Grid.Column="2"
+                                                  Style="{StaticResource ModernToggleStyle}"
+                                                  IsEnabled="False" Width="52"
+                                                  XYFocusUp="{x:Bind PerformanceOverlayComboBox}"
+                                                  XYFocusDown="{x:Bind TDPModeComboBox}"/>
+                                </Grid>
+                                <Slider x:Name="FPSLimitSlider"
+                                        Style="{StaticResource ModernSliderStyle}"
+                                        Minimum="15" Maximum="144"
+                                        StepFrequency="1"
+                                        TickFrequency="15"
+                                        TickPlacement="Outside"
+                                        SnapsTo="StepValues"
+                                        Visibility="{x:Bind FPSLimitToggle.IsOn, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}"/>
                             </StackPanel>
                         </Border>
 
@@ -1007,7 +1048,7 @@
                                           Style="{StaticResource ModernComboBoxStyle}"
                                           SelectedIndex="1"
                                           SelectionChanged="TDPModeComboBox_SelectionChanged"
-                                          XYFocusUp="{x:Bind PerformanceOverlayComboBox}"
+                                          XYFocusUp="{x:Bind FPSLimitToggle}"
                                           XYFocusDown="{x:Bind OSPowerModeComboBox}">
                                     <ComboBoxItem Content="Quiet" Tag="1"/>
                                     <ComboBoxItem Content="Balanced" Tag="2"/>
@@ -1103,7 +1144,8 @@
                                                Foreground="#4CAF50"
                                                FontWeight="SemiBold"
                                                VerticalAlignment="Center"
-                                               Margin="0,0,0,0"/>
+                                               Margin="0,0,0,0"
+                                               Visibility="Collapsed"/>
                                 </Grid>
                                 <ComboBox x:Name="OSPowerModeComboBox"
                                           Margin="0,12,0,0"
@@ -1209,48 +1251,6 @@
                                         </Grid>
                                     </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- FPS Limit Card -->
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="FPS Limit" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock x:Name="FPSLimitCaption"
-                                                   Text=""
-                                                   Style="{StaticResource CardCaptionStyle}"
-                                                   Visibility="Collapsed"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="FPSLimitValue"
-                                               Grid.Column="1"
-                                               Text=""
-                                               FontSize="14"
-                                               Foreground="#4CAF50"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,12,0"
-                                               Visibility="{x:Bind FPSLimitToggle.IsOn, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}"/>
-                                    <ToggleSwitch x:Name="FPSLimitToggle"
-                                                  Grid.Column="2"
-                                                  Style="{StaticResource ModernToggleStyle}"
-                                                  IsEnabled="False" Width="52"
-                                                  XYFocusUp="{x:Bind CPUExtrasExpandToggle}"/>
-                                </Grid>
-                                <Slider x:Name="FPSLimitSlider"
-                                        Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="15" Maximum="144"
-                                        StepFrequency="1"
-                                        TickFrequency="15"
-                                        TickPlacement="Outside"
-                                        SnapsTo="StepValues"
-                                        Visibility="{x:Bind FPSLimitToggle.IsOn, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}"/>
                             </StackPanel>
                         </Border>
 
