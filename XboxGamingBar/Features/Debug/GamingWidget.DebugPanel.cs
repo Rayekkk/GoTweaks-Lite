@@ -1011,9 +1011,13 @@ namespace XboxGamingBar
                 var dialog = new Windows.UI.Popups.MessageDialog(
                     "This will:\n\n" +
                     "• Remove the scheduled task\n" +
-                    "• Restore original CPU Boost settings\n" +
-                    "• Restore original EPP settings\n" +
-                    "• Re-enable Legion Space service (if disabled)\n\n" +
+                    "• Restore original CPU Boost, EPP, Max/Min CPU State and Power Mode settings\n" +
+                    "• Re-enable Legion Space service (if disabled)\n" +
+                    "• Re-enable the touchscreen (if disabled)\n" +
+                    "• Release any active custom fan curve\n" +
+                    "• Stop controller emulation and clear HidHide rules\n\n" +
+                    "This does not remove drivers (PawnIO, usbip-win2, HidHide) or the deployed " +
+                    "helper copy - for a full cleanup, run Uninstall-GoTweaks.ps1 after uninstalling.\n\n" +
                     "After this, you can safely uninstall the app.",
                     "Prepare for Uninstall");
 

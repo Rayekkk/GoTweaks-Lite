@@ -1768,7 +1768,7 @@ namespace XboxGamingBarHelper
 
             try
             {
-                string result = Services.SystemRestoreService.PrepareForUninstall();
+                string result = Services.SystemRestoreService.PrepareForUninstall(legionManager, systemManager, viiperEmulationManager);
                 response.Add(nameof(Function), functionValue);
                 response.Add("Content", result);
                 response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
