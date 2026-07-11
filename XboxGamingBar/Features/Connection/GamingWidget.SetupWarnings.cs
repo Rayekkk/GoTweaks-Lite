@@ -101,21 +101,6 @@ namespace XboxGamingBar
             }
         }
 
-        private void UsbipInstallButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                Logger.Info("[SETUP] Install usbip-win2 requested from CE-tab card");
-                installUsbip?.TriggerInstall();
-                UsbipInstallButton.Content = "Installing...";
-                UsbipInstallButton.IsEnabled = false;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"UsbipInstallButton_Click failed: {ex.Message}");
-            }
-        }
-
         private void DismissSetupWarningsButton_Click(object sender, RoutedEventArgs e)
         {
             try

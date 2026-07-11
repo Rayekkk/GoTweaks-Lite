@@ -1272,14 +1272,10 @@ namespace XboxGamingBar
 
             if (PawnIOStatusText != null)
             {
-                if (installed)
-                {
-                    PawnIOStatusText.Text = "PawnIO driver is installed. Signed kernel driver for anti-cheat safe hardware access.";
-                }
-                else
-                {
-                    PawnIOStatusText.Text = "Signed kernel driver for hardware access. Replaces WinRing0.";
-                }
+                PawnIOStatusText.Text = installed ? "Installed" : "Not installed";
+                PawnIOStatusText.Foreground = installed
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
             }
 
             // Ensure a valid option is selected after visibility changes
@@ -1352,6 +1348,48 @@ namespace XboxGamingBar
                 ViGEmBusInstallButton.Content = installed ? "Installed" : "Install usbip-win2";
                 ViGEmBusInstallButton.IsEnabled = !installed;
             }
+
+            // System tab -> Prerequisites card (same install trigger, different UI location).
+            if (PrereqUsbipStatusText != null)
+            {
+                PrereqUsbipStatusText.Text = installed ? "Installed" : "Not installed";
+                PrereqUsbipStatusText.Foreground = installed
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
+            }
+            if (PrereqUsbipInstallButton != null)
+            {
+                PrereqUsbipInstallButton.Content = installed ? "Installed" : "Install";
+                PrereqUsbipInstallButton.IsEnabled = !installed;
+            }
+
+            UpdateControllerEmulationPrereqGate();
+        }
+
+        /// <summary>
+        /// System tab -> Prerequisites card usbip-win2 install button. Same trigger as the Labs
+        /// card's button; both reflect the same underlying <see cref="usbipInstalled"/> property.
+        /// </summary>
+        private void PrereqUsbipInstallButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Info("Prereq usbip install button clicked - triggering usbip-win2 installation");
+                installUsbip?.TriggerInstall();
+                if (PrereqUsbipInstallButton != null)
+                {
+                    PrereqUsbipInstallButton.Content = "Installing...";
+                    PrereqUsbipInstallButton.IsEnabled = false;
+                }
+                if (PrereqUsbipStatusText != null)
+                {
+                    PrereqUsbipStatusText.Text = "Installing...";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error during usbip installation: {ex.Message}");
+            }
         }
 
         private void LabsUsbipInstallButton_Click(object sender, RoutedEventArgs e)
@@ -1395,7 +1433,169 @@ namespace XboxGamingBar
                 ControllerEmulationHidHideInstallButton.IsEnabled = !installed;
             }
 
+            // System tab -> Prerequisites card (same install trigger, different UI location).
+            if (PrereqHidHideStatusText != null)
+            {
+                PrereqHidHideStatusText.Text = installed ? "Installed" : "Not installed";
+                PrereqHidHideStatusText.Foreground = installed
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
+            }
+            if (PrereqHidHideInstallButton != null)
+            {
+                PrereqHidHideInstallButton.Content = installed ? "Installed" : "Install";
+                PrereqHidHideInstallButton.IsEnabled = !installed;
+            }
+
             Logger.Info($"HidHide install UI updated: installed={installed}");
+
+            UpdateControllerEmulationPrereqGate();
+        }
+
+        private const string UsbipEverConfirmedInstalledKey = "UsbipEverConfirmedInstalled";
+        private const string HidHideEverConfirmedInstalledKey = "HidHideEverConfirmedInstalled";
+
+        /// <summary>
+        /// Gates the whole Controller Emulation card behind usbip-win2 + HidHide being installed:
+        /// while either is missing, the expand button is disabled (card can't be opened) and the
+        /// "Enable Controller Emulation" toggle row is replaced by an inline warning with an
+        /// Install button per missing component, so the fix is one click away instead of sending
+        /// the user hunting through the System tab's Prerequisites card.
+        ///
+        /// The "confirmed installed" flags are persisted in LocalSettings, not just an in-memory
+        /// field, and once true are NEVER re-checked against the live property again. Two reasons:
+        /// (1) the helper's install-status check (registry/CLI-path lookup for HidHide, driver-list
+        /// lookup for usbip-win2) is a pull-based re-check fired on every request rather than a
+        /// stable cached value, and has been observed to blip "not installed" for a couple of
+        /// seconds even when genuinely installed (2026-07-11, confirmed via widget + helper logs:
+        /// HidHide flapped False -> True -> False -> True within ~2s of a fresh helper start, then
+        /// stayed True for the rest of that session). (2) Game Bar can silently recreate this whole
+        /// GamingWidget instance (documented elsewhere in this codebase - see the Quick Metrics and
+        /// desktop-app-close fixes), which would reset a plain in-memory latch back to false on
+        /// every close/reopen, right back into the same blip window - which is exactly what made
+        /// the in-memory-only version of this fix look like clicking "Install" was doing something
+        /// (it wasn't; the real status just happened to arrive around the same time).
+        /// </summary>
+        private void UpdateControllerEmulationPrereqGate()
+        {
+            bool usbipOk = GetBoolSetting(UsbipEverConfirmedInstalledKey, false);
+            if (!usbipOk && usbipInstalled?.Value == true)
+            {
+                usbipOk = true;
+                SetBoolSetting(UsbipEverConfirmedInstalledKey, true);
+            }
+            bool hidHideOk = GetBoolSetting(HidHideEverConfirmedInstalledKey, false);
+            if (!hidHideOk && hidHideInstalled?.Value == true)
+            {
+                hidHideOk = true;
+                SetBoolSetting(HidHideEverConfirmedInstalledKey, true);
+            }
+            bool prereqsMet = usbipOk && hidHideOk;
+
+            if (ControllerEmulationEnableRow != null)
+            {
+                ControllerEmulationEnableRow.Visibility = prereqsMet ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (ControllerEmulationPrereqWarning != null)
+            {
+                ControllerEmulationPrereqWarning.Visibility = prereqsMet ? Visibility.Collapsed : Visibility.Visible;
+            }
+            if (ControllerEmulationPrereqUsbipRow != null)
+            {
+                ControllerEmulationPrereqUsbipRow.Visibility = usbipOk ? Visibility.Collapsed : Visibility.Visible;
+            }
+            if (ControllerEmulationPrereqHidHideRow != null)
+            {
+                ControllerEmulationPrereqHidHideRow.Visibility = hidHideOk ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (ControllerEmulationExpandButton != null)
+            {
+                ControllerEmulationExpandButton.IsEnabled = prereqsMet;
+
+                // Safety net: if a component was uninstalled while the card was open, force it
+                // closed instead of leaving a now-unusable body expanded.
+                if (!prereqsMet && ControllerEmulationExpandButton.IsChecked == true)
+                {
+                    ControllerEmulationExpandButton.IsChecked = false;
+                    if (ControllerEmulationContent != null) ControllerEmulationContent.Visibility = Visibility.Collapsed;
+                    if (ViiperEmulationContent != null) ViiperEmulationContent.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        private void ControllerEmulationPrereqUsbipButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Info("Controller Emulation prereq warning: usbip install button clicked");
+                installUsbip?.TriggerInstall();
+                if (ControllerEmulationPrereqUsbipButton != null)
+                {
+                    ControllerEmulationPrereqUsbipButton.Content = "Installing...";
+                    ControllerEmulationPrereqUsbipButton.IsEnabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error during usbip installation: {ex.Message}");
+            }
+        }
+
+        private void ControllerEmulationPrereqHidHideButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Info("Controller Emulation prereq warning: HidHide install button clicked");
+                installHidHide?.TriggerInstall();
+                if (ControllerEmulationPrereqHidHideButton != null)
+                {
+                    ControllerEmulationPrereqHidHideButton.Content = "Installing...";
+                    ControllerEmulationPrereqHidHideButton.IsEnabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error during HidHide installation: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// System tab -> Prerequisites card HidHide install button. Same trigger as the Controller
+        /// Emulation tab's button; both reflect the same underlying <see cref="hidHideInstalled"/> property.
+        /// </summary>
+        private void PrereqHidHideInstallButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Info("Prereq HidHide install button clicked - triggering HidHide installation");
+
+                if (PrereqHidHideInstallButton != null)
+                {
+                    PrereqHidHideInstallButton.Content = "Installing...";
+                    PrereqHidHideInstallButton.IsEnabled = false;
+                }
+                if (PrereqHidHideStatusText != null)
+                {
+                    PrereqHidHideStatusText.Text = "Installing...";
+                }
+
+                installHidHide?.TriggerInstall();
+                Logger.Info("HidHide installation triggered, waiting for helper response...");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error during HidHide installation: {ex.Message}");
+                if (PrereqHidHideInstallButton != null)
+                {
+                    PrereqHidHideInstallButton.Content = "Install";
+                    PrereqHidHideInstallButton.IsEnabled = true;
+                }
+                if (PrereqHidHideStatusText != null)
+                {
+                    PrereqHidHideStatusText.Text = "Error";
+                }
+            }
         }
 
         /// <summary>

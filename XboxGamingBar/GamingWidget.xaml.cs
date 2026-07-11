@@ -871,8 +871,6 @@ namespace XboxGamingBar
         private readonly InstallUsbipProperty installUsbip;
         private readonly HidHideInstalledProperty hidHideInstalled;
         private readonly InstallHidHideProperty installHidHide;
-        private readonly AutoHibernateEnabledProperty autoHibernateEnabled;
-        private readonly AutoHibernateIdleMinutesProperty autoHibernateIdleMinutes;
 
         private readonly TDPLimitsProperty tdpLimits;
 
@@ -1543,9 +1541,8 @@ namespace XboxGamingBar
             // the VIIPER backend toggles on.
             if (ViiperGuideButtonModeComboBox != null)
                 ViiperGuideButtonModeComboBox.SelectionChanged += (s, e) => UpdateViiperLegionLDisabledHint();
-            // Show USBIP install card only when VIIPER toggle is on AND driver is missing
-            emulationBackend.PropertyChanged += (s, e) => { UpdateUsbipCardVisibility(); UpdateViiperConfigVisibility(); UpdateViiperLegionLDisabledHint(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
-            usbipInstalled.PropertyChanged += (s, e) => { UpdateUsbipCardVisibility(); UpdateLabsUsbipUI(usbipInstalled.Value); };
+            emulationBackend.PropertyChanged += (s, e) => { UpdateViiperConfigVisibility(); UpdateViiperLegionLDisabledHint(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
+            usbipInstalled.PropertyChanged += (s, e) => { UpdateLabsUsbipUI(usbipInstalled.Value); };
             // Show Steam sub-device picker only when a Steam device type is selected
             viiperDeviceType.PropertyChanged += (s, e) => { UpdateViiperConfigVisibility(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
             // Re-evaluate sub-device-dependent panels (e.g. Joy-Con Pair per-half gyro) when the Nintendo sub-device changes.
@@ -1559,8 +1556,6 @@ namespace XboxGamingBar
             installUsbip = new InstallUsbipProperty(this);
             hidHideInstalled = new HidHideInstalledProperty(this);
             installHidHide = new InstallHidHideProperty(this);
-            autoHibernateEnabled = new AutoHibernateEnabledProperty(AutoHibernateToggle, this);
-            autoHibernateIdleMinutes = new AutoHibernateIdleMinutesProperty(15, AutoHibernateTimeoutSlider, this);
 
             // Set up callbacks for TDP method availability
             winRing0Available.SetAvailabilityCallback(UpdateWinRing0Visibility);
@@ -1794,8 +1789,6 @@ namespace XboxGamingBar
                 installUsbip,
                 hidHideInstalled,
                 installHidHide,
-                autoHibernateEnabled,
-                autoHibernateIdleMinutes,
                 fpsLimit,
                 osPowerMode,
                 tdpLimits,
@@ -2021,9 +2014,6 @@ namespace XboxGamingBar
 
             // Load Performance Overlay setting
             LoadPerformanceOverlaySetting();
-
-            // Restore Auto Hibernate AC/DC power-source choice (issue #88 bug #3)
-            LoadAutoHibernateModeSetting();
 
             // Send OSD config to helper on startup
             SendOSDConfigToHelper();
@@ -3093,6 +3083,14 @@ namespace XboxGamingBar
                         // Update FPS Limit controls based on RTSS installed status
                         UpdateFPSLimitControls();
 
+                        // Force-recompute the Controller Emulation prereq gate from the freshly
+                        // synced values. Individual property callbacks (UpdateHidHideInstalledUI /
+                        // UpdateLabsUsbipUI) dedupe on unchanged values and may not re-fire on a
+                        // reconnect where the helper's answer didn't change, which would leave the
+                        // gate stuck showing a stale "missing" state from before the real values
+                        // ever arrived.
+                        UpdateControllerEmulationPrereqGate();
+
                         // Register Chill FPS handlers after first sync to prevent crash
                         RegisterChillFPSHandlers();
                     }
@@ -3450,6 +3448,11 @@ namespace XboxGamingBar
                     // Without this, CurrentTDPValueText shows stale "Balanced mode" from XAML defaults.
                     UpdateTDPSliderEnabledState();
                     Logger.Info($"[PIPE] Updated Custom TDP display after sync");
+
+                    // Force-recompute the Controller Emulation prereq gate from the freshly synced
+                    // values - see the comment on the other Sync() call site for why this can't
+                    // rely purely on the individual HidHide/usbip property callbacks.
+                    UpdateControllerEmulationPrereqGate();
                 });
 
                 // Send Quick Metrics and Screen Saver enabled states to helper (fire-and-forget)
@@ -3465,12 +3468,6 @@ namespace XboxGamingBar
                 // fires) but breaks every hotkey in FSE where the widget is suspended
                 // and only the helper is polling XInput. Issue #79 (kingvall).
                 SendControllerHotkeyConfigToHelper();
-
-                // Re-send the persisted Auto Hibernate AC/DC mode now that the pipe is up. At
-                // Loaded time (when LoadAutoHibernateModeSetting first runs) the pipe isn't
-                // connected, so that send is dropped; this guarantees the helper agrees with the
-                // widget's saved choice. (Issue #88 bug #3)
-                SendAutoHibernateModeToHelper();
 
                 await Task.Delay(200);
                 isInitialSync = false;
@@ -3514,14 +3511,6 @@ namespace XboxGamingBar
                     // widget constructor before App.IsConnected, so its Send* calls drop
                     // into a not-yet-connected pipe. Re-push now that the pipe is up.
                     ResendActiveControllerProfileToHelper();
-
-                    // Refresh USBIP prereq status line. PropertyChanged-driven refresh misses
-                    // the case where the helper's value matches the widget's default (false),
-                    // since GenericProperty.SetValue skips NotifyPropertyChanged on equality
-                    // (see MEMORY.md GenericProperty.SetValue Equality Check Gotcha). Without
-                    // this explicit call, users on a fresh install where USBIP isn't installed
-                    // would see "checking..." forever.
-                    UpdateUsbipCardVisibility();
 
                     // Same equality-skip gotcha applies: if helper's viiperDeviceType matches
                     // the widget's default ("xbox360"), no PropertyChanged fires and the Gyro →

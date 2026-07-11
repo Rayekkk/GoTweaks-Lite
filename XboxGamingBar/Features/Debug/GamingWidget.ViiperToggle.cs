@@ -9,44 +9,6 @@ namespace XboxGamingBar
     public sealed partial class GamingWidget
     {
         /// <summary>
-        /// Shows or hides the "usbip-win2 required" warning card based on the
-        /// emulation backend toggle and the helper-reported USBIP install status.
-        /// Also refreshes the always-visible status line under the VIIPER toggle —
-        /// added per issue #79 vvalente30 so users see the prereq state proactively
-        /// (not just when they flip the toggle and discover input doesn't work).
-        /// </summary>
-        private async void UpdateUsbipCardVisibility()
-        {
-            if (emulationBackend == null || usbipInstalled == null)
-            {
-                return;
-            }
-
-            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                bool backendOn = emulationBackend.Value;
-                bool installed = usbipInstalled.Value;
-
-                if (UsbipInstallCard != null)
-                {
-                    UsbipInstallCard.Visibility = (backendOn && !installed)
-                        ? Visibility.Visible
-                        : Visibility.Collapsed;
-                }
-
-                if (UsbipPrereqStatusLine != null)
-                {
-                    UsbipPrereqStatusLine.Text = installed
-                        ? "usbip-win2 driver: detected ✓"
-                        : "usbip-win2 driver: not detected — install + reboot required";
-                    UsbipPrereqStatusLine.Foreground = installed
-                        ? new SolidColorBrush(Color.FromArgb(0xFF, 0x66, 0xCC, 0x66))
-                        : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xC1, 0x07));
-                }
-            });
-        }
-
-        /// <summary>
         /// Swaps the Controller Emulation card body between the legacy ControllerEmulationContent
         /// and the new ViiperEmulationContent based on the backend toggle state. When expanded,
         /// only one of the two is visible at a time — they are not run concurrently.
@@ -121,7 +83,7 @@ namespace XboxGamingBar
 
                 // Backend swap can change which body (legacy vs VIIPER) is currently
                 // visible, so rebuild the System tab D-pad chain (ExpandButton →
-                // EnabledToggle → first-body-item → … → AutoHibernateToggle) for the
+                // EnabledToggle → first-body-item → … → DebugExpandButton) for the
                 // new configuration. Without this, gamepad navigation lands wherever
                 // the previous backend's chain pointed.
                 UpdateSystemControllerEmulationNavigation();

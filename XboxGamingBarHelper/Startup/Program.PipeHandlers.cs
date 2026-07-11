@@ -1103,11 +1103,8 @@ namespace XboxGamingBarHelper
                 {
                     response = HandleCalibrateGyroBias(request);
                 }
-                // Auto Hibernate Mode: 0=Always, 1=AC Only, 2=DC Only
-                else if (functionValue == (int)Function.AutoHibernateMode)
-                {
-                    response = HandleAutoHibernateMode(request);
-                }
+                // (AutoHibernateMode handler removed — Auto Hibernate feature retired,
+                // 2026-07-10 System-tab cleanup. Function ordinal stays reserved.)
                 // (ViGEmBusInstalled / InstallViGEmBus handlers removed — ViGEm
                 // backend retired. The Function enum entries stay so the wire
                 // values of later entries don't shift; unknown functions from
@@ -1471,23 +1468,6 @@ namespace XboxGamingBarHelper
                         Logger.Warn($"Pipe: CalibrateGyroBias capture threw: {capEx.Message}");
                     }
                 });
-            }
-            return response;
-        }
-
-        // Auto Hibernate Mode: 0=Always, 1=AC Only, 2=DC Only
-        private static global::Windows.Foundation.Collections.ValueSet HandleAutoHibernateMode(Shared.IPC.PipeMessage request)
-        {
-            global::Windows.Foundation.Collections.ValueSet response = null;
-            if (request.Content != null && int.TryParse(request.Content.ToString(), out int mode))
-            {
-                autoHibernateMode = mode;
-                // Persist so the AC/DC choice survives reboot even if the widget never opens
-                // (issue #88 bug #3). LocalSettingsHelper (UWP LocalSettings + JSON fallback)
-                // round-trips reliably in the MSIX-deployed helper across reboots/updates;
-                // Properties.Settings.Default did not, so the value reverted to 0=Always.
-                XboxGamingBarHelper.Settings.LocalSettingsHelper.SetValue("AutoHibernateMode", mode);
-                Logger.Info($"Pipe: Auto Hibernate mode set to: {mode} ({(mode == 0 ? "Always" : mode == 1 ? "AC Only" : "DC Only")})");
             }
             return response;
         }

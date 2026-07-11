@@ -2428,8 +2428,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="PawnIO Driver" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Signed kernel driver — required for full OSD CPU sensors"
+                                        <TextBlock Text="Prerequisites" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Optional components GoTweaks Lite can install for you"
                                                    Style="{StaticResource CardCaptionStyle}"
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
@@ -2480,25 +2480,91 @@
                                     </Grid>
                                     </StackPanel>
 
-                                    <!-- PawnIO Install Section -->
+                                    <!-- PawnIO row -->
                                     <Grid Margin="0,8,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                             <TextBlock Text="PawnIO Driver" FontSize="14" Foreground="White"/>
-                                            <TextBlock x:Name="PawnIOStatusText"
-                                                       Text="Signed kernel driver for hardware access"
+                                            <TextBlock Text="Signed kernel driver for extended sensors (fan speed, GPU power) and anti-cheat-safe TDP control"
                                                        Style="{StaticResource CardCaptionStyle}"
                                                        TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="PawnIOStatusText"
+                                                       Text="Not installed"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#FFC107"
+                                                       Margin="0,4,0,0"/>
                                         </StackPanel>
                                         <Button x:Name="InstallPawnIOButton"
                                                 Grid.Column="1"
                                                 Content="Install"
                                                 Style="{StaticResource ModernButtonStyle}"
                                                 Click="InstallPawnIOButton_Click"
+                                                VerticalAlignment="Center"
                                                 XYFocusUp="{x:Bind TDPSettingsExpandButton}"
+                                                XYFocusDown="{x:Bind PrereqUsbipInstallButton}"/>
+                                    </Grid>
+
+                                    <Border Height="1" Background="#33FFFFFF" Margin="0,12,0,12"/>
+
+                                    <!-- usbip-win2 row -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="usbip-win2" FontSize="14" Foreground="White"/>
+                                            <TextBlock Text="Kernel driver that powers VIIPER virtual controller emulation (native gyro, alternate pad types)"
+                                                       Style="{StaticResource CardCaptionStyle}"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="PrereqUsbipStatusText"
+                                                       Text="Not installed"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#FFC107"
+                                                       Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <Button x:Name="PrereqUsbipInstallButton"
+                                                Grid.Column="1"
+                                                Content="Install"
+                                                Style="{StaticResource ModernButtonStyle}"
+                                                Click="PrereqUsbipInstallButton_Click"
+                                                VerticalAlignment="Center"
+                                                XYFocusUp="{x:Bind InstallPawnIOButton}"
+                                                XYFocusDown="{x:Bind PrereqHidHideInstallButton}"/>
+                                    </Grid>
+
+                                    <Border Height="1" Background="#33FFFFFF" Margin="0,12,0,12"/>
+
+                                    <!-- HidHide row -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="HidHide" FontSize="14" Foreground="White"/>
+                                            <TextBlock Text="Hides the stock controller from games while emulation is active, so input isn't read twice"
+                                                       Style="{StaticResource CardCaptionStyle}"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="PrereqHidHideStatusText"
+                                                       Text="Not installed"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#FFC107"
+                                                       Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <Button x:Name="PrereqHidHideInstallButton"
+                                                Grid.Column="1"
+                                                Content="Install"
+                                                Style="{StaticResource ModernButtonStyle}"
+                                                Click="PrereqHidHideInstallButton_Click"
+                                                VerticalAlignment="Center"
+                                                XYFocusUp="{x:Bind PrereqUsbipInstallButton}"
                                                 XYFocusDown="{x:Bind OSDCustomizeExpandButton}"/>
                                     </Grid>
 
@@ -2927,7 +2993,7 @@
                                                   Padding="8,4"
                                                   Click="HotkeysExpandButton_Click"
                                                   XYFocusUp="{x:Bind OSDCustomizeExpandButton}"
-                                                  XYFocusDown="{x:Bind AutoHibernateToggle}"
+                                                  XYFocusDown="{x:Bind DebugExpandButton}"
                                                   UseSystemFocusVisuals="True">
                                         <FontIcon x:Name="HotkeysExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
                                     </ToggleButton>
@@ -3262,7 +3328,7 @@
                                                   Padding="8,4"
                                                   Click="ControllerEmulationExpandButton_Click"
                                                   XYFocusUp="{x:Bind HotkeysExpandButton}"
-                                                  XYFocusDown="{x:Bind AutoHibernateToggle}"
+                                                  XYFocusDown="{x:Bind DebugExpandButton}"
                                                   UseSystemFocusVisuals="True">
                                         <FontIcon x:Name="ControllerEmulationExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
                                     </ToggleButton>
@@ -3271,8 +3337,10 @@
                                 <!-- Master "Enable Controller Emulation" toggle. Lives outside both
                                      ControllerEmulationContent (legacy body) and ViiperEmulationContent
                                      (VIIPER body) so it's always visible regardless of which backend
-                                     the user has selected. -->
-                                <Grid Margin="0,12,0,0">
+                                     the user has selected. Hidden (in favor of
+                                     ControllerEmulationPrereqWarning below) while a required
+                                     component isn't installed. -->
+                                <Grid x:Name="ControllerEmulationEnableRow" Margin="0,12,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -3291,6 +3359,55 @@
                                                   Toggled="ControllerEmulationEnabledToggle_Toggled"
                                                   XYFocusUp="{x:Bind ControllerEmulationExpandButton}"/>
                                 </Grid>
+
+                                <!-- Shown instead of the row above when a required component (usbip-win2,
+                                     HidHide) isn't installed yet. Keeps the fix one click away instead of
+                                     sending the user hunting through the System tab. -->
+                                <Border x:Name="ControllerEmulationPrereqWarning"
+                                        Visibility="Collapsed"
+                                        Background="#3A2A10"
+                                        BorderBrush="#FFC107"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12"
+                                        Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="⚠ Required components missing" FontSize="13" FontWeight="SemiBold" Foreground="#FFC107"/>
+                                        <TextBlock Text="Controller emulation needs these installed first. Install them here, then come back to enable it."
+                                                   FontSize="11" Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,4,0,10"/>
+
+                                        <Grid x:Name="ControllerEmulationPrereqUsbipRow" Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="usbip-win2" FontSize="12" Foreground="White" VerticalAlignment="Center"/>
+                                            <Button x:Name="ControllerEmulationPrereqUsbipButton"
+                                                    Grid.Column="1"
+                                                    Content="Install"
+                                                    Padding="12,4"
+                                                    FontSize="12"
+                                                    Background="#AA8800"
+                                                    Foreground="White"
+                                                    Click="ControllerEmulationPrereqUsbipButton_Click"/>
+                                        </Grid>
+                                        <Grid x:Name="ControllerEmulationPrereqHidHideRow" Visibility="Collapsed" Margin="0,8,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="HidHide" FontSize="12" Foreground="White" VerticalAlignment="Center"/>
+                                            <Button x:Name="ControllerEmulationPrereqHidHideButton"
+                                                    Grid.Column="1"
+                                                    Content="Install"
+                                                    Padding="12,4"
+                                                    FontSize="12"
+                                                    Background="#AA8800"
+                                                    Foreground="White"
+                                                    Click="ControllerEmulationPrereqHidHideButton_Click"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
 
                                 <StackPanel x:Name="ControllerEmulationContent" Visibility="Collapsed" Margin="0,12,0,0">
                                 <Border Background="#1A1A2E" CornerRadius="4" Padding="10" Margin="0,10,0,0">
@@ -4970,74 +5087,6 @@
                         </StackPanel>
                         </Border>
 
-                        <!-- Auto Hibernate Card -->
-                        <Border x:Name="AutoHibernateCard" Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Auto Hibernate" Style="{StaticResource CardTitleStyle}"/>
-                                <TextBlock Text="Hibernate after inactivity to avoid Modern Standby issues"
-                                           Style="{StaticResource CardCaptionStyle}"
-                                           TextWrapping="Wrap"/>
-
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Enable auto hibernate" Foreground="#FFFFFF" FontSize="13"/>
-                                        <TextBlock Text="System will hibernate when idle" Foreground="#707070" FontSize="11"/>
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="AutoHibernateToggle"
-                                                  Grid.Column="1"
-                                                  IsOn="False"
-                                                  Style="{StaticResource ModernToggleStyle}"
-                                                  XYFocusUp="{x:Bind HotkeysExpandButton}"/>
-                                </Grid>
-
-                                <StackPanel Visibility="{Binding ElementName=AutoHibernateToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Grid Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Power source"
-                                                   FontSize="13"
-                                                   Foreground="#FFFFFF"
-                                                   VerticalAlignment="Center"
-                                                   Grid.Column="0"/>
-                                        <ComboBox x:Name="AutoHibernateModeComboBox"
-                                                  Grid.Column="1"
-                                                  Width="120"
-                                                  Style="{StaticResource ModernComboBoxStyle}"
-                                                  SelectionChanged="AutoHibernateModeComboBox_SelectionChanged">
-                                            <ComboBoxItem Content="Always" Tag="0" IsSelected="True"/>
-                                            <ComboBoxItem Content="AC Only" Tag="1"/>
-                                            <ComboBoxItem Content="DC Only" Tag="2"/>
-                                        </ComboBox>
-                                    </Grid>
-                                    <Grid Margin="0,12,0,6">
-                                        <TextBlock Text="Idle timeout"
-                                                   FontSize="14"
-                                                   Foreground="#FFFFFF"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="AutoHibernateTimeoutValue"
-                                                   Text="15 min"
-                                                   FontSize="14"
-                                                   Foreground="#4CAF50"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
-                                    <Slider x:Name="AutoHibernateTimeoutSlider"
-                                            Style="{StaticResource ModernSliderStyle}"
-                                            Minimum="1" Maximum="120"
-                                            TickFrequency="1"
-                                            SnapsTo="Ticks"
-                                            Value="15"
-                                            ValueChanged="AutoHibernateTimeoutSlider_ValueChanged"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
                         <!-- Debug Card (Collapsible) -->
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
@@ -5096,35 +5145,6 @@
                                             Style="{StaticResource StandaloneButtonStyle}"
                                             Click="ExportLogsButton_Click"/>
 
-                                    <!-- Check for Update Button -->
-                                    <Button x:Name="CheckForUpdateButton"
-                                            Margin="0,8,0,0"
-                                            Content="Check for Update"
-                                            HorizontalAlignment="Stretch"
-                                            Style="{StaticResource StandaloneButtonStyle}"
-                                            Click="CheckForUpdateButton_Click"/>
-
-                                    <!-- GoTweaks self-update preferences. Shared with the
-                                         Quick-tab update banner: the helper's startup
-                                         probe is gated by "Check for updates on start",
-                                         and the banner is hidden when "Hide banner" is
-                                         on. Persisted per-user in LocalSettings. -->
-                                    <CheckBox x:Name="GoTweaksUpdateOnStartCheckbox"
-                                              Content="Check for updates on start"
-                                              IsChecked="True"
-                                              FontSize="12"
-                                              Foreground="#AAAAAA"
-                                              Margin="0,8,0,0"
-                                              Checked="GoTweaksUpdateOnStartCheckbox_Changed"
-                                              Unchecked="GoTweaksUpdateOnStartCheckbox_Changed"/>
-                                    <CheckBox x:Name="GoTweaksHideBannerCheckbox"
-                                              Content="Hide GoTweaks Lite update banner on Quick tab"
-                                              IsChecked="False"
-                                              FontSize="12"
-                                              Foreground="#AAAAAA"
-                                              Checked="GoTweaksHideBannerCheckbox_Changed"
-                                              Unchecked="GoTweaksHideBannerCheckbox_Changed"/>
-
                                     <!-- Export/Import All Data Buttons (side by side) -->
                                     <Grid Margin="0,8,0,0">
                                         <Grid.ColumnDefinitions>
@@ -5171,64 +5191,14 @@
                                                       Toggled="EnableDebugToolsToggle_Toggled"/>
                                     </Grid>
 
-                                    <!-- VIIPER backend info. The Legacy/VIIPER toggle is retired — VIIPER
-                                         is the only emulation backend (ViGEm retirement final). The hidden
-                                         ToggleSwitch stays for the property binding; the helper clamps any
-                                         Legacy value back to VIIPER regardless. -->
-                                    <Grid Margin="0,16,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Controller emulation backend: VIIPER" FontSize="14" Foreground="#FFC107"/>
-                                            <TextBlock Text="USBIP-based virtual controllers. Requires the usbip-win2 driver." FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
-                                            <!-- Always-visible USBIP status. Driven from helper-side detection
-                                                 (XboxGamingBarHelper/Settings/UsbipInstalledProperty.cs) so users
-                                                 know the prerequisite state at a glance. -->
-                                            <TextBlock x:Name="UsbipPrereqStatusLine"
-                                                       FontSize="11"
-                                                       Margin="0,4,0,0"
-                                                       Foreground="#888888"
-                                                       Text="usbip-win2 driver: checking..."/>
-                                        </StackPanel>
-                                        <ToggleSwitch x:Name="ViiperEmulationToggle"
-                                                      Grid.Column="1"
-                                                      OnContent="" OffContent=""
-                                                      IsOn="True"
-                                                      Visibility="Collapsed"/>
-                                    </Grid>
-
-                                    <!-- USBIP prerequisite card, visible only when usbip-win2 is not installed -->
-                                    <Border x:Name="UsbipInstallCard"
-                                            Visibility="Collapsed"
-                                            Background="#3A2A10"
-                                            BorderBrush="#FFC107"
-                                            BorderThickness="1"
-                                            CornerRadius="6"
-                                            Padding="12"
-                                            Margin="0,8,0,0">
-                                        <StackPanel>
-                                            <TextBlock Text="⚠ usbip-win2 required" FontSize="13" FontWeight="SemiBold" Foreground="#FFC107"/>
-                                            <TextBlock Text="Controller emulation needs the usbip-win2 kernel driver. Install it once, reboot, then come back here."
-                                                       FontSize="11" Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,4,0,8"/>
-                                            <StackPanel Orientation="Horizontal">
-                                                <Button x:Name="UsbipInstallButton"
-                                                        Content="Install usbip-win2"
-                                                        Padding="12,4"
-                                                        FontSize="12"
-                                                        Background="#AA8800"
-                                                        Foreground="White"
-                                                        Click="UsbipInstallButton_Click"/>
-                                                <HyperlinkButton x:Name="UsbipInstallLink"
-                                                                 Content="or download manually"
-                                                                 FontSize="11"
-                                                                 Margin="12,0,0,0"
-                                                                 VerticalAlignment="Center"
-                                                                 NavigateUri="https://github.com/vadimgrn/usbip-win2/releases"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
+                                    <!-- VIIPER is the only emulation backend (ViGEm retirement final) - the
+                                         Legacy/VIIPER toggle and its visible info card are retired. This
+                                         ToggleSwitch has no visual footprint but must stay in the tree:
+                                         EmulationBackendProperty (GamingWidget.xaml.cs) binds to it, and the
+                                         helper clamps any Legacy value back to VIIPER regardless. -->
+                                    <ToggleSwitch x:Name="ViiperEmulationToggle"
+                                                  IsOn="True"
+                                                  Visibility="Collapsed"/>
 
                                     <!-- PawnIO Debug Tools (visible when Debug Tools enabled) -->
                                     <StackPanel x:Name="PawnIODebugTools" Visibility="Collapsed" Margin="0,12,0,0">
@@ -5342,25 +5312,6 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
-
-                                    <!-- Update Status Text -->
-                                    <TextBlock x:Name="UpdateStatusText"
-                                               Text=""
-                                               FontSize="12"
-                                               Foreground="#A0A0A0"
-                                               TextWrapping="Wrap"
-                                               Margin="0,8,0,0"
-                                               Visibility="Collapsed"/>
-
-                                    <!-- Update Button (shown when update available) -->
-                                    <Button x:Name="UpdateButton"
-                                            Content="Update"
-                                            HorizontalAlignment="Stretch"
-                                            Margin="0,8,0,0"
-                                            Style="{StaticResource StandaloneButtonStyle}"
-                                            Background="#107C10"
-                                            Click="UpdateButton_Click"
-                                            Visibility="Collapsed"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -5394,6 +5345,55 @@
 
                                 <!-- Collapsible Content -->
                                 <StackPanel x:Name="AboutContent" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <!-- Updates - everything update-related lives here, at the top. -->
+                                    <Button x:Name="CheckForUpdateButton"
+                                            Content="Check for Update"
+                                            HorizontalAlignment="Stretch"
+                                            Style="{StaticResource StandaloneButtonStyle}"
+                                            Click="CheckForUpdateButton_Click"/>
+
+                                    <!-- Update Status Text -->
+                                    <TextBlock x:Name="UpdateStatusText"
+                                               Text=""
+                                               FontSize="12"
+                                               Foreground="#A0A0A0"
+                                               TextWrapping="Wrap"
+                                               Margin="0,8,0,0"
+                                               Visibility="Collapsed"/>
+
+                                    <!-- Update Button (shown when update available) -->
+                                    <Button x:Name="UpdateButton"
+                                            Content="Update"
+                                            HorizontalAlignment="Stretch"
+                                            Margin="0,8,0,0"
+                                            Style="{StaticResource StandaloneButtonStyle}"
+                                            Background="#107C10"
+                                            Click="UpdateButton_Click"
+                                            Visibility="Collapsed"/>
+
+                                    <!-- Single "check for updates automatically" preference, gating both
+                                         update surfaces (the helper's Quick-tab banner probe and the
+                                         widget's own startup auto-check) so there is only one on-screen
+                                         toggle instead of two near-duplicate ones. -->
+                                    <CheckBox x:Name="GoTweaksUpdateOnStartCheckbox"
+                                              Content="Check for updates automatically on start"
+                                              IsChecked="True"
+                                              FontSize="12"
+                                              Foreground="#AAAAAA"
+                                              Margin="0,0,0,0"
+                                              Checked="GoTweaksUpdateOnStartCheckbox_Changed"
+                                              Unchecked="GoTweaksUpdateOnStartCheckbox_Changed"/>
+                                    <CheckBox x:Name="GoTweaksHideBannerCheckbox"
+                                              Content="Hide GoTweaks Lite update banner on Quick tab"
+                                              IsChecked="False"
+                                              FontSize="12"
+                                              Foreground="#AAAAAA"
+                                              Margin="0,4,0,0"
+                                              Checked="GoTweaksHideBannerCheckbox_Changed"
+                                              Unchecked="GoTweaksHideBannerCheckbox_Changed"/>
+
+                                    <Border Height="1" Background="#33FFFFFF" Margin="0,16,0,16"/>
+
                                     <!-- Version -->
                                     <Grid Margin="0,0,0,8">
                                         <TextBlock Text="Version"
@@ -5444,30 +5444,6 @@
                                                    FontSize="14"
                                                    Foreground="#B0B0B0"
                                                    HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <!-- Check for updates on startup toggle -->
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="Check for updates on startup"
-                                                       FontSize="14"
-                                                       Foreground="#FFFFFF"/>
-                                            <TextBlock Text="Automatically check GitHub for new versions"
-                                                       FontSize="11"
-                                                       Foreground="#888888"/>
-                                        </StackPanel>
-                                        <!-- No IsOn="True" here: the XAML default fired Toggled during
-                                             InitializeComponent and stomped a stored False on every
-                                             launch (upstream #94 "unchecking doesn't stick"). The stored
-                                             value (default true) is applied by CheckForUpdatesOnStartupAsync. -->
-                                        <ToggleSwitch x:Name="AutoUpdateCheckToggle"
-                                                      Grid.Column="1"
-                                                      Style="{StaticResource ModernToggleStyle}"
-                                                      Toggled="AutoUpdateCheckToggle_Toggled"/>
                                     </Grid>
                                 </StackPanel>
                             </StackPanel>

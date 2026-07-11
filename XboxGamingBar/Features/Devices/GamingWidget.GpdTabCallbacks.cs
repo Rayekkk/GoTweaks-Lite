@@ -156,6 +156,7 @@ namespace XboxGamingBar
 
             UpdateControllerEmulationControlState();
             UpdateControllerEmulationStatusText();
+            UpdateControllerEmulationPrereqGate();
             Logger.Info($"Controller emulation availability set to: {available}");
             UpdateControllerEmulationMouseSettingsVisibility();
             RefreshLegionEnhancedRemapUi();
@@ -427,7 +428,7 @@ namespace XboxGamingBar
                     : Visibility.Collapsed;
             }
 
-            DependencyObject firstModeDetailControl = AutoHibernateToggle;
+            DependencyObject firstModeDetailControl = DebugExpandButton;
             if (isMouseMode && ControllerEmulationMouseSensitivitySlider != null)
             {
                 firstModeDetailControl = ControllerEmulationMouseSensitivitySlider;
@@ -441,33 +442,33 @@ namespace XboxGamingBar
             {
                 ControllerEmulationModeComboBox.XYFocusDown = firstModeDetailControl;
                 if (firstModeDetailControl is Control firstControl &&
-                    !ReferenceEquals(firstModeDetailControl, AutoHibernateToggle))
+                    !ReferenceEquals(firstModeDetailControl, DebugExpandButton))
                 {
                     firstControl.XYFocusUp = ControllerEmulationModeComboBox;
                 }
             }
 
-            if (AutoHibernateToggle != null)
+            if (DebugExpandButton != null)
             {
                 if (isMouseMode && ControllerEmulationMouseGainYSlider != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationMouseGainYSlider;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationMouseGainYSlider;
                 }
                 else if (JoystickOutputExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = JoystickOutputExpandToggle;
+                    DebugExpandButton.XYFocusUp = JoystickOutputExpandToggle;
                 }
                 else if (FeaturesExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = FeaturesExpandToggle;
+                    DebugExpandButton.XYFocusUp = FeaturesExpandToggle;
                 }
                 else if (GyroActivationExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = GyroActivationExpandToggle;
+                    DebugExpandButton.XYFocusUp = GyroActivationExpandToggle;
                 }
                 else
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationModeComboBox;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationModeComboBox;
                 }
             }
         }
@@ -496,7 +497,7 @@ namespace XboxGamingBar
         /// </summary>
         private void UpdateSystemControllerEmulationNavigation()
         {
-            if (HotkeysExpandButton == null || AutoHibernateToggle == null)
+            if (HotkeysExpandButton == null || DebugExpandButton == null)
             {
                 return;
             }
@@ -546,8 +547,8 @@ namespace XboxGamingBar
 
                 if (!emulationCardExpanded)
                 {
-                    ControllerEmulationExpandButton.XYFocusDown = AutoHibernateToggle;
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationExpandButton;
+                    ControllerEmulationExpandButton.XYFocusDown = DebugExpandButton;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationExpandButton;
                     return;
                 }
 
@@ -558,8 +559,8 @@ namespace XboxGamingBar
                 }
                 else
                 {
-                    ControllerEmulationExpandButton.XYFocusDown = AutoHibernateToggle;
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationExpandButton;
+                    ControllerEmulationExpandButton.XYFocusDown = DebugExpandButton;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationExpandButton;
                     return;
                 }
 
@@ -572,52 +573,52 @@ namespace XboxGamingBar
                     {
                         ControllerEmulationEnabledToggle.XYFocusDown = ViiperDeviceTypeComboBox;
                         ViiperDeviceTypeComboBox.XYFocusUp = ControllerEmulationEnabledToggle;
-                        AutoHibernateToggle.XYFocusUp = ViiperDeviceTypeComboBox;
+                        DebugExpandButton.XYFocusUp = ViiperDeviceTypeComboBox;
                     }
                     else
                     {
-                        AutoHibernateToggle.XYFocusUp = ControllerEmulationEnabledToggle;
+                        DebugExpandButton.XYFocusUp = ControllerEmulationEnabledToggle;
                     }
                     return;
                 }
 
                 if (!emulationCardActive)
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationEnabledToggle;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationEnabledToggle;
                     return;
                 }
 
                 if (!emulationModeControlsActive)
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationEnabledToggle;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationEnabledToggle;
                     return;
                 }
 
                 if (isMouseMode && ControllerEmulationMouseGainYSlider != null && ControllerEmulationMouseGainYSlider.IsEnabled)
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationMouseGainYSlider;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationMouseGainYSlider;
                 }
                 else if (isStickMode && JoystickOutputExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = JoystickOutputExpandToggle;
+                    DebugExpandButton.XYFocusUp = JoystickOutputExpandToggle;
                 }
                 else if (FeaturesExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = FeaturesExpandToggle;
+                    DebugExpandButton.XYFocusUp = FeaturesExpandToggle;
                 }
                 else if (GyroActivationExpandToggle != null)
                 {
-                    AutoHibernateToggle.XYFocusUp = GyroActivationExpandToggle;
+                    DebugExpandButton.XYFocusUp = GyroActivationExpandToggle;
                 }
                 else
                 {
-                    AutoHibernateToggle.XYFocusUp = ControllerEmulationModeComboBox;
+                    DebugExpandButton.XYFocusUp = ControllerEmulationModeComboBox;
                 }
             }
             else
             {
-                HotkeysExpandButton.XYFocusDown = AutoHibernateToggle;
-                AutoHibernateToggle.XYFocusUp = HotkeysExpandButton;
+                HotkeysExpandButton.XYFocusDown = DebugExpandButton;
+                DebugExpandButton.XYFocusUp = HotkeysExpandButton;
             }
         }
 

@@ -357,10 +357,12 @@
         // Screen Saver (idle display off for gaming)
         ScreenSaverEnabled,             // bool - when true, helper monitors idle time and triggers Windows screen saver
 
-        // Auto Hibernate (idle-based hibernation)
-        AutoHibernateEnabled,           // bool - when true, helper hibernates system after inactivity timeout
-        AutoHibernateIdleMinutes,       // int - idle minutes before hibernate
-        AutoHibernateMode,              // int - 0=Always, 1=AC Only, 2=DC Only
+        // Auto Hibernate (idle-based hibernation) — REMOVED (feature deleted both sides, 2026-07-10
+        // System-tab cleanup). Ordinals kept RESERVED per the standard removed-feature convention —
+        // never delete/reorder, it would shift every wire ID after it.
+        AutoHibernateEnabled,           // RESERVED - bool
+        AutoHibernateIdleMinutes,       // RESERVED - int
+        AutoHibernateMode,              // RESERVED - int
 
         // GPD Controller Emulation
         GPDGyroSource,                  // int - gyro source (0=Internal Handheld, 1=Controller Internal)

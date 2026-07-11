@@ -137,17 +137,5 @@ namespace XboxGamingBarHelper
                 glo => glo.CPUEPP = powerManager.CPUEPP);
         }
 
-        private static void AutoHibernateEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (settingsManager?.AutoHibernateEnabled == null) return;
-            SetAutoHibernateEnabled(settingsManager.AutoHibernateEnabled.Value);
-        }
-
-        private static void AutoHibernateIdleMinutes_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (settingsManager?.AutoHibernateIdleMinutes == null) return;
-            UpdateAutoHibernateIdleTimeout(settingsManager.AutoHibernateIdleMinutes.Value);
-        }
-
     }
 }

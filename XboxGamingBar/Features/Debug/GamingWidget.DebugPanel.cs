@@ -543,24 +543,9 @@ namespace XboxGamingBar
         {
             try
             {
-                // Check if auto-update check is enabled (default: true)
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                bool autoCheckEnabled = true;
-                if (settings.Values.TryGetValue("AutoUpdateCheckEnabled", out object val) && val is bool b)
-                {
-                    autoCheckEnabled = b;
-                }
-
-                // Update the toggle to match saved setting
-                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-                {
-                    if (AutoUpdateCheckToggle != null)
-                    {
-                        AutoUpdateCheckToggle.IsOn = autoCheckEnabled;
-                    }
-                    // From here on, Toggled events are real user input.
-                    _autoUpdateToggleLoaded = true;
-                });
+                // Single "check for updates automatically" preference (also gates the
+                // helper's Quick-tab banner probe; see GoTweaksUpdateOnStartCheckbox).
+                bool autoCheckEnabled = GoTweaksCheckOnStart;
 
                 if (!autoCheckEnabled)
                 {
@@ -742,31 +727,6 @@ namespace XboxGamingBar
         private void DismissUpdateBannerButton_Click(object sender, RoutedEventArgs e)
         {
             HideUpdateBanner();
-        }
-
-        // Guard: same pattern used elsewhere for programmatic-vs-user toggle writes.
-        // Programmatic IsOn writes (XAML parse, the startup load above) fire Toggled
-        // just like user clicks; saving from those stomped the stored value on every
-        // launch (upstream #94).
-        private bool _autoUpdateToggleLoaded;
-
-        /// <summary>
-        /// Handles the auto-update check toggle change.
-        /// </summary>
-        private void AutoUpdateCheckToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (AutoUpdateCheckToggle == null)
-                return;
-
-            if (!_autoUpdateToggleLoaded)
-            {
-                Logger.Debug("AutoUpdateCheckToggle_Toggled before load; not saving");
-                return;
-            }
-
-            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            settings.Values["AutoUpdateCheckEnabled"] = AutoUpdateCheckToggle.IsOn;
-            Logger.Info($"Auto-update check setting changed to: {AutoUpdateCheckToggle.IsOn}");
         }
 
         private async void ExportAllDataButton_Click(object sender, RoutedEventArgs e)

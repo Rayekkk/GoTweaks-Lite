@@ -237,17 +237,6 @@ namespace XboxGamingBarHelper
         private const int SetupHealthCheckIntervalMs = 2 * 60 * 1000;
 
         /// <summary>
-        /// Auto hibernate idle monitoring - hibernates after inactivity timeout
-        /// </summary>
-        private static volatile bool autoHibernateEnabled = false;
-        private static volatile int autoHibernateMode = 0; // 0=Always, 1=AC Only, 2=DC Only
-        private static System.Threading.Timer autoHibernateTimer;
-        private static DateTime lastAutoHibernateAttemptUtc = DateTime.MinValue;
-        private static int autoHibernateIdleTimeoutMs = 15 * 60 * 1000; // 15 minutes idle before hibernate
-        private const int AutoHibernateCheckIntervalMs = 30000; // Check every 30 seconds
-        private const int AutoHibernateCooldownMs = 5 * 60 * 1000; // Minimum time between attempts
-
-        /// <summary>
         /// Configures NLog to write logs to the package's LocalCache/Local folder.
         /// Must be called BEFORE any logging happens.
         /// </summary>
@@ -1340,8 +1329,6 @@ namespace XboxGamingBarHelper
                 losslessScalingManager.LosslessScalingBringToForeground,
                 losslessScalingManager.LosslessScalingLaunch,
                 settingsManager.AutoStartRTSS,
-                settingsManager.AutoHibernateEnabled,
-                settingsManager.AutoHibernateIdleMinutes,
                 settingsManager.UseManufacturerWMI,
                 settingsManager.TdpMethod,
                 settingsManager.EmulationBackend,
@@ -1558,16 +1545,6 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.PropertyChanged += CPUEPP_PropertyChanged;
             powerManager.MaxCPUState.PropertyChanged += CPUState_PropertyChanged;
             powerManager.MinCPUState.PropertyChanged += CPUState_PropertyChanged;
-            if (settingsManager?.AutoHibernateEnabled != null)
-            {
-                settingsManager.AutoHibernateEnabled.PropertyChanged += AutoHibernateEnabled_PropertyChanged;
-                SetAutoHibernateEnabled(settingsManager.AutoHibernateEnabled.Value);
-            }
-            if (settingsManager?.AutoHibernateIdleMinutes != null)
-            {
-                settingsManager.AutoHibernateIdleMinutes.PropertyChanged += AutoHibernateIdleMinutes_PropertyChanged;
-                UpdateAutoHibernateIdleTimeout(settingsManager.AutoHibernateIdleMinutes.Value);
-            }
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
             //powerManager.LimitGPUClock.PropertyChanged += GPUClock_PropertyChanged;
             //powerManager.GPUClockMin.PropertyChanged += GPUClock_PropertyChanged;
