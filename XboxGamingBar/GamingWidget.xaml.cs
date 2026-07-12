@@ -892,6 +892,11 @@ namespace XboxGamingBar
         private int fpsLimitPendingValue;
         private const int FPS_LIMIT_DEBOUNCE_MS = 300;
 
+        // Debounces SettingChanged for slider drags (CPU EPP, AMD sharpness/resolution/FPS
+        // sliders) so a drag writes the profile once when it settles instead of on every tick.
+        private DispatcherTimer settingsSaveDebounceTimer;
+        private const int SETTINGS_SAVE_DEBOUNCE_MS = 300;
+
         // Profile management
         private PerformanceProfile globalProfile = new PerformanceProfile();
         private PerformanceProfile acProfile = new PerformanceProfile();
@@ -923,6 +928,13 @@ namespace XboxGamingBar
         private bool isSwitchingControllerProfile = false;
         private DateTime lastProfileApplyTime = DateTime.MinValue; // Prevents duplicate sends from queued UI events
         private int profileSwitchEpoch = 0; // Incremented on each LoadProfileSettings; used to skip stale deferred callbacks
+
+        // Debounces the controller-profile save/send for slider drags (gyro sensitivity/
+        // deadzone, stick deadzones, trigger travel, joystick-mouse sens, light brightness/
+        // speed) - see ControllerSliderSettingChanged.
+        private DispatcherTimer controllerSliderDebounceTimer;
+        private object controllerSliderDebouncePendingSender;
+        private const int CONTROLLER_SLIDER_DEBOUNCE_MS = 300;
 
         // Helper to check if we have a valid game (not null, not empty, not "No game detected")
         private bool HasValidGame(string gameName)

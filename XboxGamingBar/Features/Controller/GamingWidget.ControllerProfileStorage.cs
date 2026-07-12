@@ -1622,7 +1622,53 @@ namespace XboxGamingBar
         {
             // Update slider value displays
             UpdateControllerSliderDisplays(sender);
+            ApplyControllerSettingChange(sender);
+        }
 
+        /// <summary>
+        /// Debounced entry point for slider ValueChanged events (gyro sensitivity/deadzone,
+        /// stick deadzones, trigger travel, joystick-mouse sensitivity, light brightness/speed).
+        /// Raw ValueChanged fires continuously while the thumb moves; ControllerSettingChanged
+        /// does a profile-storage write plus button-mapping/lighting IPC sends on every call,
+        /// so without this a drag fires dozens of writes+sends in under a second. The value
+        /// display still updates live; only the save/send is coalesced to ~300ms after the
+        /// drag settles. Matches the FPSLimitSlider debounce pattern
+        /// (GamingWidget.QuickSettings.Actions.cs).
+        /// </summary>
+        private void ControllerSliderSettingChanged(object sender, object e)
+        {
+            // Update slider value displays immediately - only the save/send is debounced
+            UpdateControllerSliderDisplays(sender);
+
+            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate)
+                return;
+            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
+                return;
+
+            controllerSliderDebouncePendingSender = sender;
+
+            if (controllerSliderDebounceTimer == null)
+            {
+                controllerSliderDebounceTimer = new DispatcherTimer();
+                controllerSliderDebounceTimer.Interval = TimeSpan.FromMilliseconds(CONTROLLER_SLIDER_DEBOUNCE_MS);
+                controllerSliderDebounceTimer.Tick += ControllerSliderDebounceTimer_Tick;
+            }
+
+            controllerSliderDebounceTimer.Stop();
+            controllerSliderDebounceTimer.Start();
+        }
+
+        private void ControllerSliderDebounceTimer_Tick(object sender, object e)
+        {
+            controllerSliderDebounceTimer?.Stop();
+            // Re-checks the same guards inside ApplyControllerSettingChange - state may have
+            // changed (e.g. a profile switch started) during the debounce wait.
+            ApplyControllerSettingChange(controllerSliderDebouncePendingSender);
+            controllerSliderDebouncePendingSender = null;
+        }
+
+        private void ApplyControllerSettingChange(object sender)
+        {
             // Don't save during profile loading, switching, widget unloading, or helper sync
             if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate)
                 return;

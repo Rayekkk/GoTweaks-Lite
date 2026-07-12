@@ -50,7 +50,7 @@ namespace XboxGamingBar
             // (Master TDP slider removed — the Custom power-limit sliders self-save via their own
             //  ValueChanged handlers → OnCustomTDPSliderChanged → SaveCurrentSettingsToProfile.)
             CPUBoostToggle.Toggled += SettingChanged;
-            CPUEPPSlider.ValueChanged += SettingChanged;
+            CPUEPPSlider.ValueChanged += SettingChangedDebounced;
             MinCPUStateComboBox.SelectionChanged += SettingChanged;
             MaxCPUStateComboBox.SelectionChanged += SettingChanged;
             FPSLimitToggle.Toggled += FPSLimitToggle_Toggled;
@@ -63,15 +63,15 @@ namespace XboxGamingBar
             // AMD settings
             AMDFluidMotionFrameToggle.Toggled += SettingChanged;
             AMDRadeonSuperResolutionToggle.Toggled += AMDRadeonSuperResolutionToggle_Toggled;
-            AMDRadeonSuperResolutionSharpnessSlider.ValueChanged += SettingChanged;
+            AMDRadeonSuperResolutionSharpnessSlider.ValueChanged += SettingChangedDebounced;
             AMDImageSharpeningToggle.Toggled += AMDImageSharpeningToggle_Toggled;
-            AMDImageSharpeningSlider.ValueChanged += SettingChanged;
+            AMDImageSharpeningSlider.ValueChanged += SettingChangedDebounced;
             AMDRadeonAntiLagToggle.Toggled += AMDRadeonAntiLagToggle_Toggled;
             AMDRadeonBoostToggle.Toggled += AMDRadeonBoostToggle_Toggled;
-            AMDRadeonBoostResolutionSlider.ValueChanged += SettingChanged;
+            AMDRadeonBoostResolutionSlider.ValueChanged += SettingChangedDebounced;
             AMDRadeonChillToggle.Toggled += AMDRadeonChillToggle_Toggled;
-            AMDRadeonChillMinFPSSlider.ValueChanged += SettingChanged;
-            AMDRadeonChillMaxFPSSlider.ValueChanged += SettingChanged;
+            AMDRadeonChillMinFPSSlider.ValueChanged += SettingChangedDebounced;
+            AMDRadeonChillMaxFPSSlider.ValueChanged += SettingChangedDebounced;
 
             // Legion controller button mapping settings
             InitializeButtonMappingEvents("Y1");
@@ -96,9 +96,9 @@ namespace XboxGamingBar
             if (LegionGyroTargetComboBox != null)
                 LegionGyroTargetComboBox.SelectionChanged += ControllerSettingChanged;
             if (LegionGyroSensitivityXSlider != null)
-                LegionGyroSensitivityXSlider.ValueChanged += ControllerSettingChanged;
+                LegionGyroSensitivityXSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionGyroSensitivityYSlider != null)
-                LegionGyroSensitivityYSlider.ValueChanged += ControllerSettingChanged;
+                LegionGyroSensitivityYSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionGyroInvertXToggle != null)
                 LegionGyroInvertXToggle.Toggled += ControllerSettingChanged;
             if (LegionGyroInvertYToggle != null)
@@ -112,23 +112,23 @@ namespace XboxGamingBar
 
             // Advanced gyro settings (per-game profile)
             if (LegionGyroDeadzoneSlider != null)
-                LegionGyroDeadzoneSlider.ValueChanged += ControllerSettingChanged;
+                LegionGyroDeadzoneSlider.ValueChanged += ControllerSliderSettingChanged;
 
             // Stick deadzones (per-game profile)
             if (LegionLeftStickDeadzoneSlider != null)
-                LegionLeftStickDeadzoneSlider.ValueChanged += ControllerSettingChanged;
+                LegionLeftStickDeadzoneSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionRightStickDeadzoneSlider != null)
-                LegionRightStickDeadzoneSlider.ValueChanged += ControllerSettingChanged;
+                LegionRightStickDeadzoneSlider.ValueChanged += ControllerSliderSettingChanged;
 
             // Trigger travel (per-game profile)
             if (LegionLeftTriggerStartSlider != null)
-                LegionLeftTriggerStartSlider.ValueChanged += ControllerSettingChanged;
+                LegionLeftTriggerStartSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionLeftTriggerEndSlider != null)
-                LegionLeftTriggerEndSlider.ValueChanged += ControllerSettingChanged;
+                LegionLeftTriggerEndSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionRightTriggerStartSlider != null)
-                LegionRightTriggerStartSlider.ValueChanged += ControllerSettingChanged;
+                LegionRightTriggerStartSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionRightTriggerEndSlider != null)
-                LegionRightTriggerEndSlider.ValueChanged += ControllerSettingChanged;
+                LegionRightTriggerEndSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionHairTriggersToggle != null)
                 LegionHairTriggersToggle.Toggled += LegionHairTriggers_Toggled;
 
@@ -136,7 +136,7 @@ namespace XboxGamingBar
             if (LegionJoystickAsMouseComboBox != null)
                 LegionJoystickAsMouseComboBox.SelectionChanged += ControllerSettingChanged;
             if (LegionJoystickMouseSensSlider != null)
-                LegionJoystickMouseSensSlider.ValueChanged += ControllerSettingChanged;
+                LegionJoystickMouseSensSlider.ValueChanged += ControllerSliderSettingChanged;
 
             // Lighting settings (per-game profile)
             if (LegionPowerLightToggle != null)
@@ -146,9 +146,9 @@ namespace XboxGamingBar
             if (LegionColorPicker != null)
                 LegionColorPicker.ColorChanged += ControllerSettingChanged;
             if (LegionBrightnessSlider != null)
-                LegionBrightnessSlider.ValueChanged += ControllerSettingChanged;
+                LegionBrightnessSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionSpeedSlider != null)
-                LegionSpeedSlider.ValueChanged += ControllerSettingChanged;
+                LegionSpeedSlider.ValueChanged += ControllerSliderSettingChanged;
 
             // Gamepad button remapping (per-game profile)
             if (LegionGamepadButtonSelectorComboBox != null)
@@ -186,6 +186,40 @@ namespace XboxGamingBar
 
             // Auto-save to current profile
             SaveCurrentSettingsToProfile(currentProfileName);
+        }
+
+        /// <summary>
+        /// Debounced entry point for slider ValueChanged events (CPU EPP, AMD sharpness/
+        /// resolution/FPS sliders). Raw ValueChanged fires continuously while the thumb moves,
+        /// and SettingChanged does a synchronous full-profile write on the UI thread - without
+        /// this, dragging one of these sliders end-to-end fires dozens of writes in under a
+        /// second. Coalesces to a single SettingChanged call ~300ms after the drag settles,
+        /// matching the FPSLimitSlider debounce pattern (GamingWidget.QuickSettings.Actions.cs).
+        /// </summary>
+        private void SettingChangedDebounced(object sender, object e)
+        {
+            if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync
+                || WidgetSliderProperty.HelperSyncCount > 0)
+            {
+                return;
+            }
+
+            if (settingsSaveDebounceTimer == null)
+            {
+                settingsSaveDebounceTimer = new DispatcherTimer();
+                settingsSaveDebounceTimer.Interval = TimeSpan.FromMilliseconds(SETTINGS_SAVE_DEBOUNCE_MS);
+                settingsSaveDebounceTimer.Tick += SettingsSaveDebounceTimer_Tick;
+            }
+
+            settingsSaveDebounceTimer.Stop();
+            settingsSaveDebounceTimer.Start();
+        }
+
+        private void SettingsSaveDebounceTimer_Tick(object sender, object e)
+        {
+            settingsSaveDebounceTimer?.Stop();
+            // Re-checks the same guards - state may have changed during the debounce wait.
+            SettingChanged(sender, e);
         }
 
     }
