@@ -738,15 +738,20 @@ namespace XboxGamingBar
                 {
                     if (legionGoDetected?.Value == true)
                     {
-                        int vibMode = legionVibrationMode?.Value ?? 0;
+                        // legionVibrationMode.Value is 1-based (FPS=1, Racing=2, AVG=3, SPG=4,
+                        // RPG=5 - see LegionVibrationModeProperty.cs / VibrationMode enum in
+                        // LegionGoController.cs), NOT the 0-based index this switch used to
+                        // assume - every label was off by one (e.g. the tile showed "Racing"
+                        // while the controller was actually in FPS mode).
+                        int vibMode = legionVibrationMode?.Value ?? 1;
                         string vibModeText;
                         switch (vibMode)
                         {
-                            case 0: vibModeText = "FPS"; break;
-                            case 1: vibModeText = "Racing"; break;
-                            case 2: vibModeText = "AVG"; break;
-                            case 3: vibModeText = "SPG"; break;
-                            case 4: vibModeText = "RPG"; break;
+                            case 1: vibModeText = "FPS"; break;
+                            case 2: vibModeText = "Racing"; break;
+                            case 3: vibModeText = "AVG"; break;
+                            case 4: vibModeText = "SPG"; break;
+                            case 5: vibModeText = "RPG"; break;
                             default: vibModeText = "FPS"; break;
                         }
                         vibrationModeTile.StateText.Text = vibModeText;

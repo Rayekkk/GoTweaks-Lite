@@ -1123,7 +1123,10 @@ namespace XboxGamingBar
             if (legionGoDetected?.Value == true && legionVibrationMode != null)
             {
                 int currentMode = legionVibrationMode.Value;
-                int nextMode = (currentMode + 1) % 5; // 0-4: FPS, Racing, AVG, SPG, RPG
+                // Modes are 1-based (FPS=1, Racing=2, AVG=3, SPG=4, RPG=5), not 0-based - the
+                // old "% 5" cycled 0-4, which could land on the invalid value 0 and could never
+                // actually reach RPG (5).
+                int nextMode = (currentMode % 5) + 1; // 1-5: FPS, Racing, AVG, SPG, RPG
                 legionVibrationMode.SetValue(nextMode);
                 Logger.Info($"Legion Vibration mode cycled from {currentMode} to {nextMode}");
             }
