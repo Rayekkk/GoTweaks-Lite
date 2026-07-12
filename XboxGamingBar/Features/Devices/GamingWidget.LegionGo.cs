@@ -1385,6 +1385,7 @@ namespace XboxGamingBar
                 {
                     PrereqUsbipStatusText.Text = "Installing...";
                 }
+                ScheduleInstallButtonTimeout(PrereqUsbipInstallButton, PrereqUsbipStatusText, "Install", "Install may have failed - check the log");
             }
             catch (Exception ex)
             {
@@ -1407,6 +1408,7 @@ namespace XboxGamingBar
                 {
                     ViGEmBusStatusText.Text = "Status: Installing...";
                 }
+                ScheduleInstallButtonTimeout(ViGEmBusInstallButton, ViGEmBusStatusText, "Install usbip-win2", "Status: Install may have failed - check the log");
             }
             catch (Exception ex)
             {
@@ -1535,6 +1537,7 @@ namespace XboxGamingBar
                     ControllerEmulationPrereqUsbipButton.Content = "Installing...";
                     ControllerEmulationPrereqUsbipButton.IsEnabled = false;
                 }
+                ScheduleInstallButtonTimeout(ControllerEmulationPrereqUsbipButton, null, "Install", null);
             }
             catch (Exception ex)
             {
@@ -1553,6 +1556,7 @@ namespace XboxGamingBar
                     ControllerEmulationPrereqHidHideButton.Content = "Installing...";
                     ControllerEmulationPrereqHidHideButton.IsEnabled = false;
                 }
+                ScheduleInstallButtonTimeout(ControllerEmulationPrereqHidHideButton, null, "Install", null);
             }
             catch (Exception ex)
             {
@@ -1582,6 +1586,7 @@ namespace XboxGamingBar
 
                 installHidHide?.TriggerInstall();
                 Logger.Info("HidHide installation triggered, waiting for helper response...");
+                ScheduleInstallButtonTimeout(PrereqHidHideInstallButton, PrereqHidHideStatusText, "Install", "Install may have failed - check the log");
             }
             catch (Exception ex)
             {
@@ -1620,6 +1625,7 @@ namespace XboxGamingBar
 
                 installHidHide?.TriggerInstall();
                 Logger.Info("HidHide installation triggered, waiting for helper response...");
+                ScheduleInstallButtonTimeout(ControllerEmulationHidHideInstallButton, ControllerEmulationHidHideStatusText, "Install HidHide", "HidHide: Install may have failed - check the log");
             }
             catch (Exception ex)
             {
@@ -1633,6 +1639,32 @@ namespace XboxGamingBar
                 if (ControllerEmulationHidHideStatusText != null)
                 {
                     ControllerEmulationHidHideStatusText.Text = "HidHide: Error";
+                }
+            }
+        }
+
+        private const int PREREQ_INSTALL_TIMEOUT_MS = 45000;
+
+        /// <summary>
+        /// Safety net for the one-click usbip-win2/HidHide installers. GenericProperty.SetValue
+        /// skips PropertyChanged whenever the pushed value equals the cached one (echo
+        /// suppression) - so if an install attempt fails, the "still not installed" push never
+        /// changes the value and the widget never gets notified, leaving the button stuck on
+        /// "Installing..." forever with no recovery short of restarting the whole app. After a
+        /// timeout, if the button still reads "Installing...", force it back so the user can see
+        /// something went wrong and retry.
+        /// </summary>
+        private async void ScheduleInstallButtonTimeout(Button button, TextBlock statusText, string idleContent, string idleStatusText)
+        {
+            await Task.Delay(PREREQ_INSTALL_TIMEOUT_MS);
+            if (button != null && (button.Content as string) == "Installing...")
+            {
+                Logger.Warn("Prerequisite install did not report completion within the timeout - resetting button (install may have failed; check the helper log)");
+                button.Content = idleContent;
+                button.IsEnabled = true;
+                if (statusText != null)
+                {
+                    statusText.Text = idleStatusText;
                 }
             }
         }
