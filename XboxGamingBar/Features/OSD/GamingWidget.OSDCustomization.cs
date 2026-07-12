@@ -984,17 +984,13 @@ namespace XboxGamingBar
                 InitializeFanCurveGraph();
             }
 
-            // Tell helper whether to push CPU temp/RPM updates
+            // Tell helper whether to push the fan-control sensor temp (0x01) used by the
+            // fan-curve graph's own info panel, and to speed up its refresh cadence. RPM and
+            // the header CPU temp stream continuously regardless of this flag (see
+            // LegionManager.RefreshFanSpeed), so the header never needs clearing here.
             legionFanCurveVisible?.SetVisible(isFanCurveExpanded);
 
-            // RPM/temp only stream while expanded; clear the live header readout on collapse so
-            // it never shows a stale value, and refresh the "editing X" hint on expand.
-            if (!isFanCurveExpanded)
-            {
-                if (FanRPMLabel != null) FanRPMLabel.Text = "-- RPM";
-                if (FanHeaderTempLabel != null) FanHeaderTempLabel.Text = "--°C";
-            }
-            else
+            if (isFanCurveExpanded)
             {
                 UpdateActiveModeLabel();
             }

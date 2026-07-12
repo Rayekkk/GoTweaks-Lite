@@ -3296,11 +3296,24 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     cpuFanSpeed = fanResult.Result.Value;
                 }
 
-                // Always push RPM so the OSD + quick-settings fan readout shows a value
-                // instead of "--" even when the fan-curve panel hasn't been opened (issue
-                // #83/#88). The extra sensor-temp WMI reads below stay gated on the panel
-                // being visible since they're only consumed by the fan-curve UI.
+                // Always push RPM and CPU temp so the OSD + quick-settings fan readout (and the
+                // fan-curve card header) show a value instead of "--" even when the fan-curve
+                // panel hasn't been opened (issue #83/#88 for RPM; the header temp had the same
+                // bug - it went right back to "--" on every collapse since only RPM was
+                // unconditional). The fan-control sensor (0x01) read below stays gated on the
+                // panel being visible since it's only consumed by the fan-curve UI's own info
+                // panel, not the always-visible header.
                 LegionCPUFanRPM.UpdateRPM(cpuFanSpeed);
+
+                // Send the true CPU temperature (Tctl/Tdie). This is what the fan-curve UI
+                // displays and what the EC override loop evaluates the curve against — NOT
+                // the EC fan-control sensor (0x01) below, which reads a chipset/board area
+                // and was being mistaken for the CPU temp.
+                if (performanceManager?.CPUTemperature != null && performanceManager.CPUTemperature.Value > 0)
+                {
+                    int cpuTemp = (int)performanceManager.CPUTemperature.Value;
+                    LegionCPUCurrentTemp.UpdateTemp(cpuTemp);
+                }
 
                 if (fanCurveVisible)
                 {
@@ -3309,16 +3322,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     if (fanSensorResult.Success && fanSensorResult.Result.HasValue)
                     {
                         LegionFanSensorTemp.UpdateTemp(fanSensorResult.Result.Value);
-                    }
-
-                    // Send the true CPU temperature (Tctl/Tdie). This is what the fan-curve UI
-                    // displays and what the EC override loop evaluates the curve against — NOT
-                    // the EC fan-control sensor (0x01) above, which reads a chipset/board area
-                    // and was being mistaken for the CPU temp.
-                    if (performanceManager?.CPUTemperature != null && performanceManager.CPUTemperature.Value > 0)
-                    {
-                        int cpuTemp = (int)performanceManager.CPUTemperature.Value;
-                        LegionCPUCurrentTemp.UpdateTemp(cpuTemp);
                     }
                 }
             }
