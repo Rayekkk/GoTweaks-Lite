@@ -69,6 +69,7 @@ namespace XboxGamingBar
         private SolidColorBrush tileSeverityBlueBrush;
         private SolidColorBrush tileSeverityRedBrush;
         private SolidColorBrush tileSeverityPurpleBrush;
+        private SolidColorBrush tileSeverityOrangeBrush;
         private bool quickSettingsInitialized = false;
 
         // Tile definitions with visibility tracking
@@ -212,6 +213,7 @@ namespace XboxGamingBar
                 tileSeverityBlueBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x4C, 0xC2, 0xFF));   // Windows blue swatch
                 tileSeverityRedBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x6B, 0x6B));    // App's established warning red
                 tileSeverityPurpleBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xB4, 0xA0, 0xFF)); // Distinct from tileActionBrush
+                tileSeverityOrangeBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xA5, 0x3D)); // Fluent "Caution" amber/orange
 
                 // Define all tiles
                 DefineQuickSettingsTiles();

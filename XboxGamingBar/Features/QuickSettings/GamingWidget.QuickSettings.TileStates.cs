@@ -1001,11 +1001,18 @@ namespace XboxGamingBar
                     }
 
                     // Background/border stay the same neutral as every other tile -
-                    // subtitle + bottom bar are always this Windows 11-consistent
-                    // green (tileSeverityGreenBrush), not charge-level-based.
+                    // subtitle + bottom bar color reflects charge level (green >50%,
+                    // orange <=50%, red <=20%), except while charging, which is always
+                    // green regardless of level.
+                    SolidColorBrush batteryColor;
+                    if (deviceCharging) batteryColor = tileSeverityGreenBrush;
+                    else if (deviceBat <= 20) batteryColor = tileSeverityRedBrush;
+                    else if (deviceBat <= 50) batteryColor = tileSeverityOrangeBrush;
+                    else batteryColor = tileSeverityGreenBrush;
+
                     batteryTile.StateText.Text = stateText;
-                    batteryTile.StateText.Foreground = tileSeverityGreenBrush;
-                    if (batteryTile.AccentBar != null) batteryTile.AccentBar.Background = tileSeverityGreenBrush;
+                    batteryTile.StateText.Foreground = batteryColor;
+                    if (batteryTile.AccentBar != null) batteryTile.AccentBar.Background = batteryColor;
                     batteryTile.TileButton.Background = tileOffBrush;
                 }
 
