@@ -391,12 +391,13 @@ namespace XboxGamingBar
                 else
                 {
                     bool isUpdate = root.GetNamedBoolean("isUpdateAvailable", false);
+                    bool checkFailed = root.GetNamedBoolean("checkFailed", false);
                     string latest = root.GetNamedString("latestVersion", "");
                     string tag = root.GetNamedString("latestTag", "");
                     string url = root.GetNamedString("downloadUrl", "");
                     string label = string.IsNullOrWhiteSpace(tag) ? latest : tag;
 
-                    Logger.Info($"Update check (via helper): current={cv}, update={isUpdate}, label={label}, url={(string.IsNullOrEmpty(url) ? "(none)" : "ok")}");
+                    Logger.Info($"Update check (via helper): current={cv}, update={isUpdate}, checkFailed={checkFailed}, label={label}, url={(string.IsNullOrEmpty(url) ? "(none)" : "ok")}");
 
                     if (isUpdate && !string.IsNullOrWhiteSpace(url))
                     {
@@ -406,6 +407,14 @@ namespace XboxGamingBar
                         _pendingUpdateVersion = label;
                         _pendingUpdateIsRemote = true;
                         UpdateButton.Visibility = Visibility.Visible;
+                    }
+                    else if (checkFailed)
+                    {
+                        // The check itself didn't complete (network error, GitHub API rate-limit,
+                        // unparsable response) - don't claim "up to date" when we don't actually
+                        // know that.
+                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.Orange);
+                        UpdateStatusText.Text = "Update check failed (GitHub unreachable or rate-limited) — try again later.";
                     }
                     else
                     {

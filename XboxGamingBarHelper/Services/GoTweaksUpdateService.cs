@@ -76,7 +76,8 @@ namespace XboxGamingBarHelper.Services
                 using var response = await _http.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                 {
-                    Logger.Info($"GoTweaks update check: GitHub returned HTTP {(int)response.StatusCode} — assuming up to date");
+                    Logger.Warn($"GoTweaks update check: GitHub returned HTTP {(int)response.StatusCode} (e.g. rate limit) — check did not actually complete");
+                    result.CheckFailed = true;
                     _lastResult = result;
                     return result;
                 }
@@ -85,6 +86,8 @@ namespace XboxGamingBarHelper.Services
                 var root = doc.RootElement;
                 if (root.ValueKind != JsonValueKind.Object)
                 {
+                    Logger.Warn("GoTweaks update check: unexpected response shape from GitHub — check did not actually complete");
+                    result.CheckFailed = true;
                     _lastResult = result;
                     return result;
                 }
@@ -137,6 +140,7 @@ namespace XboxGamingBarHelper.Services
             catch (Exception ex)
             {
                 Logger.Warn($"GoTweaks update check threw: {ex.Message}");
+                result.CheckFailed = true;
             }
             _lastResult = result;
             return result;
@@ -286,6 +290,13 @@ namespace XboxGamingBarHelper.Services
     internal sealed class GoTweaksUpdateResult
     {
         public bool IsUpdateAvailable { get; set; }
+        // True when the check itself failed (network error, non-success HTTP status such as a
+        // GitHub API rate-limit, or an unparsable response) rather than genuinely confirming the
+        // installed version is current. Consumers that only look at IsUpdateAvailable still get
+        // the safe "no update" behavior; consumers showing a status message to the user (the
+        // System tab's manual "Check for Update") should use this to avoid claiming "you're up
+        // to date" when the check couldn't actually complete.
+        public bool CheckFailed { get; set; }
         public string CurrentVersion { get; set; } = "";
         public string LatestVersion { get; set; } = "";
         public string LatestTag { get; set; } = "";
