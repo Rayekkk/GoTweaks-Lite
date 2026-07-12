@@ -18,6 +18,26 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            bool prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            // Display-tab fix (same as AMDFluidMotionFrameEnabledProperty): GenericProperty.
+            // SetValue's equality skip prevents NotifyPropertyChanged from firing when our
+            // cached value matches the incoming value, so the SetEnabled call below never
+            // reaches ADLX. The cache can drift from actual driver state (user toggled RSR in
+            // Adrenalin directly, a prior SetEnabled silently failed, etc.), so the Display-tab
+            // toggle would persist in the widget UI while the driver stays in its previous
+            // state. Push to driver whenever the result was accepted, regardless of whether the
+            // value changed.
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyRSRChanged();
+                Manager.AMDRadeonSuperResolutionSetting.SetEnabled(Value);
+            }
+            return result;
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);

@@ -17,6 +17,20 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            bool prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            // Display-tab fix (same as AMDFluidMotionFrameEnabledProperty) - see that class for
+            // the full explanation. Push to driver whenever the result was accepted, regardless
+            // of whether the cached value changed.
+            if (result && prev == Value)
+            {
+                Manager.AMDRadeonBoostSetting.SetEnabled(Value);
+            }
+            return result;
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
