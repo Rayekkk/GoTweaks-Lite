@@ -936,6 +936,12 @@ namespace XboxGamingBar
         private object controllerSliderDebouncePendingSender;
         private const int CONTROLLER_SLIDER_DEBOUNCE_MS = 300;
 
+        // Debounces the profile-storage save for Custom TDP slider drags (SPL/SPPT-Boost/
+        // FPPT-Boost) - see OnCustomTDPSliderChanged. The live hardware WMI apply has its own
+        // separate throttle (RequestCustomTDPApply) and is NOT affected by this.
+        private DispatcherTimer customTDPSaveDebounceTimer;
+        private const int CUSTOM_TDP_SAVE_DEBOUNCE_MS = 300;
+
         // Helper to check if we have a valid game (not null, not empty, not "No game detected")
         private bool HasValidGame(string gameName)
         {

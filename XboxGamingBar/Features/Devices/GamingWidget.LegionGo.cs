@@ -2336,6 +2336,28 @@ namespace XboxGamingBar
                 RequestCustomTDPApply();
             }
 
+            // Profile-storage save is a separate, much heavier operation (a full ~24-key
+            // ApplicationData.LocalSettings write) than the hardware apply above, and unlike it
+            // was never debounced - a full SPL drag (5-50W, 45 ticks) used to fire ~45 full
+            // profile writes in under a second. Debounce it on its own timer, independent of the
+            // already-throttled RequestCustomTDPApply.
+            if (customTDPSaveDebounceTimer == null)
+            {
+                customTDPSaveDebounceTimer = new DispatcherTimer();
+                customTDPSaveDebounceTimer.Interval = TimeSpan.FromMilliseconds(CUSTOM_TDP_SAVE_DEBOUNCE_MS);
+                customTDPSaveDebounceTimer.Tick += CustomTDPSaveDebounceTimer_Tick;
+            }
+            customTDPSaveDebounceTimer.Stop();
+            customTDPSaveDebounceTimer.Start();
+        }
+
+        private void CustomTDPSaveDebounceTimer_Tick(object sender, object e)
+        {
+            customTDPSaveDebounceTimer?.Stop();
+
+            // Re-check the same guards - state may have changed during the debounce wait.
+            if (isApplyingHelperUpdate || isLoadingProfile || isInitialSync) return;
+            if (WidgetSliderProperty.HelperSyncCount > 0) return;
             if (!SaveTDP) return;
 
             bool isGameProfile = currentProfileName?.StartsWith("Game_") == true;
