@@ -17,14 +17,16 @@ namespace XboxGamingBarHelper.Services
     /// broke my controller after uninstall" leftover), sweep phantom virtual
     /// pads, remove the scheduled task + deployed helper copy.
     ///
-    /// With "--remove-drivers": additionally uninstall PawnIO and ViGEmBus via
-    /// their registered uninstallers. Opt-in because those drivers are shared
-    /// infrastructure — RTSS/FanControl use PawnIO, DS4Windows uses ViGEmBus —
-    /// and ripping them out under another tool is worse than leaving them.
+    /// With "--remove-drivers": additionally uninstall PawnIO and usbip-win2 via
+    /// their registered uninstallers. Opt-in because PawnIO is shared
+    /// infrastructure (RTSS/FanControl also use it) — ripping it out under
+    /// another tool is worse than leaving it.
     ///
-    /// NOTE (GoTweaks Lite): upstream also removes usbip-win2 here; this fork
-    /// never installs it (it stayed on the ViGEm emulation backend), so that
-    /// step is dropped.
+    /// NOTE (GoTweaks Lite): this fork retired the ViGEm emulation backend in
+    /// favor of VIIPER (see the ViGEm-retirement history) — usbip-win2 is now
+    /// the only controller-emulation driver GoTweaks installs, so it's the one
+    /// removed here. ViGEmBus was never installed by this fork and was left as
+    /// a target for a while after the retirement by mistake; that's fixed now.
     /// </summary>
     internal static class UninstallService
     {
@@ -47,7 +49,11 @@ namespace XboxGamingBarHelper.Services
             if (removeDrivers)
             {
                 Step("uninstall PawnIO", () => UninstallByDisplayName("PawnIO"));
-                Step("uninstall ViGEmBus", () => UninstallByDisplayName("ViGEm Bus Driver"));
+                // "USBip" matches the install folder this fork's one-click installer uses
+                // (C:\Program Files\USBip\usbip.exe, see UsbipInstalledProperty's detection
+                // signals) - UninstallByDisplayName does a safe prefix match against the
+                // Windows uninstall registry and simply no-ops (logged) if nothing matches.
+                Step("uninstall usbip-win2", () => UninstallByDisplayName("USBip"));
             }
 
             Logger.Info("=== Uninstall restoration complete ===");

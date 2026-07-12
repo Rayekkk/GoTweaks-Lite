@@ -2228,10 +2228,15 @@ namespace XboxGamingBarHelper
                 bool controllerFeatures = (legionManager?.DetectedDevice?.SupportsControllerRemap ?? false)
                                        || (legionManager?.DetectedDevice?.SupportsGyro ?? false);
                 bool pawnIO = performanceManager?.IsPawnIOInstalled ?? true; // assume fine when unknown
-                // usbip is needed when VIIPER is the selected backend OR a Legion
-                // button maps to Xbox Guide (VIIPER's guide-only pad serves that
-                // route on every backend since the ViGEm retirement).
-                bool usbipNeeded = (settingsManager?.EmulationBackend?.Value ?? false)
+                // usbip is needed when Controller Emulation is actually turned on OR a Legion
+                // button maps to Xbox Guide (VIIPER's guide-only pad serves that route on every
+                // backend since the ViGEm retirement). NOTE: EmulationBackend is "which backend
+                // is selected," not "is emulation on" — since the ViGEm retirement it's
+                // hard-pinned true (VIIPER) for every install regardless of whether the user has
+                // ever enabled the feature, so it must not be used as the on/off signal here (it
+                // used to be, which nagged every user with the "usbip-win2 missing" banner even
+                // with Controller Emulation completely untouched).
+                bool usbipNeeded = (controllerEmulationManager?.ControllerEmulationEnabled?.Value ?? false)
                                 || (legionButtonMonitor?.HasGuideActionConfigured ?? false);
                 bool usbip = settingsManager?.UsbipInstalled?.Value ?? true; // assume fine when unknown
 
