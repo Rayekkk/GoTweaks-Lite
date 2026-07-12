@@ -928,7 +928,10 @@ namespace XboxGamingBar
                 {
                     // Get device battery info (hide bolt at 100%)
                     int deviceBat = PowerManager.RemainingChargePercent;
-                    bool deviceCharging = PowerManager.PowerSupplyStatus == PowerSupplyStatus.Adequate;
+                    // On AC = not NotPresent, matching the isOnAC check used elsewhere (ProfileSwitching.cs,
+                    // PowerSourceEvents.cs) - NOT == Adequate, which can flip to Inadequate once the battery
+                    // hits 100% (the charger stops actively drawing current), wrongly showing the non-charging icon.
+                    bool deviceCharging = PowerManager.PowerSupplyStatus != PowerSupplyStatus.NotPresent;
                     string deviceIndicator = (deviceCharging && deviceBat < 100) ? "⚡" : "";
 
                     // Get the tile content elements
@@ -938,14 +941,14 @@ namespace XboxGamingBar
 
                     // Update battery icon based on level and charging state
                     // Battery icons: \uE850-\uE859 (0-9), \uE83F (full)
-                    // Charging icons: \uE85A-\uE863 (0-9), \uEBB5 (charging full)
+                    // Charging icons: \uE85A-\uE862 (0-8), \uEA93 (charging full = BatteryCharging10)
                     if (iconElement != null)
                     {
                         string glyph;
                         if (deviceCharging)
                         {
                             // Charging icons
-                            if (deviceBat >= 90) glyph = "\uEBB5";      // Full charging
+                            if (deviceBat >= 90) glyph = ((char)0xEA93).ToString(); // Full charging (BatteryCharging10)
                             else if (deviceBat >= 70) glyph = "\uE862"; // Charging 8
                             else if (deviceBat >= 50) glyph = "\uE85F"; // Charging 5
                             else if (deviceBat >= 30) glyph = "\uE85C"; // Charging 2
