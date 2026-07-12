@@ -154,13 +154,13 @@ namespace XboxGamingBar
         {
             { MetricType.BatteryDrain, new MetricInfo { Id = "BatteryDrain", Label = "Battery", Glyph = "\uE83F", Unit = "W" } },
             { MetricType.BatteryLevel, new MetricInfo { Id = "BatteryLevel", Label = "Battery", Glyph = "\uE83F", Unit = "%" } },
-            { MetricType.CPUUsage, new MetricInfo { Id = "CPUUsage", Label = "CPU", Glyph = "\uE950", Unit = "%" } },
+            { MetricType.CPUUsage, new MetricInfo { Id = "CPUUsage", Label = "CPU", Glyph = ((char)0xEEA1).ToString(), Unit = "%" } },
             { MetricType.CPUTemp, new MetricInfo { Id = "CPUTemp", Label = "CPU Temp", Glyph = "\uE9CA", Unit = "°" } },
-            { MetricType.CPUWattage, new MetricInfo { Id = "CPUWattage", Label = "CPU", Glyph = "\uE945", Unit = "W" } },
-            { MetricType.GPUUsage, new MetricInfo { Id = "GPUUsage", Label = "GPU", Glyph = "\uE7F4", Unit = "%" } },
+            { MetricType.CPUWattage, new MetricInfo { Id = "CPUWattage", Label = "CPU", Glyph = ((char)0xEEA1).ToString(), Unit = "W" } },
+            { MetricType.GPUUsage, new MetricInfo { Id = "GPUUsage", Label = "GPU", Glyph = ((char)0xE964).ToString(), Unit = "%" } },
             { MetricType.GPUTemp, new MetricInfo { Id = "GPUTemp", Label = "GPU Temp", Glyph = "\uE9CA", Unit = "°" } },
-            { MetricType.GPUWattage, new MetricInfo { Id = "GPUWattage", Label = "GPU", Glyph = "\uE945", Unit = "W" } },
-            { MetricType.MemoryUsage, new MetricInfo { Id = "MemoryUsage", Label = "Memory", Glyph = "\uE964", Unit = "%" } },
+            { MetricType.GPUWattage, new MetricInfo { Id = "GPUWattage", Label = "GPU", Glyph = ((char)0xE964).ToString(), Unit = "W" } },
+            { MetricType.MemoryUsage, new MetricInfo { Id = "MemoryUsage", Label = "Memory", Glyph = ((char)0xEEA0).ToString(), Unit = "%" } },
             { MetricType.TimeRemaining, new MetricInfo { Id = "TimeRemaining", Label = "Time", Glyph = "\uE916", Unit = "" } }
         };
 
@@ -268,11 +268,11 @@ namespace XboxGamingBar
 
             // Row 1 - Performance Core (most used)
             AddTileDefinition("TDPMode", "TDP Mode", "\uE945", order: order++);
-            AddTileDefinition("PowerMode", "Power Mode", "\uE945", order: order++);
-            AddTileDefinition("CPUBoost", "CPU Boost", "\uE7F4", order: order++);
+            AddTileDefinition("PowerMode", "Power Mode", "\uEC4A", order: order++); // SpeedHigh
+            AddTileDefinition("CPUBoost", "CPU Boost", "\uEEA1", order: order++); // CPU
 
             // Row 2 - Performance Fine-tuning
-            AddTileDefinition("EPP", "EPP", "\uE83E", order: order++);
+            AddTileDefinition("EPP", "EPP", "\uE9E9", order: order++); // Equalizer
             AddTileDefinition("FPSLimit", "FPS Limit", "\uE916", order: order++);
             AddTileDefinition("RadeonChill", "Chill", "\uE9CA", order: order++);
             AddTileDefinition("Profile", "Profile", "\uE77B", order: order++);
@@ -285,14 +285,14 @@ namespace XboxGamingBar
             AddTileDefinition("Fullscreen", "Fullscreen", "\uE740", order: order++);
 
             // Row 4 - AMD Graphics Features
-            AddTileDefinition("RSR", "RSR", "\uE8B3", order: order++);
-            AddTileDefinition("RIS", "RIS", "\uE8B3", order: order++);
-            AddTileDefinition("AFMF", "AFMF", "\uE916", order: order++);
-            AddTileDefinition("AntiLag", "Anti-Lag", "\uE916", order: order++);
+            AddTileDefinition("RSR", "RSR", "\uEE71", order: order++); // ImageExport
+            AddTileDefinition("RIS", "RIS", "\uE71E", order: order++); // Zoom
+            AddTileDefinition("AFMF", "AFMF", "\uEB9D", order: order++); // FastForward
+            AddTileDefinition("AntiLag", "Anti-Lag", "\uF42F", order: order++); // SpeedHigh2
 
             // Row 5 - Scaling/Quality
-            AddTileDefinition("LosslessScaling", "Lossless", "\uE740", order: order++);
-            AddTileDefinition("Overlay", "Overlay", "\uE7B3", order: order++);
+            AddTileDefinition("LosslessScaling", "Lossless", "\uEA5F", order: order++); // ResizeMouseMediumMirrored
+            AddTileDefinition("Overlay", "Overlay", "\uE9D9", order: order++); // Diagnostic
 
             // Row 6 - Input & Interaction
             AddTileDefinition("ScreenSaver", "Idle Screen Off", "\uE7E8", order: order++);
@@ -301,18 +301,18 @@ namespace XboxGamingBar
             AddTileDefinition("Touchscreen", "Touchscreen", "\uE815", order: order++);
             AddTileDefinition("LegionRemapControls", "Remap", "\uE7FC", order: order++);
             AddTileDefinition("LegionDesktopControls", "Desktop", "\uE7F4", order: order++);
-            // Quick toggle for the legacy controller emulation backend; state text shows
-            // the active backend mode (Xbox / DS4 / Mouse) when on, "Off" otherwise.
-            AddTileDefinition("ControllerEmulation", "Controller", "\uE7FC", order: order++);
+            // Quick toggle for controller emulation (VIIPER); state text shows the active
+            // target device mode when on, "Off" otherwise.
+            AddTileDefinition("ControllerEmulation", "Ctrl. Emulation", "\uE7FC", order: order++);
 
             // Row 7 - System/Device
-            AddTileDefinition("LegionLightMode", "Light Mode", "\uE781", order: order++);
-            AddTileDefinition("LegionVibration", "Vibration", "\uE9CA", order: order++);
-            AddTileDefinition("LegionVibrationMode", "Vib. Mode", "\uE7FC", order: order++);
-            AddTileDefinition("LegionPowerLight", "Power Light", "\uE7E8", order: order++);
-            AddTileDefinition("LegionChargeLimit", "Charge Limit", "\uE83F", order: order++);
+            AddTileDefinition("LegionLightMode", "Light Mode", "\uEA80", order: order++); // Lightbulb
+            AddTileDefinition("LegionVibration", "Vibration", "\uE877", order: order++); // Vibrate
+            AddTileDefinition("LegionVibrationMode", "Vib. Mode", "\uE877", order: order++); // Vibrate
+            AddTileDefinition("LegionPowerLight", "Power Light", "\uE781", order: order++); // LEDLight
+            AddTileDefinition("LegionChargeLimit", "Charge Limit", "\uEA95", order: order++); // BatterySaver10
             AddTileDefinition("LegionFanFullSpeed", "Fan Max", "\uE9CA", order: order++);
-            AddTileDefinition("Battery", "Battery", "\uE83F", order: order++);
+            AddTileDefinition("Battery", "Battery", "\uE83F", order: order++); // Battery10
 
             // Load custom shortcut tiles from storage
             LoadCustomShortcutTiles();

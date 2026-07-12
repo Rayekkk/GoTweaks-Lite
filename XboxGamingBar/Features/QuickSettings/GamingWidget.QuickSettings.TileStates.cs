@@ -479,16 +479,18 @@ namespace XboxGamingBar
                 {
                     int mode = osPowerMode?.Value ?? 1;
                     string modeText;
+                    string modeGlyph;
                     SolidColorBrush powerModeColor;
                     switch (mode)
                     {
-                        case 0: modeText = "Efficiency"; powerModeColor = tileSeverityGreenBrush; break;
-                        case 1: modeText = "Balanced"; powerModeColor = tileSeverityBlueBrush; break;
-                        case 2: modeText = "Performance"; powerModeColor = tileSeverityRedBrush; break;
-                        default: modeText = "Balanced"; powerModeColor = tileSeverityBlueBrush; break;
+                        case 0: modeText = "Efficiency"; modeGlyph = ((char)0xEC48).ToString(); powerModeColor = tileSeverityGreenBrush; break;  // SpeedOff
+                        case 1: modeText = "Balanced"; modeGlyph = ((char)0xEC49).ToString(); powerModeColor = tileSeverityBlueBrush; break;    // SpeedMedium
+                        case 2: modeText = "Performance"; modeGlyph = ((char)0xEC4A).ToString(); powerModeColor = tileSeverityRedBrush; break;  // SpeedHigh
+                        default: modeText = "Balanced"; modeGlyph = ((char)0xEC49).ToString(); powerModeColor = tileSeverityBlueBrush; break;   // SpeedMedium
                     }
                     powerModeTile.StateText.Text = modeText;
                     powerModeTile.StateText.Foreground = offForeground;
+                    if (powerModeTile.IconElement != null) powerModeTile.IconElement.Glyph = modeGlyph;
                     if (powerModeTile.AccentBar != null) powerModeTile.AccentBar.Background = powerModeColor;
                     powerModeTile.TileButton.Background = tileOffBrush;
                 }
