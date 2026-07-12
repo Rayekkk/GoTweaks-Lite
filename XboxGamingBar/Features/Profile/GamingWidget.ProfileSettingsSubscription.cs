@@ -143,8 +143,10 @@ namespace XboxGamingBar
                 LegionPowerLightToggle.Toggled += ControllerSettingChanged;
             if (LegionLightModeComboBox != null)
                 LegionLightModeComboBox.SelectionChanged += ControllerSettingChanged;
-            if (LegionColorPicker != null)
-                LegionColorPicker.ColorChanged += ControllerSettingChanged;
+            // LegionColorPicker's save/send is triggered from LegionColorPicker_ColorChanged
+            // (GamingWidget.LegionGo.cs), which also updates the preview swatch - no separate
+            // subscription here (a second one used to double-fire ControllerSettingChanged on
+            // every ColorChanged tick, which itself fires continuously while dragging).
             if (LegionBrightnessSlider != null)
                 LegionBrightnessSlider.ValueChanged += ControllerSliderSettingChanged;
             if (LegionSpeedSlider != null)

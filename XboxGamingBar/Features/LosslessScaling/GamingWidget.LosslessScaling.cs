@@ -134,11 +134,12 @@ namespace XboxGamingBar
                             LosslessScalingCreateProfileButton.IsEnabled = enableCreateProfile;
 
                             // Update XY navigation for Scale toggle based on Create Profile button state
-                            // When Create Profile is disabled, Scale should go up to Launch/ShowWindow button
+                            // When Create Profile is disabled, Scale should go up to Launch, or to
+                            // nav when neither Launch nor Create Profile is visible (LS running -
+                            // "Show Window" was removed and is never shown, see UpdateLosslessScalingStatus).
                             if (isRunning)
                             {
-                                // Show Window is visible
-                                LosslessScalingEnabledToggle.XYFocusUp = enableCreateProfile ? LosslessScalingCreateProfileButton : (DependencyObject)ShowLosslessScalingWindowButton;
+                                LosslessScalingEnabledToggle.XYFocusUp = enableCreateProfile ? LosslessScalingCreateProfileButton : (DependencyObject)ScalingNavItem;
                             }
                             else if (isInstalled)
                             {

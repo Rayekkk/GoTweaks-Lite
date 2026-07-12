@@ -1705,8 +1705,10 @@ namespace XboxGamingBar
 
                 legionLightColor?.OnColorChanged(args.NewColor);
 
-                // Save to controller profile (handler is detached during profile loading)
-                ControllerSettingChanged(sender, null);
+                // Save to controller profile (handler is detached during profile loading).
+                // Debounced - ColorChanged fires continuously while dragging on the spectrum/
+                // ring, same as a Slider's ValueChanged.
+                ControllerSliderSettingChanged(sender, null);
             }
             catch (Exception ex)
             {
