@@ -474,7 +474,9 @@ namespace XboxGamingBar
                 var icon = new FontIcon
                 {
                     Glyph = info.Glyph,
-                    FontSize = 16,
+                    // Matches the Quick Settings tile icon font size (see
+                    // CreateTileButton in GamingWidget.QuickSettings.TileStates.cs).
+                    FontSize = 21,
                     Foreground = metricIconBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(0, 0, 0, 3)
@@ -483,9 +485,9 @@ namespace XboxGamingBar
                 var valueText = new TextBlock
                 {
                     Text = "--",
-                    // Matches the Quick Settings tile name/title font size (see
+                    // Matches the Quick Settings tile state/subtitle font size (see
                     // CreateTileButton in GamingWidget.QuickSettings.TileStates.cs).
-                    FontSize = 13,
+                    FontSize = 12,
                     FontWeight = Windows.UI.Text.FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Windows.UI.Colors.White),
                     HorizontalAlignment = HorizontalAlignment.Center
@@ -496,7 +498,9 @@ namespace XboxGamingBar
                 var labelText = new TextBlock
                 {
                     Text = info.Label,
-                    FontSize = 10,
+                    // Matches the Quick Settings tile name/title font size (see
+                    // CreateTileButton in GamingWidget.QuickSettings.TileStates.cs).
+                    FontSize = qsColumnCount == 4 ? 13 : 14,
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136)), // #888888
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(0, 2, 0, 0)

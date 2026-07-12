@@ -132,7 +132,7 @@ namespace XboxGamingBar
             {
                 Glyph = tile.Glyph,
                 FontFamily = new FontFamily("Segoe Fluent Icons"),
-                FontSize = 20,
+                FontSize = 21,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
             content.Children.Add(icon);
@@ -142,7 +142,7 @@ namespace XboxGamingBar
             {
                 Text = tile.Name,
                 // Slightly smaller at 4 columns, where tiles are narrowest.
-                FontSize = qsColumnCount == 4 ? 12 : 13,
+                FontSize = qsColumnCount == 4 ? 13 : 14,
                 Margin = new Thickness(0, 4, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextWrapping = TextWrapping.Wrap,
@@ -155,7 +155,7 @@ namespace XboxGamingBar
             var stateText = new TextBlock
             {
                 Text = tile.IsAction ? "Action" : "Off",
-                FontSize = 11,
+                FontSize = 12,
                 Foreground = tile.IsAction ? tileActionBrush : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136)),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
