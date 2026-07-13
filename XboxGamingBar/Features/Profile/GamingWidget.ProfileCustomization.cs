@@ -92,6 +92,7 @@ namespace XboxGamingBar
                 _saveVibration = settings.Values.ContainsKey("ProfileSaveVibration") ? (bool)settings.Values["ProfileSaveVibration"] : false;
                 _saveLighting = settings.Values.ContainsKey("ProfileSaveLighting") ? (bool)settings.Values["ProfileSaveLighting"] : false;
                 _saveButtonMappings = settings.Values.ContainsKey("ProfileSaveButtonMappings") ? (bool)settings.Values["ProfileSaveButtonMappings"] : false;
+                _saveGyroSettings = settings.Values.ContainsKey("ProfileSaveGyroSettings") ? (bool)settings.Values["ProfileSaveGyroSettings"] : false;
 
                 // Update UI checkboxes
                 if (ProfileSaveTDPCheckBox != null) ProfileSaveTDPCheckBox.IsChecked = _saveTDP;
@@ -109,6 +110,7 @@ namespace XboxGamingBar
                 if (ProfileSaveVibrationCheckBox != null) ProfileSaveVibrationCheckBox.IsChecked = _saveVibration;
                 if (ProfileSaveLightingCheckBox != null) ProfileSaveLightingCheckBox.IsChecked = _saveLighting;
                 if (ProfileSaveButtonMappingsCheckBox != null) ProfileSaveButtonMappingsCheckBox.IsChecked = _saveButtonMappings;
+                if (ProfileSaveGyroSettingsCheckBox != null) ProfileSaveGyroSettingsCheckBox.IsChecked = _saveGyroSettings;
             }
             finally
             {
@@ -136,6 +138,7 @@ namespace XboxGamingBar
             settings.Values["ProfileSaveVibration"] = ProfileSaveVibrationCheckBox?.IsChecked ?? false;
             settings.Values["ProfileSaveLighting"] = ProfileSaveLightingCheckBox?.IsChecked ?? false;
             settings.Values["ProfileSaveButtonMappings"] = ProfileSaveButtonMappingsCheckBox?.IsChecked ?? false;
+            settings.Values["ProfileSaveGyroSettings"] = ProfileSaveGyroSettingsCheckBox?.IsChecked ?? false;
         }
 
         private void ProfileSettingCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -188,6 +191,7 @@ namespace XboxGamingBar
                 jsonObj["Vibration"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveVibration);
                 jsonObj["Lighting"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveLighting);
                 jsonObj["ButtonMappings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveButtonMappings);
+                jsonObj["GyroSettings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveGyroSettings);
 
                 var request = new Windows.Foundation.Collections.ValueSet
                 {
@@ -225,6 +229,7 @@ namespace XboxGamingBar
             _saveVibration = ProfileSaveVibrationCheckBox?.IsChecked ?? false;
             _saveLighting = ProfileSaveLightingCheckBox?.IsChecked ?? false;
             _saveButtonMappings = ProfileSaveButtonMappingsCheckBox?.IsChecked ?? false;
+            _saveGyroSettings = ProfileSaveGyroSettingsCheckBox?.IsChecked ?? false;
         }
 
     }

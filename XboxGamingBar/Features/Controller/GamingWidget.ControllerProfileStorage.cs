@@ -1363,15 +1363,6 @@ namespace XboxGamingBar
                     kvp => kvp.Key,
                     kvp => kvp.Value.Clone()) ?? new Dictionary<string, ButtonMapping>();
 
-                // Update UI to show current selected button's mapping
-                if (LegionGamepadButtonSelectorComboBox != null && LegionGamepadButtonSelectorComboBox.SelectedIndex >= 0)
-                {
-                    LoadGamepadMappingToUI(GetGamepadButtonNameFromIndex(LegionGamepadButtonSelectorComboBox.SelectedIndex));
-                }
-
-                // Update the remapped buttons summary display
-                UpdateGamepadMappingSummary();
-
                 // Apply Desktop Controls toggle state (with event unsubscription to prevent handler firing)
                 if (LegionDesktopControlsToggle != null)
                 {

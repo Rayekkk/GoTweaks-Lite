@@ -2555,6 +2555,22 @@ namespace XboxGamingBarHelper.Labs
             int consecutiveReadTimeouts = 0;
             const int READ_TIMEOUTS_BEFORE_RECONNECT = 20; // 20 x 100ms = ~2s of no reports
 
+            // Escalation for a WEDGED composite: CreateFile/SetupDi reconnect attempts (above)
+            // can only recover a staled handle — they can't fix the USB\VID_17EF&PID_61EB
+            // composite itself latching a bad USB state (the same class of bug the Labs
+            // "Fix Task View Bug" feature works around; see TaskViewFixManager for the full
+            // writeup — PnP disable/restart/remove all veto on this hardware, only a real
+            // port power-cycle or a reboot clears it). This is the concrete fix for
+            // "controller status is hit-or-miss and only a full reboot brings it back" —
+            // after a sustained run of failed reconnects we now escalate to the same
+            // IOCTL_USB_HUB_CYCLE_PORT the Task View fix already uses. CyclePort() is a safe
+            // no-op if the composite isn't present (e.g. controller genuinely off/out of
+            // range), so this doesn't misfire when there's really nothing to reconnect to.
+            int failedReconnectAttempts = 0;
+            const int FAILED_ATTEMPTS_BEFORE_PORT_CYCLE = 8; // ~30-60s of backoff, see reconnectDelayMs
+            DateTime lastPortCycleAttempt = DateTime.MinValue;
+            var portCycleCooldown = TimeSpan.FromMinutes(2);
+
             // Controller heartbeat - send init command every 3 seconds to keep controller in initialized mode
             // Legion Space uses 5 second timeout, so 3 seconds gives us margin
             const int HEARTBEAT_INTERVAL_MS = 3000;
@@ -2581,15 +2597,33 @@ namespace XboxGamingBarHelper.Labs
                             if (TryReconnect())
                             {
                                 consecutiveFailures = 0;
+                                failedReconnectAttempts = 0;
                                 reconnectDelayMs = 1000; // Reset delay on success
                                 lastHeartbeat = DateTime.Now; // Reset heartbeat after reconnect
                                 Logger.Info("LegionButtonMonitor: Reconnected successfully");
                             }
                             else
                             {
-                                // Exponential backoff for reconnect attempts
-                                Thread.Sleep(reconnectDelayMs);
-                                reconnectDelayMs = Math.Min(reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS);
+                                failedReconnectAttempts++;
+                                if (failedReconnectAttempts >= FAILED_ATTEMPTS_BEFORE_PORT_CYCLE
+                                    && (DateTime.Now - lastPortCycleAttempt) >= portCycleCooldown)
+                                {
+                                    lastPortCycleAttempt = DateTime.Now;
+                                    failedReconnectAttempts = 0;
+                                    Logger.Warn($"LegionButtonMonitor: {FAILED_ATTEMPTS_BEFORE_PORT_CYCLE} consecutive reconnect failures — escalating to a USB port cycle of the Legion composite.");
+                                    bool cycled = TaskViewFixManager.CyclePort();
+                                    Logger.Info(cycled
+                                        ? "LegionButtonMonitor: port cycle succeeded, controller re-enumerating — retrying shortly."
+                                        : "LegionButtonMonitor: port cycle was a no-op (composite not present or IOCTL refused) — continuing normal backoff.");
+                                    reconnectDelayMs = 2000; // give USB a moment to settle after a real re-enumeration
+                                    Thread.Sleep(reconnectDelayMs);
+                                }
+                                else
+                                {
+                                    // Exponential backoff for reconnect attempts
+                                    Thread.Sleep(reconnectDelayMs);
+                                    reconnectDelayMs = Math.Min(reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS);
+                                }
                             }
                             continue;
                         }

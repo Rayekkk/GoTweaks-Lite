@@ -85,7 +85,6 @@ namespace XboxGamingBar
             gamepadButtonMappings["Y"] = new ButtonMapping { Type = 0, GamepadAction = 17 };
 
             SaveAndSendGamepadMappings();
-            UpdateGamepadMappingSummary();
 
             Logger.Info("Applied Nintendo layout mappings: A→B, B→A, X→Y, Y→X");
         }
@@ -106,8 +105,6 @@ namespace XboxGamingBar
             {
                 gamepadButtonMappings.Remove(button);
             }
-
-            UpdateGamepadMappingSummary();
 
             Logger.Info("Cleared Nintendo layout mappings for A, B, X, Y");
         }

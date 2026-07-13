@@ -6111,9 +6111,9 @@
                             <StackPanel>
                                 <TextBlock x:Name="LegionDeviceNameText" Text="Legion Go Controller" Style="{StaticResource CardTitleStyle}"/>
                                 <TextBlock x:Name="LegionControllerStatusText"
-                                           Text="Connected"
+                                           Text="Detecting..."
                                            FontSize="14"
-                                           Foreground="#4CAF50"
+                                           Foreground="#888888"
                                            Margin="0,4,0,0"/>
 
                                 <!-- Separator under the title -->
@@ -6177,72 +6177,88 @@
                                     </Grid>
                                 </StackPanel>
 
-                                <!-- Device Info -->
-                                <TextBlock x:Name="LegionControllerPidVidText"
-                                           Text="VID:PID --"
-                                           FontSize="11"
-                                           Foreground="#888888"
-                                           Margin="0,8,0,0"/>
-
-                                <!-- Controller Information (populated from b0:01 device status) -->
+                                <!-- Controller Information — Win11-style info table.
+                                     Visibility is driven by UpdateLegionControllerInfoSectionVisibility()
+                                     (shows as soon as EITHER VID:PID or device-status JSON has data,
+                                     so VID:PID isn't hidden just because the device-status readback
+                                     hasn't arrived yet). -->
                                 <StackPanel x:Name="LegionControllerInfoSection" Visibility="Collapsed" Margin="0,10,0,0">
                                     <TextBlock Text="Controller Information"
                                                FontSize="12"
                                                FontWeight="SemiBold"
                                                Foreground="#B9C0CC"
-                                               Margin="0,0,0,6"/>
+                                               Margin="0,0,0,8"/>
 
-                                    <Grid Margin="0,2,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Firmware" FontSize="12" Foreground="#B9C0CC"/>
-                                        <TextBlock Grid.Column="1" x:Name="LegionControllerFirmwareText"
-                                                   Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
+                                    <Border Background="{StaticResource PageBackgroundBrush}" CornerRadius="6" Padding="12,2">
+                                        <StackPanel>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="VID:PID" FontSize="12" Foreground="#B9C0CC"/>
+                                                <TextBlock Grid.Column="1" x:Name="LegionControllerPidVidText"
+                                                           Text="--" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                           HorizontalAlignment="Right"/>
+                                            </Grid>
+                                            <Border Height="1" Background="#22FFFFFF" Margin="0,8,0,0"/>
 
-                                    <Grid Margin="0,6,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Stick light" FontSize="12" Foreground="#B9C0CC"/>
-                                        <TextBlock Grid.Column="1" x:Name="LegionControllerLightText"
-                                                   Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
-                                                   HorizontalAlignment="Right" Margin="0,0,8,0"/>
-                                        <Border Grid.Column="2" x:Name="LegionControllerLightSwatch"
-                                                Width="14" Height="14" CornerRadius="3"
-                                                BorderThickness="1" BorderBrush="#444444"
-                                                Visibility="Collapsed"/>
-                                    </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Firmware" FontSize="12" Foreground="#B9C0CC"/>
+                                                <TextBlock Grid.Column="1" x:Name="LegionControllerFirmwareText"
+                                                           Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                           HorizontalAlignment="Right"/>
+                                            </Grid>
+                                            <Border Height="1" Background="#22FFFFFF" Margin="0,8,0,0"/>
 
-                                    <Grid Margin="0,6,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Vibration" FontSize="12" Foreground="#B9C0CC"/>
-                                        <TextBlock Grid.Column="1" x:Name="LegionControllerVibrationText"
-                                                   Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Stick light" FontSize="12" Foreground="#B9C0CC"/>
+                                                <TextBlock Grid.Column="1" x:Name="LegionControllerLightText"
+                                                           Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                           HorizontalAlignment="Right" Margin="0,0,8,0"/>
+                                                <Border Grid.Column="2" x:Name="LegionControllerLightSwatch"
+                                                        Width="14" Height="14" CornerRadius="3"
+                                                        BorderThickness="1" BorderBrush="#444444"
+                                                        Visibility="Collapsed"/>
+                                            </Grid>
+                                            <Border Height="1" Background="#22FFFFFF" Margin="0,8,0,0"/>
 
-                                    <Grid Margin="0,6,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Touchpad" FontSize="12" Foreground="#B9C0CC"/>
-                                        <TextBlock Grid.Column="1" x:Name="LegionControllerTouchpadText"
-                                                   Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
-                                                   HorizontalAlignment="Right"/>
-                                    </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Vibration" FontSize="12" Foreground="#B9C0CC"/>
+                                                <TextBlock Grid.Column="1" x:Name="LegionControllerVibrationText"
+                                                           Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                           HorizontalAlignment="Right"/>
+                                            </Grid>
+                                            <Border Height="1" Background="#22FFFFFF" Margin="0,8,0,0"/>
+
+                                            <Grid Margin="0,8,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Touchpad" FontSize="12" Foreground="#B9C0CC"/>
+                                                <TextBlock Grid.Column="1" x:Name="LegionControllerTouchpadText"
+                                                           Text="—" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                                           HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
 
                                     <!-- Controller auto-sleep (idle power-off) timeout -->
-                                    <Grid Margin="0,8,0,0">
+                                    <Grid Margin="0,10,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
@@ -6262,6 +6278,9 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                        <!-- Controller Settings Section (Touchpad & Vibration + Lighting) -->
+                        <TextBlock Text="Controller Settings" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Touchpad & Vibration Card (hidden on devices without HID touchpad support) -->
                         <StackPanel x:Name="TouchpadVibrationSection">
@@ -6314,7 +6333,7 @@
                                         <TextBlock Text="Vibration Intensity" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
                                         <ComboBox x:Name="LegionVibrationComboBox"
                                                   Grid.Column="1"
-                                                  Width="100"
+                                                  Width="120"
                                                   Style="{StaticResource ModernComboBoxStyle}"
                                                   SelectedIndex="2">
                                             <x:String>Off</x:String>
@@ -6333,7 +6352,7 @@
                                         <TextBlock Text="Vibration Mode" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
                                         <ComboBox x:Name="LegionVibrationModeComboBox"
                                                   Grid.Column="1"
-                                                  Width="100"
+                                                  Width="120"
                                                   Style="{StaticResource ModernComboBoxStyle}"
                                                   SelectedIndex="0">
                                             <x:String>FPS</x:String>
@@ -6354,7 +6373,7 @@
                                         <ComboBox x:Name="LegionTouchpadVibrationComboBox"
                                                   Grid.Column="1"
                                                   SelectedIndex="2"
-                                                  Width="100"
+                                                  Width="120"
                                                   Style="{StaticResource ModernComboBoxStyle}">
                                             <x:String>Off</x:String>
                                             <x:String>Low</x:String>
@@ -6464,10 +6483,8 @@
                         </StackPanel>
 
                         <!-- Lighting Section (hidden on devices without HID RGB lighting support) -->
+                        <!-- No dedicated header - grouped under "Controller Settings" above, with Touchpad & Vibration -->
                         <StackPanel x:Name="LightingSection">
-                        <!-- Lighting Section Header -->
-                        <TextBlock Text="Lighting" Style="{StaticResource SectionHeaderStyle}"/>
-
                         <!-- Lighting Card -->
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
@@ -6495,7 +6512,7 @@
                                 <StackPanel x:Name="LightingContent" Spacing="12" Margin="0,12,0,0" Visibility="Collapsed">
                                     <!-- Light Mode -->
                                     <StackPanel>
-                                        <TextBlock Text="Light Mode" FontSize="13" Foreground="#B9C0CC" Margin="0,0,0,4"/>
+                                        <TextBlock Text="Light Mode" FontSize="14" Foreground="#B9C0CC" Margin="0,0,0,4"/>
                                         <ComboBox x:Name="LegionLightModeComboBox"
                                                   Style="{StaticResource ModernComboBoxStyle}"
                                                   HorizontalAlignment="Stretch"
@@ -6516,7 +6533,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Light Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="13"/>
+                                            <TextBlock Text="Light Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Border x:Name="LegionColorPreview"
                                                         Width="24" Height="24"
@@ -6554,7 +6571,7 @@
                                     <!-- Brightness (all modes except Off) -->
                                     <StackPanel x:Name="LegionBrightnessCard">
                                         <Grid>
-                                            <TextBlock Text="Brightness" FontSize="13" Foreground="#B9C0CC"/>
+                                            <TextBlock Text="Brightness" FontSize="14" Foreground="#B9C0CC"/>
                                             <TextBlock x:Name="LegionBrightnessValue"
                                                        Text="100%"
                                                        Style="{StaticResource CardValueStyle}"/>
@@ -6569,7 +6586,7 @@
                                     <!-- Speed (Pulse, Dynamic, Spiral only) -->
                                     <StackPanel x:Name="LegionSpeedCard" Visibility="Collapsed">
                                         <Grid>
-                                            <TextBlock Text="Speed" FontSize="13" Foreground="#B9C0CC"/>
+                                            <TextBlock Text="Speed" FontSize="14" Foreground="#B9C0CC"/>
                                             <TextBlock x:Name="LegionSpeedValue"
                                                        Text="50%"
                                                        Style="{StaticResource CardValueStyle}"/>
@@ -6594,110 +6611,6 @@
                                                       IsOn="True"/>
                                     </Grid>
 
-                                    <!-- GoTweaks reactive lighting (input-driven; layers on top of the static mode above) -->
-                                    <Border Height="1" Background="#22FFFFFF" Margin="0,4,0,4"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Reactive Effect" FontSize="13" Foreground="#B9C0CC" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="GoTweaksReactiveModeComboBox"
-                                                  Style="{StaticResource ModernComboBoxStyle}"
-                                                  HorizontalAlignment="Stretch"
-                                                  SelectedIndex="0"
-                                                  SelectionChanged="GoTweaksReactive_Changed">
-                                            <ComboBoxItem Content="Off" Tag="disabled"/>
-                                            <ComboBoxItem Content="Flash on press" Tag="flash"/>
-                                            <ComboBoxItem Content="Cycle palette" Tag="cycle"/>
-                                            <ComboBoxItem Content="Per-button color" Tag="perbutton"/>
-                                            <ComboBoxItem Content="Hue advance on press" Tag="hue"/>
-                                            <ComboBoxItem Content="Trigger pressure" Tag="trigger"/>
-                                            <ComboBoxItem Content="Battery indicator" Tag="battery"/>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <!-- Flash color (Flash on press only) -->
-                                    <StackPanel x:Name="GoTweaksReactiveFlashColorCard">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Flash Color" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="13"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border x:Name="GoTweaksReactiveFlashPreview"
-                                                        Width="24" Height="24" CornerRadius="4"
-                                                        Background="White" BorderBrush="#50555C" BorderThickness="1"
-                                                        Margin="0,0,8,0"/>
-                                                <Button x:Name="GoTweaksReactiveFlashExpandButton"
-                                                        Content="&#xE70D;"
-                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
-                                                        Background="Transparent"
-                                                        Click="GoTweaksReactiveFlashExpandButton_Click"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <muxc:ColorPicker x:Name="GoTweaksReactiveFlashColorPicker"
-                                                     Visibility="Collapsed" Margin="0,12,0,0" Color="White"
-                                                     ColorSpectrumShape="Box"
-                                                     IsMoreButtonVisible="False"
-                                                     IsColorSliderVisible="False"
-                                                     IsColorChannelTextInputVisible="False"
-                                                     IsHexInputVisible="False"
-                                                     IsAlphaEnabled="False"
-                                                     IsAlphaSliderVisible="False"
-                                                     IsAlphaTextInputVisible="False"
-                                                     ColorChanged="GoTweaksReactiveFlashColorPicker_ColorChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Palette editor (Cycle palette only) -->
-                                    <StackPanel x:Name="GoTweaksPaletteCard" Visibility="Collapsed">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Palette" Grid.Column="0" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="13"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                                                <Button x:Name="GoTweaksPaletteAddButton" Content="&#xE710;"
-                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
-                                                        Background="Transparent" ToolTipService.ToolTip="Add color"
-                                                        Click="GoTweaksPaletteAddButton_Click"/>
-                                                <Button x:Name="GoTweaksPaletteRemoveButton" Content="&#xE738;"
-                                                        FontFamily="Segoe MDL2 Assets" FontSize="12" Padding="8,4"
-                                                        Background="Transparent" ToolTipService.ToolTip="Remove selected"
-                                                        Click="GoTweaksPaletteRemoveButton_Click"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <!-- Swatch strip (built in code-behind) -->
-                                        <ItemsControl x:Name="GoTweaksPaletteSwatches" Margin="0,8,0,0">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-                                        <muxc:ColorPicker x:Name="GoTweaksPaletteColorPicker"
-                                                     Visibility="Collapsed" Margin="0,12,0,0" Color="White"
-                                                     ColorSpectrumShape="Box"
-                                                     IsMoreButtonVisible="False"
-                                                     IsColorSliderVisible="False"
-                                                     IsColorChannelTextInputVisible="False"
-                                                     IsHexInputVisible="False"
-                                                     IsAlphaEnabled="False"
-                                                     IsAlphaSliderVisible="False"
-                                                     IsAlphaTextInputVisible="False"
-                                                     ColorChanged="GoTweaksPaletteColorPicker_ColorChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Flash decay -->
-                                    <StackPanel x:Name="GoTweaksReactiveDecayCard">
-                                        <Grid>
-                                            <TextBlock Text="Flash Decay" FontSize="13" Foreground="#B9C0CC"/>
-                                            <TextBlock x:Name="GoTweaksReactiveDecayValue" Text="500 ms" Style="{StaticResource CardValueStyle}"/>
-                                        </Grid>
-                                        <Slider x:Name="GoTweaksReactiveDecaySlider"
-                                                Style="{StaticResource ModernSliderStyle}"
-                                                Minimum="100" Maximum="2000" Value="500"
-                                                StepFrequency="50"
-                                                ValueChanged="GoTweaksReactive_Changed"/>
-                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -6739,41 +6652,36 @@
                                                   IsEnabled="False"
                                                   Toggled="LegionControllerProfileToggle_Toggled"/>
                                 </Grid>
-                                <TextBlock Text="Stores button mappings, deadzones, trigger travel, gyro settings, joystick mouse, and lighting per game"
+                                <TextBlock Text="When on, the categories checked below are remembered separately for the detected game and re-applied automatically whenever you play it. Unchecked categories always stay global (the same for every game)."
                                            Style="{StaticResource CardCaptionStyle}"
                                            TextWrapping="Wrap"
                                            Margin="0,8,0,0"/>
 
-                                <!-- Per-game capture scope: user picks which categories the per-game
-                                     profile should override. Unchecked categories stay global even
-                                     when the master Per-Game Controller Profile toggle is on. -->
-                                <Grid Margin="0,12,0,0">
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,14,0,12"/>
+
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="Customize per-game capture"
-                                               Style="{StaticResource CardCaptionStyle}"
+                                               Text="SAVE PER-GAME"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#B9C0CC"
                                                VerticalAlignment="Center"/>
-                                    <ToggleButton x:Name="LegionControllerProfileScopeExpandToggle"
+                                    <ToggleButton x:Name="ProfileSaveCategoriesExpandToggle"
                                                   Grid.Column="1"
                                                   IsChecked="False"
                                                   VerticalAlignment="Center"
                                                   Background="Transparent"
                                                   BorderThickness="0"
                                                   Padding="8,4"
-                                                  Click="LegionControllerProfileScopeExpandToggle_Click">
-                                        <FontIcon x:Name="LegionControllerProfileScopeExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                                  Click="ProfileSaveCategoriesExpandToggle_Click">
+                                        <FontIcon x:Name="ProfileSaveCategoriesExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
                                     </ToggleButton>
                                 </Grid>
-                                <StackPanel x:Name="LegionControllerProfileScopeContent" Margin="0,8,0,0" Visibility="Collapsed">
-                                    <TextBlock Text="Checked = captured per-game. Unchecked = stays global (applies to every game)."
-                                               Style="{StaticResource CardCaptionStyle}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,6"/>
-                                    <CheckBox x:Name="ProfileSaveNintendoLayoutCheckBox"
-                                              Content="Nintendo Layout"
+                                <StackPanel x:Name="ProfileSaveCategoriesContent" Margin="0,8,0,0" Visibility="Collapsed">
+                                    <CheckBox x:Name="ProfileSaveLightingCheckBox"
+                                              Content="Lighting"
                                               IsChecked="False"
                                               Foreground="#FFFFFF"
                                               Margin="0,4,0,0"
@@ -6788,14 +6696,6 @@
                                               Style="{StaticResource FocusableCheckBoxStyle}"
                                               Checked="ProfileSettingsCheckBox_Changed"
                                               Unchecked="ProfileSettingsCheckBox_Changed"/>
-                                    <CheckBox x:Name="ProfileSaveLightingCheckBox"
-                                              Content="Lighting"
-                                              IsChecked="False"
-                                              Foreground="#FFFFFF"
-                                              Margin="0,4,0,0"
-                                              Style="{StaticResource FocusableCheckBoxStyle}"
-                                              Checked="ProfileSettingsCheckBox_Changed"
-                                              Unchecked="ProfileSettingsCheckBox_Changed"/>
                                     <CheckBox x:Name="ProfileSaveButtonMappingsCheckBox"
                                               Content="Button Mappings"
                                               IsChecked="False"
@@ -6804,6 +6704,103 @@
                                               Style="{StaticResource FocusableCheckBoxStyle}"
                                               Checked="ProfileSettingsCheckBox_Changed"
                                               Unchecked="ProfileSettingsCheckBox_Changed"/>
+                                    <CheckBox x:Name="ProfileSaveGyroSettingsCheckBox"
+                                              Content="Gyro Settings"
+                                              IsChecked="False"
+                                              Foreground="#FFFFFF"
+                                              Margin="0,4,0,0"
+                                              Style="{StaticResource FocusableCheckBoxStyle}"
+                                              Checked="ProfileSettingsCheckBox_Changed"
+                                              Unchecked="ProfileSettingsCheckBox_Changed"/>
+                                    <CheckBox x:Name="ProfileSaveNintendoLayoutCheckBox"
+                                              Content="Nintendo Layout"
+                                              IsChecked="False"
+                                              Foreground="#FFFFFF"
+                                              Margin="0,4,0,0"
+                                              Style="{StaticResource FocusableCheckBoxStyle}"
+                                              Checked="ProfileSettingsCheckBox_Changed"
+                                              Unchecked="ProfileSettingsCheckBox_Changed"/>
+                                </StackPanel>
+
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,16,0,12"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="Saved Profiles"
+                                               FontSize="12" FontWeight="SemiBold" Foreground="#B9C0CC"
+                                               VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="SavedProfilesExpandToggle"
+                                                  Grid.Column="1"
+                                                  IsChecked="False"
+                                                  VerticalAlignment="Center"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  Padding="8,4"
+                                                  Click="SavedProfilesExpandToggle_Click">
+                                        <FontIcon x:Name="SavedProfilesExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                    </ToggleButton>
+                                </Grid>
+                                <StackPanel x:Name="SavedProfilesContent" Spacing="8" Margin="0,8,0,0" Visibility="Collapsed">
+                                    <!-- No profiles message -->
+                                    <TextBlock x:Name="NoSavedProfilesText"
+                                               Text="No saved game profiles"
+                                               Foreground="#888888"
+                                               FontSize="13"
+                                               FontStyle="Italic"
+                                               Visibility="Visible"/>
+
+                                    <!-- Saved profiles list -->
+                                    <ItemsControl x:Name="SavedProfilesList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#2A2A2A" CornerRadius="6" Padding="12,8" Margin="0,4">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- Game Icon -->
+                                                        <Image Grid.Column="0"
+                                                               Source="{Binding IconSource}"
+                                                               Width="28" Height="28"
+                                                               Margin="0,0,10,0"
+                                                               Stretch="UniformToFill"
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding IconVisibility}"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding GameName}"
+                                                                       Foreground="White"
+                                                                       FontSize="14"
+                                                                       FontWeight="SemiBold"/>
+                                                            <TextBlock Text="{Binding SettingsSummary}"
+                                                                       Foreground="#888888"
+                                                                       FontSize="11"
+                                                                       TextWrapping="NoWrap"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2"
+                                                                Content="&#xE711;"
+                                                                FontFamily="Segoe MDL2 Assets"
+                                                                FontSize="12"
+                                                                Background="Transparent"
+                                                                Foreground="#FF6666"
+                                                                BorderThickness="0"
+                                                                Padding="8,4"
+                                                                VerticalAlignment="Center"
+                                                                Tag="{Binding ProfileKey}"
+                                                                Visibility="{Binding CanDelete}"
+                                                                Click="DeleteSavedProfile_Click"
+                                                                ToolTipService.ToolTip="Delete profile"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -7142,84 +7139,6 @@
                                         </ComboBox>
                                     </StackPanel>
                                 </StackPanel>
-
-                                <!-- Gamepad Button Remapping -->
-                                <Grid Margin="0,16,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Gamepad Buttons" FontSize="14" Foreground="#888888" VerticalAlignment="Center"/>
-                                    <Button x:Name="LegionGamepadResetAllButton" Grid.Column="1" Content="Reset All"
-                                            Style="{StaticResource ModernButtonStyle}" Padding="8,4" FontSize="11"
-                                            Background="#3C3C3C" Foreground="#B9C0CC"/>
-                                </Grid>
-
-                                <!-- Remapped buttons summary -->
-                                <StackPanel x:Name="LegionGamepadRemappedSummary" Margin="0,0,0,8">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Remapped: " FontSize="12" Foreground="#888888" VerticalAlignment="Center"
-                                                   x:Name="LegionGamepadRemappedLabel" Visibility="Collapsed"/>
-                                        <TextBlock Text="None" FontSize="12" Foreground="#555555" VerticalAlignment="Center"
-                                                   x:Name="LegionGamepadNoRemapsLabel"/>
-                                    </StackPanel>
-                                    <ItemsControl x:Name="LegionGamepadRemappedTags" Margin="0,4,0,0">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <ItemsWrapGrid Orientation="Horizontal"/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </StackPanel>
-
-                                <StackPanel>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="110"/>
-                                            <ColumnDefinition Width="110"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <!-- Button selector -->
-                                        <ComboBox x:Name="LegionGamepadButtonSelectorComboBox" Width="100" Margin="0,0,8,0"
-                                                  Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="0">
-                                            <x:String>LS Click</x:String><x:String>LS Up</x:String><x:String>LS Down</x:String><x:String>LS Left</x:String><x:String>LS Right</x:String>
-                                            <x:String>RS Click</x:String><x:String>RS Up</x:String><x:String>RS Down</x:String><x:String>RS Left</x:String><x:String>RS Right</x:String>
-                                            <x:String>D-Pad Up</x:String><x:String>D-Pad Down</x:String><x:String>D-Pad Left</x:String><x:String>D-Pad Right</x:String>
-                                            <x:String>A</x:String><x:String>B</x:String><x:String>X</x:String><x:String>Y</x:String>
-                                            <x:String>LB</x:String><x:String>LT</x:String><x:String>RB</x:String><x:String>RT</x:String>
-                                            <x:String>Start</x:String><x:String>Select</x:String>
-                                        </ComboBox>
-                                        <!-- Type dropdown -->
-                                        <ComboBox x:Name="LegionGamepadTypeComboBox" Grid.Column="1" Margin="0,0,8,0"
-                                                  Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="0">
-                                            <x:String>Gamepad</x:String><x:String>Keyboard</x:String><x:String>Mouse</x:String>
-                                        </ComboBox>
-                                        <!-- Gamepad action dropdown -->
-                                        <ComboBox x:Name="LegionGamepadActionComboBox" Grid.Column="2"
-                                                  Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="0">
-                                            <x:String>Disabled</x:String>
-                                            <x:String>LS Click</x:String><x:String>LS Up</x:String><x:String>LS Down</x:String><x:String>LS Left</x:String><x:String>LS Right</x:String>
-                                            <x:String>RS Click</x:String><x:String>RS Up</x:String><x:String>RS Down</x:String><x:String>RS Left</x:String><x:String>RS Right</x:String>
-                                            <x:String>D-Pad Up</x:String><x:String>D-Pad Down</x:String><x:String>D-Pad Left</x:String><x:String>D-Pad Right</x:String>
-                                            <x:String>A</x:String><x:String>B</x:String><x:String>X</x:String><x:String>Y</x:String>
-                                            <x:String>LB</x:String><x:String>LT</x:String><x:String>RB</x:String><x:String>RT</x:String>
-                                            <x:String>View</x:String><x:String>Menu</x:String>
-                                        </ComboBox>
-                                        <!-- Mouse action dropdown (hidden by default) -->
-                                        <ComboBox x:Name="LegionGamepadMouseComboBox" Grid.Column="2" Visibility="Collapsed"
-                                                  Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="0">
-                                            <x:String>Left Click</x:String><x:String>Right Click</x:String><x:String>Middle Click</x:String>
-                                            <x:String>Scroll Up</x:String><x:String>Scroll Down</x:String><x:String>Scroll Left</x:String><x:String>Scroll Right</x:String>
-                                        </ComboBox>
-                                    </Grid>
-                                    <!-- Keyboard panel (shown when Keyboard type selected) -->
-                                    <StackPanel x:Name="LegionGamepadKeyboardPanel" Visibility="Collapsed" Margin="0,8,0,0" Orientation="Horizontal">
-                                        <StackPanel x:Name="LegionGamepadKeyTags" Orientation="Horizontal"/>
-                                        <ComboBox x:Name="LegionGamepadKeyComboBox" Width="100" Style="{StaticResource ModernComboBoxStyle}" SelectedIndex="0">
-                                            <x:String>+ Key</x:String><x:String>A</x:String><x:String>B</x:String><x:String>C</x:String><x:String>D</x:String><x:String>E</x:String><x:String>F</x:String><x:String>G</x:String><x:String>H</x:String><x:String>I</x:String><x:String>J</x:String><x:String>K</x:String><x:String>L</x:String><x:String>M</x:String><x:String>N</x:String><x:String>O</x:String><x:String>P</x:String><x:String>Q</x:String><x:String>R</x:String><x:String>S</x:String><x:String>T</x:String><x:String>U</x:String><x:String>V</x:String><x:String>W</x:String><x:String>X</x:String><x:String>Y</x:String><x:String>Z</x:String><x:String>1</x:String><x:String>2</x:String><x:String>3</x:String><x:String>4</x:String><x:String>5</x:String><x:String>6</x:String><x:String>7</x:String><x:String>8</x:String><x:String>9</x:String><x:String>0</x:String><x:String>F1</x:String><x:String>F2</x:String><x:String>F3</x:String><x:String>F4</x:String><x:String>F5</x:String><x:String>F6</x:String><x:String>F7</x:String><x:String>F8</x:String><x:String>F9</x:String><x:String>F10</x:String><x:String>F11</x:String><x:String>F12</x:String><x:String>Enter</x:String><x:String>Esc</x:String><x:String>Space</x:String><x:String>Tab</x:String><x:String>Backspace</x:String><x:String>Up</x:String><x:String>Down</x:String><x:String>Left</x:String><x:String>Right</x:String><x:String>LCtrl</x:String><x:String>LShift</x:String><x:String>LAlt</x:String><x:String>LWin</x:String><x:String>RCtrl</x:String><x:String>RShift</x:String><x:String>RAlt</x:String><x:String>RWin</x:String><x:String>Home</x:String><x:String>End</x:String><x:String>PgUp</x:String><x:String>PgDn</x:String><x:String>Insert</x:String><x:String>Delete</x:String><x:String>PrintScr</x:String><x:String>Pause</x:String><x:String>VolUp</x:String><x:String>VolDown</x:String><x:String>VolMute</x:String><x:String>[</x:String><x:String>]</x:String>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -7260,130 +7179,6 @@
                                               Style="{StaticResource ModernToggleStyle}"
                                               IsOn="False"/>
                             </Grid>
-                        </Border>
-
-                        <!-- Joystick as Mouse Card -->
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="Joystick as Mouse" Style="{StaticResource CardTitleStyle}"/>
-                                <TextBlock Text="Use a joystick to control mouse cursor"
-                                           Style="{StaticResource CardCaptionStyle}"/>
-
-                                <!-- Mode Selection -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Stick" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
-                                    <ComboBox x:Name="LegionJoystickAsMouseComboBox" Grid.Column="1"
-                                              Width="120" HorizontalAlignment="Left"
-                                              Style="{StaticResource ModernComboBoxStyle}">
-                                        <ComboBoxItem Content="Disabled" Tag="0"/>
-                                        <ComboBoxItem Content="Left Stick" Tag="1"/>
-                                        <ComboBoxItem Content="Right Stick" Tag="2"/>
-                                    </ComboBox>
-                                </Grid>
-
-                                <!-- Sensitivity (shown when not disabled) -->
-                                <Grid x:Name="LegionJoystickMouseSensGrid" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Sensitivity" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Slider x:Name="LegionJoystickMouseSensSlider"
-                                                Width="120" Minimum="10" Maximum="100" Value="50"
-                                                Style="{StaticResource ModernSliderStyle}"/>
-                                        <TextBlock x:Name="LegionJoystickMouseSensValue"
-                                                   Text="50" Width="30" Margin="8,0,0,0"
-                                                   VerticalAlignment="Center" Foreground="#B9C0CC"/>
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Brightness Gesture Card -->
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel Spacing="12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="Brightness Gesture" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Hold the trigger button below and tilt the axis to fade display brightness. A quick tap of the trigger still behaves normally."
-                                                   Style="{StaticResource CardCaptionStyle}"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="BrightnessGestureEnabledToggle"
-                                                  Grid.Column="1"
-                                                  Style="{StaticResource ModernToggleStyle}"
-                                                  IsOn="False"/>
-                                </Grid>
-
-                                <!-- Info note, collapsed by default to keep the card tidy - explains
-                                     why Legion L/R aren't offered as trigger options. -->
-                                <muxc:Expander HorizontalAlignment="Stretch"
-                                               HorizontalContentAlignment="Stretch"
-                                               IsExpanded="False">
-                                    <muxc:Expander.Header>
-                                        <TextBlock Text="Why not Legion R + left stick, like SteamOS?" FontSize="12" Foreground="#B9C0CC"/>
-                                    </muxc:Expander.Header>
-                                    <Border Background="#1A1A2E" CornerRadius="4" Padding="10">
-                                        <TextBlock FontSize="11" Foreground="#B9C0CC" TextWrapping="Wrap"
-                                                   Text="This gesture was meant to work exactly like on SteamOS - hold Legion R and tilt the left stick. On Windows, holding Legion L or R for more than about 5 seconds is hardcoded in the controller's own firmware to toggle that grip's connection off and on (a real Legion Space feature) - not something GoTweaks, or any app, can override. None of the trigger options below have this limitation."/>
-                                    </Border>
-                                </muxc:Expander>
-
-                                <StackPanel x:Name="BrightnessGestureOptionsPanel" Spacing="12" Visibility="Collapsed">
-                                    <!-- Trigger Button -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Trigger" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
-                                        <ComboBox x:Name="BrightnessGestureTriggerComboBox"
-                                                  Grid.Column="1"
-                                                  MinWidth="140"
-                                                  HorizontalAlignment="Left"
-                                                  Style="{StaticResource ModernComboBoxStyle}"
-                                                  SelectionChanged="BrightnessGestureTriggerComboBox_SelectionChanged">
-                                            <ComboBoxItem Content="Desktop" Tag="0"/>
-                                            <ComboBoxItem Content="Page" Tag="1"/>
-                                            <ComboBoxItem Content="Scroll Click" Tag="2"/>
-                                            <ComboBoxItem Content="Y1" Tag="3"/>
-                                            <ComboBoxItem Content="Y2" Tag="4"/>
-                                            <ComboBoxItem Content="Y3" Tag="5"/>
-                                            <ComboBoxItem Content="M1" Tag="6"/>
-                                            <ComboBoxItem Content="M2" Tag="7"/>
-                                            <ComboBoxItem Content="M3" Tag="8"/>
-                                        </ComboBox>
-                                    </Grid>
-
-                                    <!-- Axis -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Axis" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
-                                        <ComboBox x:Name="BrightnessGestureAxisComboBox"
-                                                  Grid.Column="1"
-                                                  MinWidth="140"
-                                                  HorizontalAlignment="Left"
-                                                  Style="{StaticResource ModernComboBoxStyle}"
-                                                  SelectionChanged="BrightnessGestureAxisComboBox_SelectionChanged">
-                                            <ComboBoxItem Content="Right Stick" Tag="0"/>
-                                            <ComboBoxItem Content="Left Stick" Tag="1"/>
-                                            <ComboBoxItem Content="D-Pad (Up/Down)" Tag="2"/>
-                                        </ComboBox>
-                                    </Grid>
-                                </StackPanel>
-                            </StackPanel>
                         </Border>
 
                         <!-- Deadzones Card -->
@@ -7517,8 +7312,6 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        </StackPanel>
-                        <!-- End Controller Remapping Section -->
 
                         <!-- Gyro Settings Section (hidden on devices without HID gyro support) -->
                         <StackPanel x:Name="GyroSection">
@@ -7705,86 +7498,50 @@
                         </StackPanel>
                         <!-- End Gyro Section -->
 
-                        <!-- Saved Profiles Card -->
+                        <!-- Joystick as Mouse Card -->
                         <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Joystick as Mouse" Style="{StaticResource CardTitleStyle}"/>
+                                <TextBlock Text="Use a joystick to control mouse cursor"
+                                           Style="{StaticResource CardCaptionStyle}"/>
+
+                                <!-- Mode Selection -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Saved Profiles" Style="{StaticResource CardTitleStyle}" Grid.Column="0"/>
-                                    <ToggleButton x:Name="SavedProfilesExpandToggle"
-                                                  Grid.Column="1"
-                                                  IsChecked="False"
-                                                  VerticalAlignment="Center"
-                                                  Background="Transparent"
-                                                  BorderThickness="0"
-                                                  Padding="8,4"
-                                                  Click="SavedProfilesExpandToggle_Click">
-                                        <FontIcon x:Name="SavedProfilesExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
-                                    </ToggleButton>
+                                    <TextBlock Text="Stick" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                    <ComboBox x:Name="LegionJoystickAsMouseComboBox" Grid.Column="1"
+                                              Width="120" HorizontalAlignment="Left"
+                                              Style="{StaticResource ModernComboBoxStyle}">
+                                        <ComboBoxItem Content="Disabled" Tag="0"/>
+                                        <ComboBoxItem Content="Left Stick" Tag="1"/>
+                                        <ComboBoxItem Content="Right Stick" Tag="2"/>
+                                    </ComboBox>
                                 </Grid>
-                                <StackPanel x:Name="SavedProfilesContent" Spacing="8" Margin="0,12,0,0" Visibility="Collapsed">
-                                    <!-- No profiles message -->
-                                    <TextBlock x:Name="NoSavedProfilesText"
-                                               Text="No saved game profiles"
-                                               Foreground="#888888"
-                                               FontSize="13"
-                                               FontStyle="Italic"
-                                               Visibility="Visible"/>
 
-                                    <!-- Saved profiles list -->
-                                    <ItemsControl x:Name="SavedProfilesList">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#2A2A2A" CornerRadius="6" Padding="12,8" Margin="0,4">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <!-- Game Icon -->
-                                                        <Image Grid.Column="0"
-                                                               Source="{Binding IconSource}"
-                                                               Width="28" Height="28"
-                                                               Margin="0,0,10,0"
-                                                               Stretch="UniformToFill"
-                                                               VerticalAlignment="Center"
-                                                               Visibility="{Binding IconVisibility}"/>
-                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding GameName}"
-                                                                       Foreground="White"
-                                                                       FontSize="14"
-                                                                       FontWeight="SemiBold"/>
-                                                            <TextBlock Text="{Binding SettingsSummary}"
-                                                                       Foreground="#888888"
-                                                                       FontSize="11"
-                                                                       TextWrapping="NoWrap"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                        </StackPanel>
-                                                        <Button Grid.Column="2"
-                                                                Content="&#xE711;"
-                                                                FontFamily="Segoe MDL2 Assets"
-                                                                FontSize="12"
-                                                                Background="Transparent"
-                                                                Foreground="#FF6666"
-                                                                BorderThickness="0"
-                                                                Padding="8,4"
-                                                                VerticalAlignment="Center"
-                                                                Tag="{Binding ProfileKey}"
-                                                                Visibility="{Binding CanDelete}"
-                                                                Click="DeleteSavedProfile_Click"
-                                                                ToolTipService.ToolTip="Delete profile"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
+                                <!-- Sensitivity (shown when not disabled) -->
+                                <Grid x:Name="LegionJoystickMouseSensGrid" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Sensitivity" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Slider x:Name="LegionJoystickMouseSensSlider"
+                                                Width="120" Minimum="10" Maximum="100" Value="50"
+                                                Style="{StaticResource ModernSliderStyle}"/>
+                                        <TextBlock x:Name="LegionJoystickMouseSensValue"
+                                                   Text="50" Width="30" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center" Foreground="#B9C0CC"/>
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
+
+                        </StackPanel>
+                        <!-- End Controller Remapping Section -->
 
                         <!-- Special Remapping Card -->
                         <Border Style="{StaticResource CardStyle}">
@@ -7813,7 +7570,7 @@
 
                                 <StackPanel x:Name="SpecialRemappingContent" Visibility="Collapsed" Margin="0,12,0,0">
                                     <!-- Legion Buttons Section -->
-                                    <TextBlock Text="LEGION BUTTONS" FontSize="11" FontWeight="SemiBold" Foreground="#888888" Margin="0,0,0,8"/>
+                                    <TextBlock Text="LEGION BUTTONS" FontSize="11" FontWeight="SemiBold" Foreground="#B9C0CC" Margin="0,0,0,8"/>
 
                                     <!-- Legion L Row -->
                                     <Grid>
@@ -7933,10 +7690,10 @@
                                     <!-- Scroll Wheel Section (hidden on devices without scroll wheel) -->
                                     <StackPanel x:Name="ScrollWheelSection">
                                         <!-- Divider -->
-                                        <Border Background="#333333" Height="1" Margin="0,16,0,16"/>
+                                        <Border Height="1" Background="#33FFFFFF" Margin="0,16,0,16"/>
 
                                         <!-- Scroll Wheel Header -->
-                                        <TextBlock Text="SCROLL WHEEL" FontSize="11" FontWeight="SemiBold" Foreground="#888888" Margin="0,0,0,8"/>
+                                        <TextBlock Text="SCROLL WHEEL" FontSize="11" FontWeight="SemiBold" Foreground="#B9C0CC" Margin="0,0,0,8"/>
 
                                     <!-- Scroll Wheel Row (unified - direction not available) -->
                                     <Grid>
@@ -8059,7 +7816,7 @@
                                     <!-- Guide remap prerequisite note. Since the ViGEm retirement the
                                          Guide route is served by VIIPER's guide-only pad, which needs
                                          usbip-win2 (not ViGEmBus). Control names kept from the ViGEm era. -->
-                                    <Border Background="#1A1A2E" CornerRadius="4" Padding="10" Margin="0,16,0,0">
+                                    <Border Background="{StaticResource PageBackgroundBrush}" CornerRadius="4" Padding="10" Margin="0,16,0,0">
                                         <StackPanel>
                                             <TextBlock Text="Xbox Guide remap requires the usbip-win2 driver"
                                                        FontSize="11" Foreground="#B9C0CC" TextWrapping="Wrap"/>
@@ -8077,8 +7834,90 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Performance Mode Section Header -->
-                        <TextBlock Text="Performance Mode" Style="{StaticResource SectionHeaderStyle}"/>
+                        <!-- Brightness Gesture Card -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="Brightness Gesture" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Hold the trigger button below and tilt the axis to fade display brightness. A quick tap of the trigger still behaves normally."
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="BrightnessGestureEnabledToggle"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernToggleStyle}"
+                                                  IsOn="False"/>
+                                </Grid>
+
+                                <StackPanel x:Name="BrightnessGestureOptionsPanel" Spacing="12" Visibility="Collapsed">
+                                    <!-- Trigger Button -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Trigger" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                        <ComboBox x:Name="BrightnessGestureTriggerComboBox"
+                                                  Grid.Column="1"
+                                                  MinWidth="140"
+                                                  HorizontalAlignment="Left"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  SelectionChanged="BrightnessGestureTriggerComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Desktop" Tag="0"/>
+                                            <ComboBoxItem Content="Page" Tag="1"/>
+                                            <ComboBoxItem Content="Scroll Click" Tag="2"/>
+                                            <ComboBoxItem Content="Y1" Tag="3"/>
+                                            <ComboBoxItem Content="Y2" Tag="4"/>
+                                            <ComboBoxItem Content="Y3" Tag="5"/>
+                                            <ComboBoxItem Content="M1" Tag="6"/>
+                                            <ComboBoxItem Content="M2" Tag="7"/>
+                                            <ComboBoxItem Content="M3" Tag="8"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <!-- Axis -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Axis" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                        <ComboBox x:Name="BrightnessGestureAxisComboBox"
+                                                  Grid.Column="1"
+                                                  MinWidth="140"
+                                                  HorizontalAlignment="Left"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  SelectionChanged="BrightnessGestureAxisComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Right Stick" Tag="0"/>
+                                            <ComboBoxItem Content="Left Stick" Tag="1"/>
+                                            <ComboBoxItem Content="D-Pad (Up/Down)" Tag="2"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Info note, collapsed by default to keep the card tidy - explains
+                                     why Legion L/R aren't offered as trigger options. -->
+                                <muxc:Expander HorizontalAlignment="Stretch"
+                                               HorizontalContentAlignment="Stretch"
+                                               IsExpanded="False">
+                                    <muxc:Expander.Header>
+                                        <TextBlock Text="Why not Legion R + left stick, like SteamOS?" FontSize="12" Foreground="#B9C0CC"/>
+                                    </muxc:Expander.Header>
+                                    <Border Background="{StaticResource PageBackgroundBrush}" CornerRadius="4" Padding="10">
+                                        <TextBlock FontSize="11" Foreground="#B9C0CC" TextWrapping="Wrap"
+                                                   Text="This gesture was meant to work exactly like on SteamOS - hold Legion R and tilt the left stick. On Windows, holding Legion L or R for more than about 5 seconds is hardcoded in the controller's own firmware to toggle that grip's connection off and on (a real Legion Space feature) - not something GoTweaks, or any app, can override. None of the trigger options below have this limitation."/>
+                                    </Border>
+                                </muxc:Expander>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Fan Settings Section Header -->
+                        <TextBlock Text="Fan Settings" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- The Legion-tab "Power Profile" dropdown was removed: the Performance tab's
                              TDP Mode dropdown (TDPModeComboBox) is now the single control for the
@@ -8119,11 +7958,15 @@
                                         <!-- Live hardware readout: fan RPM + the temperature currently
                                              driving the fan. Always shown while the card is expanded,
                                              independent of which mode's curve is selected below. -->
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Fan: " Style="{StaticResource CardCaptionStyle}"/>
-                                            <TextBlock x:Name="FanRPMLabel" Text="-- RPM" Style="{StaticResource CardCaptionStyle}"/>
-                                            <TextBlock Text="  ·  " Style="{StaticResource CardCaptionStyle}"/>
-                                            <TextBlock x:Name="FanHeaderTempLabel" Text="--°C" Style="{StaticResource CardCaptionStyle}"/>
+                                        <StackPanel Margin="0,4,0,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Fan:" FontSize="12" FontWeight="SemiBold" Foreground="#B9C0CC" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock x:Name="FanRPMLabel" Text="-- RPM" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SystemAccentBrush}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                <TextBlock Text="CPU Temp:" FontSize="12" FontWeight="SemiBold" Foreground="#B9C0CC" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock x:Name="FanHeaderTempLabel" Text="--°C" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SystemAccentBrush}" VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </StackPanel>
                                         <!-- Spells out which power mode's curve the graph below is editing,
                                              and the running mode when they differ (the dropdown is a
@@ -8161,6 +8004,8 @@
                                         <FontIcon x:Name="FanCurveExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
                                     </ToggleButton>
                                 </Grid>
+
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,10,0,0"/>
 
                                 <!-- Helper-disconnected warning. Shown only when the pipe drops while
                                      the active mode had EC override on, since that's the case where
@@ -8214,17 +8059,21 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <TextBlock FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,8,0,0"
-                                                   Text="• Curves &amp; unlock state save per power mode&#x0a;• Dropdown selects which mode to edit, not the active one&#x0a;• Unlock OFF: firmware drives the fan (Custom only via WMI, with firmware-enforced floors)&#x0a;• Unlock ON: helper writes the curve directly to EC every 3s, in any mode&#x0a;• Axis labels (10°C–100°C) are how the curve is stored; firmware modes may map temps differently"/>
+                                        <Border Background="{StaticResource PageBackgroundBrush}" CornerRadius="4" Padding="10" Margin="0,8,0,0">
+                                            <StackPanel>
+                                                <TextBlock FontSize="11" Foreground="#888888" TextWrapping="Wrap"
+                                                           Text="• Curves &amp; unlock state save per power mode&#x0a;• Dropdown selects which mode to edit, not the active one&#x0a;• Unlock OFF: firmware drives the fan (Custom only via WMI, with firmware-enforced floors)&#x0a;• Unlock ON: helper writes the curve directly to EC every 3s, in any mode&#x0a;• Axis labels (10°C–100°C) are how the curve is stored; firmware modes may map temps differently"/>
 
-                                        <TextBlock FontSize="10" Foreground="#888888" TextWrapping="Wrap" Margin="0,8,0,0">
-                                            Credits:
-                                            <Hyperlink NavigateUri="https://github.com/Rodpad/LeGo2-Fan-Control">Rodpad/LeGo2-Fan-Control</Hyperlink>
-                                            ·
-                                            <Hyperlink NavigateUri="https://github.com/Undervoltologist/legiongo2_ec_reverse_engineer">Undervoltologist EC RE</Hyperlink>
-                                            ·
-                                            <Hyperlink NavigateUri="https://github.com/namazso/PawnIO.Modules">namazso/PawnIO.Modules</Hyperlink>
-                                        </TextBlock>
+                                                <TextBlock FontSize="10" Foreground="#888888" TextWrapping="Wrap" Margin="0,8,0,0">
+                                                    Credits:
+                                                    <Hyperlink NavigateUri="https://github.com/Rodpad/LeGo2-Fan-Control">Rodpad/LeGo2-Fan-Control</Hyperlink>
+                                                    ·
+                                                    <Hyperlink NavigateUri="https://github.com/Undervoltologist/legiongo2_ec_reverse_engineer">Undervoltologist EC RE</Hyperlink>
+                                                    ·
+                                                    <Hyperlink NavigateUri="https://github.com/namazso/PawnIO.Modules">namazso/PawnIO.Modules</Hyperlink>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                 </muxc:Expander>
 
@@ -8384,8 +8233,9 @@
                         <TextBlock Text="Labs" Style="{StaticResource SectionHeaderStyle}"/>
 
                         <!-- Labs Description -->
-                        <TextBlock Text="Experimental features - use at your own risk"
+                        <TextBlock Text="Experimental fixes for specific hardware quirks. Safe to leave off — only turn one on if you actually recognize the problem it describes."
                                    Style="{StaticResource CardCaptionStyle}"
+                                   TextWrapping="Wrap"
                                    Margin="0,4,0,8"/>
 
                         <!-- Disable Legion Space Card -->
@@ -8396,23 +8246,28 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <TextBlock Text="Disable Legion Space Service" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Removes Legion L/R handling. May override TDP, remaps, fan curve. You can still open Legion Space for updates."
+                                        <TextBlock Text="Stops Lenovo's Legion Space background service so GoTweaks has exclusive control of the controllers' Legion L/R buttons. Only needed if Legion Space is fighting GoTweaks over TDP, button remaps, or the fan curve — you can still open Legion Space itself normally, e.g. for firmware updates."
                                                    Style="{StaticResource CardCaptionStyle}"
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <Button x:Name="ToggleDAServiceButton"
                                             Grid.Column="1"
                                             Content="Disable"
+                                            VerticalAlignment="Top"
                                             Style="{StaticResource ModernButtonStyle}"
                                             Click="ToggleDAServiceButton_Click"/>
                                 </Grid>
-                                <TextBlock x:Name="DAServiceStatusText"
-                                           Text="Checking..."
-                                           FontSize="14"
-                                           Foreground="#B9C0CC"
-                                           Margin="0,8,0,0"/>
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,12,0,10"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Status:" FontSize="12" Foreground="#B9C0CC" Margin="0,0,4,0"/>
+                                    <TextBlock x:Name="DAServiceStatusText"
+                                               Text="Checking..."
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFFFFF"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -8424,27 +8279,31 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <TextBlock Text="Fix Task View Bug" Style="{StaticResource CardTitleStyle}"/>
-                                        <TextBlock Text="Optional — enable only if you have this bug: with a USB hub attached, after every boot Task View keeps opening (with a controller vibration) whenever you return to the desktop, until you replug a controller. Enable runs a one-time controller re-plug automatically after each restart to clear it."
+                                        <TextBlock Text="Fixes a rare USB quirk on some setups: with a hub attached at boot, Task View starts popping open on its own (with a controller buzz) every time you return to the desktop, until a controller is unplugged and replugged. Turning this on re-cycles the controller's USB connection once automatically after every restart, so you never have to do it by hand."
                                                    Style="{StaticResource CardCaptionStyle}"
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <Button x:Name="ToggleTaskViewFixButton"
                                             Grid.Column="1"
                                             Content="Enable"
-                                            VerticalAlignment="Center"
+                                            VerticalAlignment="Top"
                                             Style="{StaticResource ModernButtonStyle}"
                                             Click="ToggleTaskViewFixButton_Click"/>
                                 </Grid>
-                                <TextBlock x:Name="TaskViewFixStatusText"
-                                           Text="Checking..."
-                                           FontSize="14"
-                                           Foreground="#B9C0CC"
-                                           Margin="0,8,0,0"/>
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,12,0,10"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Status:" FontSize="12" Foreground="#B9C0CC" Margin="0,0,4,0"/>
+                                    <TextBlock x:Name="TaskViewFixStatusText"
+                                               Text="Checking..."
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFFFFF"/>
+                                </StackPanel>
                                 <Button x:Name="TaskViewFixRunNowButton"
                                         Content="Run fix now (one-time)"
-                                        Margin="0,8,0,0"
+                                        Margin="0,10,0,0"
                                         Style="{StaticResource ModernButtonStyle}"
                                         Click="TaskViewFixRunNowButton_Click"/>
                             </StackPanel>
@@ -8517,8 +8376,12 @@
                                     <TextBlock x:Name="DriverUpdatesStatusText"
                                                Text="Click Check for updates to query Lenovo."
                                                FontSize="11"
-                                               Foreground="#888888"
+                                               Foreground="#B9C0CC"
                                                TextWrapping="Wrap"/>
+
+                                    <Border Height="1" Background="#33FFFFFF" Margin="0,2,0,0"/>
+
+                                    <TextBlock Text="PREFERENCES" FontSize="11" FontWeight="SemiBold" Foreground="#B9C0CC"/>
 
                                     <!-- Category filter: utilities/diagnostics hidden by default -->
                                     <CheckBox x:Name="DriverUpdatesShowUtilitiesCheckbox"
@@ -8559,9 +8422,10 @@
                                                                 <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
                                                             <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="13" Foreground="#FFFFFF" TextWrapping="Wrap"/>
-                                                            <!-- Status chip: color comes from StatusColor ("#55C855" up-to-date, "#FFB060" update, "#888" unknown/not-installed) -->
+                                                            <!-- Status chip: color comes from StatusColor ("#6CCB5F" up-to-date, "#FFB060" update, "#888" unknown/not-installed).
+                                                                 Text color comes from StatusTextColor (black on the up-to-date green for contrast, white otherwise). -->
                                                             <Border Grid.Column="1" Background="{Binding StatusColor}" CornerRadius="10" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding StatusLabel}" FontSize="10" Foreground="#FFFFFF"/>
+                                                                <TextBlock Text="{Binding StatusLabel}" FontSize="10" Foreground="{Binding StatusTextColor}"/>
                                                             </Border>
                                                         </Grid>
                                                         <TextBlock FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,2,0,0">

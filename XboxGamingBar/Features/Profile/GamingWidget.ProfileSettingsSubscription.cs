@@ -152,20 +152,6 @@ namespace XboxGamingBar
             if (LegionSpeedSlider != null)
                 LegionSpeedSlider.ValueChanged += ControllerSliderSettingChanged;
 
-            // Gamepad button remapping (per-game profile)
-            if (LegionGamepadButtonSelectorComboBox != null)
-                LegionGamepadButtonSelectorComboBox.SelectionChanged += LegionGamepadButtonSelector_SelectionChanged;
-            if (LegionGamepadTypeComboBox != null)
-                LegionGamepadTypeComboBox.SelectionChanged += LegionGamepadMapping_Changed;
-            if (LegionGamepadActionComboBox != null)
-                LegionGamepadActionComboBox.SelectionChanged += LegionGamepadMapping_Changed;
-            if (LegionGamepadMouseComboBox != null)
-                LegionGamepadMouseComboBox.SelectionChanged += LegionGamepadMapping_Changed;
-            if (LegionGamepadKeyComboBox != null)
-                LegionGamepadKeyComboBox.SelectionChanged += LegionGamepadKey_SelectionChanged;
-            if (LegionGamepadResetAllButton != null)
-                LegionGamepadResetAllButton.Click += LegionGamepadResetAll_Click;
-
             if (ControllerEmulationImprovedInputToggle != null)
                 ControllerEmulationImprovedInputToggle.Toggled += ControllerEmulationImprovedInputToggle_Toggled;
 

@@ -44,6 +44,23 @@ namespace XboxGamingBar
     public sealed partial class GamingWidget
     {
 
+        private void ProfileSaveCategoriesExpandToggle_Click(object sender, RoutedEventArgs e)
+        {
+            isProfileSaveCategoriesExpanded = !isProfileSaveCategoriesExpanded;
+
+            if (ProfileSaveCategoriesContent != null)
+            {
+                ProfileSaveCategoriesContent.Visibility = isProfileSaveCategoriesExpanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ProfileSaveCategoriesExpandIcon != null)
+            {
+                ProfileSaveCategoriesExpandIcon.Glyph = isProfileSaveCategoriesExpanded
+                    ? ((char)0xE70E).ToString()
+                    : ((char)0xE70D).ToString();
+            }
+        }
+
         private void SavedProfilesExpandToggle_Click(object sender, RoutedEventArgs e)
         {
             isSavedProfilesExpanded = !isSavedProfilesExpanded;

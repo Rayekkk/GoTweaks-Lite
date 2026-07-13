@@ -54,8 +54,8 @@ namespace XboxGamingBarHelper
                 return;
             }
 
-            // Per-setting routing: buttons/gamepad-mapping/nintendo/vibration/lighting consult the
-            // widget's save-flags. Gyro, stick deadzones, triggers, joystick-as-mouse, and
+            // Per-setting routing: buttons/gamepad-mapping/nintendo/vibration/lighting/gyro consult
+            // the widget's save-flags. Stick deadzones, triggers, joystick-as-mouse, and
             // LegionControllerProfileEnabled stay per-game (CurrentProfile) — no flag exists yet.
             var profileName = profileManager.CurrentProfile.GameId.Name;
             bool saveButtonsToProfile = ProfileSaveFlagsState.ButtonMappings;
@@ -109,51 +109,60 @@ namespace XboxGamingBarHelper
                     cur => cur.LegionButtonPage = legionManager.LegionButtonPage.Value,
                     glo => glo.LegionButtonPage = legionManager.LegionButtonPage.Value);
             }
-            // Gyro settings
+            // Gyro settings — share a single GyroSettings flag, same pattern as Vibration/Lighting
             else if (sender == legionManager?.LegionGyroActivationButton)
             {
-                Logger.Info($"Saving LegionGyroButton to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroButton = legionManager.LegionGyroActivationButton.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroButton",
+                    cur => cur.LegionGyroButton = legionManager.LegionGyroActivationButton.Value,
+                    glo => glo.LegionGyroButton = legionManager.LegionGyroActivationButton.Value);
             }
             else if (sender == legionManager?.LegionGyroTarget)
             {
-                Logger.Info($"Saving LegionGyroTarget to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroTarget = legionManager.LegionGyroTarget.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroTarget",
+                    cur => cur.LegionGyroTarget = legionManager.LegionGyroTarget.Value,
+                    glo => glo.LegionGyroTarget = legionManager.LegionGyroTarget.Value);
             }
             else if (sender == legionManager?.LegionGyroSensitivityX)
             {
-                Logger.Info($"Saving LegionGyroSensitivityX to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroSensitivityX = legionManager.LegionGyroSensitivityX.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroSensitivityX",
+                    cur => cur.LegionGyroSensitivityX = legionManager.LegionGyroSensitivityX.Value,
+                    glo => glo.LegionGyroSensitivityX = legionManager.LegionGyroSensitivityX.Value);
             }
             else if (sender == legionManager?.LegionGyroSensitivityY)
             {
-                Logger.Info($"Saving LegionGyroSensitivityY to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroSensitivityY = legionManager.LegionGyroSensitivityY.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroSensitivityY",
+                    cur => cur.LegionGyroSensitivityY = legionManager.LegionGyroSensitivityY.Value,
+                    glo => glo.LegionGyroSensitivityY = legionManager.LegionGyroSensitivityY.Value);
             }
             else if (sender == legionManager?.LegionGyroInvertX)
             {
-                Logger.Info($"Saving LegionGyroInvertX to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroInvertX = legionManager.LegionGyroInvertX.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroInvertX",
+                    cur => cur.LegionGyroInvertX = legionManager.LegionGyroInvertX.Value,
+                    glo => glo.LegionGyroInvertX = legionManager.LegionGyroInvertX.Value);
             }
             else if (sender == legionManager?.LegionGyroInvertY)
             {
-                Logger.Info($"Saving LegionGyroInvertY to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroInvertY = legionManager.LegionGyroInvertY.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroInvertY",
+                    cur => cur.LegionGyroInvertY = legionManager.LegionGyroInvertY.Value,
+                    glo => glo.LegionGyroInvertY = legionManager.LegionGyroInvertY.Value);
             }
             else if (sender == legionManager?.LegionGyroMappingType)
             {
-                Logger.Info($"Saving LegionGyroMappingType to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroMappingType = legionManager.LegionGyroMappingType.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroMappingType",
+                    cur => cur.LegionGyroMappingType = legionManager.LegionGyroMappingType.Value,
+                    glo => glo.LegionGyroMappingType = legionManager.LegionGyroMappingType.Value);
             }
             else if (sender == legionManager?.LegionGyroActivationMode)
             {
-                Logger.Info($"Saving LegionGyroActivationMode to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroActivationMode = legionManager.LegionGyroActivationMode.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroActivationMode",
+                    cur => cur.LegionGyroActivationMode = legionManager.LegionGyroActivationMode.Value,
+                    glo => glo.LegionGyroActivationMode = legionManager.LegionGyroActivationMode.Value);
             }
             else if (sender == legionManager?.LegionGyroDeadzone)
             {
-                Logger.Info($"Saving LegionGyroDeadzone to profile {profileName}");
-                profileManager.CurrentProfile.LegionGyroDeadzone = legionManager.LegionGyroDeadzone.Value;
+                RouteProfileSave(ProfileSaveFlagsState.GyroSettings, "LegionGyroDeadzone",
+                    cur => cur.LegionGyroDeadzone = legionManager.LegionGyroDeadzone.Value,
+                    glo => glo.LegionGyroDeadzone = legionManager.LegionGyroDeadzone.Value);
             }
             // Stick deadzones
             else if (sender == legionManager?.LegionLeftStickDeadzone)

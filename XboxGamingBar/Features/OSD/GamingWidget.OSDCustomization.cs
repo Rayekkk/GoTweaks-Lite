@@ -126,6 +126,7 @@ namespace XboxGamingBar
         private bool isButtonRemappingExpanded = false;
         private bool isGyroSettingsExpanded = false;
         private bool isSavedProfilesExpanded = false;
+        private bool isProfileSaveCategoriesExpanded = false;
         private bool isSpecialRemappingExpanded = false;
         private bool isStickDeadzonesExpanded = false;
         private bool isTouchpadVibrationExpanded = false;
@@ -879,24 +880,6 @@ namespace XboxGamingBar
             if (isButtonRemappingExpanded)
             {
                 RefreshLegionEnhancedRemapUi();
-            }
-        }
-
-        private bool isLegionControllerProfileScopeExpanded = false;
-
-        private void LegionControllerProfileScopeExpandToggle_Click(object sender, RoutedEventArgs e)
-        {
-            isLegionControllerProfileScopeExpanded = !isLegionControllerProfileScopeExpanded;
-
-            if (LegionControllerProfileScopeContent != null)
-            {
-                LegionControllerProfileScopeContent.Visibility = isLegionControllerProfileScopeExpanded ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (LegionControllerProfileScopeExpandIcon != null)
-            {
-                // E70D = ChevronDown, E70E = ChevronUp
-                LegionControllerProfileScopeExpandIcon.Glyph = isLegionControllerProfileScopeExpanded ? "" : "";
             }
         }
 

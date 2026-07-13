@@ -425,6 +425,7 @@ namespace XboxGamingBar
                             InstalledVersion = string.IsNullOrWhiteSpace(installed) ? "—" : installed,
                             StatusLabel = StatusLabelFor(statusCode),
                             StatusColor = StatusColorFor(statusCode),
+                            StatusTextColor = StatusTextColorFor(statusCode),
                             InstallButtonLabel = installLabel,
                             InstallButtonVisibility = installVis,
                         });
@@ -498,6 +499,8 @@ namespace XboxGamingBar
             public string StatusLabel { get; set; }
             /// <summary>Solid-color hex (#AARRGGBB) for the status pill background.</summary>
             public Windows.UI.Xaml.Media.Brush StatusColor { get; set; }
+            /// <summary>Text color for the status pill label — black on the up-to-date green for contrast, white otherwise.</summary>
+            public Windows.UI.Xaml.Media.Brush StatusTextColor { get; set; }
             /// <summary>"Install" when missing, "Update" when outdated — empty when neither applies (hides the button).</summary>
             public string InstallButtonLabel { get; set; }
             /// <summary>Visibility of the Install/Update button — hidden when the driver is up-to-date or has no download URL.</summary>
@@ -633,11 +636,23 @@ namespace XboxGamingBar
                 {
                     if (QuickDriverUpdatesTile == null) return;
                     // Sync the checkboxes themselves with persisted state so
-                    // the user sees the current setting on first render.
-                    if (DriverUpdatesUpdateOnStartCheckbox != null && DriverUpdatesUpdateOnStartCheckbox.IsChecked != checkOnStart)
-                        DriverUpdatesUpdateOnStartCheckbox.IsChecked = checkOnStart;
-                    if (DriverUpdatesHideBannerCheckbox != null && DriverUpdatesHideBannerCheckbox.IsChecked != hideBanner)
-                        DriverUpdatesHideBannerCheckbox.IsChecked = hideBanner;
+                    // the user sees the current setting on first render. Guarded
+                    // like every other programmatic write to these checkboxes
+                    // (see _isLoadingUpdatePreferenceCheckboxes) so this doesn't
+                    // re-fire the Changed handlers and pipe a redundant Set*OnStart
+                    // message to the helper on every driver-update push.
+                    _isLoadingUpdatePreferenceCheckboxes = true;
+                    try
+                    {
+                        if (DriverUpdatesUpdateOnStartCheckbox != null && DriverUpdatesUpdateOnStartCheckbox.IsChecked != checkOnStart)
+                            DriverUpdatesUpdateOnStartCheckbox.IsChecked = checkOnStart;
+                        if (DriverUpdatesHideBannerCheckbox != null && DriverUpdatesHideBannerCheckbox.IsChecked != hideBanner)
+                            DriverUpdatesHideBannerCheckbox.IsChecked = hideBanner;
+                    }
+                    finally
+                    {
+                        _isLoadingUpdatePreferenceCheckboxes = false;
+                    }
 
                     bool visible = count > 0
                                    && legionGoDetected != null
@@ -1040,17 +1055,29 @@ namespace XboxGamingBar
         private static Windows.UI.Xaml.Media.Brush StatusColorFor(int code)
         {
             // Green for up-to-date, orange for "update available", dark gray
-            // for not-installed / unknown. Matches the rest of the widget's
-            // status chip palette.
+            // for not-installed / unknown. The up-to-date green matches the
+            // Quick Settings tile severity green (tileSeverityGreenBrush).
             byte r, g, b;
             switch (code)
             {
-                case 1: r = 0x55; g = 0xC8; b = 0x55; break; // #55C855 success green
+                case 1: r = 0x6C; g = 0xCB; b = 0x5F; break; // #6CCB5F success green (Quick Settings tile green)
                 case 2: r = 0xFF; g = 0xB0; b = 0x60; break; // #FFB060 warning orange
                 case 3: r = 0x66; g = 0x66; b = 0x66; break; // #666666 neutral gray
                 default: r = 0x55; g = 0x55; b = 0x55; break; // #555555 unknown
             }
             return new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, r, g, b));
+        }
+
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _driverStatusTextBlack =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x00, 0x00, 0x00));
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _driverStatusTextWhite =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+
+        private static Windows.UI.Xaml.Media.Brush StatusTextColorFor(int code)
+        {
+            // The up-to-date green (#6CCB5F) is light enough that white text loses
+            // contrast — black reads clearly on it. The orange/gray chips stay white.
+            return code == 1 ? _driverStatusTextBlack : _driverStatusTextWhite;
         }
 
         private void SetControllerBatterySectionVisibility(bool visible)
@@ -1339,7 +1366,7 @@ namespace XboxGamingBar
             {
                 ViGEmBusStatusText.Text = installed ? "Status: Installed" : "Status: Not Installed";
                 ViGEmBusStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
                     : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
             }
 

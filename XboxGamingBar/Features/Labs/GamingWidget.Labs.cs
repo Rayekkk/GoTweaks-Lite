@@ -307,7 +307,7 @@ namespace XboxGamingBar
                     case 0: // Disabled (no auto-start; still launchable on demand)
                         daServiceIsRunning = false;
                         DAServiceStatusText.Text = "Auto-start off - Legion Space won't run at boot (still launchable)";
-                        DAServiceStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 200, 83)); // Green
+                        DAServiceStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)); // #6CCB5F - matches Quick Settings tile green
                         ToggleDAServiceButton.Content = "Enable";
                         ToggleDAServiceButton.IsEnabled = true;
                         break;
@@ -418,7 +418,7 @@ namespace XboxGamingBar
                 {
                     taskViewFixEnabled = true;
                     TaskViewFixStatusText.Text = "Enabled — runs once automatically after every restart";
-                    TaskViewFixStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 200, 83)); // Green
+                    TaskViewFixStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)); // #6CCB5F - matches Quick Settings tile green
                     ToggleTaskViewFixButton.Content = "Disable";
                 }
                 else

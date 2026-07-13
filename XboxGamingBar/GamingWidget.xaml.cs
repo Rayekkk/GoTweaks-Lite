@@ -1140,6 +1140,7 @@ namespace XboxGamingBar
         private bool _saveVibration = false;
         private bool _saveLighting = false;
         private bool _saveButtonMappings = false;
+        private bool _saveGyroSettings = false;
 
         private bool SaveTDP => _saveTDP;
         private bool SaveCPUBoost => _saveCPUBoost;
@@ -2180,10 +2181,49 @@ namespace XboxGamingBar
                 }
                 RightControllerChargingIcon.Visibility = rightCharging ? Visibility.Visible : Visibility.Collapsed;
                 RightControllerConnectionText.Text = rightConnected ? "Attached" : "Detached";
+
+                UpdateLegionControllerOverallStatus(leftConnected, rightConnected, leftBattery, rightBattery);
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error updating Legion controller battery display: {ex.Message}");
+            }
+        }
+
+        // #6CCB5F matches the Quick Settings tile "good" green (tileSeverityGreenBrush).
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _legionControllerStatusGreen =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F));
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _legionControllerStatusGray =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x88, 0x88, 0x88));
+
+        /// <summary>
+        /// Drives the top-of-card status line: "Attached" when at least one controller is
+        /// physically docked, "Connected" when detached-but-paired (wireless) controllers are
+        /// still reporting data, "Not detected" when neither controller has any signal yet.
+        /// Both positive states use the same green as the Quick Settings battery tile.
+        /// </summary>
+        private void UpdateLegionControllerOverallStatus(bool leftConnected, bool rightConnected, int leftBattery, int rightBattery)
+        {
+            if (LegionControllerStatusText == null) return;
+
+            bool anyAttached = leftConnected || rightConnected;
+            bool anyPresent = anyAttached || leftBattery >= 0 || rightBattery >= 0
+                               || !string.IsNullOrEmpty(controllerVidPid?.Value);
+
+            if (anyAttached)
+            {
+                LegionControllerStatusText.Text = "Attached";
+                LegionControllerStatusText.Foreground = _legionControllerStatusGreen;
+            }
+            else if (anyPresent)
+            {
+                LegionControllerStatusText.Text = "Connected";
+                LegionControllerStatusText.Foreground = _legionControllerStatusGreen;
+            }
+            else
+            {
+                LegionControllerStatusText.Text = "Not detected";
+                LegionControllerStatusText.Foreground = _legionControllerStatusGray;
             }
         }
 
@@ -2213,17 +2253,39 @@ namespace XboxGamingBar
                 Logger.Info($"UpdateLegionControllerVidPidDisplay: vidPid='{vidPid}'");
                 if (!string.IsNullOrEmpty(vidPid))
                 {
-                    LegionControllerPidVidText.Text = $"VID:PID {vidPid}";
+                    LegionControllerPidVidText.Text = vidPid;
                 }
                 else
                 {
-                    LegionControllerPidVidText.Text = "VID:PID --";
+                    LegionControllerPidVidText.Text = "--";
                 }
+                UpdateLegionControllerInfoSectionVisibility();
+
+                // VID:PID can arrive before battery/connected data does — re-evaluate the
+                // top status line so it doesn't sit on "Not detected" longer than necessary.
+                UpdateLegionControllerOverallStatus(
+                    controllerConnectedLeft?.Value ?? false,
+                    controllerConnectedRight?.Value ?? false,
+                    controllerBatteryLeft?.Value ?? -1,
+                    controllerBatteryRight?.Value ?? -1);
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error updating Legion controller VID:PID display: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Shows the Controller Information table as soon as EITHER VID:PID or the
+        /// device-status JSON has data, instead of gating solely on device-status —
+        /// the two properties can arrive independently and out of order.
+        /// </summary>
+        private void UpdateLegionControllerInfoSectionVisibility()
+        {
+            if (LegionControllerInfoSection == null) return;
+            bool hasVidPid = !string.IsNullOrEmpty(controllerVidPid?.Value);
+            bool hasDeviceStatus = !string.IsNullOrEmpty(controllerDeviceStatus?.Value);
+            LegionControllerInfoSection.Visibility = (hasVidPid || hasDeviceStatus) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void LegionControllerDeviceStatus_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -2264,10 +2326,9 @@ namespace XboxGamingBar
             {
                 Logger.Info("UpdateLegionControllerDeviceStatusDisplay: ENTER");
                 string json = controllerDeviceStatus?.Value ?? "";
+                UpdateLegionControllerInfoSectionVisibility();
                 if (string.IsNullOrEmpty(json))
                 {
-                    if (LegionControllerInfoSection != null)
-                        LegionControllerInfoSection.Visibility = Visibility.Collapsed;
                     return;
                 }
 
@@ -2297,8 +2358,6 @@ namespace XboxGamingBar
 
                 Logger.Info($"UpdateLegionControllerDeviceStatusDisplay: parsed fw={fw} le={lightEnabled} lm={lightMode} br={brightness} sp={speed} vb={vibration} tp={touchpad}");
 
-                if (LegionControllerInfoSection != null)
-                    LegionControllerInfoSection.Visibility = Visibility.Visible;
                 if (LegionControllerFirmwareText != null)
                     LegionControllerFirmwareText.Text = string.IsNullOrEmpty(fw) ? "—" : fw;
 
@@ -2310,7 +2369,11 @@ namespace XboxGamingBar
                     }
                     else
                     {
-                        LegionControllerLightText.Text = $"{LightModeLabel(lightMode)} · {brightness}% · speed {speed}%";
+                        // Solid has no animation, so it has no "speed" — only show the speed
+                        // segment for modes that actually animate (Pulse/Dynamic/Spiral).
+                        LegionControllerLightText.Text = lightMode == 0
+                            ? $"{LightModeLabel(lightMode)} · {brightness}%"
+                            : $"{LightModeLabel(lightMode)} · {brightness}% · speed {speed}%";
                     }
                 }
                 if (LegionControllerLightSwatch != null)

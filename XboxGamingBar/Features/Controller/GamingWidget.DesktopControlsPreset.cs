@@ -129,7 +129,6 @@ namespace XboxGamingBar
             {
                 SaveAndSendGamepadMappings();
             }
-            UpdateGamepadMappingSummary();
 
             Logger.Info("Applied desktop control mappings: DPAD/LS→Arrows, LSClick→Win, A→Enter, B→Esc, LB→LClick, LT→RClick");
         }
@@ -156,8 +155,6 @@ namespace XboxGamingBar
                 }
             }
             // When loading profile, keep Type=0 entries in dictionary so they get sent with other mappings
-
-            UpdateGamepadMappingSummary();
 
             Logger.Info("Cleared desktop control mappings for DPAD, LS, A, B, LB, LT");
         }

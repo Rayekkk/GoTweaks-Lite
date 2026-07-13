@@ -61,6 +61,7 @@ namespace XboxGamingBarHelper
             public static bool Vibration = false;
             public static bool Lighting = false;
             public static bool ButtonMappings = false;
+            public static bool GyroSettings = false;
         }
 
         internal static void ApplyProfileSaveFlags(string configJson)
@@ -85,12 +86,13 @@ namespace XboxGamingBarHelper
                 if (cfg.TryGetValue("Vibration", out var v16)) ProfileSaveFlagsState.Vibration = v16;
                 if (cfg.TryGetValue("Lighting", out var v17)) ProfileSaveFlagsState.Lighting = v17;
                 if (cfg.TryGetValue("ButtonMappings", out var v18)) ProfileSaveFlagsState.ButtonMappings = v18;
+                if (cfg.TryGetValue("GyroSettings", out var v19)) ProfileSaveFlagsState.GyroSettings = v19;
                 Logger.Info("Applied ProfileSaveFlags from widget "
                     + $"(TDP={ProfileSaveFlagsState.TDP}, CPUBoost={ProfileSaveFlagsState.CPUBoost}, "
                     + $"CPUEPP={ProfileSaveFlagsState.CPUEPP}, CPUState={ProfileSaveFlagsState.CPUState}, "
                     + $"NintendoLayout={ProfileSaveFlagsState.NintendoLayout}, "
                     + $"Vibration={ProfileSaveFlagsState.Vibration}, Lighting={ProfileSaveFlagsState.Lighting}, "
-                    + $"ButtonMappings={ProfileSaveFlagsState.ButtonMappings})");
+                    + $"ButtonMappings={ProfileSaveFlagsState.ButtonMappings}, GyroSettings={ProfileSaveFlagsState.GyroSettings})");
             }
             catch (Exception ex)
             {
