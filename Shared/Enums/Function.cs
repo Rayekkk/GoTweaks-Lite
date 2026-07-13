@@ -572,5 +572,16 @@
         // (Windows.Devices\HIDClass, matched by friendly name containing "touch screen").
         // Not Legion-specific hardware, but only surfaced on Legion Go 2 for now.
         TouchscreenEnabled,         // bool - true = touch input active, false = digitizer disabled
+
+        // SteamOS-style "hold a button + tilt a stick/D-Pad" brightness gesture. While the
+        // configured trigger button is held past a short tap threshold, its own configured
+        // click action (if any - only Scroll Click has one) never fires; only a genuine
+        // quick tap still fires it. See LegionButtonMonitor's gesture state machine.
+        Labs_LegionRBrightnessGesture,          // bool - true = gesture enabled (default false)
+
+        // Trigger button: 0=Desktop,1=Page,2=ScrollClick,3=Y1,4=Y2,5=Y3,6=M1,7=M2,8=M3 (default 0=Desktop)
+        Labs_LegionBrightnessGestureTrigger,    // int
+        // Axis used to adjust brightness while the trigger is held: 0=RightStick,1=LeftStick,2=DPad (default 0)
+        Labs_LegionBrightnessGestureAxis,       // int
     }
 }

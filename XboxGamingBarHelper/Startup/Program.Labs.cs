@@ -1033,6 +1033,82 @@ namespace XboxGamingBarHelper
         }
 
         /// <summary>
+        /// Enable/disable the SteamOS-style brightness gesture (hold a configurable
+        /// trigger button, tilt a configurable axis to fade brightness) and set which
+        /// trigger/axis it uses. Uses the same unified LegionButtonMonitor as the button
+        /// and scroll wheel remaps.
+        /// </summary>
+        /// <param name="triggerType">0=Desktop,1=Page,2=ScrollClick,3=Y1,4=Y2,5=Y3,6=M1,7=M2,8=M3</param>
+        /// <param name="axisType">0=RightStick,1=LeftStick,2=DPad</param>
+        private static bool ConfigureLegionBrightnessGesture(bool enabled, int triggerType, int axisType)
+        {
+            try
+            {
+                lock (legionButtonMonitorLock)
+                {
+                    LegionButtonMonitor monitor = EnsureLegionButtonMonitor();
+                    bool wasRunning = monitor.IsRunning;
+
+                    monitor.SetBrightnessGestureTrigger(triggerType);
+                    monitor.SetBrightnessGestureAxis(axisType);
+                    monitor.SetBrightnessGestureEnabled(enabled, (level) =>
+                    {
+                        // Route through the PanelBrightness property, not BrightnessManager
+                        // directly, so hardware apply AND widget slider sync both happen
+                        // through the normal property-sync path.
+                        systemManager?.PanelBrightness?.SetValue(level);
+                    });
+
+                    if (!monitor.HasAnyButtonConfigured)
+                    {
+                        if (!wasRunning)
+                        {
+                            monitor.StartForBatteryMonitoring();
+                        }
+                        Logger.Info("Labs: Brightness gesture disabled, no buttons configured - battery monitoring continues");
+                        return true;
+                    }
+                    else if (!wasRunning)
+                    {
+                        if (!monitor.Start())
+                        {
+                            Logger.Error("Labs: Failed to start Legion button monitoring for brightness gesture (controller not found)");
+                            return false;
+                        }
+                    }
+
+                    Logger.Info($"Labs: Brightness gesture {(enabled ? "enabled" : "disabled")} - Trigger={triggerType}, Axis={axisType}");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Labs: Error configuring brightness gesture: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Load and apply the brightness gesture settings (enabled/trigger/axis) from
+        /// LocalSettings on startup.
+        /// </summary>
+        private static void LoadLegionRBrightnessGestureSetting()
+        {
+            try
+            {
+                bool enabled = Settings.LocalSettingsHelper.TryGetValue<bool>("LegionR_BrightnessGesture", out var enabledVal) && enabledVal;
+                int triggerType = Settings.LocalSettingsHelper.TryGetValue<int>("BrightnessGesture_Trigger", out var triggerVal) ? triggerVal : 0;
+                int axisType = Settings.LocalSettingsHelper.TryGetValue<int>("BrightnessGesture_Axis", out var axisVal) ? axisVal : 0;
+                bool success = ConfigureLegionBrightnessGesture(enabled, triggerType, axisType);
+                Logger.Info($"Labs: Loaded brightness gesture settings - Enabled={enabled}, Trigger={triggerType}, Axis={axisType}, Success={success}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Labs: Failed to load brightness gesture settings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Configure scroll wheel remap (Up/Down/Click to Xbox Guide, Keyboard Shortcut, Command, or Focus GoTweaks).
         /// Uses the unified LegionButtonMonitor which handles both buttons and scroll wheel.
         /// </summary>

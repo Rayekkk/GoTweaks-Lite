@@ -7304,6 +7304,88 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Brightness Gesture Card -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="Brightness Gesture" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Hold the trigger button below and tilt the axis to fade display brightness. A quick tap of the trigger still behaves normally."
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="BrightnessGestureEnabledToggle"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernToggleStyle}"
+                                                  IsOn="False"/>
+                                </Grid>
+
+                                <!-- Info note, collapsed by default to keep the card tidy - explains
+                                     why Legion L/R aren't offered as trigger options. -->
+                                <muxc:Expander HorizontalAlignment="Stretch"
+                                               HorizontalContentAlignment="Stretch"
+                                               IsExpanded="False">
+                                    <muxc:Expander.Header>
+                                        <TextBlock Text="Why not Legion R + left stick, like SteamOS?" FontSize="12" Foreground="#B9C0CC"/>
+                                    </muxc:Expander.Header>
+                                    <Border Background="#1A1A2E" CornerRadius="4" Padding="10">
+                                        <TextBlock FontSize="11" Foreground="#B9C0CC" TextWrapping="Wrap"
+                                                   Text="This gesture was meant to work exactly like on SteamOS - hold Legion R and tilt the left stick. On Windows, holding Legion L or R for more than about 5 seconds is hardcoded in the controller's own firmware to toggle that grip's connection off and on (a real Legion Space feature) - not something GoTweaks, or any app, can override. None of the trigger options below have this limitation."/>
+                                    </Border>
+                                </muxc:Expander>
+
+                                <StackPanel x:Name="BrightnessGestureOptionsPanel" Spacing="12" Visibility="Collapsed">
+                                    <!-- Trigger Button -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Trigger" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                        <ComboBox x:Name="BrightnessGestureTriggerComboBox"
+                                                  Grid.Column="1"
+                                                  MinWidth="140"
+                                                  HorizontalAlignment="Left"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  SelectionChanged="BrightnessGestureTriggerComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Desktop" Tag="0"/>
+                                            <ComboBoxItem Content="Page" Tag="1"/>
+                                            <ComboBoxItem Content="Scroll Click" Tag="2"/>
+                                            <ComboBoxItem Content="Y1" Tag="3"/>
+                                            <ComboBoxItem Content="Y2" Tag="4"/>
+                                            <ComboBoxItem Content="Y3" Tag="5"/>
+                                            <ComboBoxItem Content="M1" Tag="6"/>
+                                            <ComboBoxItem Content="M2" Tag="7"/>
+                                            <ComboBoxItem Content="M3" Tag="8"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <!-- Axis -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Axis" VerticalAlignment="Center" Foreground="#B9C0CC" FontSize="14"/>
+                                        <ComboBox x:Name="BrightnessGestureAxisComboBox"
+                                                  Grid.Column="1"
+                                                  MinWidth="140"
+                                                  HorizontalAlignment="Left"
+                                                  Style="{StaticResource ModernComboBoxStyle}"
+                                                  SelectionChanged="BrightnessGestureAxisComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Right Stick" Tag="0"/>
+                                            <ComboBoxItem Content="Left Stick" Tag="1"/>
+                                            <ComboBoxItem Content="D-Pad (Up/Down)" Tag="2"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Deadzones Card -->
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>

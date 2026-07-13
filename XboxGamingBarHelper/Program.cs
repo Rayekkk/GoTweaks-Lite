@@ -1732,6 +1732,9 @@ namespace XboxGamingBarHelper
             // Load and apply Legion scroll wheel remap settings from LocalSettings
             LoadLegionScrollRemapSettings();
 
+            // Load and apply the Legion R brightness gesture setting from LocalSettings
+            LoadLegionRBrightnessGestureSetting();
+
             // Restore all global profile settings (TDP, AutoTDP, CPUBoost, EPP, Legion mode, etc.)
             // on startup so saved values are applied to hardware after device restart.
             if (profileManager?.CurrentProfile != null)
