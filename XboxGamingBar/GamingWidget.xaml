@@ -6109,28 +6109,25 @@
                         <!-- Controller Status Card -->
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
-                                <TextBlock x:Name="LegionDeviceNameText" Text="Legion Go Controller" Style="{StaticResource CardTitleStyle}"/>
-                                <TextBlock x:Name="LegionControllerStatusText"
-                                           Text="Detecting..."
-                                           FontSize="14"
-                                           Foreground="#888888"
-                                           Margin="0,4,0,0"/>
+                                <!-- Left Controller / Device Glyph / Right Controller, flanking row.
+                                     All three panels share the same 132px height (the glyph box is
+                                     taller than the others to fit the device name inside it). Left/
+                                     Right cards are individually collapsible (hidden on devices
+                                     without detachable controllers) via SetControllerBatterySectionVisibility. -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <!-- Separator under the title -->
-                                <Border Height="1" Background="#33FFFFFF" Margin="0,10,0,0"/>
-
-                                <!-- Controller Battery Info (hidden on devices without detachable controllers) -->
-                                <StackPanel x:Name="ControllerBatterySection">
-                                    <Grid Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- Left Controller -->
-                                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                            <TextBlock Text="Left Controller" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
-                                            <StackPanel Orientation="Horizontal">
+                                    <!-- Left Controller -->
+                                    <Border x:Name="LeftControllerCard" Grid.Column="0" Height="132"
+                                            Background="{StaticResource PageBackgroundBrush}"
+                                            CornerRadius="14" Padding="12,10" Margin="0,0,8,0">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="Left Controller" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                 <FontIcon Glyph="&#xE83F;" FontSize="14" Foreground="#B9C0CC" Margin="0,0,6,0"/>
                                                 <TextBlock x:Name="LeftControllerBatteryText"
                                                            Text="--%"
@@ -6148,13 +6145,33 @@
                                                        Text="--"
                                                        FontSize="11"
                                                        Foreground="#888888"
-                                                       Margin="0,2,0,0"/>
+                                                       Margin="0,2,0,0"
+                                                       HorizontalAlignment="Center"/>
                                         </StackPanel>
+                                    </Border>
 
-                                        <!-- Right Controller -->
-                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                            <TextBlock Text="Right Controller" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4"/>
-                                            <StackPanel Orientation="Horizontal">
+                                    <!-- Device Glyph + name, stacked together in one taller box -->
+                                    <Border Grid.Column="1" Width="176" Height="132" CornerRadius="18"
+                                            Background="{StaticResource PageBackgroundBrush}"
+                                            Margin="8,0,8,0">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Image Source="/Assets/Glyph_LeGo2.png"
+                                                   Width="136" Stretch="Uniform"
+                                                   HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="LegionDeviceNameText" Text="Legion Go Controller"
+                                                       Style="{StaticResource CardTitleStyle}"
+                                                       HorizontalAlignment="Center" TextAlignment="Center"
+                                                       Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Right Controller -->
+                                    <Border x:Name="RightControllerCard" Grid.Column="2" Height="132"
+                                            Background="{StaticResource PageBackgroundBrush}"
+                                            CornerRadius="14" Padding="12,10" Margin="8,0,0,0">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="Right Controller" FontSize="12" Foreground="#B9C0CC" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                 <FontIcon Glyph="&#xE83F;" FontSize="14" Foreground="#B9C0CC" Margin="0,0,6,0"/>
                                                 <TextBlock x:Name="RightControllerBatteryText"
                                                            Text="--%"
@@ -6172,10 +6189,14 @@
                                                        Text="--"
                                                        FontSize="11"
                                                        Foreground="#888888"
-                                                       Margin="0,2,0,0"/>
+                                                       Margin="0,2,0,0"
+                                                       HorizontalAlignment="Center"/>
                                         </StackPanel>
-                                    </Grid>
-                                </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Separator under the title -->
+                                <Border Height="1" Background="#33FFFFFF" Margin="0,10,0,0"/>
 
                                 <!-- Controller Information — Win11-style info table.
                                      Visibility is driven by UpdateLegionControllerInfoSectionVisibility()

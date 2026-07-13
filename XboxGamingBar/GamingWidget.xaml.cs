@@ -2181,49 +2181,10 @@ namespace XboxGamingBar
                 }
                 RightControllerChargingIcon.Visibility = rightCharging ? Visibility.Visible : Visibility.Collapsed;
                 RightControllerConnectionText.Text = rightConnected ? "Attached" : "Detached";
-
-                UpdateLegionControllerOverallStatus(leftConnected, rightConnected, leftBattery, rightBattery);
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error updating Legion controller battery display: {ex.Message}");
-            }
-        }
-
-        // #6CCB5F matches the Quick Settings tile "good" green (tileSeverityGreenBrush).
-        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _legionControllerStatusGreen =
-            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F));
-        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _legionControllerStatusGray =
-            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x88, 0x88, 0x88));
-
-        /// <summary>
-        /// Drives the top-of-card status line: "Attached" when at least one controller is
-        /// physically docked, "Connected" when detached-but-paired (wireless) controllers are
-        /// still reporting data, "Not detected" when neither controller has any signal yet.
-        /// Both positive states use the same green as the Quick Settings battery tile.
-        /// </summary>
-        private void UpdateLegionControllerOverallStatus(bool leftConnected, bool rightConnected, int leftBattery, int rightBattery)
-        {
-            if (LegionControllerStatusText == null) return;
-
-            bool anyAttached = leftConnected || rightConnected;
-            bool anyPresent = anyAttached || leftBattery >= 0 || rightBattery >= 0
-                               || !string.IsNullOrEmpty(controllerVidPid?.Value);
-
-            if (anyAttached)
-            {
-                LegionControllerStatusText.Text = "Attached";
-                LegionControllerStatusText.Foreground = _legionControllerStatusGreen;
-            }
-            else if (anyPresent)
-            {
-                LegionControllerStatusText.Text = "Connected";
-                LegionControllerStatusText.Foreground = _legionControllerStatusGreen;
-            }
-            else
-            {
-                LegionControllerStatusText.Text = "Not detected";
-                LegionControllerStatusText.Foreground = _legionControllerStatusGray;
             }
         }
 
@@ -2260,14 +2221,6 @@ namespace XboxGamingBar
                     LegionControllerPidVidText.Text = "--";
                 }
                 UpdateLegionControllerInfoSectionVisibility();
-
-                // VID:PID can arrive before battery/connected data does — re-evaluate the
-                // top status line so it doesn't sit on "Not detected" longer than necessary.
-                UpdateLegionControllerOverallStatus(
-                    controllerConnectedLeft?.Value ?? false,
-                    controllerConnectedRight?.Value ?? false,
-                    controllerBatteryLeft?.Value ?? -1,
-                    controllerBatteryRight?.Value ?? -1);
             }
             catch (Exception ex)
             {

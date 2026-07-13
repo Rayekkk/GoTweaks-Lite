@@ -1082,11 +1082,10 @@ namespace XboxGamingBar
 
         private void SetControllerBatterySectionVisibility(bool visible)
         {
-            if (ControllerBatterySection != null)
-            {
-                ControllerBatterySection.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"Controller battery section visibility set to: {visible}");
-            }
+            var vis = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (LeftControllerCard != null) LeftControllerCard.Visibility = vis;
+            if (RightControllerCard != null) RightControllerCard.Visibility = vis;
+            Logger.Info($"Controller battery section visibility set to: {visible}");
         }
 
         private void SetTouchpadVibrationSectionVisibility(bool visible)
