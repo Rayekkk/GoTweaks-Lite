@@ -633,6 +633,8 @@ namespace XboxGamingBar
         private readonly AMDDisplayBrightnessProperty amdDisplayBrightness;
         private readonly PanelBrightnessProperty panelBrightness;
         private readonly PanelBrightnessSupportedProperty panelBrightnessSupported;
+        private readonly InternalPanelActiveProperty internalPanelActive;
+        private readonly XboxGamingBar.Data.DeviceTypeProperty deviceTypeProperty;
         private readonly AMDDisplayContrastSupportedProperty amdDisplayContrastSupported;
         private readonly AMDDisplayContrastProperty amdDisplayContrast;
         private readonly AMDDisplaySaturationSupportedProperty amdDisplaySaturationSupported;
@@ -1301,6 +1303,8 @@ namespace XboxGamingBar
             amdDisplayBrightness = new AMDDisplayBrightnessProperty(AMDDisplayBrightnessSlider, this);
             panelBrightness = new PanelBrightnessProperty(PanelBrightnessSlider, this);
             panelBrightnessSupported = new PanelBrightnessSupportedProperty(PanelBrightnessSlider, PanelBrightnessRow, this);
+            internalPanelActive = new InternalPanelActiveProperty(true, this);
+            deviceTypeProperty = new XboxGamingBar.Data.DeviceTypeProperty(0, this);
             amdDisplayContrastSupported = new AMDDisplayContrastSupportedProperty(AMDDisplayContrastSlider, this);
             amdDisplayContrast = new AMDDisplayContrastProperty(AMDDisplayContrastSlider, this);
             amdDisplaySaturationSupported = new AMDDisplaySaturationSupportedProperty(AMDDisplaySaturationSlider, this);
@@ -1686,6 +1690,8 @@ namespace XboxGamingBar
                 amdDisplayBrightness,
                 panelBrightness,
                 panelBrightnessSupported,
+                internalPanelActive,
+                deviceTypeProperty,
                 amdDisplayContrastSupported,
                 amdDisplayContrast,
                 amdDisplaySaturationSupported,
@@ -2073,15 +2079,32 @@ namespace XboxGamingBar
             if (losslessScalingEnabled != null)
                 losslessScalingEnabled.PropertyChanged += QuickSettingsProperty_Changed;
             if (amdFluidMotionFrameEnabled != null)
+            {
                 amdFluidMotionFrameEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                amdFluidMotionFrameEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+            }
             if (amdRadeonSuperResolutionEnabled != null)
+            {
                 amdRadeonSuperResolutionEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                amdRadeonSuperResolutionEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+            }
             if (amdRadeonAntiLagEnabled != null)
+            {
                 amdRadeonAntiLagEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                amdRadeonAntiLagEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+            }
             if (amdRadeonChillEnabled != null)
+            {
                 amdRadeonChillEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                amdRadeonChillEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+            }
             if (amdRadeonBoostEnabled != null)
+            {
                 amdRadeonBoostEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                amdRadeonBoostEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+            }
+            if (amdImageSharpeningEnabled != null)
+                amdImageSharpeningEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
 
             // Controller battery properties - update tile when battery status changes
             if (controllerBatteryLeft != null)
@@ -2154,7 +2177,7 @@ namespace XboxGamingBar
                 if (leftBattery >= 0)
                 {
                     LeftControllerBatteryText.Text = $"{leftBattery}%";
-                    LeftControllerBatteryText.Foreground = GetBatteryBrush(leftBattery);
+                    LeftControllerBatteryText.Foreground = GetBatteryBrush(leftBattery, leftCharging);
                 }
                 else
                 {
@@ -2172,7 +2195,7 @@ namespace XboxGamingBar
                 if (rightBattery >= 0)
                 {
                     RightControllerBatteryText.Text = $"{rightBattery}%";
-                    RightControllerBatteryText.Foreground = GetBatteryBrush(rightBattery);
+                    RightControllerBatteryText.Foreground = GetBatteryBrush(rightBattery, rightCharging);
                 }
                 else
                 {
@@ -2188,14 +2211,21 @@ namespace XboxGamingBar
             }
         }
 
-        private Windows.UI.Xaml.Media.SolidColorBrush GetBatteryBrush(int percentage)
+        // Same thresholds/colors as the Quick Settings battery tile (TileStates.cs):
+        // charging is always green regardless of level, then red <=20%, orange <=50%, green above.
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _controllerBatteryGreen =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F));
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _controllerBatteryRed =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x6B, 0x6B));
+        private static readonly Windows.UI.Xaml.Media.SolidColorBrush _controllerBatteryOrange =
+            new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xA5, 0x3D));
+
+        private Windows.UI.Xaml.Media.SolidColorBrush GetBatteryBrush(int percentage, bool charging = false)
         {
-            if (percentage <= 20)
-                return new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xF4, 0x43, 0x36)); // Red
-            else if (percentage <= 40)
-                return new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x98, 0x00)); // Orange
-            else
-                return new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x4C, 0xAF, 0x50)); // Green
+            if (charging) return _controllerBatteryGreen;
+            if (percentage <= 20) return _controllerBatteryRed;
+            if (percentage <= 50) return _controllerBatteryOrange;
+            return _controllerBatteryGreen;
         }
 
         private void LegionControllerVidPid_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -2340,7 +2370,7 @@ namespace XboxGamingBar
                 }
 
                 if (LegionControllerVibrationText != null)
-                    LegionControllerVibrationText.Text = VibrationLabel(vibration);
+                    LegionControllerVibrationText.Text = $"{VibrationLabel(vibration)} · {VibrationModeLabel(legionVibrationMode?.Value ?? 1)}";
                 if (LegionControllerTouchpadText != null)
                     LegionControllerTouchpadText.Text = touchpad ? "On" : "Off";
 
@@ -2378,6 +2408,21 @@ namespace XboxGamingBar
                 case 3: return "Medium";
                 case 4: return "Strong";
                 default: return $"Level {raw}";
+            }
+        }
+
+        // legionVibrationMode.Value is 1-based (FPS=1, Racing=2, AVG=3, SPG=4, RPG=5) — same
+        // mapping as the Quick Settings vibration-mode tile (TileStates.cs).
+        private static string VibrationModeLabel(int mode)
+        {
+            switch (mode)
+            {
+                case 1: return "FPS";
+                case 2: return "Racing";
+                case 3: return "AVG";
+                case 4: return "SPG";
+                case 5: return "RPG";
+                default: return "FPS";
             }
         }
 
