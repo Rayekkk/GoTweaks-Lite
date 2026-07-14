@@ -87,14 +87,14 @@ namespace XboxGamingBar
                             case "Resolution":
                                 CycleResolution();
                                 break;
+                            case "RefreshRate":
+                                CycleRefreshRate();
+                                break;
                             case "Rotation":
                                 CycleRotation();
                                 break;
                             case "HDR":
                                 ToggleHDR();
-                                break;
-                            case "AutoSDR":
-                                ToggleAutoSdr();
                                 break;
                             case "LosslessScaling":
                                 ToggleLosslessScaling();
@@ -464,6 +464,7 @@ namespace XboxGamingBar
 
         private void CycleResolution()
         {
+            if (!IsInternalPanelActive) return;
             if (resolution != null && resolutions?.Value != null && resolutions.Value.Count > 0)
             {
                 // Filter out excluded resolutions for quick cycling
@@ -518,17 +519,26 @@ namespace XboxGamingBar
             }
         }
 
-        private void ToggleAutoSdr()
+        /// <summary>
+        /// Cycles the display refresh rate between 60Hz and 120Hz. Only offers a rate if the
+        /// display actually reports it as supported (refreshRates.Value); otherwise no-ops rather
+        /// than requesting a mode the driver would reject or silently ignore.
+        /// </summary>
+        private void CycleRefreshRate()
         {
-            if (autoSdrEnabled != null)
+            if (refreshRate == null || !IsInternalPanelActive) return;
+
+            int current = refreshRate.Value;
+            int next = current >= 120 ? 60 : 120;
+
+            if (refreshRates?.Value != null && refreshRates.Value.Count > 0 && !refreshRates.Value.Contains(next))
             {
-                bool newValue = !autoSdrEnabled.Value;
-                autoSdrEnabled.SetValue(newValue);
-                // Keep the bound Display-tab toggle in sync (WidgetToggleProperty echoes UI too).
-                if (AutoSdrToggle != null)
-                    AutoSdrToggle.IsOn = newValue;
-                Logger.Info($"Auto SDR toggled to {newValue}");
+                Logger.Info($"Refresh rate {next}Hz not in supported list, skipping cycle");
+                return;
             }
+
+            refreshRate.SetValue(next);
+            Logger.Info($"Refresh rate cycled from {current}Hz to {next}Hz");
         }
 
         private void ToggleLosslessScaling()

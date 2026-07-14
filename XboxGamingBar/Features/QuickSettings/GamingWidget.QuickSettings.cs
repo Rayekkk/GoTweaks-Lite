@@ -279,9 +279,9 @@ namespace XboxGamingBar
 
             // Row 3 - Display
             AddTileDefinition("Resolution", "Resolution", "\uE7F8", order: order++);
+            AddTileDefinition("RefreshRate", "Refresh Rate", "\uE72C", order: order++); // Refresh
             AddTileDefinition("Rotation", "Rotation", "\uE7AD", order: order++);
             AddTileDefinition("HDR", "HDR", "\uE706", order: order++);
-            AddTileDefinition("AutoSDR", "Auto SDR", "\uE706", order: order++);
             AddTileDefinition("Fullscreen", "Fullscreen", "\uE740", order: order++);
 
             // Row 4 - AMD Graphics Features
