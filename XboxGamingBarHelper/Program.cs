@@ -1274,6 +1274,8 @@ namespace XboxGamingBarHelper
                 systemManager.HDRSupported,
                 systemManager.HDREnabled,
                 systemManager.AutoSdrEnabled,
+                systemManager.AutoSdrPreset,
+                systemManager.AutoSdrCustomCurve,
                 systemManager.AdaptiveBrightnessMode,
                 systemManager.PanelBrightness,
                 systemManager.PanelBrightnessSupported,

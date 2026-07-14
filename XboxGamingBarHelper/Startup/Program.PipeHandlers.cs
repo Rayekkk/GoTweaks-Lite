@@ -152,6 +152,18 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // Handle Auto SDR curve export/import (Go2HDR-compatible JSON)
+                if (pipeMsg.Extra.ContainsKey("ExportAutoSdrCurve"))
+                {
+                    HandleExportAutoSdrCurve(pipeMsg);
+                    return;
+                }
+                if (pipeMsg.Extra.ContainsKey("ImportAutoSdrCurve"))
+                {
+                    HandleImportAutoSdrCurve(pipeMsg);
+                    return;
+                }
+
                 // Handle Lenovo driver-update check. Widget button fires this, helper
                 // resolves the machine type + BIOS version via WMI and best-effort-fetches
                 // the live driver list from Lenovo's public pcsupport API. Response is
@@ -535,6 +547,79 @@ namespace XboxGamingBarHelper
             }
 
             // Send response
+            if (pipeServer != null && pipeServer.IsConnected)
+            {
+                var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+                responseMsg.RequestId = pipeMsg.RequestId;
+                pipeServer.SendMessage(responseMsg.ToJson());
+            }
+        }
+
+        // ExportAutoSdrCurve: write the currently active Auto SDR curve (whichever preset) to
+        // a Go2HDR-compatible JSON file at the widget-picked path.
+        private static void HandleExportAutoSdrCurve(Shared.IPC.PipeMessage pipeMsg)
+        {
+            Logger.Info("Pipe: ExportAutoSdrCurve request received");
+            var response = new global::Windows.Foundation.Collections.ValueSet();
+            try
+            {
+                var exportPath = pipeMsg.Extra["ExportAutoSdrCurve"] as string;
+                if (string.IsNullOrEmpty(exportPath))
+                    throw new Exception("No export path provided");
+
+                if (systemManager.ExportAutoSdrCurve(exportPath, out var error))
+                {
+                    response.Add("Success", true);
+                    response.Add("Path", exportPath);
+                }
+                else
+                {
+                    throw new Exception(error ?? "Unknown error");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Pipe: Failed to export Auto SDR curve: {ex.Message}");
+                response.Add("Success", false);
+                response.Add("Error", ex.Message);
+            }
+
+            if (pipeServer != null && pipeServer.IsConnected)
+            {
+                var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+                responseMsg.RequestId = pipeMsg.RequestId;
+                pipeServer.SendMessage(responseMsg.ToJson());
+            }
+        }
+
+        // ImportAutoSdrCurve: read a Go2HDR-compatible curve JSON file from the widget-picked
+        // path, apply it as the Custom curve, and switch to the Custom preset.
+        private static void HandleImportAutoSdrCurve(Shared.IPC.PipeMessage pipeMsg)
+        {
+            Logger.Info("Pipe: ImportAutoSdrCurve request received");
+            var response = new global::Windows.Foundation.Collections.ValueSet();
+            try
+            {
+                var importPath = pipeMsg.Extra["ImportAutoSdrCurve"] as string;
+                if (string.IsNullOrEmpty(importPath) || !File.Exists(importPath))
+                    throw new Exception($"Import file not found: {importPath}");
+
+                if (systemManager.ImportAutoSdrCurve(importPath, out var error))
+                {
+                    response.Add("Success", true);
+                }
+                else
+                {
+                    throw new Exception(error ?? "Unknown error");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Pipe: Failed to import Auto SDR curve: {ex.Message}");
+                response.Add("Success", false);
+                response.Add("Error", ex.Message);
+            }
+
             if (pipeServer != null && pipeServer.IsConnected)
             {
                 var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);

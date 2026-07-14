@@ -623,6 +623,8 @@
     <Compile Include="Systems\TouchscreenEnabledProperty.cs" />
     <Compile Include="Systems\AdaptiveBrightnessManager.cs" />
     <Compile Include="Systems\AutoSdrManager.cs" />
+    <Compile Include="Systems\AutoSdrPresetProperty.cs" />
+    <Compile Include="Systems\AutoSdrCustomCurveProperty.cs" />
     <Compile Include="Systems\AutoSdrEnabledProperty.cs" />
     <Compile Include="Systems\RefreshRateProperty.cs" />
     <Compile Include="Systems\RefreshRatesProperty.cs" />

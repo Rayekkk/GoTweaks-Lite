@@ -588,5 +588,14 @@
         // only an external monitor active)? Gates Auto SDR / Resolution / Refresh Rate, which only
         // make sense against the internal panel. Re-read on display-config changes (dock/undock).
         InternalPanelActive,        // bool
+
+        // Auto SDR curve preset: 0 = Legion Go 2 (fixed default curve), 1 = Custom (editable,
+        // see AutoSdrCustomCurve). Persisted helper-side.
+        AutoSdrPreset,              // int
+        // The Custom preset's brightness->SDR curve, as a Go2HDR-compatible flat JSON array:
+        // [{"brightness":47,"sdrValue":0},...], sorted ascending by brightness. Seeded from the
+        // Legion Go 2 default curve the first time the Custom preset is selected. Persisted
+        // helper-side; the widget renders it as a read-only chart + an editable per-point list.
+        AutoSdrCustomCurve,         // string (JSON array)
     }
 }

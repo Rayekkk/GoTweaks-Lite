@@ -274,6 +274,8 @@
     <Compile Include="Data\PanelBrightnessSupportedProperty.cs" />
     <Compile Include="Data\InternalPanelActiveProperty.cs" />
     <Compile Include="Data\DeviceTypeProperty.cs" />
+    <Compile Include="Data\AutoSdrPresetProperty.cs" />
+    <Compile Include="Data\AutoSdrCustomCurveProperty.cs" />
     <Compile Include="Data\AdaptiveBrightnessModeProperty.cs" />
     <Compile Include="Data\RTSSInstalledProperty.cs" />
     <Compile Include="Data\FPSLimitProperty.cs" />
@@ -412,6 +414,9 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Display\GamingWidget.DisplayGating.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Features\Display\GamingWidget.AutoSdrCurve.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\QuickSettings\GamingWidget.QuickSettingsHelpers.cs">
