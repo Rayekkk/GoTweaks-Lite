@@ -401,7 +401,7 @@ namespace XboxGamingBar
 
                     if (isUpdate && !string.IsNullOrWhiteSpace(url))
                     {
-                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
+                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)); // #6CCB5F - matches Quick Settings tile green
                         UpdateStatusText.Text = $"New version available: {label}\nCurrent: {friendlyCurrent}";
                         _goTweaksDownloadUrl = url;          // .msixbundle URL — unified install
                         _pendingUpdateVersion = label;
@@ -487,7 +487,7 @@ namespace XboxGamingBar
                             return;
                         }
                     }
-                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
+                    UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)); // #6CCB5F - matches Quick Settings tile green
                     UpdateStatusText.Text = message;
                     return;
                 }
@@ -514,7 +514,7 @@ namespace XboxGamingBar
                     var statusStr = status?.ToString() ?? "";
                     if (statusStr == "Installing")
                     {
-                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Colors.LimeGreen);
+                        UpdateStatusText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)); // #6CCB5F - matches Quick Settings tile green
                         UpdateStatusText.Text = "Installing update... Please follow the installer prompts.";
                         UpdateButton.Content = "Installing...";
                     }

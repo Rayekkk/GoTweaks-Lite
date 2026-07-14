@@ -1300,7 +1300,7 @@ namespace XboxGamingBar
             {
                 PawnIOStatusText.Text = installed ? "Installed" : "Not installed";
                 PawnIOStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
                     : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
             }
 
@@ -1380,7 +1380,7 @@ namespace XboxGamingBar
             {
                 PrereqUsbipStatusText.Text = installed ? "Installed" : "Not installed";
                 PrereqUsbipStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
                     : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
             }
             if (PrereqUsbipInstallButton != null)
@@ -1451,7 +1451,7 @@ namespace XboxGamingBar
             {
                 ControllerEmulationHidHideStatusText.Text = installed ? "HidHide: Installed" : "HidHide: Not Installed";
                 ControllerEmulationHidHideStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
                     : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
             }
 
@@ -1466,7 +1466,7 @@ namespace XboxGamingBar
             {
                 PrereqHidHideStatusText.Text = installed ? "Installed" : "Not installed";
                 PrereqHidHideStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.LimeGreen)
+                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
                     : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0xC1, 0x07));
             }
             if (PrereqHidHideInstallButton != null)
