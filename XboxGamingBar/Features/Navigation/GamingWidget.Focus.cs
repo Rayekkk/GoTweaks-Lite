@@ -187,42 +187,12 @@ namespace XboxGamingBar
             // System tab - Controller Emulation card
             ControllerEmulationExpandButton.GotFocus += Control_GotFocus;
             ControllerEmulationExpandButton.LostFocus += Control_LostFocus;
-            ControllerEmulationInputNotesExpandButton.GotFocus += Control_GotFocus;
-            ControllerEmulationInputNotesExpandButton.LostFocus += Control_LostFocus;
             ControllerEmulationEnabledToggle.GotFocus += Control_GotFocus;
             ControllerEmulationEnabledToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationImprovedInputToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationImprovedInputToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationHideStockControllerToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationHideStockControllerToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationHideTargetComboBox.GotFocus += Control_GotFocus;
-            ControllerEmulationHideTargetComboBox.LostFocus += Control_LostFocus;
-            ControllerEmulationGyroSourceComboBox.GotFocus += Control_GotFocus;
-            ControllerEmulationGyroSourceComboBox.LostFocus += Control_LostFocus;
-            ControllerEmulationModeComboBox.GotFocus += Control_GotFocus;
-            ControllerEmulationModeComboBox.LostFocus += Control_LostFocus;
             ControllerEmulationGyroActivationModeComboBox.GotFocus += Control_GotFocus;
             ControllerEmulationGyroActivationModeComboBox.LostFocus += Control_LostFocus;
             ControllerEmulationGyroActivationButtonComboBox.GotFocus += Control_GotFocus;
             ControllerEmulationGyroActivationButtonComboBox.LostFocus += Control_LostFocus;
-            ControllerEmulationPs4TouchpadToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationPs4TouchpadToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationLedForwardingToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationLedForwardingToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseSensitivitySlider.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseSensitivitySlider.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseThresholdSlider.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseThresholdSlider.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseAxisComboBox.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseAxisComboBox.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseInvertXToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseInvertXToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseInvertYToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseInvertYToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseGainXSlider.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseGainXSlider.LostFocus += Control_LostFocus;
-            ControllerEmulationMouseGainYSlider.GotFocus += Control_GotFocus;
-            ControllerEmulationMouseGainYSlider.LostFocus += Control_LostFocus;
             StickConversionComboBox.GotFocus += Control_GotFocus;
             StickConversionComboBox.LostFocus += Control_LostFocus;
             StickOrientationV2ComboBox.GotFocus += Control_GotFocus;
@@ -237,16 +207,6 @@ namespace XboxGamingBar
             // Output mix sliders all removed in #79 round 5 (pipeline matches HC).
             ControllerEmulationStickSelectComboBox.GotFocus += Control_GotFocus;
             ControllerEmulationStickSelectComboBox.LostFocus += Control_LostFocus;
-            GyroActivationExpandToggle.GotFocus += Control_GotFocus;
-            GyroActivationExpandToggle.LostFocus += Control_LostFocus;
-            FeaturesExpandToggle.GotFocus += Control_GotFocus;
-            FeaturesExpandToggle.LostFocus += Control_LostFocus;
-            JoystickOutputExpandToggle.GotFocus += Control_GotFocus;
-            JoystickOutputExpandToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationStickOnlyJoystickToggle.GotFocus += Control_GotFocus;
-            ControllerEmulationStickOnlyJoystickToggle.LostFocus += Control_LostFocus;
-            ControllerEmulationVirtualAbxyLayoutComboBox.GotFocus += Control_GotFocus;
-            ControllerEmulationVirtualAbxyLayoutComboBox.LostFocus += Control_LostFocus;
 
             // Scaling tab - Status card buttons
             ShowLosslessScalingWindowButton.GotFocus += Control_GotFocus;

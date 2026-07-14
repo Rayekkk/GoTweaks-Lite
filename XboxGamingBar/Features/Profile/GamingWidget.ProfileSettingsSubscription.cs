@@ -152,9 +152,6 @@ namespace XboxGamingBar
             if (LegionSpeedSlider != null)
                 LegionSpeedSlider.ValueChanged += ControllerSliderSettingChanged;
 
-            if (ControllerEmulationImprovedInputToggle != null)
-                ControllerEmulationImprovedInputToggle.Toggled += ControllerEmulationImprovedInputToggle_Toggled;
-
             foreach (string buttonName in LegionRemapButtonNames)
             {
                 UpdateButtonGamepadComboControls(buttonName);

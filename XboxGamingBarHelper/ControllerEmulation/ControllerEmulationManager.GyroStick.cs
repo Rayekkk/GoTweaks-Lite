@@ -414,33 +414,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
             return ((1.0f - t) * StickGyroHcCurve[lo] + t * StickGyroHcCurve[hi]) * 2.0f;
         }
 
-        private void ApplyDs4Orientation(
-            ref float gyroX,
-            ref float gyroY,
-            ref float gyroZ,
-            ref float accelX,
-            ref float accelY,
-            ref float accelZ)
-        {
-            if (ds4Orientation != 1)
-            {
-                return;
-            }
-
-            // Orthogonal mode rotates around X so DS4 motion orientation matches
-            // users holding the handheld in a perpendicular posture.
-            // Swaps Y↔Z (yaw↔roll) with sign flip.
-            float originalGyroY = gyroY;
-            float originalGyroZ = gyroZ;
-            gyroY = originalGyroZ;
-            gyroZ = -originalGyroY;
-
-            float originalAccelY = accelY;
-            float originalAccelZ = accelZ;
-            accelY = originalAccelZ;
-            accelZ = -originalAccelY;
-        }
-
         private static short ConvertNormalizedToInt16(float normalized)
         {
             float clamped = Math.Max(-1.0f, Math.Min(1.0f, normalized));

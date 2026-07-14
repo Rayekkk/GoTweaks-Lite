@@ -133,7 +133,6 @@ namespace XboxGamingBar
         private bool isLightingExpanded = false;
         private bool isFanCurveExpanded = false;
         private bool isControllerEmulationExpanded = false;
-        private bool isControllerEmulationInputNotesExpanded = false;
         private bool fanCurveGraphInitialized = false;
 
         // Display and OSD settings
@@ -1021,26 +1020,7 @@ namespace XboxGamingBar
                 ControllerEmulationExpandIcon.Glyph = isControllerEmulationExpanded ? "\uE70E" : "\uE70D";
             }
 
-            UpdateControllerEmulationMouseSettingsVisibility();
             UpdateSystemControllerEmulationNavigation();
-        }
-
-        private void ControllerEmulationInputNotesExpandButton_Click(object sender, RoutedEventArgs e)
-        {
-            isControllerEmulationInputNotesExpanded = !isControllerEmulationInputNotesExpanded;
-
-            if (ControllerEmulationInputNotesContent != null)
-            {
-                ControllerEmulationInputNotesContent.Visibility = isControllerEmulationInputNotesExpanded
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-
-            if (ControllerEmulationInputNotesExpandIcon != null)
-            {
-                // E70D = ChevronDown, E70E = ChevronUp
-                ControllerEmulationInputNotesExpandIcon.Glyph = isControllerEmulationInputNotesExpanded ? "\uE70E" : "\uE70D";
-            }
         }
 
         private void TDPSettingsExpandButton_Click(object sender, RoutedEventArgs e)
@@ -1073,65 +1053,6 @@ namespace XboxGamingBar
                 // E70D = ChevronDown, E70E = ChevronUp
                 SpecialRemappingExpandIcon.Glyph = isSpecialRemappingExpanded ? "\uE70E" : "\uE70D";
             }
-        }
-
-        private void ControllerEmulationMouseSensitivitySlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ControllerEmulationMouseSensitivityValue != null)
-            {
-                ControllerEmulationMouseSensitivityValue.Text = ((int)e.NewValue).ToString();
-            }
-        }
-
-        private void ControllerEmulationMouseThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ControllerEmulationMouseThresholdValue != null)
-            {
-                ControllerEmulationMouseThresholdValue.Text = ((int)e.NewValue).ToString();
-            }
-        }
-
-        private void ControllerEmulationMouseGainXSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ControllerEmulationMouseGainXValue != null)
-            {
-                ControllerEmulationMouseGainXValue.Text = ((int)e.NewValue).ToString();
-            }
-        }
-
-        private void ControllerEmulationMouseGainYSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ControllerEmulationMouseGainYValue != null)
-            {
-                ControllerEmulationMouseGainYValue.Text = ((int)e.NewValue).ToString();
-            }
-        }
-
-        private void GyroActivationExpandToggle_Click(object sender, RoutedEventArgs e)
-        {
-            isGyroActivationExpanded = !isGyroActivationExpanded;
-            if (GyroActivationContent != null)
-                GyroActivationContent.Visibility = isGyroActivationExpanded ? Visibility.Visible : Visibility.Collapsed;
-            if (GyroActivationExpandIcon != null)
-                GyroActivationExpandIcon.Glyph = isGyroActivationExpanded ? "\uE70E" : "\uE70D";
-        }
-
-        private void FeaturesExpandToggle_Click(object sender, RoutedEventArgs e)
-        {
-            isFeaturesExpanded = !isFeaturesExpanded;
-            if (FeaturesContent != null)
-                FeaturesContent.Visibility = isFeaturesExpanded ? Visibility.Visible : Visibility.Collapsed;
-            if (FeaturesExpandIcon != null)
-                FeaturesExpandIcon.Glyph = isFeaturesExpanded ? "\uE70E" : "\uE70D";
-        }
-
-        private void JoystickOutputExpandToggle_Click(object sender, RoutedEventArgs e)
-        {
-            isJoystickOutputExpanded = !isJoystickOutputExpanded;
-            if (JoystickOutputContent != null)
-                JoystickOutputContent.Visibility = isJoystickOutputExpanded ? Visibility.Visible : Visibility.Collapsed;
-            if (JoystickOutputExpandIcon != null)
-                JoystickOutputExpandIcon.Glyph = isJoystickOutputExpanded ? "\uE70E" : "\uE70D";
         }
 
         private void StickSensitivityV2Slider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)

@@ -1447,20 +1447,6 @@ namespace XboxGamingBar
         /// </summary>
         private void UpdateHidHideInstalledUI(bool installed)
         {
-            if (ControllerEmulationHidHideStatusText != null)
-            {
-                ControllerEmulationHidHideStatusText.Text = installed ? "HidHide: Installed" : "HidHide: Not Installed";
-                ControllerEmulationHidHideStatusText.Foreground = installed
-                    ? new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // #6CCB5F - matches Quick Settings tile green
-                    : new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
-            }
-
-            if (ControllerEmulationHidHideInstallButton != null)
-            {
-                ControllerEmulationHidHideInstallButton.Content = installed ? "Installed" : "Install HidHide";
-                ControllerEmulationHidHideInstallButton.IsEnabled = !installed;
-            }
-
             // System tab -> Prerequisites card (same install trigger, different UI location).
             if (PrereqHidHideStatusText != null)
             {
@@ -1625,46 +1611,6 @@ namespace XboxGamingBar
                 if (PrereqHidHideStatusText != null)
                 {
                     PrereqHidHideStatusText.Text = "Error";
-                }
-            }
-        }
-
-        /// <summary>
-        /// Handles the HidHide install button click.
-        /// </summary>
-        private void HidHideInstallButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                Logger.Info("HidHideInstallButton clicked - triggering HidHide installation");
-
-                if (ControllerEmulationHidHideInstallButton != null)
-                {
-                    ControllerEmulationHidHideInstallButton.Content = "Installing...";
-                    ControllerEmulationHidHideInstallButton.IsEnabled = false;
-                }
-
-                if (ControllerEmulationHidHideStatusText != null)
-                {
-                    ControllerEmulationHidHideStatusText.Text = "HidHide: Installing...";
-                }
-
-                installHidHide?.TriggerInstall();
-                Logger.Info("HidHide installation triggered, waiting for helper response...");
-                ScheduleInstallButtonTimeout(ControllerEmulationHidHideInstallButton, ControllerEmulationHidHideStatusText, "Install HidHide", "HidHide: Install may have failed - check the log");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error during HidHide installation: {ex.Message}");
-                if (ControllerEmulationHidHideInstallButton != null)
-                {
-                    ControllerEmulationHidHideInstallButton.Content = "Install HidHide";
-                    ControllerEmulationHidHideInstallButton.IsEnabled = true;
-                }
-
-                if (ControllerEmulationHidHideStatusText != null)
-                {
-                    ControllerEmulationHidHideStatusText.Text = "HidHide: Error";
                 }
             }
         }

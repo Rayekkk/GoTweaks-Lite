@@ -382,10 +382,12 @@ namespace XboxGamingBar
 
         private bool IsImprovedButtonComboUiEnabled()
         {
-            // The enhanced remap editor is gated by "Improved Input" itself.
-            // Do not require controller emulation runtime toggle to be ON just to edit mappings.
-            return controllerEmulationImprovedInput?.Value == true ||
-                   ControllerEmulationImprovedInputToggle?.IsOn == true;
+            // The legacy "Improved Input" toggle that used to gate this (default off,
+            // never turned on since VIIPER became the sole emulation backend - see
+            // CLAUDE.md SS21) was removed along with the rest of the dead legacy
+            // Controller Emulation panel. No UI can set it to true anymore, so this
+            // preserves the original default.
+            return false;
         }
 
         private List<int> NormalizeGamepadActions(List<int> actions)

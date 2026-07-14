@@ -2676,9 +2676,11 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
             // touchpad, so set a midrange value (0x4000 ≈ 16384) when pressed
             // and 0 when only touching, matching Steam Deck's typical wire
             // emission for a non-force-sensitive press.
-            // Touchpad bytes already gated by ps4TouchpadEnabled at the source
-            // (forwarder zeroes currentTouchActive when disabled) so this
-            // honors the user's existing toggle.
+            // NOTE: unlike the legacy manager, this path does not currently gate on
+            // Ps4TouchpadEnabled - currentTouchActive is set purely from the raw
+            // LegionButtonMonitor touch sample, so touchpad forwarding is always on
+            // here regardless of that setting. Left as-is (behavior unchanged); flagging
+            // so a future pass wires the setting in rather than assuming it already works.
             if (currentTouchActive)
             {
                 byte flags = (byte)LibViiperTouchFlags.RightPadTouch;

@@ -808,35 +808,14 @@ namespace XboxGamingBar
         private readonly GPDButtonProperty gpdButtonLSRight;
         private readonly ControllerEmulationAvailableProperty controllerEmulationAvailable;
         private readonly ControllerEmulationEnabledProperty controllerEmulationEnabled;
-        private readonly ControllerEmulationHideStockControllerProperty controllerEmulationHideStockController;
-        private readonly ControllerEmulationImprovedInputProperty controllerEmulationImprovedInput;
-        private readonly ControllerEmulationHideTargetProperty controllerEmulationHideTarget;
-        private readonly ControllerEmulationGyroSourceProperty controllerEmulationGyroSource;
-        private readonly ControllerEmulationModeProperty controllerEmulationMode;
-        private readonly ControllerEmulationRumbleProfileProperty controllerEmulationRumbleProfile;
         private readonly ControllerEmulationGyroActivationModeProperty controllerEmulationGyroActivationMode;
         private readonly ControllerEmulationGyroActivationButtonProperty controllerEmulationGyroActivationButton;
-        private readonly ControllerEmulationDs4OrientationProperty controllerEmulationDs4Orientation;
-        private readonly ControllerEmulationPs4TouchpadEnabledProperty controllerEmulationPs4TouchpadEnabled;
-        private readonly ControllerEmulationLedForwardingEnabledProperty controllerEmulationLedForwardingEnabled;
-        private readonly ControllerEmulationMouseSensitivityProperty controllerEmulationMouseSensitivity;
-        private readonly ControllerEmulationMouseThresholdProperty controllerEmulationMouseThreshold;
-        private readonly ControllerEmulationMouseAxisProperty controllerEmulationMouseAxis;
-        private readonly ControllerEmulationMouseInvertXProperty controllerEmulationMouseInvertX;
-        private readonly ControllerEmulationMouseInvertYProperty controllerEmulationMouseInvertY;
-        private readonly ControllerEmulationMouseGainXProperty controllerEmulationMouseGainX;
-        private readonly ControllerEmulationMouseGainYProperty controllerEmulationMouseGainY;
         private readonly ControllerEmulationStickInvertXProperty controllerEmulationStickInvertX;
         private readonly ControllerEmulationStickInvertYProperty controllerEmulationStickInvertY;
         private readonly ControllerEmulationStickSelectProperty controllerEmulationStickSelect;
-        private readonly ControllerEmulationStickOnlyJoystickDataProperty controllerEmulationStickOnlyJoystickData;
-        private readonly ControllerEmulationVirtualABXYLayoutProperty controllerEmulationVirtualAbxyLayout;
         private readonly ControllerEmulationStickSensitivityV2Property controllerEmulationStickSensitivityV2;
         private readonly ControllerEmulationStickOrientationV2Property controllerEmulationStickOrientationV2;
         private readonly ControllerEmulationStickConversionProperty controllerEmulationStickConversion;
-        private bool isGyroActivationExpanded;
-        private bool isFeaturesExpanded;
-        private bool isJoystickOutputExpanded;
         private bool controllerEmulationSupported = false;
         private bool isApplyingGpdRestoreDefaults = false;
         private readonly GPDFanCurveGraphProperty gpdFanCurveGraph;
@@ -1494,35 +1473,16 @@ namespace XboxGamingBar
             gpdButtonLSRight = new GPDButtonProperty(this, Function.GPDButtonLSRight);
             controllerEmulationAvailable = new ControllerEmulationAvailableProperty(this);
             controllerEmulationEnabled = new ControllerEmulationEnabledProperty(ControllerEmulationEnabledToggle, this);
-            controllerEmulationHideStockController = new ControllerEmulationHideStockControllerProperty(ControllerEmulationHideStockControllerToggle, this);
-            controllerEmulationImprovedInput = new ControllerEmulationImprovedInputProperty(ControllerEmulationImprovedInputToggle, this);
-            controllerEmulationImprovedInput.PropertyChanged += ControllerEmulationImprovedInput_PropertyChanged;
-            controllerEmulationHideTarget = new ControllerEmulationHideTargetProperty(ControllerEmulationHideTargetComboBox, this);
-            controllerEmulationGyroSource = new ControllerEmulationGyroSourceProperty(ControllerEmulationGyroSourceComboBox, this);
-            controllerEmulationMode = new ControllerEmulationModeProperty(ControllerEmulationModeComboBox, this);
-            controllerEmulationRumbleProfile = new ControllerEmulationRumbleProfileProperty(ControllerEmulationRumbleProfileComboBox, this);
             controllerEmulationGyroActivationMode = new ControllerEmulationGyroActivationModeProperty(ControllerEmulationGyroActivationModeComboBox, this);
             controllerEmulationGyroActivationButton = new ControllerEmulationGyroActivationButtonProperty(ControllerEmulationGyroActivationButtonComboBox, this);
-            controllerEmulationDs4Orientation = new ControllerEmulationDs4OrientationProperty(ControllerEmulationDs4OrientationComboBox, this);
-            controllerEmulationPs4TouchpadEnabled = new ControllerEmulationPs4TouchpadEnabledProperty(ControllerEmulationPs4TouchpadToggle, this);
-            controllerEmulationLedForwardingEnabled = new ControllerEmulationLedForwardingEnabledProperty(ControllerEmulationLedForwardingToggle, this);
-            controllerEmulationMouseSensitivity = new ControllerEmulationMouseSensitivityProperty(ControllerEmulationMouseSensitivitySlider, this);
-            controllerEmulationMouseThreshold = new ControllerEmulationMouseThresholdProperty(ControllerEmulationMouseThresholdSlider, this);
-            controllerEmulationMouseAxis = new ControllerEmulationMouseAxisProperty(ControllerEmulationMouseAxisComboBox, this);
-            controllerEmulationMouseInvertX = new ControllerEmulationMouseInvertXProperty(ControllerEmulationMouseInvertXToggle, this);
-            controllerEmulationMouseInvertY = new ControllerEmulationMouseInvertYProperty(ControllerEmulationMouseInvertYToggle, this);
-            controllerEmulationMouseGainX = new ControllerEmulationMouseGainXProperty(ControllerEmulationMouseGainXSlider, this);
-            controllerEmulationMouseGainY = new ControllerEmulationMouseGainYProperty(ControllerEmulationMouseGainYSlider, this);
             controllerEmulationStickInvertX = new ControllerEmulationStickInvertXProperty(ControllerEmulationStickInvertXToggle, this);
             controllerEmulationStickInvertY = new ControllerEmulationStickInvertYProperty(ControllerEmulationStickInvertYToggle, this);
             controllerEmulationStickSelect = new ControllerEmulationStickSelectProperty(ControllerEmulationStickSelectComboBox, this);
-            controllerEmulationStickOnlyJoystickData = new ControllerEmulationStickOnlyJoystickDataProperty(ControllerEmulationStickOnlyJoystickToggle, this);
             // Min/Max gyro speed, Min/Max output, Power curve, Deadzone, Precision speed,
             // Output mix — pipeline removed in #79 round 5 (matches HC). Sensitivity stays.
             controllerEmulationStickSensitivityV2 = new ControllerEmulationStickSensitivityV2Property(StickSensitivityV2Slider, this);
             controllerEmulationStickOrientationV2 = new ControllerEmulationStickOrientationV2Property(StickOrientationV2ComboBox, this);
             controllerEmulationStickConversion = new ControllerEmulationStickConversionProperty(StickConversionComboBox, this);
-            controllerEmulationVirtualAbxyLayout = new ControllerEmulationVirtualABXYLayoutProperty(ControllerEmulationVirtualAbxyLayoutComboBox, this);
             gpdFanCurveGraph = new GPDFanCurveGraphProperty(this);
             gpdFanCurveGraph.SetGraphUpdateCallback(OnGPDFanCurveUpdated);
             gpdCPUTemp = new GPDCPUTempProperty(this);
@@ -1574,7 +1534,6 @@ namespace XboxGamingBar
             viiperDeviceType.PropertyChanged += (s, e) => { UpdateViiperConfigVisibility(); UpdateQuickSettingsTileStates(); UpdateViiperStickGyroSectionVisibility(); };
             // Re-evaluate sub-device-dependent panels (e.g. Joy-Con Pair per-half gyro) when the Nintendo sub-device changes.
             viiperNintendoSubDevice.PropertyChanged += (s, e) => UpdateViiperConfigVisibility();
-            controllerEmulationMode.PropertyChanged += (s, e) => UpdateQuickSettingsTileStates();
             winRing0Available = new WinRing0AvailableProperty(this);
             pawnIOAvailable = new PawnIOAvailableProperty();
             pawnIOInstalled = new PawnIOInstalledProperty(this);
@@ -1870,32 +1829,14 @@ namespace XboxGamingBar
                 gpdButtonLSRight,
                 controllerEmulationAvailable,
                 controllerEmulationEnabled,
-                controllerEmulationHideStockController,
-                controllerEmulationImprovedInput,
-                controllerEmulationHideTarget,
-                controllerEmulationGyroSource,
-                controllerEmulationMode,
-                controllerEmulationRumbleProfile,
                 controllerEmulationGyroActivationMode,
                 controllerEmulationGyroActivationButton,
-                controllerEmulationDs4Orientation,
-                controllerEmulationPs4TouchpadEnabled,
-                controllerEmulationLedForwardingEnabled,
-                controllerEmulationMouseSensitivity,
-                controllerEmulationMouseThreshold,
-                controllerEmulationMouseAxis,
-                controllerEmulationMouseInvertX,
-                controllerEmulationMouseInvertY,
-                controllerEmulationMouseGainX,
-                controllerEmulationMouseGainY,
                 controllerEmulationStickInvertX,
                 controllerEmulationStickInvertY,
                 controllerEmulationStickSelect,
-                controllerEmulationStickOnlyJoystickData,
                 controllerEmulationStickSensitivityV2,
                 controllerEmulationStickOrientationV2,
                 controllerEmulationStickConversion,
-                controllerEmulationVirtualAbxyLayout,
                 gpdFanCurveGraph,
                 gpdCPUTemp,
                 gpdFanCurveVisible,

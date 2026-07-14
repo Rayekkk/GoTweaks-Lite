@@ -609,27 +609,6 @@ namespace XboxGamingBar
             }
         }
 
-        private void CalibrateGyroButton_Click(object sender, Windows.UI.Xaml.RoutedEventArgs e)
-        {
-            try
-            {
-                if (!App.IsConnected) return;
-
-                var request = new Windows.Foundation.Collections.ValueSet
-                {
-                    { "Command", (int)Shared.Enums.Command.Set },
-                    { "Function", (int)Shared.Enums.Function.ControllerEmulationCalibrateGyro },
-                    { "Content", true }
-                };
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info("Sent gyro calibration request to helper");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending gyro calibration: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// Send Quick Metrics enabled state to helper
         /// </summary>
