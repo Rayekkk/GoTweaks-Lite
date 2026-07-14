@@ -480,17 +480,45 @@ namespace XboxGamingBarHelper.AMD
                 Logger.Warn($"AFMF v1 wrapper init threw {ex.GetType().Name}: {ex.Message} — extended controls unavailable");
             }
 
-            // ADLX 1.5+: VGM (Variable Graphics Memory) probe — DISABLED in 2093 after
-            // 2092's QueryInterface(IADLXSystem3, ppVoid) approach hung AMDManager init,
-            // causing a helper crash-loop. The Marshal.AllocHGlobal + manually-constructed
-            // SWIGTYPE_p_p_void path apparently doesn't survive ADLX's expectations on
-            // this driver — the call never returns, AMDManager never DONE, bootstrapper
-            // respawns the helper. Need a different approach (likely add proper
-            // %pointer_functions(void*, ...) to SWIG and regenerate) before we can
-            // re-attempt VGM. The raw-cast version from 2087/2091 returned
-            // ADLX_INVALID_ARGS without hanging, so it's at least safe — but useless,
-            // since the VGM call routes to the wrong vtable. Pure no-op for now to
-            // unblock the helper.
+            // ADLX 1.5+: VGM (Variable Graphics Memory / UMA carveout) probe — DISABLED again
+            // after a SECOND confirmed crash. Re-attempted 2026-07-14 using
+            // IADLXSystem.QueryInterface(IADLXSystem3.IID(), ppVoid) (the properly
+            // SWIG-generated IID accessor, not a hand-rolled string — ruling out the
+            // "bad IID string" theory from the original 2093 disable). Ran inside its own
+            // 3s watchdog thread, wrapped in try/catch. Result: an immediate, unrecoverable
+            // access violation in clr.dll (Windows Event Log: Application Error 0xc0000005 in
+            // clr.dll, .NET Runtime error 1023 exit code 80131506 — same signature as the
+            // original crash AND as the unrelated helper-CLR-crash investigation in §30) —
+            // no log line from inside the new code ever printed, meaning it crashed at or
+            // before the very first native call (IADLXSystem3.IID() or the QueryInterface
+            // dispatch itself), before the 3s watchdog or the try/catch could do anything —
+            // AV-class native crashes bypass both. Confirmed on-device on the real Legion Go 2
+            // dev unit, not a hang, not theoretical.
+            //
+            // Root cause theory (still unproven, but well-supported): the locally-vendored
+            // ADLX/SDK/Include headers in this repo's ADLX/ submodule only go up to
+            // ISystem2.h — there is no ISystem3.h checked in anywhere in this tree. Yet the
+            // prebuilt ADLXCSharpBind.dll this project ships DOES export working
+            // IADLXSystem3_IID / IADLXSystem3_GetVariableGraphicsMemory symbols (confirmed:
+            // calling them produces real ADLX_RESULT values / a real crash address, not a
+            // missing-export error). That native DLL must have been built from a different,
+            // more complete ADLX SDK snapshot than what's tracked here — likely with a
+            // System1/System2/System3 method layout that doesn't exactly match what the
+            // checked-in SWIG-generated C# proxies (and possibly the DLL's own internal
+            // vtable bookkeeping for the System family) assume, corrupting native state on
+            // the very first call into that specific interface family.
+            //
+            // Do not re-attempt without either (a) rebuilding ADLXCSharpBind.dll from a
+            // complete, internally-consistent ADLX SDK that actually includes ISystem3.h /
+            // IVariableGraphicsMemory.h (not just patching in generated .cs proxies against
+            // a partial header set), or (b) investigating whether Legion Space's path to the
+            // same setting goes through Lenovo's own WMI BIOS-setting mechanism instead —
+            // that would sidestep this ADLX interface entirely. See memory
+            // `vgm-uma-buffer-adlx-crash.md` for the full research + crash trail. The actual
+            // attempted code (QueryInterface + IADLXSystem3.IID(), 3s watchdog thread) is not
+            // kept here — it's in git history (this comment's commit) and in the memory file;
+            // re-derive it fresh next time rather than resurrecting dead code that already
+            // crashed twice.
 
             // GPU Tuning probe was REMOVED in 2090 — both 2088 (with DDR + tuning probes)
             // and 2089 (tuning only) crashed at AMDManager init with AccessViolation
