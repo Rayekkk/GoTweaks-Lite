@@ -272,6 +272,8 @@
     <Compile Include="Data\PanelBrightnessProperty.cs" />
     <Compile Include="Data\TouchscreenEnabledProperty.cs" />
     <Compile Include="Data\PanelBrightnessSupportedProperty.cs" />
+    <Compile Include="Data\InternalPanelActiveProperty.cs" />
+    <Compile Include="Data\DeviceTypeProperty.cs" />
     <Compile Include="Data\AdaptiveBrightnessModeProperty.cs" />
     <Compile Include="Data\RTSSInstalledProperty.cs" />
     <Compile Include="Data\FPSLimitProperty.cs" />
@@ -407,6 +409,9 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\OSD\GamingWidget.DisplayOSDHandlers.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Features\Display\GamingWidget.DisplayGating.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\QuickSettings\GamingWidget.QuickSettingsHelpers.cs">

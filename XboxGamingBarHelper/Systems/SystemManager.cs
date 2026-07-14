@@ -179,6 +179,18 @@ namespace XboxGamingBarHelper.Systems
             get { return panelBrightnessSupported; }
         }
 
+        private readonly InternalPanelActiveProperty internalPanelActive;
+        public InternalPanelActiveProperty InternalPanelActive
+        {
+            get { return internalPanelActive; }
+        }
+
+        private readonly DeviceTypeProperty deviceType;
+        public DeviceTypeProperty DeviceType
+        {
+            get { return deviceType; }
+        }
+
         private const string TouchscreenEnabledKey = "TouchscreenEnabled";
         private readonly TouchscreenEnabledProperty touchscreenEnabled;
         public TouchscreenEnabledProperty TouchscreenEnabled
@@ -252,6 +264,8 @@ namespace XboxGamingBarHelper.Systems
             adaptiveBrightnessMode = new AdaptiveBrightnessModeProperty(this);
             panelBrightness = new PanelBrightnessProperty(this);
             panelBrightnessSupported = new PanelBrightnessSupportedProperty(this);
+            internalPanelActive = new InternalPanelActiveProperty(this);
+            deviceType = new DeviceTypeProperty(this);
 
             // Touch screen: persist the user's last choice across helper restarts, same as
             // LegionTouchpadEnabled. Default true (touch active) if never set. No need to
@@ -434,6 +448,17 @@ namespace XboxGamingBarHelper.Systems
                     {
                         panelBrightness.ForceSetValue(XboxGamingBarHelper.Sidebar.BrightnessManager.GetBrightness());
                     }
+                }
+
+                // Refresh internal-panel-active status - gates Auto SDR / Resolution / Refresh Rate,
+                // which only make sense against the built-in panel. Same dock/undock trigger as the
+                // panel brightness check above; ForceSetValue re-asserts even if unchanged so the
+                // widget re-evaluates its enabled/grayed state without needing a reopen.
+                if (internalPanelActive != null)
+                {
+                    bool panelActive = User32.IsInternalPanelActive() ?? true;
+                    Logger.Info($"Internal panel active after display change: {panelActive}");
+                    internalPanelActive.ForceSetValue(panelActive);
                 }
             }
             catch (Exception ex)
