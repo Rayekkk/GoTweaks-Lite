@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 {
@@ -187,9 +188,37 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
                 using (var proc = Process.Start(psi))
                 {
                     if (proc == null) return string.Empty;
-                    string stdout = proc.StandardOutput.ReadToEnd();
-                    string stderr = proc.StandardError.ReadToEnd();
-                    proc.WaitForExit(15000);
+
+                    // Read both streams concurrently, not sequentially - reading stdout to
+                    // completion before even starting to drain stderr is the classic .NET
+                    // Process deadlock: if usbip.exe writes enough to the unread stream to
+                    // fill its OS pipe buffer, it blocks on that write forever, so it never
+                    // closes stdout, so ReadToEnd() here never returns either. That hung this
+                    // call indefinitely on a misbehaving usbip.exe, which meant the helper's
+                    // ProcessExit handler (Environment.Exit -> viiperEmulationManager.Stop() ->
+                    // DetachAll() -> here) never completed - the helper process became a
+                    // permanent zombie still holding the single-instance mutex and the
+                    // scheduled task's "running" state (MultipleInstances=IgnoreNew), so every
+                    // later RunTaskNow() silently no-opped until a full reboot or reinstall
+                    // reset that state. Reading both streams via Task avoids the deadlock, and
+                    // killing the process on timeout stops it becoming a zombie in the first
+                    // place (also keeps stray usbip.exe instances from piling up - see the
+                    // VIIPER/usbip-win2 native-state theory in the helper-CLR-crash notes).
+                    var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                    var stderrTask = proc.StandardError.ReadToEndAsync();
+                    bool exited = proc.WaitForExit(15000);
+
+                    if (!exited)
+                    {
+                        Logger.Warn($"usbip {args} did not exit within 15s - killing it.");
+                        try { proc.Kill(); } catch (Exception killEx) { Logger.Debug($"usbip kill failed: {killEx.Message}"); }
+                    }
+
+                    // Killing (or a normal exit) closes the pipes, so these resolve promptly;
+                    // still bound the wait so a pathological case can't hang the caller.
+                    Task.WaitAll(new Task[] { stdoutTask, stderrTask }, 3000);
+                    string stdout = stdoutTask.Status == TaskStatus.RanToCompletion ? stdoutTask.Result : string.Empty;
+                    string stderr = stderrTask.Status == TaskStatus.RanToCompletion ? stderrTask.Result : string.Empty;
                     return (stdout ?? string.Empty) + "\n" + (stderr ?? string.Empty);
                 }
             }
