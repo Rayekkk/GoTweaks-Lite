@@ -149,6 +149,10 @@ namespace XboxGamingBar
             SyncProfileSettingsBackingFields();
             SaveProfileCustomizationSettings();
             SendProfileSaveFlagsToHelper();
+            // Re-render the profile tables immediately so the row visibility (which
+            // categories are shown/hidden) reflects the new Save* selection without
+            // requiring the widget to be closed and reopened.
+            UpdateProfileDisplay();
             Logger.Info($"Profile customization settings updated");
         }
 
@@ -160,6 +164,10 @@ namespace XboxGamingBar
             SyncProfileSettingsBackingFields();
             SaveProfileCustomizationSettings();
             SendProfileSaveFlagsToHelper();
+            // Re-render the profile tables immediately so the row visibility (which
+            // categories are shown/hidden) reflects the new Save* selection without
+            // requiring the widget to be closed and reopened.
+            UpdateProfileDisplay();
             Logger.Info($"Profile customization settings updated");
         }
 
