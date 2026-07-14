@@ -284,6 +284,29 @@ namespace XboxGamingBar
             UpdateProfileDisplay();
         }
 
+        /// <summary>
+        /// Fired whenever an AMD feature property's value changes, from EITHER direction: a
+        /// genuine widget-side toggle click (already captured via SettingChanged ->
+        /// SaveCurrentSettingsToProfile through the control's own Toggled event) or a helper-
+        /// pushed update reflecting the real driver state (e.g. Anti-Lag/Boost/Chill changed
+        /// externally via AMD Software: Adrenalin Edition, or a hardware read-back on connect).
+        /// The helper-driven direction is deliberately skipped by SettingChanged's
+        /// WidgetSliderProperty.HelperSyncCount guard, to avoid a startup BatchGet flood
+        /// clobbering a freshly-loaded profile - but that also means the profile table's AMD row
+        /// never learns about a driver-side change, and shows stale data (e.g. "Off") forever.
+        /// Deferring one dispatcher tick lets the isApplyingHelperUpdate window (set around the
+        /// whole HandlePipeMessage call in GamingWidget.PipeClient.cs) close before
+        /// SaveCurrentSettingsToProfile's own guards (isLoadingProfile/isSwitchingProfile/
+        /// isInitialSync) decide whether it's safe to resync the active profile + redraw the table.
+        /// </summary>
+        private void AMDFeatureProperty_ChangedResyncProfile(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                SaveCurrentSettingsToProfile(currentProfileName);
+            });
+        }
+
         private void LoadProfileSettings(string profileName, bool isExplicitSwitch = false)
         {
             if (isLoadingProfile) return;
