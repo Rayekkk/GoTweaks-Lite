@@ -242,6 +242,19 @@ namespace XboxGamingBar
         }
 
         /// <summary>
+        /// Dims and disables an entire tile (not just its state text) when it's blocked by the
+        /// built-in-panel-only gate (only an external monitor is active). Used by Resolution,
+        /// Refresh Rate and Rotation - a dimmed-but-clickable tile with just an "N/A" label reads
+        /// as a bug to the user, so this makes the whole tile visibly non-interactive instead.
+        /// </summary>
+        private void ApplyPanelGateVisual(TileDefinition tile, bool internalActive)
+        {
+            if (tile?.TileButton == null) return;
+            tile.TileButton.IsEnabled = internalActive;
+            tile.TileButton.Opacity = internalActive ? 1.0 : 0.4;
+        }
+
+        /// <summary>
         /// Updates the scroll animation for a tile's state text.
         /// If the rendered text is wider than the tile's column, marquees it
         /// left-right-left on a loop so the full value is readable. Otherwise
@@ -506,37 +519,51 @@ namespace XboxGamingBar
                     fpsLimitTile.TileButton.Background = limit > 0 ? tileOnBrush : tileOffBrush;
                 }
 
-                // Resolution tile - blocked (dimmed, "N/A") when only an external monitor is
-                // active, since the resolution override only applies to the built-in panel.
+                // Resolution tile - blocked (whole tile dimmed + disabled) when only an external
+                // monitor is active, since the resolution override only applies to the built-in panel.
                 if (qsTileMap.TryGetValue("Resolution", out var resTile) && resTile.TileButton != null)
                 {
                     string currentRes = resolution?.Value ?? "1920x1080";
-                    resTile.StateText.Text = _internalPanelActive ? currentRes : "N/A";
+                    resTile.StateText.Text = _internalPanelActive ? currentRes : "Built-in Only";
                     resTile.StateText.Foreground = _internalPanelActive ? accentForeground : offForeground;
                     SetTileAccentBar(resTile, _internalPanelActive);
                     resTile.TileButton.Background = tileOffBrush;
+                    ApplyPanelGateVisual(resTile, _internalPanelActive);
                 }
 
-                // Refresh Rate tile - blocked (dimmed, "N/A") when only an external monitor is
-                // active, same reasoning as the Resolution tile above.
+                // Refresh Rate tile - blocked (whole tile dimmed + disabled) when only an external
+                // monitor is active, same reasoning as the Resolution tile above.
                 if (qsTileMap.TryGetValue("RefreshRate", out var refreshRateTile) && refreshRateTile.TileButton != null)
                 {
                     int currentRate = refreshRate?.Value ?? 60;
-                    refreshRateTile.StateText.Text = _internalPanelActive ? $"{currentRate} Hz" : "N/A";
+                    refreshRateTile.StateText.Text = _internalPanelActive ? $"{currentRate} Hz" : "Built-in Only";
                     refreshRateTile.StateText.Foreground = _internalPanelActive ? accentForeground : offForeground;
                     SetTileAccentBar(refreshRateTile, _internalPanelActive);
                     refreshRateTile.TileButton.Background = tileOffBrush;
+                    ApplyPanelGateVisual(refreshRateTile, _internalPanelActive);
                 }
 
-                // Rotation tile
+                // Rotation tile - blocked (whole tile dimmed + disabled) when only an external
+                // monitor is active, since display rotation only applies to the built-in panel.
                 if (qsTileMap.TryGetValue("Rotation", out var rotationTile) && rotationTile.TileButton != null)
                 {
-                    string orientationText = displayOrientation?.GetOrientationText() ?? "Landscape";
-                    bool isPortrait = (displayOrientation?.Value ?? 0) == 1 || (displayOrientation?.Value ?? 0) == 3;
-                    rotationTile.StateText.Text = orientationText;
-                    rotationTile.StateText.Foreground = isPortrait ? accentForeground : offForeground;
-                    SetTileAccentBar(rotationTile, isPortrait);
-                    rotationTile.TileButton.Background = isPortrait ? tileOnBrush : tileOffBrush;
+                    if (_internalPanelActive)
+                    {
+                        string orientationText = displayOrientation?.GetOrientationText() ?? "Landscape";
+                        bool isPortrait = (displayOrientation?.Value ?? 0) == 1 || (displayOrientation?.Value ?? 0) == 3;
+                        rotationTile.StateText.Text = orientationText;
+                        rotationTile.StateText.Foreground = isPortrait ? accentForeground : offForeground;
+                        SetTileAccentBar(rotationTile, isPortrait);
+                        rotationTile.TileButton.Background = isPortrait ? tileOnBrush : tileOffBrush;
+                    }
+                    else
+                    {
+                        rotationTile.StateText.Text = "Built-in Only";
+                        rotationTile.StateText.Foreground = offForeground;
+                        SetTileAccentBar(rotationTile, false);
+                        rotationTile.TileButton.Background = tileOffBrush;
+                    }
+                    ApplyPanelGateVisual(rotationTile, _internalPanelActive);
                 }
 
                 // HDR tile
