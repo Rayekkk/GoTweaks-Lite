@@ -358,6 +358,12 @@ namespace XboxGamingBarHelper
                 try
                 {
                     Logger.Warn("ProcessExit fired — releasing EC fan + HidHide suppression + VIIPER bus before shutdown");
+                    // Flush any pending debounced GameProfile writes (global.xml etc, 250ms debounce
+                    // in Shared/Data/GameProfile.cs) - without this a Custom TDP change made just
+                    // before an update/exit-triggered Environment.Exit(0) is silently lost and the
+                    // profile reverts to whatever was last flushed.
+                    try { Shared.Data.GameProfile.FlushAllPendingWrites(); }
+                    catch (Exception ex) { Logger.Warn($"ProcessExit FlushAllPendingWrites threw: {ex.Message}"); }
                     legionManager?.EmergencyReleaseFanOverride();
                     try { controllerEmulationManager?.SuppressionManager?.Disable(); }
                     catch (Exception ex) { Logger.Warn($"ProcessExit HidHide.Disable threw: {ex.Message}"); }
@@ -372,6 +378,8 @@ namespace XboxGamingBarHelper
                 try
                 {
                     Logger.Error($"UnhandledException — releasing EC fan + HidHide suppression + VIIPER bus. Exception: {e.ExceptionObject}");
+                    try { Shared.Data.GameProfile.FlushAllPendingWrites(); }
+                    catch (Exception ex) { Logger.Warn($"UnhandledException FlushAllPendingWrites threw: {ex.Message}"); }
                     legionManager?.EmergencyReleaseFanOverride();
                     try { controllerEmulationManager?.SuppressionManager?.Disable(); }
                     catch (Exception ex) { Logger.Warn($"UnhandledException HidHide.Disable threw: {ex.Message}"); }

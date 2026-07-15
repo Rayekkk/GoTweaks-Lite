@@ -2326,7 +2326,17 @@ namespace XboxGamingBar
         private void CustomTDPSaveDebounceTimer_Tick(object sender, object e)
         {
             customTDPSaveDebounceTimer?.Stop();
+            FlushPendingCustomTDPSave();
+        }
 
+        /// <summary>
+        /// Performs the debounced Custom TDP profile save immediately (same guards as the debounce
+        /// timer tick). Shared by the timer and by <see cref="FlushPendingProfileSaves"/> so a
+        /// pending change isn't silently lost if the widget instance is torn down before the timer
+        /// fires - Game Bar can recreate GamingWidget at any time (see App.xaml.cs OnSuspending).
+        /// </summary>
+        private void FlushPendingCustomTDPSave()
+        {
             // Re-check the same guards - state may have changed during the debounce wait.
             if (isApplyingHelperUpdate || isLoadingProfile || isInitialSync) return;
             if (WidgetSliderProperty.HelperSyncCount > 0) return;
@@ -2336,6 +2346,21 @@ namespace XboxGamingBar
             if (isGameProfile && perGameProfile?.Value != true) return;
 
             SaveCurrentSettingsToProfile(currentProfileName);
+        }
+
+        /// <summary>
+        /// Flushes any pending debounced profile-save timers immediately. Called from
+        /// App.xaml.cs's OnSuspending right before the GamingWidget instance is discarded, so a
+        /// slider change made just before Game Bar suspends/recreates the widget still gets
+        /// persisted instead of silently reverting to the previous saved value.
+        /// </summary>
+        internal void FlushPendingProfileSaves()
+        {
+            if (customTDPSaveDebounceTimer != null && customTDPSaveDebounceTimer.IsEnabled)
+            {
+                customTDPSaveDebounceTimer.Stop();
+                FlushPendingCustomTDPSave();
+            }
         }
 
     }
