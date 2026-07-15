@@ -825,6 +825,12 @@ namespace XboxGamingBar
 
         // Settings properties
         private readonly TdpMethodProperty tdpMethod;
+        private readonly PowerButtonActionProperty powerButtonActionAC;
+        private readonly PowerButtonActionProperty powerButtonActionDC;
+        private readonly IntTagComboProperty displayTimeoutAC;
+        private readonly IntTagComboProperty displayTimeoutDC;
+        private readonly IntTagComboProperty hibernateTimeoutAC;
+        private readonly IntTagComboProperty hibernateTimeoutDC;
         private readonly EmulationBackendProperty emulationBackend;
         private readonly UsbipInstalledProperty usbipInstalled;
         private readonly ViiperStringComboProperty viiperDeviceType;
@@ -1488,6 +1494,12 @@ namespace XboxGamingBar
 
             // Settings properties
             tdpMethod = new TdpMethodProperty(TdpMethodComboBox, this);
+            powerButtonActionAC = new PowerButtonActionProperty(Shared.Enums.Function.SystemPowerButtonActionAC, PowerButtonActionACComboBox, this);
+            powerButtonActionDC = new PowerButtonActionProperty(Shared.Enums.Function.SystemPowerButtonActionDC, PowerButtonActionDCComboBox, this);
+            displayTimeoutAC = new IntTagComboProperty(600, Shared.Enums.Function.SystemDisplayTimeoutAC, DisplayTimeoutACComboBox, this);
+            displayTimeoutDC = new IntTagComboProperty(600, Shared.Enums.Function.SystemDisplayTimeoutDC, DisplayTimeoutDCComboBox, this);
+            hibernateTimeoutAC = new IntTagComboProperty(0, Shared.Enums.Function.SystemHibernateTimeoutAC, HibernateTimeoutACComboBox, this);
+            hibernateTimeoutDC = new IntTagComboProperty(0, Shared.Enums.Function.SystemHibernateTimeoutDC, HibernateTimeoutDCComboBox, this);
             emulationBackend = new EmulationBackendProperty(ViiperEmulationToggle, this);
             usbipInstalled = new UsbipInstalledProperty();
             viiperDeviceType = new ViiperStringComboProperty("xbox360", Shared.Enums.Function.Viiper_DeviceType, ViiperDeviceTypeComboBox, this);
@@ -1741,6 +1753,12 @@ namespace XboxGamingBar
                 legionRightTriggerEnd,
                 legionHairTriggers,
                 tdpMethod,
+                powerButtonActionAC,
+                powerButtonActionDC,
+                displayTimeoutAC,
+                displayTimeoutDC,
+                hibernateTimeoutAC,
+                hibernateTimeoutDC,
                 emulationBackend,
                 usbipInstalled,
                 viiperDeviceType,

@@ -113,6 +113,8 @@
     <Compile Include="Data\Profile\ProfileMatchByExeProperty.cs" />
     <Compile Include="Data\Profile\ProfileGamesOnlyProperty.cs" />
     <Compile Include="Data\TdpMethodProperty.cs" />
+    <Compile Include="Data\PowerButtonActionProperty.cs" />
+    <Compile Include="Data\IntTagComboProperty.cs" />
     <Compile Include="Data\EmulationBackendProperty.cs" />
     <Compile Include="Data\UsbipInstalledProperty.cs" />
     <Compile Include="Data\ViiperStringComboProperty.cs" />
@@ -292,6 +294,9 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="GamingWidget.ViiperStickTrigger.cs">
+      <DependentUpon>GamingWidget.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="GamingWidget.PowerAndSleep.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Performance\GamingWidget.CPUState.cs">

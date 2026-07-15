@@ -5202,6 +5202,224 @@
                         </StackPanel>
                         </Border>
 
+                        <!-- Power & Sleep Card (Collapsible): power button behavior + screen/hibernate
+                             idle timers, merged under one expandable card matching Windows' own
+                             "Power & sleep" settings grouping. Power Button + Display Timeout are
+                             pulled directly from the active Windows power plan; Hibernate Timeout is
+                             a GoTweaks-only feature (see its section note below). -->
+                        <Border x:Name="PowerAndSleepCard" Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Power &amp; Sleep" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Power button behavior and idle timers"
+                                                   Style="{StaticResource CardCaptionStyle}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="PowerAndSleepExpandButton"
+                                                  Grid.Column="1"
+                                                  IsChecked="False"
+                                                  VerticalAlignment="Center"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  Padding="8,4"
+                                                  Click="PowerAndSleepExpandButton_Click">
+                                        <FontIcon x:Name="PowerAndSleepExpandIcon" Glyph="&#xE70D;" FontSize="12"/>
+                                    </ToggleButton>
+                                </Grid>
+
+                                <StackPanel x:Name="PowerAndSleepContent" Visibility="Collapsed" Margin="0,12,0,0">
+
+                                    <TextBlock Text="Power button" FontSize="13" FontWeight="SemiBold" Foreground="#B9C0CC"/>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Plugged in (AC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="PowerButtonActionACComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Sleep" Tag="1"/>
+                                            <ComboBoxItem Content="Hibernate" Tag="2"/>
+                                            <ComboBoxItem Content="Do nothing" Tag="0"/>
+                                            <ComboBoxItem Content="Shut down" Tag="3"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="On battery (DC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="PowerButtonActionDCComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Sleep" Tag="1"/>
+                                            <ComboBoxItem Content="Hibernate" Tag="2"/>
+                                            <ComboBoxItem Content="Do nothing" Tag="0"/>
+                                            <ComboBoxItem Content="Shut down" Tag="3"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <Border Margin="0,14,0,0" Height="1" Background="#22FFFFFF"/>
+
+                                    <TextBlock Text="Turn off screen after" FontSize="13" FontWeight="SemiBold" Foreground="#B9C0CC" Margin="0,12,0,0"/>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Plugged in (AC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="DisplayTimeoutACComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Never" Tag="0"/>
+                                            <ComboBoxItem Content="1 minute" Tag="60"/>
+                                            <ComboBoxItem Content="2 minutes" Tag="120"/>
+                                            <ComboBoxItem Content="3 minutes" Tag="180"/>
+                                            <ComboBoxItem Content="5 minutes" Tag="300"/>
+                                            <ComboBoxItem Content="10 minutes" Tag="600"/>
+                                            <ComboBoxItem Content="15 minutes" Tag="900"/>
+                                            <ComboBoxItem Content="20 minutes" Tag="1200"/>
+                                            <ComboBoxItem Content="30 minutes" Tag="1800"/>
+                                            <ComboBoxItem Content="45 minutes" Tag="2700"/>
+                                            <ComboBoxItem Content="1 hour" Tag="3600"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="On battery (DC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="DisplayTimeoutDCComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Never" Tag="0"/>
+                                            <ComboBoxItem Content="1 minute" Tag="60"/>
+                                            <ComboBoxItem Content="2 minutes" Tag="120"/>
+                                            <ComboBoxItem Content="3 minutes" Tag="180"/>
+                                            <ComboBoxItem Content="5 minutes" Tag="300"/>
+                                            <ComboBoxItem Content="10 minutes" Tag="600"/>
+                                            <ComboBoxItem Content="15 minutes" Tag="900"/>
+                                            <ComboBoxItem Content="20 minutes" Tag="1200"/>
+                                            <ComboBoxItem Content="30 minutes" Tag="1800"/>
+                                            <ComboBoxItem Content="45 minutes" Tag="2700"/>
+                                            <ComboBoxItem Content="1 hour" Tag="3600"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <Border Margin="0,14,0,0" Height="1" Background="#22FFFFFF"/>
+
+                                    <TextBlock Text="Hibernate after" FontSize="13" FontWeight="SemiBold" Foreground="#B9C0CC" Margin="0,12,0,0"/>
+                                    <TextBlock Text="GoTweaks feature - not a Windows setting, since Windows has no built-in idle-to-hibernate timer"
+                                               FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,2,0,0"/>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Plugged in (AC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="HibernateTimeoutACComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Never" Tag="0"/>
+                                            <ComboBoxItem Content="10 minutes" Tag="10"/>
+                                            <ComboBoxItem Content="15 minutes" Tag="15"/>
+                                            <ComboBoxItem Content="20 minutes" Tag="20"/>
+                                            <ComboBoxItem Content="30 minutes" Tag="30"/>
+                                            <ComboBoxItem Content="45 minutes" Tag="45"/>
+                                            <ComboBoxItem Content="1 hour" Tag="60"/>
+                                            <ComboBoxItem Content="2 hours" Tag="120"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="On battery (DC)" FontSize="13" Foreground="White" VerticalAlignment="Center" Grid.Column="0"/>
+                                        <ComboBox x:Name="HibernateTimeoutDCComboBox"
+                                                  Width="150"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource ModernComboBoxStyle}">
+                                            <ComboBoxItem Content="Never" Tag="0"/>
+                                            <ComboBoxItem Content="10 minutes" Tag="10"/>
+                                            <ComboBoxItem Content="15 minutes" Tag="15"/>
+                                            <ComboBoxItem Content="20 minutes" Tag="20"/>
+                                            <ComboBoxItem Content="30 minutes" Tag="30"/>
+                                            <ComboBoxItem Content="45 minutes" Tag="45"/>
+                                            <ComboBoxItem Content="1 hour" Tag="60"/>
+                                            <ComboBoxItem Content="2 hours" Tag="120"/>
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <!-- Windows' own Sleep idle timer (Settings > Power & battery)
+                                         still runs independently of the Hibernate timer above and can
+                                         fire first, sending the system to Sleep before our Hibernate
+                                         timeout is ever reached. This one-off button zeroes Windows'
+                                         Sleep-after timeout for both AC and DC so the GoTweaks
+                                         Hibernate timer above is the only idle-power action left. -->
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="Windows' own Sleep timer can still fire first"
+                                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="DisableSleepTimersStatusText"
+                                                       Text=""
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#6CCB5F"
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button x:Name="DisableSleepTimersButton"
+                                                Grid.Column="1"
+                                                Content="Disable Sleep Timer (AC+DC)"
+                                                Style="{StaticResource ModernButtonStyle}"
+                                                Click="DisableSleepTimersButton_Click"
+                                                VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <muxc:Expander x:Name="PowerButtonInfoExpander"
+                                                   Margin="0,14,0,0"
+                                                   HorizontalAlignment="Stretch"
+                                                   HorizontalContentAlignment="Stretch"
+                                                   IsExpanded="False">
+                                        <muxc:Expander.Header>
+                                            <TextBlock Text="Recommendation" FontSize="12" Foreground="#B9C0CC"/>
+                                        </muxc:Expander.Header>
+                                        <Border Background="#3D2A1A" CornerRadius="4" Padding="10">
+                                            <StackPanel>
+                                                <TextBlock Foreground="#FFB060" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"
+                                                           Text="⚠ Use Hibernate instead of Sleep"/>
+                                                <TextBlock Foreground="#DDB890" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                           Text="Windows' default Sleep (Modern Standby) sometimes drains the battery from background wake-ups or fails to resume cleanly. Hibernate saves the session to disk and fully powers off, which is closer to how SteamOS suspends and tends to be more reliable - at the cost of a slightly slower resume. Setting the Power Button and Hibernate Timeout options above to Hibernate (and disabling Windows' Sleep timer) is the recommended change."/>
+                                            </StackPanel>
+                                        </Border>
+                                    </muxc:Expander>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Debug Card (Collapsible) -->
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>

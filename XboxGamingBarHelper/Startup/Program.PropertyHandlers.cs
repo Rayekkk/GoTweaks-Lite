@@ -77,6 +77,10 @@ namespace XboxGamingBarHelper
             // until three tick-level write failures trigger the self-heal.
             legionManager?.RecoverEcFanOverrideAfterResume();
 
+            // Re-arm the idle-to-hibernate monitor so a fresh sleep/hibernate cycle doesn't
+            // immediately re-trigger on stale pre-sleep idle timestamps.
+            ResetHibernateTimeoutAfterResume();
+
             // Re-apply current profile settings (TDP, CPU boost, EPP, CPU state)
             CurrentProfile_PropertyChanged(sender, null);
         }

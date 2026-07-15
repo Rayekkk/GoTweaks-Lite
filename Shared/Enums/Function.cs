@@ -597,5 +597,26 @@
         // Legion Go 2 default curve the first time the Custom preset is selected. Persisted
         // helper-side; the widget renders it as a read-only chart + an editable per-point list.
         AutoSdrCustomCurve,         // string (JSON array)
+
+        // What the physical power button does, read directly from the active Windows
+        // power plan's Power/Sleep buttons policy (Settings > Power & battery > Power
+        // button behavior) rather than a GoTweaks-owned default. 0=Do nothing, 1=Sleep,
+        // 2=Hibernate, 3=Shut down - matches the raw Windows PowerButtonAction values.
+        SystemPowerButtonActionAC,  // int - action while plugged in (AC)
+        SystemPowerButtonActionDC,  // int - action while on battery (DC)
+
+        // Display (screen) off timeout, read directly from Windows' active power plan
+        // (SUB_VIDEO/VIDEOIDLE), separately for AC/DC. Raw value is SECONDS (0 = never),
+        // matching Windows exactly - same "pull from Windows" model as the Power Button.
+        SystemDisplayTimeoutAC,     // int seconds, 0 = never
+        SystemDisplayTimeoutDC,     // int seconds, 0 = never
+
+        // Idle-to-hibernate timeout, in MINUTES (0 = disabled). Entirely GoTweaks-owned:
+        // Windows only exposes a "sleep after X" idle timer via the standard power-plan
+        // API (no reliable "hibernate after X" setting to piggyback on), so the helper
+        // runs its own idle poll (Program.HibernateTimeout.cs) and calls SetSuspendState
+        // directly. Persisted helper-side (LocalSettingsHelper), not read from Windows.
+        SystemHibernateTimeoutAC,   // int minutes, 0 = disabled
+        SystemHibernateTimeoutDC,   // int minutes, 0 = disabled
     }
 }

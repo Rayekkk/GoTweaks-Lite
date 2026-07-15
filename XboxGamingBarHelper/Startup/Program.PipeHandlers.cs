@@ -94,6 +94,13 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // Handle "Disable Sleep Timer (AC+DC)" request from the Power & Sleep card
+                if (pipeMsg.Extra.ContainsKey("DisableWindowsSleepTimers"))
+                {
+                    HandleDisableWindowsSleepTimers(pipeMsg);
+                    return;
+                }
+
                 // Handle export logs request
                 if (pipeMsg.Extra.ContainsKey("ExportLogs"))
                 {
@@ -392,6 +399,24 @@ namespace XboxGamingBarHelper
             catch (Exception ex)
             {
                 Logger.Error($"Pipe: Failed to hibernate: {ex.Message}");
+                SendPipeAck(pipeMsg.RequestId, false);
+            }
+        }
+
+        // DisableWindowsSleepTimers: zero Windows' own idle-to-sleep timeout for both AC
+        // and DC, so it doesn't put the system to Sleep before the GoTweaks Hibernate
+        // Timeout (System tab) ever fires.
+        private static void HandleDisableWindowsSleepTimers(Shared.IPC.PipeMessage pipeMsg)
+        {
+            try
+            {
+                Logger.Info("Pipe: DisableWindowsSleepTimers request received - setting AC+DC Sleep idle timeout to Never");
+                PowerManager.DisableSleepTimers();
+                SendPipeAck(pipeMsg.RequestId, true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Pipe: DisableWindowsSleepTimers failed: {ex.Message}");
                 SendPipeAck(pipeMsg.RequestId, false);
             }
         }

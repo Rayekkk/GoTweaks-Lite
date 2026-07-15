@@ -1270,6 +1270,12 @@ namespace XboxGamingBarHelper
                 powerManager.MaxCPUState,
                 powerManager.MinCPUState,
                 powerManager.OSPowerMode,
+                powerManager.PowerButtonActionAC,
+                powerManager.PowerButtonActionDC,
+                powerManager.DisplayTimeoutAC,
+                powerManager.DisplayTimeoutDC,
+                powerManager.HibernateTimeoutAC,
+                powerManager.HibernateTimeoutDC,
                 // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
                 //powerManager.LimitGPUClock,
                 //powerManager.GPUClockMin,
@@ -1528,6 +1534,8 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.PropertyChanged += CPUEPP_PropertyChanged;
             powerManager.MaxCPUState.PropertyChanged += CPUState_PropertyChanged;
             powerManager.MinCPUState.PropertyChanged += CPUState_PropertyChanged;
+            powerManager.HibernateTimeoutAC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
+            powerManager.HibernateTimeoutDC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
             //powerManager.LimitGPUClock.PropertyChanged += GPUClock_PropertyChanged;
             //powerManager.GPUClockMin.PropertyChanged += GPUClock_PropertyChanged;
@@ -1598,6 +1606,11 @@ namespace XboxGamingBarHelper
             // controller composite once per boot to clear the boot-time USB phantom that makes
             // Task View pop up on desktop focus. No-op when disabled or on non-Legion hardware.
             Labs.TaskViewFixManager.RunOncePerBootIfEnabled();
+
+            // GoTweaks-owned idle-to-hibernate monitor (System tab). Only runs the polling
+            // timer while at least one of AC/DC is configured - see
+            // UpdateHibernateTimeoutMonitorState / the PropertyChanged subscriptions below.
+            UpdateHibernateTimeoutMonitorState();
 
             // #66: bring up PresentMon integration after managers are ready. Lifecycle is
             // driven from RunningGame_PropertyChanged → OnRunningGameChangedForPresentMon.

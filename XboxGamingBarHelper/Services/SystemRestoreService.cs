@@ -70,6 +70,22 @@ namespace XboxGamingBarHelper.Services
             public int? OriginalOsPowerMode { get; set; }
             public bool OsPowerModeSaved { get; set; } = false;
 
+            // Power Button action original values
+            public uint? OriginalPowerButtonActionAC { get; set; }
+            public uint? OriginalPowerButtonActionDC { get; set; }
+            public bool PowerButtonActionSaved { get; set; } = false;
+
+            // Display Timeout original values (seconds)
+            public uint? OriginalDisplayTimeoutAC { get; set; }
+            public uint? OriginalDisplayTimeoutDC { get; set; }
+            public bool DisplayTimeoutSaved { get; set; } = false;
+
+            // Sleep Timeout original values (seconds) - only touched by the "Disable Sleep
+            // Timer (AC+DC)" button, not by any synced property.
+            public uint? OriginalSleepTimeoutAC { get; set; }
+            public uint? OriginalSleepTimeoutDC { get; set; }
+            public bool SleepTimeoutSaved { get; set; } = false;
+
             // Scheduled task was created
             public bool ScheduledTaskCreated { get; set; } = false;
         }
@@ -261,6 +277,72 @@ namespace XboxGamingBarHelper.Services
             Save();
 
             Logger.Info($"Saved original OS Power Mode value: {currentMode}");
+        }
+
+        /// <summary>
+        /// Saves the original Power Button action values before first modification.
+        /// Call this BEFORE changing the Power Button action for the first time.
+        /// </summary>
+        public static void SaveOriginalPowerButtonAction(uint currentAC, uint currentDC)
+        {
+            Initialize();
+
+            if (_restoreData.PowerButtonActionSaved)
+            {
+                Logger.Debug("Power Button action original values already saved, skipping");
+                return;
+            }
+
+            _restoreData.OriginalPowerButtonActionAC = currentAC;
+            _restoreData.OriginalPowerButtonActionDC = currentDC;
+            _restoreData.PowerButtonActionSaved = true;
+            Save();
+
+            Logger.Info($"Saved original Power Button action values: AC={currentAC}, DC={currentDC}");
+        }
+
+        /// <summary>
+        /// Saves the original Display Timeout values before first modification.
+        /// Call this BEFORE changing the Display Timeout for the first time.
+        /// </summary>
+        public static void SaveOriginalDisplayTimeout(uint currentAC, uint currentDC)
+        {
+            Initialize();
+
+            if (_restoreData.DisplayTimeoutSaved)
+            {
+                Logger.Debug("Display Timeout original values already saved, skipping");
+                return;
+            }
+
+            _restoreData.OriginalDisplayTimeoutAC = currentAC;
+            _restoreData.OriginalDisplayTimeoutDC = currentDC;
+            _restoreData.DisplayTimeoutSaved = true;
+            Save();
+
+            Logger.Info($"Saved original Display Timeout values: AC={currentAC}s, DC={currentDC}s");
+        }
+
+        /// <summary>
+        /// Saves the original Sleep Timeout values before first modification.
+        /// Call this BEFORE changing the Sleep Timeout for the first time.
+        /// </summary>
+        public static void SaveOriginalSleepTimeout(uint currentAC, uint currentDC)
+        {
+            Initialize();
+
+            if (_restoreData.SleepTimeoutSaved)
+            {
+                Logger.Debug("Sleep Timeout original values already saved, skipping");
+                return;
+            }
+
+            _restoreData.OriginalSleepTimeoutAC = currentAC;
+            _restoreData.OriginalSleepTimeoutDC = currentDC;
+            _restoreData.SleepTimeoutSaved = true;
+            Save();
+
+            Logger.Info($"Saved original Sleep Timeout values: AC={currentAC}s, DC={currentDC}s");
         }
 
         /// <summary>
@@ -566,6 +648,78 @@ namespace XboxGamingBarHelper.Services
                 results.AppendLine($"✗ Failed to sweep phantom virtual pads: {ex.Message}");
             }
 
+            // 13. Restore Power Button action
+            if (_restoreData.PowerButtonActionSaved && _restoreData.OriginalPowerButtonActionAC.HasValue)
+            {
+                try
+                {
+                    Logger.Info($"Uninstall: Restoring Power Button action to AC={_restoreData.OriginalPowerButtonActionAC}, DC={_restoreData.OriginalPowerButtonActionDC}");
+                    PowerManager.SetPowerButtonAction(true, _restoreData.OriginalPowerButtonActionAC.Value);
+                    if (_restoreData.OriginalPowerButtonActionDC.HasValue)
+                    {
+                        PowerManager.SetPowerButtonAction(false, _restoreData.OriginalPowerButtonActionDC.Value);
+                    }
+                    results.AppendLine($"✓ Power Button action restored to: AC={_restoreData.OriginalPowerButtonActionAC}, DC={_restoreData.OriginalPowerButtonActionDC}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Uninstall: Failed to restore Power Button action: {ex.Message}");
+                    results.AppendLine($"✗ Failed to restore Power Button action: {ex.Message}");
+                }
+            }
+            else
+            {
+                results.AppendLine("- Power Button action: No original value saved (was not modified)");
+            }
+
+            // 14. Restore Display Timeout
+            if (_restoreData.DisplayTimeoutSaved && _restoreData.OriginalDisplayTimeoutAC.HasValue)
+            {
+                try
+                {
+                    Logger.Info($"Uninstall: Restoring Display Timeout to AC={_restoreData.OriginalDisplayTimeoutAC}s, DC={_restoreData.OriginalDisplayTimeoutDC}s");
+                    PowerManager.SetDisplayTimeoutSeconds(true, _restoreData.OriginalDisplayTimeoutAC.Value);
+                    if (_restoreData.OriginalDisplayTimeoutDC.HasValue)
+                    {
+                        PowerManager.SetDisplayTimeoutSeconds(false, _restoreData.OriginalDisplayTimeoutDC.Value);
+                    }
+                    results.AppendLine($"✓ Display Timeout restored to: AC={_restoreData.OriginalDisplayTimeoutAC}s, DC={_restoreData.OriginalDisplayTimeoutDC}s");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Uninstall: Failed to restore Display Timeout: {ex.Message}");
+                    results.AppendLine($"✗ Failed to restore Display Timeout: {ex.Message}");
+                }
+            }
+            else
+            {
+                results.AppendLine("- Display Timeout: No original value saved (was not modified)");
+            }
+
+            // 15. Restore Sleep Timeout
+            if (_restoreData.SleepTimeoutSaved && _restoreData.OriginalSleepTimeoutAC.HasValue)
+            {
+                try
+                {
+                    Logger.Info($"Uninstall: Restoring Sleep Timeout to AC={_restoreData.OriginalSleepTimeoutAC}s, DC={_restoreData.OriginalSleepTimeoutDC}s");
+                    PowerManager.SetSleepTimeoutSeconds(true, _restoreData.OriginalSleepTimeoutAC.Value);
+                    if (_restoreData.OriginalSleepTimeoutDC.HasValue)
+                    {
+                        PowerManager.SetSleepTimeoutSeconds(false, _restoreData.OriginalSleepTimeoutDC.Value);
+                    }
+                    results.AppendLine($"✓ Sleep Timeout restored to: AC={_restoreData.OriginalSleepTimeoutAC}s, DC={_restoreData.OriginalSleepTimeoutDC}s");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Uninstall: Failed to restore Sleep Timeout: {ex.Message}");
+                    results.AppendLine($"✗ Failed to restore Sleep Timeout: {ex.Message}");
+                }
+            }
+            else
+            {
+                results.AppendLine("- Sleep Timeout: No original value saved (was not modified)");
+            }
+
             results.AppendLine();
             results.AppendLine("Uninstall preparation complete.");
             results.AppendLine("You can now uninstall the app from Windows Settings.");
@@ -613,7 +767,7 @@ namespace XboxGamingBarHelper.Services
         public static bool HasSavedValues()
         {
             Initialize();
-            return _restoreData.CpuBoostSaved || _restoreData.EppSaved || _restoreData.DAServiceSaved;
+            return _restoreData.CpuBoostSaved || _restoreData.EppSaved || _restoreData.DAServiceSaved || _restoreData.PowerButtonActionSaved || _restoreData.DisplayTimeoutSaved || _restoreData.SleepTimeoutSaved;
         }
     }
 }

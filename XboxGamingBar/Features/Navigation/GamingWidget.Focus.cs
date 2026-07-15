@@ -176,6 +176,22 @@ namespace XboxGamingBar
             TdpMethodComboBox.GotFocus += Control_GotFocus;
             TdpMethodComboBox.LostFocus += Control_LostFocus;
 
+            // System tab - Power & Sleep card
+            PowerAndSleepExpandButton.GotFocus += Control_GotFocus;
+            PowerAndSleepExpandButton.LostFocus += Control_LostFocus;
+            PowerButtonActionACComboBox.GotFocus += Control_GotFocus;
+            PowerButtonActionACComboBox.LostFocus += Control_LostFocus;
+            PowerButtonActionDCComboBox.GotFocus += Control_GotFocus;
+            PowerButtonActionDCComboBox.LostFocus += Control_LostFocus;
+            DisplayTimeoutACComboBox.GotFocus += Control_GotFocus;
+            DisplayTimeoutACComboBox.LostFocus += Control_LostFocus;
+            DisplayTimeoutDCComboBox.GotFocus += Control_GotFocus;
+            DisplayTimeoutDCComboBox.LostFocus += Control_LostFocus;
+            HibernateTimeoutACComboBox.GotFocus += Control_GotFocus;
+            HibernateTimeoutACComboBox.LostFocus += Control_LostFocus;
+            HibernateTimeoutDCComboBox.GotFocus += Control_GotFocus;
+            HibernateTimeoutDCComboBox.LostFocus += Control_LostFocus;
+
             // System tab - PawnIO Driver card
             TDPSettingsExpandButton.GotFocus += Control_GotFocus;
             TDPSettingsExpandButton.LostFocus += Control_LostFocus;

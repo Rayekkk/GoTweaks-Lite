@@ -46,6 +46,42 @@ namespace XboxGamingBarHelper.Power
             get { return osPowerMode; }
         }
 
+        private readonly PowerButtonActionProperty powerButtonActionAC;
+        public PowerButtonActionProperty PowerButtonActionAC
+        {
+            get { return powerButtonActionAC; }
+        }
+
+        private readonly PowerButtonActionProperty powerButtonActionDC;
+        public PowerButtonActionProperty PowerButtonActionDC
+        {
+            get { return powerButtonActionDC; }
+        }
+
+        private readonly DisplayTimeoutProperty displayTimeoutAC;
+        public DisplayTimeoutProperty DisplayTimeoutAC
+        {
+            get { return displayTimeoutAC; }
+        }
+
+        private readonly DisplayTimeoutProperty displayTimeoutDC;
+        public DisplayTimeoutProperty DisplayTimeoutDC
+        {
+            get { return displayTimeoutDC; }
+        }
+
+        private readonly HibernateTimeoutProperty hibernateTimeoutAC;
+        public HibernateTimeoutProperty HibernateTimeoutAC
+        {
+            get { return hibernateTimeoutAC; }
+        }
+
+        private readonly HibernateTimeoutProperty hibernateTimeoutDC;
+        public HibernateTimeoutProperty HibernateTimeoutDC
+        {
+            get { return hibernateTimeoutDC; }
+        }
+
         // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
         //private readonly LimitGPUClockProperty limitGPUClock;
         //public LimitGPUClockProperty LimitGPUClock
@@ -84,6 +120,28 @@ namespace XboxGamingBarHelper.Power
             var initialPowerMode = GetOSPowerMode();
             Logger.Info($"Initial OS Power Mode: {initialPowerMode} (0=Efficiency, 1=Balanced, 2=Performance)");
             osPowerMode = new OSPowerModeProperty(initialPowerMode >= 0 ? initialPowerMode : 1, this);
+
+            // Power Button action - read directly from the active Windows power plan
+            // (not a GoTweaks-owned default; Windows' own out-of-box default is Sleep=1).
+            var initialPowerButtonAC = (int)GetPowerButtonAction(true);
+            var initialPowerButtonDC = (int)GetPowerButtonAction(false);
+            Logger.Info($"Initial Power Button action: AC={initialPowerButtonAC}, DC={initialPowerButtonDC} (0=Nothing, 1=Sleep, 2=Hibernate, 3=Shutdown)");
+            powerButtonActionAC = new PowerButtonActionProperty(initialPowerButtonAC, this, true, Shared.Enums.Function.SystemPowerButtonActionAC);
+            powerButtonActionDC = new PowerButtonActionProperty(initialPowerButtonDC, this, false, Shared.Enums.Function.SystemPowerButtonActionDC);
+
+            // Display Timeout - read directly from the active Windows power plan, same
+            // "pull from Windows" model as the Power Button action above.
+            var initialDisplayTimeoutAC = (int)GetDisplayTimeoutSeconds(true);
+            var initialDisplayTimeoutDC = (int)GetDisplayTimeoutSeconds(false);
+            Logger.Info($"Initial Display Timeout: AC={initialDisplayTimeoutAC}s, DC={initialDisplayTimeoutDC}s");
+            displayTimeoutAC = new DisplayTimeoutProperty(initialDisplayTimeoutAC, this, true, Shared.Enums.Function.SystemDisplayTimeoutAC);
+            displayTimeoutDC = new DisplayTimeoutProperty(initialDisplayTimeoutDC, this, false, Shared.Enums.Function.SystemDisplayTimeoutDC);
+
+            // Hibernate Timeout - GoTweaks-owned (no Windows API to read from), loads
+            // its own persisted value from LocalSettings.
+            hibernateTimeoutAC = new HibernateTimeoutProperty(this, true, Shared.Enums.Function.SystemHibernateTimeoutAC);
+            hibernateTimeoutDC = new HibernateTimeoutProperty(this, false, Shared.Enums.Function.SystemHibernateTimeoutDC);
+            Logger.Info($"Initial Hibernate Timeout: AC={hibernateTimeoutAC.Value}min, DC={hibernateTimeoutDC.Value}min");
 
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
             //// Initialize GPU Clock properties
@@ -414,6 +472,205 @@ namespace XboxGamingBarHelper.Power
 
             PowrProf.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
         }
+
+        #region Power Button Action
+
+        /// <summary>
+        /// Gets what the physical power button does. 0=Do nothing, 1=Sleep, 2=Hibernate, 3=Shut down
+        /// - these match the raw Windows PowerButtonAction setting values exactly.
+        /// </summary>
+        public static uint GetPowerButtonAction(bool isAC)
+        {
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_BUTTONS_SUBGROUP;
+            Guid setting = PowerGuids.GUID_POWERBUTTON_ACTION;
+
+            uint result;
+            uint status = isAC
+                ? PowrProf.PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result)
+                : PowrProf.PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't read Power Button action.");
+                return 1; // Sleep - Windows' own out-of-box default
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sets what the physical power button does. 0=Do nothing, 1=Sleep, 2=Hibernate, 3=Shut down.
+        /// </summary>
+        public static void SetPowerButtonAction(bool isAC, uint value)
+        {
+            // Save original values before first modification (for clean uninstall)
+            try
+            {
+                uint currentAC = GetPowerButtonAction(true);
+                uint currentDC = GetPowerButtonAction(false);
+                SystemRestoreService.SaveOriginalPowerButtonAction(currentAC, currentDC);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to save original Power Button action values: {ex.Message}");
+            }
+
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_BUTTONS_SUBGROUP;
+            Guid setting = PowerGuids.GUID_POWERBUTTON_ACTION;
+
+            uint status = isAC
+                ? PowrProf.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, value)
+                : PowrProf.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, value);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't set Power Button action.");
+                return;
+            }
+
+            Logger.Info($"Set Power Button action {(isAC ? "AC" : "DC")} to {value}.");
+            PowrProf.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+        }
+
+        #endregion
+
+        #region Display Timeout
+
+        /// <summary>
+        /// Gets the "turn off display after" idle timeout, in seconds (0 = never).
+        /// </summary>
+        public static uint GetDisplayTimeoutSeconds(bool isAC)
+        {
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_VIDEO_SUBGROUP;
+            Guid setting = PowerGuids.GUID_VIDEO_IDLE;
+
+            uint result;
+            uint status = isAC
+                ? PowrProf.PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result)
+                : PowrProf.PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't read Display Timeout.");
+                return 600; // 10 minutes - Windows' own out-of-box default
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sets the "turn off display after" idle timeout, in seconds (0 = never).
+        /// </summary>
+        public static void SetDisplayTimeoutSeconds(bool isAC, uint seconds)
+        {
+            // Save original values before first modification (for clean uninstall)
+            try
+            {
+                uint currentAC = GetDisplayTimeoutSeconds(true);
+                uint currentDC = GetDisplayTimeoutSeconds(false);
+                SystemRestoreService.SaveOriginalDisplayTimeout(currentAC, currentDC);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to save original Display Timeout values: {ex.Message}");
+            }
+
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_VIDEO_SUBGROUP;
+            Guid setting = PowerGuids.GUID_VIDEO_IDLE;
+
+            uint status = isAC
+                ? PowrProf.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, seconds)
+                : PowrProf.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, seconds);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't set Display Timeout.");
+                return;
+            }
+
+            Logger.Info($"Set Display Timeout {(isAC ? "AC" : "DC")} to {seconds}s.");
+            PowrProf.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+        }
+
+        #endregion
+
+        #region Sleep Timeout
+
+        /// <summary>
+        /// Gets the "put the device to sleep after" idle timeout, in seconds (0 = never).
+        /// </summary>
+        public static uint GetSleepTimeoutSeconds(bool isAC)
+        {
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_SLEEP_SUBGROUP;
+            Guid setting = PowerGuids.GUID_SLEEP_IDLE;
+
+            uint result;
+            uint status = isAC
+                ? PowrProf.PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result)
+                : PowrProf.PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out result);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't read Sleep Timeout.");
+                return 1800; // 30 minutes - Windows' own out-of-box default
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sets the "put the device to sleep after" idle timeout, in seconds (0 = never).
+        /// </summary>
+        public static void SetSleepTimeoutSeconds(bool isAC, uint seconds)
+        {
+            // Save original values before first modification (for clean uninstall)
+            try
+            {
+                uint currentAC = GetSleepTimeoutSeconds(true);
+                uint currentDC = GetSleepTimeoutSeconds(false);
+                SystemRestoreService.SaveOriginalSleepTimeout(currentAC, currentDC);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to save original Sleep Timeout values: {ex.Message}");
+            }
+
+            Guid scheme = GetActiveScheme();
+            Guid subgroup = PowerGuids.GUID_SLEEP_SUBGROUP;
+            Guid setting = PowerGuids.GUID_SLEEP_IDLE;
+
+            uint status = isAC
+                ? PowrProf.PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, seconds)
+                : PowrProf.PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, seconds);
+
+            if (status != 0)
+            {
+                Logger.Error("Can't set Sleep Timeout.");
+                return;
+            }
+
+            Logger.Info($"Set Sleep Timeout {(isAC ? "AC" : "DC")} to {seconds}s.");
+            PowrProf.PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+        }
+
+        /// <summary>
+        /// Disables Windows' own idle-to-sleep timer for both AC and DC in one call - used
+        /// by the System tab's "Disable Sleep Timer (AC+DC)" button so the GoTweaks
+        /// Hibernate Timeout (see HibernateTimeoutProperty) is the only idle-power action
+        /// left, instead of racing against Windows' Sleep timer.
+        /// </summary>
+        public static void DisableSleepTimers()
+        {
+            SetSleepTimeoutSeconds(true, 0);
+            SetSleepTimeoutSeconds(false, 0);
+        }
+
+        #endregion
 
         #region OS Power Mode (Windows 11 Power Slider)
 

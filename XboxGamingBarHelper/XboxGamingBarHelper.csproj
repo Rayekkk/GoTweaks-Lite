@@ -506,6 +506,9 @@
     <Compile Include="Power\GPUClockMaxProperty.cs" />-->
     <Compile Include="Power\CPUEPPProperty.cs" />
     <Compile Include="Power\OSPowerModeProperty.cs" />
+    <Compile Include="Power\PowerButtonActionProperty.cs" />
+    <Compile Include="Power\DisplayTimeoutProperty.cs" />
+    <Compile Include="Power\HibernateTimeoutProperty.cs" />
     <Compile Include="Power\PowerManager.cs" />
     <Compile Include="Profile\DeleteGameProfileProperty.cs" />
     <Compile Include="Profile\GameProfileProperty.cs" />
@@ -533,6 +536,7 @@
     <Compile Include="Startup\Program.HotkeyHandlers.cs" />
     <Compile Include="Startup\Program.Labs.cs" />
     <Compile Include="Startup\Program.ScreenSaver.cs" />
+    <Compile Include="Startup\Program.HibernateTimeout.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
