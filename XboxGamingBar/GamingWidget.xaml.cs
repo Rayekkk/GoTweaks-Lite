@@ -864,10 +864,6 @@ namespace XboxGamingBar
         // Profile Detection Settings
         private readonly ProfileMatchByExeProperty profileMatchByExe;
         private readonly ProfileGamesOnlyProperty profileGamesOnly;
-        // DISABLED: Custom games, blacklist, and current apps features - caused user confusion
-        // private readonly ProfileCustomGamePathProperty profileCustomGamePath;
-        // private readonly ProfileBlacklistPathsProperty profileBlacklistPaths;
-        // private readonly ForegroundAppProperty foregroundApp;
 
         // FPS Limit (RTSS)
         private readonly FPSLimitProperty fpsLimit;
@@ -1104,7 +1100,7 @@ namespace XboxGamingBar
         }
 
         // Profile save settings - backed by fields to avoid UI thread access issues
-        // These are updated in LoadProfileCustomizationSettings and ProfileSettingCheckBox_Changed
+        // These are updated in LoadProfileCustomizationSettings and ProfileSettingsCheckBox_Changed
         private bool _saveTDP = true;
         private bool _saveCPUBoost = true;
         private bool _saveCPUEPP = true;
@@ -1559,11 +1555,6 @@ namespace XboxGamingBar
             // Profile Detection Settings
             profileMatchByExe = new ProfileMatchByExeProperty(ProfileMatchByExeToggle, this);
             profileGamesOnly = new ProfileGamesOnlyProperty(ProfileGamesOnlyToggle, this);
-            // DISABLED: Custom games, blacklist, and current apps features - caused user confusion
-            // profileCustomGamePath = new ProfileCustomGamePathProperty(CustomGamesList, CustomGamesEmptyText, this);
-            // profileBlacklistPaths = new ProfileBlacklistPathsProperty(BlacklistList, BlacklistEmptyText, this);
-            // foregroundApp = new ForegroundAppProperty(ForegroundAppsContainer, this);
-            // foregroundApp.OnAppsChanged = UpdateForegroundAppsList;
 
             // Set up Legion tab visibility callback
             legionGoDetected.SetVisibilityCallback(SetLegionTabVisibility);
@@ -1844,10 +1835,6 @@ namespace XboxGamingBar
                 // Profile Detection Settings
                 profileMatchByExe,
                 profileGamesOnly
-                // DISABLED: Custom games, blacklist, and current apps features
-                // profileCustomGamePath,
-                // profileBlacklistPaths,
-                // foregroundApp
             );
             widgetPropsTimer.Stop();
             Logger.Info($"[TIMING] WidgetProperties creation: {widgetPropsTimer.ElapsedMilliseconds}ms");

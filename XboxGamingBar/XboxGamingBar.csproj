@@ -112,10 +112,6 @@
     <Compile Include="Data\Profile\DeleteGameProfileProperty.cs" />
     <Compile Include="Data\Profile\ProfileMatchByExeProperty.cs" />
     <Compile Include="Data\Profile\ProfileGamesOnlyProperty.cs" />
-    <Compile Include="Data\Profile\ProfileCustomGamePathProperty.cs" />
-    <Compile Include="Data\Profile\ProfileBlacklistPathsProperty.cs" />
-    <Compile Include="Data\ForegroundAppProperty.cs" />
-    <Compile Include="Data\UseManufacturerWMIProperty.cs" />
     <Compile Include="Data\TdpMethodProperty.cs" />
     <Compile Include="Data\EmulationBackendProperty.cs" />
     <Compile Include="Data\UsbipInstalledProperty.cs" />
@@ -194,7 +190,6 @@
     <Compile Include="Data\GPD\GPDApplyMappingsProperty.cs" />
     <Compile Include="Data\GPD\GPDButtonL4Property.cs" />
     <Compile Include="Data\GPD\GPDButtonR4Property.cs" />
-    <Compile Include="Data\GPD\GPDControllerEmulationProperties.cs" />
     <Compile Include="Data\Controller\ControllerEmulationProperties.cs" />
     <Compile Include="Data\Legion\LegionTouchpadEnabledProperty.cs" />
     <Compile Include="Data\Legion\LegionLightModeProperty.cs" />

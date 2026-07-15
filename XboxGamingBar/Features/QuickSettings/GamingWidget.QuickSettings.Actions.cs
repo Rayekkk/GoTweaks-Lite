@@ -495,6 +495,7 @@ namespace XboxGamingBar
         /// </summary>
         private void CycleRotation()
         {
+            if (!IsInternalPanelActive) return;
             if (displayOrientation != null)
             {
                 int currentOrientation = displayOrientation.Value;
@@ -1397,22 +1398,6 @@ namespace XboxGamingBar
             UpdateCustomShortcutKeyTags();
 
             UpdateQuickSettingsTileStates();
-        }
-
-        /// <summary>
-        /// Handle tile visibility checkbox changes
-        /// </summary>
-        private void TileVisibility_Changed(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox checkBox && checkBox.Tag is string tileId)
-            {
-                bool isVisible = checkBox.IsChecked ?? true;
-
-                if (qsTileMap.TryGetValue(tileId, out var tile))
-                {
-                    tile.IsVisible = isVisible;
-                }
-            }
         }
 
     }

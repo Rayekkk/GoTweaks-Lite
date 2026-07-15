@@ -538,13 +538,6 @@ namespace XboxGamingBar
             ViiperLegionLDisabledHint.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void LegionLShortcutApplyButton_Click(object sender, RoutedEventArgs e)
-        {
-            SaveLegionRemapSettings();
-            ApplyLegionButtonConfig(true);
-            UpdateLegionRemapDescription();
-        }
-
         private void LegionLCommandApplyButton_Click(object sender, RoutedEventArgs e)
         {
             SaveLegionRemapSettings();
@@ -573,13 +566,6 @@ namespace XboxGamingBar
             if (selection != 2 && selection != 3)
                 ApplyLegionButtonConfig(false);
 
-            UpdateLegionRemapDescription();
-        }
-
-        private void LegionRShortcutApplyButton_Click(object sender, RoutedEventArgs e)
-        {
-            SaveLegionRemapSettings();
-            ApplyLegionButtonConfig(false);
             UpdateLegionRemapDescription();
         }
 

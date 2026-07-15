@@ -342,13 +342,6 @@ namespace XboxGamingBar
             }
         }
 
-        private void OSDOption_Changed(object sender, RoutedEventArgs e)
-        {
-            if (isLoadingOSDConfig) return;
-
-            SaveCurrentOSDConfig();
-        }
-
         /// <summary>
         /// Refreshes the OSD items control with the current level's order and enabled states
         /// </summary>
@@ -436,28 +429,6 @@ namespace XboxGamingBar
                     SaveOSDConfigToStorage();
                     SendOSDConfigToHelper();
                 }
-            }
-        }
-
-        private void OSDItemLabelColor_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (isLoadingOSDConfig) return;
-
-            if (sender is ComboBox cb && cb.Tag is string itemId && cb.SelectedItem is ComboBoxItem selected && selected.Tag is string colorTag)
-            {
-                int currentLevel = osdCustomizeLevel;
-                if (!osdItemLabelColors.ContainsKey(currentLevel))
-                {
-                    osdItemLabelColors[currentLevel] = new Dictionary<string, string>();
-                }
-                osdItemLabelColors[currentLevel][itemId] = colorTag;
-
-                // Update the view model to refresh the preview
-                var vm = osdItemViewModels.FirstOrDefault(v => v.Id == itemId);
-                if (vm != null) vm.LabelColor = colorTag;
-
-                SaveOSDConfigToStorage();
-                SendOSDConfigToHelper();
             }
         }
 
@@ -784,82 +755,6 @@ namespace XboxGamingBar
                 ProfileDetectionExpandIcon.Glyph = isProfileDetectionExpanded ? "\uE70E" : "\uE70D";
             }
         }
-
-        /* DISABLED: Custom games, blacklist, and current apps features - caused user confusion
-        private async void CustomGameAddButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var picker = new Windows.Storage.Pickers.FileOpenPicker();
-                picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder;
-                picker.FileTypeFilter.Add(".exe");
-                picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.List;
-
-                var file = await picker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    profileCustomGamePath?.AddPath(file.Path);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error adding custom game: {ex.Message}");
-            }
-        }
-
-        private void CustomGameRemoveButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button button && button.Tag is string path)
-            {
-                profileCustomGamePath?.RemovePath(path);
-            }
-        }
-
-        private void BlacklistRemoveButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button button && button.Tag is string path)
-            {
-                profileBlacklistPaths?.RemovePath(path);
-            }
-        }
-
-        private async void ForegroundAppAddCustom_Click(object sender, RoutedEventArgs e)
-        {
-            var button = sender as Button;
-            var path = button?.Tag as string;
-            if (!string.IsNullOrEmpty(path))
-            {
-                profileBlacklistPaths?.RemovePath(path);
-                profileCustomGamePath?.AddPath(path);
-                await System.Threading.Tasks.Task.Delay(200);
-                await foregroundApp?.Sync();
-            }
-        }
-
-        private async void ForegroundAppAddBlacklist_Click(object sender, RoutedEventArgs e)
-        {
-            var button = sender as Button;
-            var path = button?.Tag as string;
-            if (!string.IsNullOrEmpty(path))
-            {
-                profileCustomGamePath?.RemovePath(path);
-                profileBlacklistPaths?.AddPath(path);
-                await System.Threading.Tasks.Task.Delay(200);
-                await foregroundApp?.Sync();
-            }
-        }
-
-        private void UpdateForegroundAppsList(List<string> paths)
-        {
-            // ... method body removed for brevity ...
-        }
-
-        private Border CreateForegroundAppRow(string path)
-        {
-            // ... method body removed for brevity ...
-            return null;
-        }
-        END DISABLED */
 
         private void ButtonRemappingExpandToggle_Click(object sender, RoutedEventArgs e)
         {

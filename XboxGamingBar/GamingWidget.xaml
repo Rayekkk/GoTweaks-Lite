@@ -1479,61 +1479,6 @@
                                                       IsOn="True"/>
                                     </Grid>
 
-                                    <!-- COMMENTED OUT: Current Apps, Custom Games, and Blacklist sections
-                                         These features caused user confusion and are disabled for now.
-
-                                    <StackPanel>
-                                        <TextBlock Text="Current apps"
-                                                   FontSize="11"
-                                                   Foreground="#888888"
-                                                   Margin="0,0,0,4"/>
-                                        <StackPanel x:Name="ForegroundAppsContainer" Spacing="4">
-                                            <TextBlock x:Name="ForegroundAppsEmptyText"
-                                                       Text="No apps detected"
-                                                       FontSize="11"
-                                                       Foreground="#888888"
-                                                       FontStyle="Italic"/>
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <StackPanel>
-                                        <TextBlock Text="Custom games"
-                                                   FontSize="13"
-                                                   Foreground="#FFFFFF"/>
-                                        <TextBlock Text="Apps always treated as games"
-                                                   FontSize="11"
-                                                   Foreground="#888888"/>
-                                        <TextBlock x:Name="CustomGamesEmptyText"
-                                                   Text="No custom games added"
-                                                   FontSize="11"
-                                                   Foreground="#888888"
-                                                   FontStyle="Italic"
-                                                   Margin="0,8,0,0"/>
-                                        <ItemsControl x:Name="CustomGamesList" Margin="0,4,0,0">
-                                            ...
-                                        </ItemsControl>
-                                    </StackPanel>
-
-                                    <StackPanel>
-                                        <TextBlock Text="Blacklist"
-                                                   FontSize="13"
-                                                   Foreground="#FFFFFF"/>
-                                        <TextBlock Text="Apps never treated as games"
-                                                   FontSize="11"
-                                                   Foreground="#888888"/>
-                                        <TextBlock x:Name="BlacklistEmptyText"
-                                                   Text="No apps blacklisted"
-                                                   FontSize="11"
-                                                   Foreground="#888888"
-                                                   FontStyle="Italic"
-                                                   Margin="0,8,0,0"/>
-                                        <ItemsControl x:Name="BlacklistList" Margin="0,4,0,0">
-                                            ...
-                                        </ItemsControl>
-                                    </StackPanel>
-
-                                    END COMMENTED OUT -->
-
                                 </StackPanel>
                             </StackPanel>
                         </Border>

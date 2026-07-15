@@ -43,18 +43,6 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        // Map of button index to button name (used by GamepadButtonMapping serialization,
-        // and by the Nintendo Layout / Desktop Controls presets to key gamepadButtonMappings)
-        private static readonly string[] GamepadButtonNames = new[]
-        {
-            "LSClick", "LSUp", "LSDown", "LSLeft", "LSRight",
-            "RSClick", "RSUp", "RSDown", "RSLeft", "RSRight",
-            "DPadUp", "DPadDown", "DPadLeft", "DPadRight",
-            "A", "B", "X", "Y",
-            "LB", "LT", "RB", "RT",
-            "Start", "Select"
-        };
-
         /// <summary>
         /// Serializes gamepad button mappings dictionary to JSON string.
         /// Format: {"ButtonName":{Type:0,GamepadAction:5,...},...}
