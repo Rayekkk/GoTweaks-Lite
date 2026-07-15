@@ -1657,6 +1657,19 @@ namespace XboxGamingBarHelper.Performance
                             currentTdp.SetValue(newTdpString);
                             lastTdpString = newTdpString;
                         }
+
+                        // Keep the master TDP property (Function.TDP) in sync with the live Custom
+                        // SPL value. Nothing else does this: dragging the Custom sliders only goes
+                        // through the separate LegionCustomTDPSlow/Fast/Peak wire channels, so
+                        // TDP.Value otherwise stays frozen at whatever it was last explicitly set
+                        // to. That stale value is exactly what TDP_PropertyChanged persists to the
+                        // profile and what the widget adopts as "helper is source of truth" on every
+                        // reconnect - without this, a live Custom TDP change silently reverts the
+                        // next time the widget reconnects (even without a helper restart).
+                        if (TDP.Value != slow.Value)
+                        {
+                            TDP.SetValue(slow.Value);
+                        }
                     }
                     else
                     {
