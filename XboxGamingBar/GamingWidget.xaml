@@ -272,16 +272,19 @@
             <Setter Property="FocusVisualMargin" Value="-3,-3,-3,-3"/>
         </Style>
 
-        <!-- Accent-when-off ToggleButton Style (Scale button on the Scaling tab): a full custom
-             template, not just resource overrides, so the accent-on-idle / neutral-on-checked
-             coloring stays scoped to this one control instead of affecting every other
-             ToggleButton in the app (the many small expand/collapse chevron toggles). -->
+        <!-- Scale button (Scaling tab): standard gray fill like every other button, with an
+             accent-colored border so it still reads as the primary action on the tab. Full
+             custom template (not just resource overrides) so this stays scoped to this one
+             control instead of affecting every other ToggleButton in the app (the many small
+             expand/collapse chevron toggles). -->
         <Style x:Key="ScaleToggleButtonStyle" TargetType="ToggleButton">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="{StaticResource ButtonPadding}"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="{StaticResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SystemAccentBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
             <Setter Property="UseSystemFocusVisuals" Value="True"/>
             <Setter Property="FocusVisualPrimaryBrush" Value="White"/>
             <Setter Property="FocusVisualSecondaryBrush" Value="Transparent"/>
@@ -291,7 +294,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="RootBorder"
-                                Background="{StaticResource SystemAccentBrush}"
+                                Background="{TemplateBinding Background}"
                                 CornerRadius="{StaticResource ControlCornerRadius}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 BorderBrush="{TemplateBinding BorderBrush}">
@@ -300,12 +303,16 @@
                                     <VisualState x:Name="Normal"/>
                                     <VisualState x:Name="PointerOver">
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Opacity" To="0.85" Duration="0"/>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundPointerOver}"/>
+                                            </ObjectAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Opacity" To="0.7" Duration="0"/>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource ButtonBackgroundPressed}"/>
+                                            </ObjectAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Disabled">
