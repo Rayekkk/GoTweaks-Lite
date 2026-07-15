@@ -1658,17 +1658,20 @@ namespace XboxGamingBarHelper.Performance
                             lastTdpString = newTdpString;
                         }
 
-                        // Keep the master TDP property (Function.TDP) in sync with the live Custom
-                        // SPL value. Nothing else does this: dragging the Custom sliders only goes
-                        // through the separate LegionCustomTDPSlow/Fast/Peak wire channels, so
-                        // TDP.Value otherwise stays frozen at whatever it was last explicitly set
-                        // to. That stale value is exactly what TDP_PropertyChanged persists to the
-                        // profile and what the widget adopts as "helper is source of truth" on every
-                        // reconnect - without this, a live Custom TDP change silently reverts the
-                        // next time the widget reconnects (even without a helper restart).
+                        // Keep the master TDP property's (Function.TDP) CACHE in sync with the live
+                        // Custom SPL value, so a BatchGet on widget reconnect reflects the true SPL
+                        // instead of a stale value frozen at whatever TDP was last explicitly set to.
+                        // MUST be SetValueSilent, not SetValue: TDPProperty.NotifyPropertyChanged
+                        // unconditionally calls Manager.SetTDP(Value), which in Custom mode calls
+                        // ReassertCustomTDP() - re-pushing the CACHED customTDPFast/Peak over WMI.
+                        // SPL changes on every tick of a slider drag, so a plain SetValue() here fired
+                        // that reassert cascade several times a second, racing the real SPPT/FPPT
+                        // writes coming from the boost sliders and stomping them back to stale cached
+                        // values (regression confirmed via on-device helper log: FPPT/SPPT visibly
+                        // reverting to earlier cached numbers seconds after being set to newer ones).
                         if (TDP.Value != slow.Value)
                         {
-                            TDP.SetValue(slow.Value);
+                            TDP.SetValueSilent(slow.Value);
                         }
                     }
                     else
