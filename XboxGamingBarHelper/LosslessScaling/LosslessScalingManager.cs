@@ -160,7 +160,33 @@ namespace XboxGamingBarHelper.LosslessScaling
         private readonly LosslessScalingResetProfileProperty losslessScalingResetProfile;
         public LosslessScalingResetProfileProperty LosslessScalingResetProfile => losslessScalingResetProfile;
 
+        private readonly LosslessScalingLS1SharpnessProperty losslessScalingLS1Sharpness;
+        public LosslessScalingLS1SharpnessProperty LosslessScalingLS1Sharpness => losslessScalingLS1Sharpness;
+
         #endregion
+
+        // --- Real Settings.xml <-> GoTweaks wire value translation tables ---
+        // Confirmed against a real on-device Settings.xml (2026-07-15): several fields use
+        // short codes or no-space spellings that don't match the widget's own display
+        // strings. Anime4kType codes beyond "S" (Small, confirmed) are inferred from the
+        // widget's 5-option list (Small/Medium/Large/VeryLarge/UltraLarge) - verify M/L/VL/UL
+        // against a real profile if one becomes available.
+        private static readonly Dictionary<string, string> Anime4KSizeToCode = new Dictionary<string, string>
+        {
+            { "Small", "S" }, { "Medium", "M" }, { "Large", "L" }, { "Very Large", "VL" }, { "Ultra Large", "UL" }
+        };
+        private static readonly Dictionary<string, string> Anime4KCodeToSize =
+            Anime4KSizeToCode.ToDictionary(kv => kv.Value, kv => kv.Key);
+
+        // Widget displays "Aspect Ratio" (with a space) for the ScalingFitMode option that
+        // Lossless Scaling itself stores as "AspectRatio" (no space). "Fullscreen" matches
+        // on both sides.
+        private static readonly Dictionary<string, string> AspectRatioToScalingFitMode = new Dictionary<string, string>
+        {
+            { "Aspect Ratio", "AspectRatio" }, { "Fullscreen", "Fullscreen" }
+        };
+        private static readonly Dictionary<string, string> ScalingFitModeToAspectRatio =
+            AspectRatioToScalingFitMode.ToDictionary(kv => kv.Value, kv => kv.Key);
 
         // State tracking
         private bool isScalingActive = false;
@@ -233,6 +259,7 @@ namespace XboxGamingBarHelper.LosslessScaling
             losslessScalingLS1Type = new LosslessScalingLS1TypeProperty(settings.LS1Type, this);
             losslessScalingMaxFrameLatency = new LosslessScalingMaxFrameLatencyProperty(settings.MaxFrameLatency, this);
             losslessScalingResetProfile = new LosslessScalingResetProfileProperty(false, this);
+            losslessScalingLS1Sharpness = new LosslessScalingLS1SharpnessProperty(settings.LS1Sharpness, this);
 
             // Subscribe to action properties
             losslessScalingEnabled.PropertyChanged += LosslessScalingEnabled_PropertyChanged;
@@ -832,6 +859,10 @@ namespace XboxGamingBarHelper.LosslessScaling
             public bool ResizeBeforeScaling { get; set; } = false;
             public string LS1Type { get; set; } = "BALANCED";   // BALANCED, PERFORMANCE
             public int MaxFrameLatency { get; set; } = 1;       // 0..4
+
+            // Added 2026-07-15 — LS1's own sharpness field (Settings.xml "LS1Sharpness"),
+            // distinct from the general Sharpness field above (used by FSR/NIS/SGSR/BCAS).
+            public int LS1Sharpness { get; set; } = 1;
         }
 
         /// <summary>
@@ -976,11 +1007,25 @@ namespace XboxGamingBarHelper.LosslessScaling
                 settings.ScalingType = profile.Element("ScalingType")?.Value ?? "Off";
                 settings.Sharpness = int.TryParse(profile.Element("Sharpness")?.Value, out int sharpness) ? sharpness : 50;
                 settings.FSROptimize = bool.TryParse(profile.Element("FSROptimize")?.Value?.ToLower(), out bool fsrOpt) && fsrOpt;
-                settings.Anime4KSize = profile.Element("Anime4KSize")?.Value ?? "Medium";
-                settings.Anime4KVRS = bool.TryParse(profile.Element("Anime4KVRS")?.Value?.ToLower(), out bool vrs) && vrs;
-                settings.ScaleMode = profile.Element("ScaleMode")?.Value ?? "Auto";
-                settings.ScaleFactor = int.TryParse(profile.Element("ScaleFactor")?.Value, out int factor) ? factor : 2;
-                settings.AspectRatio = profile.Element("AspectRatio")?.Value ?? "Aspect Ratio";
+                // Real element is "Anime4kType" (lowercase k, "Type" not "Size"), storing a
+                // short code (S/M/L/VL/UL) rather than the widget's full-word display value.
+                string anime4kCode = profile.Element("Anime4kType")?.Value;
+                settings.Anime4KSize = anime4kCode != null && Anime4KCodeToSize.TryGetValue(anime4kCode, out var anime4kWord) ? anime4kWord : "Medium";
+                // Real element is "VRS" (was misread as "Anime4KVRS", which doesn't exist).
+                settings.Anime4KVRS = bool.TryParse(profile.Element("VRS")?.Value?.ToLower(), out bool vrs) && vrs;
+                // Real element is "ScalingMode" (was misread as "ScaleMode", which doesn't exist).
+                settings.ScaleMode = profile.Element("ScalingMode")?.Value ?? "Auto";
+                // Real LS stores a decimal multiplier (e.g. 1.5), not a whole "1-5" int - parse
+                // as double and round for our int-based slider instead of TryParse<int>, which
+                // silently fails on any fractional value and always fell back to the default.
+                settings.ScaleFactor = double.TryParse(profile.Element("ScaleFactor")?.Value,
+                    System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture,
+                    out double factorD) ? (int)Math.Round(factorD) : 2;
+                // Real element is "ScalingFitMode" (was misread as "AspectRatio", which doesn't
+                // exist), storing "AspectRatio"/"Fullscreen" (no space) vs the widget's "Aspect
+                // Ratio"/"Fullscreen" display values.
+                string scalingFitMode = profile.Element("ScalingFitMode")?.Value;
+                settings.AspectRatio = scalingFitMode != null && ScalingFitModeToAspectRatio.TryGetValue(scalingFitMode, out var aspectWord) ? aspectWord : "Aspect Ratio";
                 settings.FrameGenType = profile.Element("FrameGeneration")?.Value ?? "Off";
                 settings.LSFG3Mode = profile.Element("LSFG3Mode1")?.Value ?? "FIXED";
                 settings.LSFG3Multiplier = int.TryParse(profile.Element("LSFG3Multiplier")?.Value, out int mult) ? mult : 2;
@@ -1000,6 +1045,7 @@ namespace XboxGamingBarHelper.LosslessScaling
                 settings.ResizeBeforeScaling = bool.TryParse(profile.Element("ResizeBeforeScaling")?.Value?.ToLower(), out bool rbs) && rbs;
                 settings.LS1Type = profile.Element("LS1Type")?.Value ?? "BALANCED";
                 settings.MaxFrameLatency = int.TryParse(profile.Element("MaxFrameLatency")?.Value, out int latency) ? latency : 1;
+                settings.LS1Sharpness = int.TryParse(profile.Element("LS1Sharpness")?.Value, out int ls1Sharpness) ? ls1Sharpness : 1;
 
                 Logger.Info($"Read settings from profile '{profileName}'");
             }
@@ -1035,11 +1081,13 @@ namespace XboxGamingBarHelper.LosslessScaling
                 SetElementValue(profile, "ScalingType", losslessScalingScalingType.Value);
                 SetElementValue(profile, "Sharpness", losslessScalingSharpness.Value.ToString());
                 SetElementValue(profile, "FSROptimize", losslessScalingFSROptimize.Value.ToString().ToLower());
-                SetElementValue(profile, "Anime4KSize", losslessScalingAnime4KSize.Value);
-                SetElementValue(profile, "Anime4KVRS", losslessScalingAnime4KVRS.Value.ToString().ToLower());
-                SetElementValue(profile, "ScaleMode", losslessScalingScaleMode.Value);
+                string anime4kCode = Anime4KSizeToCode.TryGetValue(losslessScalingAnime4KSize.Value, out var code) ? code : "M";
+                SetElementValue(profile, "Anime4kType", anime4kCode);
+                SetElementValue(profile, "VRS", losslessScalingAnime4KVRS.Value.ToString().ToLower());
+                SetElementValue(profile, "ScalingMode", losslessScalingScaleMode.Value);
                 SetElementValue(profile, "ScaleFactor", losslessScalingScaleFactor.Value.ToString());
-                SetElementValue(profile, "AspectRatio", losslessScalingAspectRatio.Value);
+                string scalingFitMode = AspectRatioToScalingFitMode.TryGetValue(losslessScalingAspectRatio.Value, out var fitMode) ? fitMode : "AspectRatio";
+                SetElementValue(profile, "ScalingFitMode", scalingFitMode);
                 SetElementValue(profile, "FrameGeneration", losslessScalingFrameGenType.Value);
                 SetElementValue(profile, "LSFG3Mode1", losslessScalingLSFG3Mode.Value);
                 SetElementValue(profile, "LSFG3Multiplier", losslessScalingLSFG3Multiplier.Value.ToString());
@@ -1059,6 +1107,7 @@ namespace XboxGamingBarHelper.LosslessScaling
                 SetElementValue(profile, "ResizeBeforeScaling", losslessScalingResizeBeforeScaling.Value.ToString().ToLower());
                 SetElementValue(profile, "LS1Type", losslessScalingLS1Type.Value);
                 SetElementValue(profile, "MaxFrameLatency", losslessScalingMaxFrameLatency.Value.ToString());
+                SetElementValue(profile, "LS1Sharpness", losslessScalingLS1Sharpness.Value.ToString());
 
                 doc.Save(SETTINGS_PATH);
                 Logger.Info($"Settings written to profile '{profileName}'");
@@ -1170,6 +1219,7 @@ namespace XboxGamingBarHelper.LosslessScaling
             losslessScalingResizeBeforeScaling.SetValue(settings.ResizeBeforeScaling, now);
             losslessScalingLS1Type.SetValue(settings.LS1Type, now);
             losslessScalingMaxFrameLatency.SetValue(settings.MaxFrameLatency, now);
+            losslessScalingLS1Sharpness.SetValue(settings.LS1Sharpness, now);
         }
 
         #endregion

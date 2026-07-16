@@ -1350,6 +1350,29 @@ namespace XboxGamingBarHelper
                 losslessScalingManager.LosslessScalingCreateProfile,
                 losslessScalingManager.LosslessScalingBringToForeground,
                 losslessScalingManager.LosslessScalingLaunch,
+                // The following were never registered here, so Set messages for them were
+                // silently rejected by FunctionalProperties.HandlePipeMessage ("Property X
+                // not found for pipe message") - the widget's Sharpness/ScaleFactor/
+                // AspectRatio/Anime4K/ScaleMode/Sync-Capture-HDR-Gsync-Resize/LS1Type/
+                // MaxFrameLatency/ResetProfile controls never actually reached the helper's
+                // cached values, no matter what the user set them to (2026-07-15 audit).
+                losslessScalingManager.LosslessScalingSharpness,
+                losslessScalingManager.LosslessScalingFSROptimize,
+                losslessScalingManager.LosslessScalingAnime4KSize,
+                losslessScalingManager.LosslessScalingAnime4KVRS,
+                losslessScalingManager.LosslessScalingScaleMode,
+                losslessScalingManager.LosslessScalingScaleFactor,
+                losslessScalingManager.LosslessScalingAspectRatio,
+                losslessScalingManager.LosslessScalingSyncMode,
+                losslessScalingManager.LosslessScalingCaptureApi,
+                losslessScalingManager.LosslessScalingDrawFps,
+                losslessScalingManager.LosslessScalingHdrSupport,
+                losslessScalingManager.LosslessScalingGsyncSupport,
+                losslessScalingManager.LosslessScalingResizeBeforeScaling,
+                losslessScalingManager.LosslessScalingLS1Type,
+                losslessScalingManager.LosslessScalingMaxFrameLatency,
+                losslessScalingManager.LosslessScalingResetProfile,
+                losslessScalingManager.LosslessScalingLS1Sharpness,
                 settingsManager.AutoStartRTSS,
                 settingsManager.UseManufacturerWMI,
                 settingsManager.TdpMethod,

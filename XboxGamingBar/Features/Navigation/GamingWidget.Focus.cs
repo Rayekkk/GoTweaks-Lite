@@ -249,6 +249,8 @@ namespace XboxGamingBar
             LosslessScalingScalingTypeComboBox.LostFocus += Control_LostFocus;
             LosslessScalingSharpnessSlider.GotFocus += Control_GotFocus;
             LosslessScalingSharpnessSlider.LostFocus += Control_LostFocus;
+            LosslessScalingLS1SharpnessSlider.GotFocus += Control_GotFocus;
+            LosslessScalingLS1SharpnessSlider.LostFocus += Control_LostFocus;
             LosslessScalingScaleModeComboBox.GotFocus += Control_GotFocus;
             LosslessScalingScaleModeComboBox.LostFocus += Control_LostFocus;
             LosslessScalingScaleFactorSlider.GotFocus += Control_GotFocus;

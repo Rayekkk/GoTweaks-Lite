@@ -618,5 +618,14 @@
         // directly. Persisted helper-side (LocalSettingsHelper), not read from Windows.
         SystemHibernateTimeoutAC,   // int minutes, 0 = disabled
         SystemHibernateTimeoutDC,   // int minutes, 0 = disabled
+
+        // Lossless Scaling's LS1 algorithm has its own dedicated sharpness field
+        // (Settings.xml "LS1Sharpness"), distinct from the general "Sharpness" field used
+        // by FSR/NIS/SGSR/BCAS (LosslessScalingSharpness). The widget used to show the
+        // general Sharpness slider for LS1 too, which pointed at the wrong XML element -
+        // this is the correct, separate one. Range inferred from a real Settings.xml
+        // sample (observed value 1, i.e. a small integer scale, not the 0-100 the general
+        // Sharpness field uses) - verify against a wider range of real profiles if possible.
+        LosslessScalingLS1Sharpness, // int, small range (see LS1SharpnessSlider in XAML)
     }
 }

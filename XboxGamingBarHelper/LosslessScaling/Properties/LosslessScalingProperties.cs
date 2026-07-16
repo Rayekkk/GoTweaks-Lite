@@ -261,4 +261,12 @@ namespace XboxGamingBarHelper.LosslessScaling.Properties
         public LosslessScalingResetProfileProperty(bool inValue, LosslessScalingManager inManager)
             : base(inValue, null, Function.LosslessScalingResetProfile, inManager) { }
     }
+
+    // LS1's own sharpness field (Settings.xml "LS1Sharpness"), separate from the general
+    // Sharpness field used by FSR/NIS/SGSR/BCAS.
+    internal class LosslessScalingLS1SharpnessProperty : HelperProperty<int, LosslessScalingManager>
+    {
+        public LosslessScalingLS1SharpnessProperty(int inValue, LosslessScalingManager inManager)
+            : base(inValue, null, Function.LosslessScalingLS1Sharpness, inManager) { }
+    }
 }

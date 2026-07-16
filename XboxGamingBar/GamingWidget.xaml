@@ -6002,6 +6002,27 @@
                                     </ComboBox>
                                 </StackPanel>
 
+                                <!-- LS1 Sharpness (LS1 only) - LS1's own dedicated sharpness field
+                                     (Settings.xml "LS1Sharpness"), separate from the general
+                                     Sharpness field above used by FSR/NIS/SGSR/BCAS. -->
+                                <StackPanel x:Name="LosslessScalingLS1SharpnessPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Sharpness" FontSize="13" Foreground="#FFFFFF"/>
+                                        <TextBlock x:Name="LosslessScalingLS1SharpnessValueText"
+                                                   Text="{Binding ElementName=LosslessScalingLS1SharpnessSlider, Path=Value}"
+                                                   FontSize="13"
+                                                   Foreground="#B9C0CC"
+                                                   HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <Slider x:Name="LosslessScalingLS1SharpnessSlider"
+                                            Style="{StaticResource ModernSliderStyle}"
+                                            Minimum="0" Maximum="10"
+                                            TickFrequency="1"
+                                            SnapsTo="Ticks"
+                                            TickPlacement="BottomRight"
+                                            IsEnabled="False"/>
+                                </StackPanel>
+
                                 <!-- Resize Before Scale (any non-Off scaling type) -->
                                 <Grid x:Name="LosslessScalingResizeBeforePanel" Visibility="Collapsed" Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>

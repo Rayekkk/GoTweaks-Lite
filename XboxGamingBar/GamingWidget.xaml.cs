@@ -681,6 +681,7 @@ namespace XboxGamingBar
         private readonly LosslessScalingLS1TypeProperty losslessScalingLS1Type;
         private readonly LosslessScalingMaxFrameLatencyProperty losslessScalingMaxFrameLatency;
         private readonly LosslessScalingResetProfileProperty losslessScalingResetProfile;
+        private readonly LosslessScalingLS1SharpnessProperty losslessScalingLS1Sharpness;
 
         // Legion Go properties
         private readonly LegionGoDetectedProperty legionGoDetected;
@@ -1334,6 +1335,7 @@ namespace XboxGamingBar
             losslessScalingLS1Type = new LosslessScalingLS1TypeProperty(LosslessScalingLS1TypeComboBox, this);
             losslessScalingMaxFrameLatency = new LosslessScalingMaxFrameLatencyProperty(1, LosslessScalingMaxFrameLatencySlider, this);
             losslessScalingResetProfile = new LosslessScalingResetProfileProperty();
+            losslessScalingLS1Sharpness = new LosslessScalingLS1SharpnessProperty(1, LosslessScalingLS1SharpnessSlider, this);
 
             // Legion Go properties
             legionGoDetected = new LegionGoDetectedProperty(this);
@@ -1699,6 +1701,7 @@ namespace XboxGamingBar
                 losslessScalingLS1Type,
                 losslessScalingMaxFrameLatency,
                 losslessScalingResetProfile,
+                losslessScalingLS1Sharpness,
                 currentTdp,
                 legionGoDetected,
                 legionTouchpadEnabled,
