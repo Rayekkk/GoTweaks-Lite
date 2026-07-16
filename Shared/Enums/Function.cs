@@ -627,5 +627,14 @@
         // sample (observed value 1, i.e. a small integer scale, not the 0-100 the general
         // Sharpness field uses) - verify against a wider range of real profiles if possible.
         LosslessScalingLS1Sharpness, // int, small range (see LS1SharpnessSlider in XAML)
+
+        // Quick-tile controller combos. Widget -> helper: JSON array of tiles that have a
+        // controller-combo binding [{ "id":..., "name":..., "mask":<uint> }]. Helper
+        // registers each mask with ControllerHotkeyMonitor. Sent on save + on pipe connect.
+        TileHotkeyConfig,               // string JSON - tile combo bindings (widget -> helper)
+
+        // Helper -> widget push: a registered tile combo fired. Content = the tile id/tag.
+        // Widget re-dispatches it through the normal tile-click handler (SimulateTileHotkeyFired).
+        TileHotkeyFired,                // string - tile id/tag that the combo activated (helper -> widget)
     }
 }

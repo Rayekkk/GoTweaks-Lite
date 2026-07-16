@@ -3502,6 +3502,10 @@ namespace XboxGamingBar
                 // fires) but breaks every hotkey in FSE where the widget is suspended
                 // and only the helper is polling XInput. Issue #79 (kingvall).
                 SendControllerHotkeyConfigToHelper();
+                // Same reasoning applies to quick-tile controller combos: without this a
+                // helper restart forgets every tile combo binding until the user re-opens
+                // Customize Tiles and hits Save again.
+                SendTileHotkeysToHelper();
 
                 await Task.Delay(200);
                 isInitialSync = false;
