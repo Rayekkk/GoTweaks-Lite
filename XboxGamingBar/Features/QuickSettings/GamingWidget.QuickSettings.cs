@@ -852,6 +852,19 @@ namespace XboxGamingBar
                         status.Text = "Pick at least 2 buttons.";
                         return;
                     }
+
+                    // A combo already bound to a different tile would silently overwrite it at
+                    // the helper (RegisterTileHotkey keys by mask) - block it here instead.
+                    foreach (var other in qsTileDefinitions)
+                    {
+                        if (other.Id == tile.Id || string.IsNullOrEmpty(other.ControllerHotkey)) continue;
+                        if (uint.TryParse(other.ControllerHotkey, out uint otherMask) && otherMask == mask)
+                        {
+                            status.Text = $"Already used by \"{other.Name}\".";
+                            return;
+                        }
+                    }
+
                     tile.ControllerHotkey = mask.ToString();
                     SaveQuickSettingsConfig();   // persists + SendTileHotkeysToHelper
                     flyout.Hide();
