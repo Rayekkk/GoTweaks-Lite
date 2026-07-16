@@ -16,7 +16,7 @@ profiles, and an OSD — rebuilt into a clean, predictable base tuned specifical
 
 > [!NOTE]
 > **Installation differs from the original.** Download the latest release and run
-> **`Install GoTweaks.bat`** — see [Installation](#-installation) below — not the upstream
+> **`GoTweaks-Setup.exe`** — see [Installation](#-installation) below — not the upstream
 > download-and-run-`Install.ps1` steps.
 
 ---
@@ -237,17 +237,19 @@ installer first tells Windows to trust that certificate.
    `.cer`, and the installer. **Keep all files in the same folder.**
 2. **Close the Game Bar overlay** if it's open (`Win + G` to check) — an open Game Bar keeps the
    old version running and blocks the update.
-3. Double-click **`Install GoTweaks.bat`**.
+3. Double-click **`GoTweaks-Setup.exe`**.
 4. Click **Yes** on the UAC prompt — needed only to trust the certificate.
-5. Wait for **“Done — GoTweaks Lite installed.”**
+5. A small progress window appears; wait for the **"GoTweaks Lite installed"** confirmation.
 
 > [!NOTE]
 > **Windows may show a "Windows protected your PC" SmartScreen warning** the first time you run
-> the `.bat` — this is normal for a freshly downloaded, unsigned script and not specific to
+> the installer — this is normal for a freshly downloaded, unsigned executable and not specific to
 > GoTweaks Lite. Click **More info** → **Run anyway** to continue.
 
-> If double-clicking the `.bat` does nothing (or SmartScreen blocks it entirely), open PowerShell
-> in the same folder (Shift + right-click the folder → **Open PowerShell window here**) and run:
+> If `GoTweaks-Setup.exe` is missing or blocked, use **`Install GoTweaks.bat`** instead — same
+> steps, a console window instead of a GUI. If double-clicking the `.bat` does nothing (or
+> SmartScreen blocks it entirely), open PowerShell in the same folder (Shift + right-click the
+> folder → **Open PowerShell window here**) and run:
 > ```powershell
 > powershell -ExecutionPolicy Bypass -File ".\Install GoTweaks.ps1"
 > ```

@@ -6,13 +6,14 @@ installer has to tell Windows to trust that certificate before installing the ap
 
 ## What you downloaded
 
-A folder (or zip) containing three files:
+A folder (or zip) containing:
 
 | File | What it is |
 |------|------------|
 | `GoTweaks_<version>.msixbundle` | the application package |
 | `GoTweaks_<version>.cer`        | the certificate Windows must trust |
-| `Install GoTweaks.bat` / `.ps1` | the installer |
+| `GoTweaks-Setup.exe`            | the installer (recommended) |
+| `Install GoTweaks.bat` / `.ps1` | console fallback installer, same steps |
 
 Keep all of them **in the same folder**.
 
@@ -20,13 +21,14 @@ Keep all of them **in the same folder**.
 
 1. **Close the Game Bar overlay** if it is open (press `Win + G` to check). An open Game
    Bar keeps the old version running and will block the update.
-2. Double-click **`Install GoTweaks.bat`**.
+2. Double-click **`GoTweaks-Setup.exe`**.
 3. Click **Yes** on the Windows administrator (UAC) prompt — this is needed only to trust
    the certificate.
-4. Wait for **"Done — GoTweaks Lite installed."**
+4. A small window shows progress; wait for the **"GoTweaks Lite installed"** confirmation.
 
-> If double-clicking the `.bat` is blocked, right-click **`Install GoTweaks.ps1`** →
-> **Run with PowerShell** instead.
+> If `GoTweaks-Setup.exe` is blocked or missing, use **`Install GoTweaks.bat`** instead (same
+> steps, console window instead of a GUI). If double-clicking the `.bat` is also blocked,
+> right-click **`Install GoTweaks.ps1`** → **Run with PowerShell**.
 
 ## Using it
 
