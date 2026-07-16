@@ -1706,29 +1706,33 @@ namespace XboxGamingBar
         /// This method is only called from user-initiated changes (ControllerSettingChanged
         /// already has guards for profile loading), so we always want to send.
         /// </summary>
-        private void SendButtonMappingsToHelper(ControllerProfile profile)
+        private void SendButtonMappingsToHelper(ControllerProfile profile, bool force = false)
         {
             try
             {
                 // Always send button mappings, including "Disabled" (Type=0, GamepadAction=0)
                 // When user explicitly sets a button to Disabled, we need to send that to
                 // the helper so it clears the button mapping on the controller.
+                // force=true bypasses the per-property json==Value dedup so cold-start recovery
+                // (ResendActiveControllerProfileToHelper) actually re-pushes - the early sends
+                // during ApplyControllerProfile latch Value even though the pipe write was
+                // suppressed (not yet connected).
                 if (profile.ButtonY1 != null)
-                    legionButtonY1?.SendMapping(profile.ButtonY1.ToJson());
+                    legionButtonY1?.SendMapping(profile.ButtonY1.ToJson(), force);
                 if (profile.ButtonY2 != null)
-                    legionButtonY2?.SendMapping(profile.ButtonY2.ToJson());
+                    legionButtonY2?.SendMapping(profile.ButtonY2.ToJson(), force);
                 if (profile.ButtonY3 != null)
-                    legionButtonY3?.SendMapping(profile.ButtonY3.ToJson());
+                    legionButtonY3?.SendMapping(profile.ButtonY3.ToJson(), force);
                 if (profile.ButtonM1 != null)
-                    legionButtonM1?.SendMapping(profile.ButtonM1.ToJson());
+                    legionButtonM1?.SendMapping(profile.ButtonM1.ToJson(), force);
                 if (profile.ButtonM2 != null)
-                    legionButtonM2?.SendMapping(profile.ButtonM2.ToJson());
+                    legionButtonM2?.SendMapping(profile.ButtonM2.ToJson(), force);
                 if (profile.ButtonM3 != null)
-                    legionButtonM3?.SendMapping(profile.ButtonM3.ToJson());
+                    legionButtonM3?.SendMapping(profile.ButtonM3.ToJson(), force);
                 if (profile.ButtonDesktop != null)
-                    legionButtonDesktop?.SendMapping(profile.ButtonDesktop.ToJson());
+                    legionButtonDesktop?.SendMapping(profile.ButtonDesktop.ToJson(), force);
                 if (profile.ButtonPage != null)
-                    legionButtonPage?.SendMapping(profile.ButtonPage.ToJson());
+                    legionButtonPage?.SendMapping(profile.ButtonPage.ToJson(), force);
 
                 // Send gamepad button mappings as JSON dictionary
                 // During profile loading, use gamepadButtonMappings (includes desktop control changes)
@@ -1737,11 +1741,13 @@ namespace XboxGamingBar
                 if (mappingsToSend != null && mappingsToSend.Count > 0)
                 {
                     var gamepadMappingsJson = SerializeGamepadButtonMappings(mappingsToSend);
-                    legionGamepadMapping?.SetValue(gamepadMappingsJson);
+                    if (force) legionGamepadMapping?.ForceSetValue(gamepadMappingsJson);
+                    else legionGamepadMapping?.SetValue(gamepadMappingsJson);
                 }
                 else
                 {
-                    legionGamepadMapping?.SetValue("");
+                    if (force) legionGamepadMapping?.ForceSetValue("");
+                    else legionGamepadMapping?.SetValue("");
                 }
             }
             catch (Exception ex)
@@ -1769,7 +1775,7 @@ namespace XboxGamingBar
                 if (profile == null) return;
 
                 Logger.Info("Re-pushing active controller profile to helper after pipe connect (recovery from cold-start race)");
-                SendButtonMappingsToHelper(profile);
+                SendButtonMappingsToHelper(profile, force: true);
                 SendControllerSettingsToHelper(profile);
                 SendLightingToHelper(profile);
             }
