@@ -6,15 +6,12 @@ installer has to tell Windows to trust that certificate before installing the ap
 
 ## What you downloaded
 
-A folder (or zip) containing three files:
+**Just one file: `GoTweaks-Setup.exe`.** It has the application package and the signing
+certificate built in - there is nothing else to download or keep next to it.
 
-| File | What it is |
-|------|------------|
-| `GoTweaks_<version>.msixbundle` | the application package |
-| `GoTweaks_<version>.cer`        | the certificate Windows must trust |
-| `GoTweaks-Setup.exe`            | the installer |
-
-Keep all of them **in the same folder**.
+(The GitHub Release also lists a loose `GoTweaks_<version>.msixbundle` + `.cer` - those aren't
+for you to run; GoTweaks Lite's own in-app "Check for Update" downloads them directly for
+later updates. Ignore them for a first install.)
 
 ## How to install
 

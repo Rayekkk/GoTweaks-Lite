@@ -233,13 +233,17 @@ installer first tells Windows to trust that certificate.
 
 ### 1. Install
 
-1. Grab the latest release — a folder/zip with `GoTweaks_<version>.msixbundle`, its matching
-   `.cer`, and the installer. **Keep all files in the same folder.**
+1. Grab **`GoTweaks-Setup.exe`** from the latest release. That's the only file you need — the
+   package and the certificate are built into it.
 2. **Close the Game Bar overlay** if it's open (`Win + G` to check) — an open Game Bar keeps the
    old version running and blocks the update.
 3. Double-click **`GoTweaks-Setup.exe`**.
 4. Click **Yes** on the UAC prompt — needed only to trust the certificate.
 5. A small progress window appears; wait for the **"GoTweaks Lite installed"** confirmation.
+
+> The release also lists a loose `GoTweaks_<version>.msixbundle` + `.cer` — those aren't for you
+> to download, GoTweaks Lite's own in-app "Check for Update" fetches them directly for later
+> updates. Ignore them for a first install.
 
 > [!NOTE]
 > **Windows may show a "Windows protected your PC" SmartScreen warning** the first time you run
@@ -247,8 +251,9 @@ installer first tells Windows to trust that certificate.
 > GoTweaks Lite. Click **More info** → **Run anyway** to continue.
 
 > If `GoTweaks-Setup.exe` is blocked outright, you can run the same steps yourself from source:
-> clone the repo, put `Installer\Install GoTweaks.ps1` next to the downloaded bundle/cert, and
-> from PowerShell in that folder run:
+> clone the repo, grab the loose `GoTweaks_<version>.msixbundle` + `.cer` from the release, put
+> `Installer\Install GoTweaks.ps1` in the same folder as those two, and from PowerShell in that
+> folder run:
 > ```powershell
 > powershell -ExecutionPolicy Bypass -File ".\Install GoTweaks.ps1"
 > ```

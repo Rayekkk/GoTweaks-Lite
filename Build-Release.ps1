@@ -1,20 +1,25 @@
 <#
     Build-Release.ps1 - produce a distributable GoTweaks Lite release (option "C").
 
-    Builds the signed MSIX bundle, then assembles a clean `dist/` folder
-    containing everything an end user needs - just three files, plus the zip:
+    Builds the signed MSIX bundle, then assembles a clean `dist/` folder:
 
         dist/
-          GoTweaks_<version>.msixbundle
-          GoTweaks_<version>.cer
-          GoTweaks-Setup.exe       (the installer - GUI, auto-elevating, no console)
-          GoTweaks_<version>.zip   (the three files above, zipped - upload this to a GitHub Release)
+          GoTweaks-Setup.exe       (THE end-user download - self-contained, embeds the two
+                                     files below, nothing else needed next to it)
+          GoTweaks_<version>.msixbundle   (also published loose - required for the app's own
+          GoTweaks_<version>.cer          in-app auto-update, which fetches these directly
+                                           from GitHub Release assets, not via Setup.exe)
+          GoTweaks_<version>.zip   (all three above, zipped - convenience, not required)
 
     GoTweaks-Setup.exe is compiled from Installer/GoTweaksSetupGUI.ps1 via the `ps2exe` module
-    (double-clickable, no console window, auto-elevates via its own manifest). It is the ONLY
-    installer shipped, so the `ps2exe` module is a HARD build requirement - one-time setup on a
-    fresh dev box:
+    (double-clickable, no console window, auto-elevates via its own manifest, EMBEDS the
+    .msixbundle + .cer via -embedFiles so a user only ever downloads this one file for a first
+    install). It is the ONLY installer shipped, so the `ps2exe` module is a HARD build
+    requirement - one-time setup on a fresh dev box:
         Install-Module ps2exe -Scope CurrentUser -Force
+    Upload BOTH GoTweaks-Setup.exe AND the loose .msixbundle to the GitHub Release - the exe is
+    for humans, the loose bundle is for the in-app updater (see GoTweaksUpdateService.cs, which
+    scans release assets for a *.msixbundle file - it doesn't know Setup.exe exists).
     The console `Install GoTweaks.ps1`/`.bat` scripts still live under `Installer/` in the repo
     (useful for local dev-box installs / troubleshooting) but are no longer copied into dist/.
 
@@ -116,11 +121,18 @@ if (-not (Get-Module -ListAvailable -Name ps2exe)) {
 }
 try {
     Import-Module ps2exe -ErrorAction Stop
+    # Embed the bundle + cert so GoTweaks-Setup.exe is a fully self-contained single-file
+    # install - they're extracted to %TEMP%\GoTweaksSetup\ at startup (see
+    # Installer/GoTweaksSetupGUI.ps1). Target paths must match that script's $embeddedDir.
+    $embedFiles = @{
+        '%TEMP%\GoTweaksSetup\GoTweaks.msixbundle' = (Join-Path $dist $bundleOut)
+        '%TEMP%\GoTweaksSetup\GoTweaks.cer'         = (Join-Path $dist $cerOut)
+    }
     Invoke-ps2exe -inputFile "$repo\Installer\GoTweaksSetupGUI.ps1" -outputFile (Join-Path $dist "GoTweaks-Setup.exe") `
         -iconFile "$repo\XboxGamingBarHelper\GoTweaks.ico" -noConsole -requireAdmin -STA -noConfigFile `
         -title "GoTweaks Lite Setup" -product "GoTweaks Lite" -company "GoTweaks Lite" `
-        -version $version -description "GoTweaks Lite installer" | Out-Null
-    Write-Host "   GoTweaks-Setup.exe compiled." -ForegroundColor Green
+        -version $version -description "GoTweaks Lite installer" -embedFiles $embedFiles | Out-Null
+    Write-Host "   GoTweaks-Setup.exe compiled (embeds the bundle + cert)." -ForegroundColor Green
 } catch {
     Fail "Failed to compile GoTweaks-Setup.exe: $($_.Exception.Message)"
 }

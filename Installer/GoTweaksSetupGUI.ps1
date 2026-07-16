@@ -9,9 +9,12 @@
     script does NOT self-relaunch like the console version - Windows shows the UAC prompt
     before any of this code runs at all.
 
-    Place the compiled exe in the SAME folder as:
-        GoTweaks_<version>.msixbundle   (the app package)
-        GoTweaks_<version>.cer          (the signing certificate)
+    The .msixbundle and .cer are EMBEDDED in the compiled exe (ps2exe -embedFiles, see
+    Build-Release.ps1) and extracted to %TEMP%\GoTweaksSetup\ at startup, so the whole install
+    is a single downloaded file - nothing needs to sit next to the exe. The -BundlePath/
+    -CertPath params below are a manual override (dev convenience: running the raw .ps1, or a
+    rebuild without -embedFiles); if omitted, the script looks for the extracted copies first,
+    then falls back to searching next to the exe.
 
     What it does (and why it needs admin):
       1. Imports the bundled .cer into the machine's Trusted People + Trusted Root stores -
@@ -26,7 +29,7 @@
 
 [CmdletBinding()]
 param(
-    # Optional explicit paths; auto-detected from the exe's own folder if omitted.
+    # Optional explicit paths; auto-detected (embedded copy, then the exe's own folder) if omitted.
     [string]$BundlePath,
     [string]$CertPath
 )
@@ -79,36 +82,49 @@ function Fail([string]$msg) {
 # --- Locate the package + certificate ----------------------------------
 # The exe's own folder, regardless of how ps2exe resolves $PSScriptRoot internally.
 $here = Split-Path -Parent ([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
+# Where ps2exe -embedFiles extracts the embedded bundle/cert at startup (must match the
+# target paths given to -embedFiles in Build-Release.ps1).
+$embeddedDir = Join-Path $env:TEMP "GoTweaksSetup"
 
 Set-Status "Locating the package..."
 
 if (-not $BundlePath) {
-    $BundlePath = Get-ChildItem -Path $here -Filter *.msixbundle -ErrorAction SilentlyContinue |
-                  Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
-    # Dev convenience: fall back to the build output folder if not next to the exe.
-    if (-not $BundlePath) {
-        $appPkgs = Join-Path $here '..\XboxGamingBarPackage\AppPackages'
-        if (Test-Path $appPkgs) {
-            $BundlePath = Get-ChildItem -Path $appPkgs -Recurse -Filter *.msixbundle -ErrorAction SilentlyContinue |
-                          Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
+    $embeddedBundle = Join-Path $embeddedDir "GoTweaks.msixbundle"
+    if (Test-Path $embeddedBundle) {
+        $BundlePath = $embeddedBundle
+    } else {
+        # Dev convenience: same folder as the exe, or a raw uncompiled run of this script.
+        $BundlePath = Get-ChildItem -Path $here -Filter *.msixbundle -ErrorAction SilentlyContinue |
+                      Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
+        if (-not $BundlePath) {
+            $appPkgs = Join-Path $here '..\XboxGamingBarPackage\AppPackages'
+            if (Test-Path $appPkgs) {
+                $BundlePath = Get-ChildItem -Path $appPkgs -Recurse -Filter *.msixbundle -ErrorAction SilentlyContinue |
+                              Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
+            }
         }
     }
 }
 if (-not $BundlePath -or -not (Test-Path $BundlePath)) {
-    Fail "No .msixbundle found next to Setup.exe. Make sure the package file is in the same folder."
+    Fail "No .msixbundle found (embedded copy missing, and none next to Setup.exe either)."
 }
 
 if (-not $CertPath) {
-    $bundleDir = Split-Path -Parent $BundlePath
-    $CertPath = Get-ChildItem -Path $bundleDir -Filter *.cer -ErrorAction SilentlyContinue |
-                Select-Object -First 1 -ExpandProperty FullName
-    if (-not $CertPath) {
-        $CertPath = Get-ChildItem -Path $here -Filter *.cer -ErrorAction SilentlyContinue |
+    $embeddedCert = Join-Path $embeddedDir "GoTweaks.cer"
+    if (Test-Path $embeddedCert) {
+        $CertPath = $embeddedCert
+    } else {
+        $bundleDir = Split-Path -Parent $BundlePath
+        $CertPath = Get-ChildItem -Path $bundleDir -Filter *.cer -ErrorAction SilentlyContinue |
                     Select-Object -First 1 -ExpandProperty FullName
+        if (-not $CertPath) {
+            $CertPath = Get-ChildItem -Path $here -Filter *.cer -ErrorAction SilentlyContinue |
+                        Select-Object -First 1 -ExpandProperty FullName
+        }
     }
 }
 if (-not $CertPath -or -not (Test-Path $CertPath)) {
-    Fail "No .cer certificate found next to the package. It is required to trust the self-signed package."
+    Fail "No .cer certificate found (embedded copy missing, and none next to the package either)."
 }
 
 # --- 1. Trust the signing certificate -----------------------------------
@@ -148,6 +164,12 @@ try {
     else {
         Fail "Install failed: $($_.Exception.Message)"
     }
+}
+
+# Clean up the extracted embedded copies - only relevant when they came from $embeddedDir,
+# harmless no-op otherwise (Remove-Item on a path that isn't there / isn't ours).
+if ($BundlePath -like "$embeddedDir\*") {
+    try { Remove-Item $embeddedDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
 }
 
 $form.Close()
