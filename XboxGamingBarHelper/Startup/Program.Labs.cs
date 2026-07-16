@@ -382,7 +382,17 @@ namespace XboxGamingBarHelper
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var exportFolderName = $"GoTweaks_Backup_{DateTime.Now:yyyy-MM-dd_HHmmss}";
             var exportPath = Path.Combine(desktopPath, exportFolderName);
+            ExportDataToFolder(exportPath, widgetSettings);
+            return exportPath;
+        }
 
+        /// <summary>
+        /// Core of ExportAllData, parameterized by target folder so it can also be used for
+        /// the silent migration-snapshot staging in Program.MigrationStaging.cs (which targets
+        /// a fixed non-Desktop path instead of a timestamped Desktop backup folder).
+        /// </summary>
+        private static void ExportDataToFolder(string exportPath, string widgetSettings)
+        {
             // Create export folder structure
             Directory.CreateDirectory(exportPath);
             var profilesFolder = Path.Combine(exportPath, "profiles");
@@ -478,7 +488,6 @@ namespace XboxGamingBarHelper
             File.WriteAllText(Path.Combine(exportPath, "manifest.json"), manifest.ToString());
 
             Logger.Info($"Exported {itemCount} items to {exportPath}");
-            return exportPath;
         }
 
         /// <summary>

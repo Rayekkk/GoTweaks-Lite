@@ -1647,6 +1647,15 @@ namespace XboxGamingBarHelper
             // Task View pop up on desktop focus. No-op when disabled or on non-Legion hardware.
             Labs.TaskViewFixManager.RunOncePerBootIfEnabled();
 
+            // Silently stage a migration snapshot for a future package rebrand (no identity
+            // change in this release - see Program.MigrationStaging.cs). Fire-and-forget,
+            // never blocks startup, never surfaces to the user.
+            _ = Task.Run(() =>
+            {
+                try { StageMigrationSnapshot(); }
+                catch (Exception ex) { Logger.Debug($"StageMigrationSnapshot background task failed: {ex.Message}"); }
+            });
+
             // GoTweaks-owned idle-to-hibernate monitor (System tab). Only runs the polling
             // timer while at least one of AC/DC is configured - see
             // UpdateHibernateTimeoutMonitorState / the PropertyChanged subscriptions below.
