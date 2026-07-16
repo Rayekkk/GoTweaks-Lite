@@ -2,23 +2,21 @@
     Build-Release.ps1 - produce a distributable GoTweaks Lite release (option "C").
 
     Builds the signed MSIX bundle, then assembles a clean `dist/` folder
-    containing everything an end user needs:
+    containing everything an end user needs - just three files, plus the zip:
 
         dist/
           GoTweaks_<version>.msixbundle
           GoTweaks_<version>.cer
-          GoTweaks-Setup.exe       (GUI installer - recommended; needs the ps2exe module, see below)
-          Install GoTweaks.bat     (console fallback if ps2exe isn't available on the build box)
-          Install GoTweaks.ps1
-          README.md
-          GoTweaks_<version>.zip   (everything above, zipped - upload this to a GitHub Release)
+          GoTweaks-Setup.exe       (the installer - GUI, auto-elevating, no console)
+          GoTweaks_<version>.zip   (the three files above, zipped - upload this to a GitHub Release)
 
     GoTweaks-Setup.exe is compiled from Installer/GoTweaksSetupGUI.ps1 via the `ps2exe` module
-    (double-clickable, no console window, auto-elevates via its own manifest - no separate UAC
-    dance from this script). One-time setup on a fresh dev box:
+    (double-clickable, no console window, auto-elevates via its own manifest). It is the ONLY
+    installer shipped, so the `ps2exe` module is a HARD build requirement - one-time setup on a
+    fresh dev box:
         Install-Module ps2exe -Scope CurrentUser -Force
-    If the module isn't installed, this script skips the .exe and just warns - the .bat/.ps1
-    installers still ship normally.
+    The console `Install GoTweaks.ps1`/`.bat` scripts still live under `Installer/` in the repo
+    (useful for local dev-box installs / troubleshooting) but are no longer copied into dist/.
 
     Usage (from the repo root, in a Developer PowerShell / VS-enabled shell):
         ./Build-Release.ps1
@@ -110,26 +108,21 @@ $bundleOut = "GoTweaks_$version.msixbundle"
 $cerOut    = "GoTweaks_$version.cer"
 Copy-Item $bundle.FullName (Join-Path $dist $bundleOut)
 Copy-Item $cer.FullName    (Join-Path $dist $cerOut)
-Copy-Item "$repo\Installer\Install GoTweaks.ps1" $dist
-Copy-Item "$repo\Installer\Install GoTweaks.bat" $dist
-Copy-Item "$repo\Installer\README.md"            $dist
-Copy-Item "$repo\scripts\Uninstall-GoTweaks.ps1" $dist
 
-# --- Compile the GUI installer (optional - needs the ps2exe module) ---
+# --- Compile the GUI installer (the only installer shipped - hard requirement) ---
 Write-Step "Compiling GoTweaks-Setup.exe (GUI installer)"
 if (-not (Get-Module -ListAvailable -Name ps2exe)) {
-    Write-Host "   ps2exe module not installed - skipping GoTweaks-Setup.exe (run: Install-Module ps2exe -Scope CurrentUser)" -ForegroundColor Yellow
-} else {
-    try {
-        Import-Module ps2exe -ErrorAction Stop
-        Invoke-ps2exe -inputFile "$repo\Installer\GoTweaksSetupGUI.ps1" -outputFile (Join-Path $dist "GoTweaks-Setup.exe") `
-            -iconFile "$repo\XboxGamingBarHelper\GoTweaks.ico" -noConsole -requireAdmin -STA -noConfigFile `
-            -title "GoTweaks Lite Setup" -product "GoTweaks Lite" -company "GoTweaks Lite" `
-            -version $version -description "GoTweaks Lite installer" | Out-Null
-        Write-Host "   GoTweaks-Setup.exe compiled." -ForegroundColor Green
-    } catch {
-        Write-Host "   Failed to compile GoTweaks-Setup.exe: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
+    Fail "ps2exe module not installed - GoTweaks-Setup.exe is the only installer shipped, so this is required. Run: Install-Module ps2exe -Scope CurrentUser"
+}
+try {
+    Import-Module ps2exe -ErrorAction Stop
+    Invoke-ps2exe -inputFile "$repo\Installer\GoTweaksSetupGUI.ps1" -outputFile (Join-Path $dist "GoTweaks-Setup.exe") `
+        -iconFile "$repo\XboxGamingBarHelper\GoTweaks.ico" -noConsole -requireAdmin -STA -noConfigFile `
+        -title "GoTweaks Lite Setup" -product "GoTweaks Lite" -company "GoTweaks Lite" `
+        -version $version -description "GoTweaks Lite installer" | Out-Null
+    Write-Host "   GoTweaks-Setup.exe compiled." -ForegroundColor Green
+} catch {
+    Fail "Failed to compile GoTweaks-Setup.exe: $($_.Exception.Message)"
 }
 
 Write-Step "Staged release in dist/"

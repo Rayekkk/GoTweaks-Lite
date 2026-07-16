@@ -6,14 +6,13 @@ installer has to tell Windows to trust that certificate before installing the ap
 
 ## What you downloaded
 
-A folder (or zip) containing:
+A folder (or zip) containing three files:
 
 | File | What it is |
 |------|------------|
 | `GoTweaks_<version>.msixbundle` | the application package |
 | `GoTweaks_<version>.cer`        | the certificate Windows must trust |
-| `GoTweaks-Setup.exe`            | the installer (recommended) |
-| `Install GoTweaks.bat` / `.ps1` | console fallback installer, same steps |
+| `GoTweaks-Setup.exe`            | the installer |
 
 Keep all of them **in the same folder**.
 
@@ -26,9 +25,13 @@ Keep all of them **in the same folder**.
    the certificate.
 4. A small window shows progress; wait for the **"GoTweaks Lite installed"** confirmation.
 
-> If `GoTweaks-Setup.exe` is blocked or missing, use **`Install GoTweaks.bat`** instead (same
-> steps, console window instead of a GUI). If double-clicking the `.bat` is also blocked,
-> right-click **`Install GoTweaks.ps1`** → **Run with PowerShell**.
+> `GoTweaks-Setup.exe` is unsigned (no paid code-signing certificate), so Windows SmartScreen
+> may flag it on first run - click **More info** → **Run anyway** to continue. This is normal
+> for any freshly downloaded, unsigned executable and not specific to GoTweaks Lite.
+>
+> If you'd rather run the underlying steps yourself (or the .exe is blocked outright), clone
+> the repo and run `Installer\Install GoTweaks.ps1` from the same folder as the bundle/cert -
+> it does the exact same thing from a console instead of a GUI.
 
 ## Using it
 

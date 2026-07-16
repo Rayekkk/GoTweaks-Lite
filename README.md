@@ -246,10 +246,9 @@ installer first tells Windows to trust that certificate.
 > the installer — this is normal for a freshly downloaded, unsigned executable and not specific to
 > GoTweaks Lite. Click **More info** → **Run anyway** to continue.
 
-> If `GoTweaks-Setup.exe` is missing or blocked, use **`Install GoTweaks.bat`** instead — same
-> steps, a console window instead of a GUI. If double-clicking the `.bat` does nothing (or
-> SmartScreen blocks it entirely), open PowerShell in the same folder (Shift + right-click the
-> folder → **Open PowerShell window here**) and run:
+> If `GoTweaks-Setup.exe` is blocked outright, you can run the same steps yourself from source:
+> clone the repo, put `Installer\Install GoTweaks.ps1` next to the downloaded bundle/cert, and
+> from PowerShell in that folder run:
 > ```powershell
 > powershell -ExecutionPolicy Bypass -File ".\Install GoTweaks.ps1"
 > ```
@@ -280,13 +279,15 @@ Required for per-game profiles:
 
 ### Uninstalling
 
-The release includes **`Uninstall-GoTweaks.ps1`**, which cleanly restores your system: it stops the
-helper, clears any HidHide controller-hiding rules it added (so a controller is never left hidden),
-sweeps leftover virtual controllers, removes the scheduled task, and then removes the app package
-itself. Shared drivers (PawnIO, ViGEmBus) are left installed by default since other tools may use
-them too — pass `-RemoveDrivers` to also uninstall those.
+For a plain removal, **Settings → Apps → Installed apps → GoTweaks Lite → Uninstall** is enough.
 
-Open **PowerShell as Administrator**, `cd` to the folder with the release files, then run:
+For a deeper clean (stops the helper, clears any HidHide controller-hiding rules it added so a
+controller is never left hidden, sweeps leftover virtual controllers, removes the scheduled task,
+then removes the app package itself), grab **`scripts/Uninstall-GoTweaks.ps1`** from the repo
+(not included in the release download). Shared drivers (PawnIO, ViGEmBus) are left installed by
+default since other tools may use them too — pass `-RemoveDrivers` to also uninstall those.
+
+Open **PowerShell as Administrator**, `cd` to the folder with the script, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Uninstall-GoTweaks.ps1"
