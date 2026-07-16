@@ -9,7 +9,11 @@
           GoTweaks_<version>.msixbundle   (also published loose - required for the app's own
           GoTweaks_<version>.cer          in-app auto-update, which fetches these directly
                                            from GitHub Release assets, not via Setup.exe)
-          GoTweaks_<version>.zip   (all three above, zipped - convenience, not required)
+
+    Upload all three loose files as separate GitHub Release assets - no zip needed. (A zip made
+    sense when users had to keep 3 files together themselves; now GoTweaks-Setup.exe is the only
+    thing end users touch, and nothing downloads a zip programmatically. Pass -Zip to still
+    produce GoTweaks_<version>.zip if you want one for archival.)
 
     GoTweaks-Setup.exe is compiled from Installer/GoTweaksSetupGUI.ps1 via the `ps2exe` module
     (double-clickable, no console window, auto-elevates via its own manifest, EMBEDS the
@@ -19,7 +23,10 @@
         Install-Module ps2exe -Scope CurrentUser -Force
     Upload BOTH GoTweaks-Setup.exe AND the loose .msixbundle to the GitHub Release - the exe is
     for humans, the loose bundle is for the in-app updater (see GoTweaksUpdateService.cs, which
-    scans release assets for a *.msixbundle file - it doesn't know Setup.exe exists).
+    scans release assets for a *.msixbundle file - it doesn't know Setup.exe exists). The loose
+    .cer isn't consumed by anything automated (the updater only ever touches the .msixbundle, the
+    cert only needs trusting once at first install) - it's kept only for the documented
+    Install-GoTweaks.ps1 source fallback.
     The console `Install GoTweaks.ps1`/`.bat` scripts still live under `Installer/` in the repo
     (useful for local dev-box installs / troubleshooting) but are no longer copied into dist/.
 
@@ -40,7 +47,7 @@ param(
     [string]$Thumbprint,
     [string]$Configuration = 'Release',
     [switch]$SkipBuild,
-    [switch]$NoZip
+    [switch]$Zip
 )
 
 $ErrorActionPreference = 'Stop'
@@ -140,12 +147,12 @@ try {
 Write-Step "Staged release in dist/"
 Get-ChildItem $dist | Select-Object Name, @{n='Size';e={'{0:N0} KB' -f ($_.Length/1KB)}} | Format-Table -AutoSize
 
-# --- Zip it for upload ----------------------------------------------
-if (-not $NoZip) {
-    $zip = Join-Path $dist "GoTweaks_$version.zip"
-    Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $zip -Force
-    Write-Host "Zip: $zip" -ForegroundColor Green
+# --- Optional zip (archival only - not needed for a normal release upload) ----
+if ($Zip) {
+    $zipPath = Join-Path $dist "GoTweaks_$version.zip"
+    Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $zipPath -Force
+    Write-Host "Zip: $zipPath" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "Release assembled. Upload the contents of dist/ (or the .zip) to a GitHub Release." -ForegroundColor Green
+Write-Host "Release assembled. Upload the 3 files in dist/ as separate GitHub Release assets." -ForegroundColor Green
