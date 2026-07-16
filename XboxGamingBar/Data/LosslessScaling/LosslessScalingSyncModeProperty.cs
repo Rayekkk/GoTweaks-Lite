@@ -10,7 +10,27 @@ namespace XboxGamingBar.Data
         public LosslessScalingSyncModeProperty(ComboBox inUI, Page inOwner)
             : base("OFF", Function.LosslessScalingSyncMode, inUI, inOwner)
         {
-            if (UI != null) UI.SelectionChanged += ComboBox_SelectionChanged;
+            if (UI != null)
+            {
+                // See LosslessScalingScalingTypeProperty for why this proactive sync is needed:
+                // GenericProperty.SetValue skips NotifyPropertyChanged when the incoming value
+                // equals this constructor default.
+                SyncSelectedIndexFromValue();
+                UI.SelectionChanged += ComboBox_SelectionChanged;
+            }
+        }
+
+        private void SyncSelectedIndexFromValue()
+        {
+            if (UI == null) return;
+            for (var i = 0; i < UI.Items.Count; i++)
+            {
+                if (UI.Items[i] is string s && s == Value)
+                {
+                    UI.SelectedIndex = i;
+                    return;
+                }
+            }
         }
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -19,6 +39,7 @@ namespace XboxGamingBar.Data
             {
                 Logger.Info($"{Function} combo box updated to {stringValue}.");
                 SetValue(stringValue);
+                (Owner as GamingWidget)?.MarkLosslessScalingSettingsDirty();
             }
         }
 
@@ -27,17 +48,7 @@ namespace XboxGamingBar.Data
             base.NotifyPropertyChanged(propertyName);
             if (UI != null && Owner != null)
             {
-                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    for (var i = 0; i < UI.Items.Count; i++)
-                    {
-                        if (UI.Items[i] is string s && s == Value)
-                        {
-                            UI.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                });
+                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncSelectedIndexFromValue);
             }
         }
     }

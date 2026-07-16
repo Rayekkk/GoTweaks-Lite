@@ -11,7 +11,25 @@ namespace XboxGamingBar.Data
         {
             if (UI != null)
             {
+                // See LosslessScalingScalingTypeProperty for why this proactive sync is needed:
+                // GenericProperty.SetValue skips NotifyPropertyChanged when the incoming value
+                // equals this constructor default, which it does for the common "2" case.
+                SyncSelectedIndexFromValue();
                 UI.SelectionChanged += ComboBox_SelectionChanged;
+            }
+        }
+
+        private void SyncSelectedIndexFromValue()
+        {
+            if (UI == null) return;
+            string valueStr = Value.ToString();
+            for (var i = 0; i < UI.Items.Count; i++)
+            {
+                if (UI.Items[i] is string stringValue && stringValue == valueStr)
+                {
+                    UI.SelectedIndex = i;
+                    return;
+                }
             }
         }
 
@@ -21,6 +39,7 @@ namespace XboxGamingBar.Data
             {
                 Logger.Info($"{Function} combo box updated to {intValue}.");
                 SetValue(intValue);
+                (Owner as GamingWidget)?.MarkLosslessScalingSettingsDirty();
             }
         }
 
@@ -30,19 +49,7 @@ namespace XboxGamingBar.Data
 
             if (UI != null && Owner != null)
             {
-                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    string valueStr = Value.ToString();
-                    for (var i = 0; i < UI.Items.Count; i++)
-                    {
-                        if (UI.Items[i] is string stringValue && stringValue == valueStr)
-                        {
-                            Logger.Info($"{Function} combo box selected index {i}.");
-                            UI.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                });
+                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncSelectedIndexFromValue);
             }
         }
     }

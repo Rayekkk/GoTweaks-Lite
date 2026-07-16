@@ -13,8 +13,19 @@ namespace XboxGamingBar.Data
         {
             if (UI != null)
             {
+                // See LosslessScalingScalingTypeProperty (a ComboBox sibling) for why this
+                // proactive sync matters in principle; for a ToggleSwitch the visible symptom
+                // is milder (no placeholder state), but this keeps the same defensive pattern
+                // in case the constructor default and the real value happen to already agree.
+                SyncToggleFromValue();
                 UI.Toggled += Toggle_Toggled;
             }
+        }
+
+        private void SyncToggleFromValue()
+        {
+            if (UI == null) return;
+            UI.IsOn = Value == "PERFORMANCE";
         }
 
         private void Toggle_Toggled(object sender, Windows.UI.Xaml.RoutedEventArgs e)
@@ -24,6 +35,7 @@ namespace XboxGamingBar.Data
             {
                 Logger.Info($"{Function} toggle updated to {newValue}.");
                 SetValue(newValue);
+                (Owner as GamingWidget)?.MarkLosslessScalingSettingsDirty();
             }
         }
 
@@ -33,15 +45,7 @@ namespace XboxGamingBar.Data
 
             if (UI != null && Owner != null)
             {
-                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    bool shouldBeOn = Value == "PERFORMANCE";
-                    if (UI.IsOn != shouldBeOn)
-                    {
-                        Logger.Info($"{Function} toggle set to {shouldBeOn} (value: {Value}).");
-                        UI.IsOn = shouldBeOn;
-                    }
-                });
+                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncToggleFromValue);
             }
         }
     }

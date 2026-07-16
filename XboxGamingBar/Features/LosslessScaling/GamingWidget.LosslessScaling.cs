@@ -46,6 +46,166 @@ namespace XboxGamingBar
 
         // Lossless Scaling Helper Methods
 
+        // Tracks whether the CURRENT Scale-tab setting values differ from a baseline snapshot
+        // (what's actually applied - the last successful Apply-and-Restart, or the freshly
+        // (re)loaded profile). Pressing "Scale" only sends LS its own toggle hotkey - it never
+        // applies GoTweaks' combobox/slider values, those only reach Settings.xml via "Apply
+        // and Restart" - so while diverged from baseline, "Scale" would silently act on stale
+        // pre-change settings. Gate the two buttons on this instead: Scale enabled only when
+        // matching baseline, Apply-and-Restart enabled (and highlighted) only when diverged.
+        //
+        // This is a real diff against baseline, not a one-way "something changed" latch: if the
+        // user changes a setting and then changes it back to its original value, the two values
+        // compare equal again and Scale re-enables - it doesn't stay stuck disabled just because
+        // a control was touched at some point.
+        private readonly Dictionary<Function, object> losslessScalingBaseline = new Dictionary<Function, object>();
+        private bool losslessScalingBaselineCaptured = false;
+        private bool losslessScalingHasPendingChanges = false;
+        private Brush losslessScalingSaveButtonDefaultBackground;
+        private Brush losslessScalingSaveButtonDefaultForeground;
+
+        /// <summary>
+        /// Every Scale-tab setting that "Apply and Restart" persists to Settings.xml - see
+        /// LosslessScalingManager.WriteSettingsToProfile/ReadSettingsFromProfile for the
+        /// authoritative list this must stay in sync with.
+        /// </summary>
+        private IEnumerable<FunctionalProperty> LosslessScalingTrackedProperties()
+        {
+            yield return losslessScalingScalingType;
+            yield return losslessScalingSharpness;
+            yield return losslessScalingFSROptimize;
+            yield return losslessScalingAnime4KSize;
+            yield return losslessScalingAnime4KVRS;
+            yield return losslessScalingScaleMode;
+            yield return losslessScalingScaleFactor;
+            yield return losslessScalingAspectRatio;
+            yield return losslessScalingFrameGenType;
+            yield return losslessScalingLSFG3Mode;
+            yield return losslessScalingLSFG3Multiplier;
+            yield return losslessScalingLSFG3Target;
+            yield return losslessScalingLSFG2Mode;
+            yield return losslessScalingFlowScale;
+            yield return losslessScalingSize;
+            yield return losslessScalingAutoScale;
+            yield return losslessScalingAutoScaleDelay;
+            yield return losslessScalingSyncMode;
+            yield return losslessScalingCaptureApi;
+            yield return losslessScalingDrawFps;
+            yield return losslessScalingHdrSupport;
+            yield return losslessScalingGsyncSupport;
+            yield return losslessScalingResizeBeforeScaling;
+            yield return losslessScalingLS1Type;
+            yield return losslessScalingMaxFrameLatency;
+            yield return losslessScalingLS1Sharpness;
+        }
+
+        /// <summary>
+        /// Snapshots every tracked setting's current value as the new "applied" baseline, then
+        /// recomputes the dirty state against it (normally comes out clean, since this is called
+        /// right after the values it's snapshotting were just applied or freshly loaded).
+        /// </summary>
+        private void RecaptureLosslessScalingBaseline()
+        {
+            losslessScalingBaseline.Clear();
+            foreach (var prop in LosslessScalingTrackedProperties())
+            {
+                if (prop != null)
+                {
+                    losslessScalingBaseline[prop.Function] = prop.GetValue();
+                }
+            }
+            Logger.Info($"Lossless Scaling: captured baseline snapshot of {losslessScalingBaseline.Count} settings");
+            RecomputeLosslessScalingDirtyState();
+        }
+
+        /// <summary>
+        /// Called by every Scale-tab setting property (ComboBox/Slider/ToggleSwitch) from its
+        /// own "the user really changed this" branch - see e.g.
+        /// LosslessScalingScalingTypeProperty.ComboBox_SelectionChanged. Never called for
+        /// helper-driven syncs (BatchGet, profile load), since those update the control to a
+        /// value that already equals Value, so the "did it actually change" checks in each
+        /// property's own handler skip calling this.
+        /// </summary>
+        internal void MarkLosslessScalingSettingsDirty()
+        {
+            RecomputeLosslessScalingDirtyState();
+        }
+
+        /// <summary>
+        /// Compares every tracked property's current value against the captured baseline and
+        /// updates losslessScalingHasPendingChanges accordingly (true the moment ANY value
+        /// differs, false again once every value matches baseline - including "changed and
+        /// changed back").
+        /// </summary>
+        private void RecomputeLosslessScalingDirtyState()
+        {
+            bool diverged = false;
+            if (losslessScalingBaseline.Count > 0)
+            {
+                foreach (var prop in LosslessScalingTrackedProperties())
+                {
+                    if (prop == null) continue;
+                    if (!losslessScalingBaseline.TryGetValue(prop.Function, out var baseValue) || !Equals(baseValue, prop.GetValue()))
+                    {
+                        diverged = true;
+                        break;
+                    }
+                }
+            }
+            // No baseline captured yet (shouldn't normally happen once LS is installed and the
+            // first status update has run) - treat as clean rather than permanently disabling
+            // Scale until a baseline shows up.
+
+            if (losslessScalingHasPendingChanges != diverged)
+            {
+                losslessScalingHasPendingChanges = diverged;
+                Logger.Info($"Lossless Scaling: pending-changes state now {diverged}");
+            }
+            UpdateLosslessScalingDirtyState();
+        }
+
+        /// <summary>
+        /// Applies the dirty/clean state to the Scale and Apply-and-Restart buttons. Safe to
+        /// call before the controls are loaded (no-ops via null checks) and off the UI thread
+        /// is NOT required here - callers are already on the UI thread (button click handlers,
+        /// property change handlers dispatched via Owner.Dispatcher).
+        /// </summary>
+        private void UpdateLosslessScalingDirtyState()
+        {
+            if (LosslessScalingSaveSettingsButton == null || LosslessScalingEnabledToggle == null)
+            {
+                return;
+            }
+
+            bool isInstalled = losslessScalingInstalled?.Value ?? false;
+            bool isRunning = losslessScalingRunning?.Value ?? false;
+
+            LosslessScalingEnabledToggle.IsEnabled = isInstalled && !losslessScalingHasPendingChanges;
+
+            bool enableSaveButton = isInstalled && isRunning && losslessScalingHasPendingChanges;
+            LosslessScalingSaveSettingsButton.IsEnabled = enableSaveButton;
+
+            // Capture the style's own defaults once, before ever overriding them, so "not
+            // dirty" can restore exactly what LosslessScalingApplyButtonStyle would have
+            // applied (its Disabled VisualState also independently resets both when the
+            // button transitions to IsEnabled=False, but this keeps .Background/.Foreground
+            // correct even before that visual-state transition runs).
+            if (losslessScalingSaveButtonDefaultBackground == null)
+            {
+                losslessScalingSaveButtonDefaultBackground = LosslessScalingSaveSettingsButton.Background;
+            }
+            if (losslessScalingSaveButtonDefaultForeground == null)
+            {
+                losslessScalingSaveButtonDefaultForeground = LosslessScalingSaveSettingsButton.Foreground;
+            }
+            LosslessScalingSaveSettingsButton.Background = losslessScalingHasPendingChanges
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x6C, 0xCB, 0x5F)) // matches the Quick Settings tile green
+                : losslessScalingSaveButtonDefaultBackground;
+            LosslessScalingSaveSettingsButton.Foreground = losslessScalingHasPendingChanges
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x1A, 0x1A, 0x1A)) // matches Scale's dark-on-accent text
+                : losslessScalingSaveButtonDefaultForeground;
+        }
+
         private async void UpdateLosslessScalingStatus()
         {
             try
@@ -69,7 +229,6 @@ namespace XboxGamingBar
 
                         // Enable controls only when LS is installed
                         bool enableControls = isInstalled;
-                        bool enableSaveButton = isInstalled && isRunning;
 
                         if (!isInstalled)
                         {
@@ -99,8 +258,9 @@ namespace XboxGamingBar
                             ShowLosslessScalingWindowButton.Visibility = Visibility.Collapsed;
                         }
 
-                        // Enable/disable all Lossless Scaling controls
-                        if (LosslessScalingEnabledToggle != null) LosslessScalingEnabledToggle.IsEnabled = enableControls;
+                        // Enable/disable all Lossless Scaling controls. Scale and Apply-and-Restart
+                        // are handled separately by UpdateLosslessScalingDirtyState (called below),
+                        // which additionally gates them on losslessScalingHasPendingChanges.
                         if (LosslessScalingAutoScaleToggle != null) LosslessScalingAutoScaleToggle.IsEnabled = enableControls;
                         if (LosslessScalingAutoScaleDelaySlider != null) LosslessScalingAutoScaleDelaySlider.IsEnabled = enableControls;
                         if (LosslessScalingScalingTypeComboBox != null) LosslessScalingScalingTypeComboBox.IsEnabled = enableControls;
@@ -123,8 +283,9 @@ namespace XboxGamingBar
                         if (LosslessScalingResetProfileButton != null) LosslessScalingResetProfileButton.IsEnabled = enableControls;
                         if (LosslessScalingSaveSettingsButton != null)
                         {
-                            LosslessScalingSaveSettingsButton.IsEnabled = enableSaveButton;
-                            // Update XY navigation to skip disabled Save button
+                            // .IsEnabled and .Background are owned by UpdateLosslessScalingDirtyState
+                            // (called below) - only compute the XY-navigation bool here.
+                            bool enableSaveButton = isInstalled && isRunning && losslessScalingHasPendingChanges;
                             LosslessScalingEnabledToggle.XYFocusDown = enableSaveButton ? LosslessScalingSaveSettingsButton : (DependencyObject)LosslessScalingAutoScaleToggle;
                             LosslessScalingAutoScaleToggle.XYFocusUp = enableSaveButton ? LosslessScalingSaveSettingsButton : (DependencyObject)LosslessScalingEnabledToggle;
                         }
@@ -161,6 +322,21 @@ namespace XboxGamingBar
                         if (LosslessScalingScaleModeComboBox != null) LosslessScalingScaleModeComboBox.IsEnabled = enableControls;
                         if (LosslessScalingScaleFactorSlider != null) LosslessScalingScaleFactorSlider.IsEnabled = enableControls;
                         if (LosslessScalingAspectRatioComboBox != null) LosslessScalingAspectRatioComboBox.IsEnabled = enableControls;
+
+                        // One-time initial baseline capture. Normally LosslessScalingCurrentProfile_
+                        // PropertyChanged already captures it on first connect, but that property's
+                        // own sync can no-op if the real value happens to equal its widget-side
+                        // constructor default ("Default") - this is a safety net so Scale never gets
+                        // stuck permanently disabled from an empty baseline in that edge case.
+                        if (!losslessScalingBaselineCaptured && isInstalled)
+                        {
+                            losslessScalingBaselineCaptured = true;
+                            RecaptureLosslessScalingBaseline();
+                        }
+                        else
+                        {
+                            UpdateLosslessScalingDirtyState();
+                        }
 
                         Logger.Info("LosslessScaling status UI updated successfully");
                     }
@@ -366,16 +542,23 @@ namespace XboxGamingBar
             {
                 string selectedType = LosslessScalingScalingTypeComboBox.SelectedItem as string ?? "Off";
 
-                // Show/hide Sharpness panel (for FSR, NIS, SGSR, BCAS, LS1)
-                bool showSharpness = selectedType == "FSR" || selectedType == "NIS" || selectedType == "SGSR" || selectedType == "BCAS" || selectedType == "LS1";
+                // Show/hide Sharpness panel (for FSR, NIS, SGSR, BCAS - LS1 has its own
+                // dedicated Sharpness field/panel, see showLS1Sharpness below)
+                bool showSharpness = selectedType == "FSR" || selectedType == "NIS" || selectedType == "SGSR" || selectedType == "BCAS";
                 bool showFSROptimize = selectedType == "FSR";
                 bool showAnime4K = selectedType == "Anime4K";
                 bool showLS1Type = selectedType == "LS1";
+                bool showLS1Sharpness = selectedType == "LS1";
                 bool showResizeBefore = selectedType != "Off";
 
                 if (LosslessScalingSharpnessPanel != null)
                 {
                     LosslessScalingSharpnessPanel.Visibility = showSharpness ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                if (LosslessScalingLS1SharpnessPanel != null)
+                {
+                    LosslessScalingLS1SharpnessPanel.Visibility = showLS1Sharpness ? Visibility.Visible : Visibility.Collapsed;
                 }
 
                 // Show/hide FSR Optimize panel (FSR only)
@@ -560,6 +743,10 @@ namespace XboxGamingBar
                     {
                         LosslessScalingCurrentProfileText.Text = losslessScalingCurrentProfile.Value ?? "Default";
                     }
+
+                    // A freshly (re)loaded profile's values ARE the new baseline - any pending
+                    // divergence belonged to whatever profile was active a moment ago.
+                    RecaptureLosslessScalingBaseline();
                 });
             }
             catch (Exception ex)
@@ -597,6 +784,10 @@ namespace XboxGamingBar
                 // Trigger save and restart
                 losslessScalingSaveAndRestart.SetValue(true);
                 Logger.Info("Saving Lossless Scaling settings and restarting");
+
+                // Optimistic: the values just sent are exactly what's about to be written to
+                // Settings.xml, so they ARE the new baseline as of this click.
+                RecaptureLosslessScalingBaseline();
             }
             catch (Exception ex)
             {
@@ -608,12 +799,22 @@ namespace XboxGamingBar
         // helper updates its in-memory state and pipes the new values back; the
         // user still needs Apply-and-Restart to persist the reset to Settings.xml.
         // That keeps Reset undoable until they explicitly commit.
-        private void LosslessScalingResetProfileButton_Click(object sender, RoutedEventArgs e)
+        private async void LosslessScalingResetProfileButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 losslessScalingResetProfile.SetValue(true);
                 Logger.Info("Reset Lossless Scaling profile to defaults");
+
+                // The helper pushes the new (default) values back via the normal per-property
+                // pipe sync, which doesn't have a single clean completion signal to await here -
+                // give it a moment, then re-diff against baseline with the (by then current)
+                // values. If the defaults happen to exactly match what's already applied, this
+                // correctly re-enables Scale instead of leaving it stuck disabled - the helper
+                // only updates its in-memory state here, Settings.xml isn't touched until
+                // Apply-and-Restart.
+                await Task.Delay(400);
+                RecomputeLosslessScalingDirtyState();
             }
             catch (Exception ex)
             {

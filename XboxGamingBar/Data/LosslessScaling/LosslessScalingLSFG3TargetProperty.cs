@@ -8,6 +8,16 @@ namespace XboxGamingBar.Data
         public LosslessScalingLSFG3TargetProperty(int inValue, Slider inUI, Page inOwner)
             : base(inValue, Function.LosslessScalingLSFG3Target, inUI, inOwner)
         {
+            if (UI != null)
+            {
+                UI.ValueChanged += (s, e) =>
+                {
+                    if (!IsUpdatingUI && (int)e.NewValue != Value)
+                    {
+                        (Owner as GamingWidget)?.MarkLosslessScalingSettingsDirty();
+                    }
+                };
+            }
         }
     }
 }
