@@ -106,10 +106,14 @@ namespace XboxGamingBar
                 if (message.TryGetValue("Function", out object thFuncObj) &&
                     Convert.ToInt32(thFuncObj) == (int)Shared.Enums.Function.TileHotkeyFired)
                 {
-                    if (message.TryGetValue("Content", out object thContent) && thContent is string tileId
+                    // Runs on the pipe read thread; SimulateTileHotkeyFired touches XAML, so
+                    // dispatch to the UI thread (guard Dispatcher like the FocusWidget branch
+                    // above - it can be null if the widget is being torn down).
+                    if (Dispatcher != null &&
+                        message.TryGetValue("Content", out object thContent) && thContent is string tileId
                         && !string.IsNullOrEmpty(tileId))
                     {
-                        await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                        _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
                             () => SimulateTileHotkeyFired(tileId));
                     }
                     return;
