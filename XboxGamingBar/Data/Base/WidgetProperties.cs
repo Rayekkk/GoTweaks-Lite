@@ -64,8 +64,13 @@ namespace XboxGamingBar.Data
         // so the widget (which loads from controller profiles) is authoritative.
         private static readonly HashSet<Function> NeverSyncFromHelper = new HashSet<Function>
         {
-            // OSD level - loaded from LocalSettings (PerformanceOverlayLevel)
-            Function.OSD,
+            // [2.0 rebuild - slice 1] Function.OSD REMOVED: the helper is now the source of
+            // truth for OSD level. It already persists it durably (Settings.Default.OSDLevel,
+            // loaded at startup, saved on every change) and pushes changes to the widget, so
+            // the widget must ACCEPT the synced value instead of guarding its own LocalSettings
+            // copy. The widget no longer loads/saves PerformanceOverlayLevel to LocalSettings
+            // (see GamingWidget.PerformanceOverlay.cs). Helper push -> osd property ->
+            // PerformanceOverlaySlider -> ValueChanged -> ComboBox keeps the UI in sync.
             // Lighting - loaded from controller profiles; helper defaults to #FFFFFF
             Function.LegionLightMode,
             Function.LegionLightColor,

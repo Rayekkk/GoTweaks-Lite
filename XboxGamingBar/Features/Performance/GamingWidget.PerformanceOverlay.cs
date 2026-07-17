@@ -100,52 +100,25 @@ namespace XboxGamingBar
             }
         }
 
+        // [2.0 rebuild - slice 1] The helper is now the source of truth for the OSD level:
+        // it persists it durably (Settings.Default.OSDLevel) and pushes it to the widget on
+        // startup (BatchGet) and on every change. So the widget no longer loads OSD from its
+        // own LocalSettings copy here - that would override the helper's authoritative value.
+        // The ComboBox/Slider are seeded by the helper's push (osd property ->
+        // PerformanceOverlaySlider -> ValueChanged -> ComboBox). Kept as a no-op shell so
+        // existing call sites don't break.
         private void LoadPerformanceOverlaySetting()
         {
-            try
-            {
-                if (PerformanceOverlayComboBox == null) return;
-                isLoadingPerformanceOverlaySetting = true;
-                var settings = ApplicationData.Current.LocalSettings;
-                if (settings.Values.TryGetValue("PerformanceOverlayLevel", out object val) && val is int level)
-                {
-                    if (level >= 0 && level < PerformanceOverlayComboBox.Items.Count)
-                    {
-                        PerformanceOverlayComboBox.SelectedIndex = level;
-                        // Also set the osd property value directly to avoid debounce delay
-                        // This ensures Quick Settings and helper have the correct value immediately
-                        if (osd != null)
-                        {
-                            osd.SetValue(level);
-                        }
-                        Logger.Debug($"Loaded PerformanceOverlayLevel: {level}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading PerformanceOverlay setting: {ex.Message}");
-            }
-            finally
-            {
-                isLoadingPerformanceOverlaySetting = false;
-            }
+            // Intentionally does nothing: OSD level authority moved to the helper (slice 1).
         }
 
+        // [2.0 rebuild - slice 1] No longer persists OSD to widget LocalSettings - the helper
+        // persists it (OnScreenDisplayProperty.SaveLevel) whenever the synced value changes.
+        // Kept as a shell for existing call sites; per-game profile OverlayLevel persistence
+        // (still widget-side for now) stays in PerformanceOverlayComboBox_SelectionChanged.
         private void SavePerformanceOverlaySetting()
         {
-            try
-            {
-                if (PerformanceOverlayComboBox == null) return;
-                var settings = ApplicationData.Current.LocalSettings;
-                int level = PerformanceOverlayComboBox.SelectedIndex;
-                settings.Values["PerformanceOverlayLevel"] = level;
-                Logger.Debug($"Saved PerformanceOverlayLevel: {level}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving PerformanceOverlay setting: {ex.Message}");
-            }
+            // Intentionally does nothing: OSD level is persisted by the helper (slice 1).
         }
 
         private void SaveAMDOverlayLevel()
@@ -171,7 +144,22 @@ namespace XboxGamingBar
 
                 if (PerformanceOverlayComboBox.SelectedIndex != newIndex)
                 {
-                    PerformanceOverlayComboBox.SelectedIndex = newIndex;
+                    // [2.0 rebuild - slice 1] OSD is now helper-authoritative, so this path also
+                    // fires on helper pushes (e.g. a controller-hotkey OSD toggle). Mark the
+                    // ComboBox update as programmatic so PerformanceOverlayComboBox_SelectionChanged
+                    // does NOT treat a sync-driven change as a user edit and write it into the
+                    // active game profile. The visible control users touch is the ComboBox, so its
+                    // own SelectionChanged still persists genuine user edits.
+                    bool wasLoading = isLoadingPerformanceOverlaySetting;
+                    isLoadingPerformanceOverlaySetting = true;
+                    try
+                    {
+                        PerformanceOverlayComboBox.SelectedIndex = newIndex;
+                    }
+                    finally
+                    {
+                        isLoadingPerformanceOverlaySetting = wasLoading;
+                    }
                 }
             }
         }
