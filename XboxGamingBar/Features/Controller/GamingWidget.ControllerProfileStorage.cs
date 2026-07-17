@@ -1289,44 +1289,11 @@ namespace XboxGamingBar
                 // sliders (and their % text via UpdateControllerSliderDisplays) reflect the helper's
                 // pushed value instead. See WidgetProperties.NeverSyncFromHelper.
 
-                // Apply trigger travel settings
-                if (LegionHairTriggersToggle != null)
-                {
-                    LegionHairTriggersToggle.Toggled -= LegionHairTriggers_Toggled;
-                    try
-                    {
-                        LegionHairTriggersToggle.IsOn = profile.HairTriggers;
-                        UpdateTriggerSlidersEnabled(!profile.HairTriggers);
-                    }
-                    finally
-                    {
-                        LegionHairTriggersToggle.Toggled += LegionHairTriggers_Toggled;
-                    }
-                }
-                if (LegionLeftTriggerStartSlider != null)
-                {
-                    LegionLeftTriggerStartSlider.Value = profile.LeftTriggerStart;
-                    if (LegionLeftTriggerStartValue != null)
-                        LegionLeftTriggerStartValue.Text = $"{profile.LeftTriggerStart}%";
-                }
-                if (LegionLeftTriggerEndSlider != null)
-                {
-                    LegionLeftTriggerEndSlider.Value = profile.LeftTriggerEnd;
-                    if (LegionLeftTriggerEndValue != null)
-                        LegionLeftTriggerEndValue.Text = $"{profile.LeftTriggerEnd}%";
-                }
-                if (LegionRightTriggerStartSlider != null)
-                {
-                    LegionRightTriggerStartSlider.Value = profile.RightTriggerStart;
-                    if (LegionRightTriggerStartValue != null)
-                        LegionRightTriggerStartValue.Text = $"{profile.RightTriggerStart}%";
-                }
-                if (LegionRightTriggerEndSlider != null)
-                {
-                    LegionRightTriggerEndSlider.Value = profile.RightTriggerEnd;
-                    if (LegionRightTriggerEndValue != null)
-                        LegionRightTriggerEndValue.Text = $"{profile.RightTriggerEnd}%";
-                }
+                // [2.0 rebuild - slice 3] Trigger travel + HairTriggers are now helper-authoritative -
+                // the widget no longer seeds the sliders/toggle from its LocalSettings ControllerProfile
+                // here. They reflect the helper's pushed values (sliders via the bound properties +
+                // ControllerSliderSettingChanged text; toggle + slider-enablement via the guarded
+                // LegionHairTriggers_Toggled). See WidgetProperties.NeverSyncFromHelper.
 
                 // Apply joystick as mouse settings
                 if (LegionJoystickAsMouseComboBox != null)
@@ -1861,12 +1828,10 @@ namespace XboxGamingBar
                 // via the bound WidgetSliderProperty (slider -> helper), and the helper persists +
                 // pushes back. Removed to avoid the widget re-seeding stale values over the helper's.
 
-                // Trigger travel settings
-                legionLeftTriggerStart?.SetValue(profile.LeftTriggerStart);
-                legionLeftTriggerEnd?.SetValue(profile.LeftTriggerEnd);
-                legionRightTriggerStart?.SetValue(profile.RightTriggerStart);
-                legionRightTriggerEnd?.SetValue(profile.RightTriggerEnd);
-                legionHairTriggers?.SetValue(profile.HairTriggers);
+                // [2.0 rebuild - slice 3] Trigger travel + HairTriggers are helper-authoritative -
+                // the widget no longer pushes its LocalSettings values here. User edits flow via the
+                // bound properties (sliders) and LegionHairTriggers_Toggled (toggle); the helper
+                // persists + pushes back.
 
                 Logger.Info($"Sent controller settings to helper: Vib={profile.VibrationLevel}, VibMode={profile.VibrationMode}, GyroTarget={profile.GyroTarget}, LDZ={profile.LeftStickDeadzone}, RDZ={profile.RightStickDeadzone}");
             }

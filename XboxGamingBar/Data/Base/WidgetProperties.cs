@@ -131,12 +131,12 @@ namespace XboxGamingBar.Data
             // pushed value (bound sliders + UpdateControllerSliderDisplays text), and no longer
             // seeds them from its own LocalSettings ControllerProfile (removed from
             // ApplyControllerProfile + SendControllerSettingsToHelper).
-            // Triggers
-            Function.LegionLeftTriggerStart,
-            Function.LegionLeftTriggerEnd,
-            Function.LegionRightTriggerStart,
-            Function.LegionRightTriggerEnd,
-            Function.LegionHairTriggers
+            // [2.0 rebuild - slice 3] Trigger travel (Left/Right Start/End) + HairTriggers REMOVED:
+            // helper-authoritative (same as deadzones - persisted §29, applied+pushed by
+            // ApplyLegionControllerSettingsFromProfile). The 4 travel sliders reflect via the
+            // already-guarded ControllerSliderSettingChanged (skips save/send when
+            // isApplyingHelperUpdate); the HairTriggers toggle reflects via a guarded
+            // LegionHairTriggers_Toggled (enablement always, preset+save only on user toggle).
         };
 
         // Set to true during initial startup to skip widget-owned property sync (widget loaded from profiles/settings)

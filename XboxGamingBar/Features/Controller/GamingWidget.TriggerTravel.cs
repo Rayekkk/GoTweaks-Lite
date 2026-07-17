@@ -50,6 +50,19 @@ namespace XboxGamingBar
 
             bool enabled = LegionHairTriggersToggle?.IsOn ?? false;
 
+            // [2.0 rebuild - slice 3] Slider enablement is a view concern - always follow the toggle
+            // state, including when the helper pushes it (HairTriggers is helper-authoritative now).
+            UpdateTriggerSlidersEnabled(!enabled);
+
+            // Applying the hair-trigger travel preset (0/99) and saving is a USER action. On a helper
+            // push the helper already sent the correct trigger travel values, so don't overwrite them
+            // with the preset or re-save/echo. Just reflect the toggle + enablement (done above).
+            if (isApplyingHelperUpdate)
+            {
+                Logger.Info($"Hair Triggers reflected from helper: {enabled}");
+                return;
+            }
+
             if (enabled)
             {
                 // Hair triggers: Start=0 (no dead zone), End=99 (full press at 1% travel)
