@@ -1248,39 +1248,10 @@ namespace XboxGamingBar
                 // seeds the comboboxes from its LocalSettings ControllerProfile here. They reflect the
                 // helper's pushed value via the bound properties. See WidgetProperties.NeverSyncFromHelper.
 
-                // Apply gyro settings
-                if (LegionGyroTargetComboBox != null)
-                    LegionGyroTargetComboBox.SelectedIndex = profile.GyroTarget;
-                if (LegionGyroSensitivityXSlider != null)
-                {
-                    LegionGyroSensitivityXSlider.Value = profile.GyroSensitivityX;
-                    if (LegionGyroSensitivityXValue != null)
-                        LegionGyroSensitivityXValue.Text = profile.GyroSensitivityX.ToString();
-                }
-                if (LegionGyroSensitivityYSlider != null)
-                {
-                    LegionGyroSensitivityYSlider.Value = profile.GyroSensitivityY;
-                    if (LegionGyroSensitivityYValue != null)
-                        LegionGyroSensitivityYValue.Text = profile.GyroSensitivityY.ToString();
-                }
-                if (LegionGyroInvertXToggle != null)
-                    LegionGyroInvertXToggle.IsOn = profile.GyroInvertX;
-                if (LegionGyroInvertYToggle != null)
-                    LegionGyroInvertYToggle.IsOn = profile.GyroInvertY;
-                if (LegionGyroMappingTypeComboBox != null)
-                    LegionGyroMappingTypeComboBox.SelectedIndex = profile.GyroMappingType;
-                if (LegionGyroActivationModeComboBox != null)
-                    LegionGyroActivationModeComboBox.SelectedIndex = profile.GyroActivationMode;
-                if (LegionGyroActivationButtonComboBox != null)
-                    LegionGyroActivationButtonComboBox.SelectedIndex = profile.GyroActivationButton;
-
-                // Apply advanced gyro settings
-                if (LegionGyroDeadzoneSlider != null)
-                {
-                    LegionGyroDeadzoneSlider.Value = profile.GyroDeadzone;
-                    if (LegionGyroDeadzoneValue != null)
-                        LegionGyroDeadzoneValue.Text = profile.GyroDeadzone.ToString();
-                }
+                // [2.0 rebuild - slice 5] Gyro is helper-authoritative - the widget no longer seeds
+                // the gyro comboboxes/sliders/toggles from its LocalSettings ControllerProfile here.
+                // They reflect the helper's pushed values via the bound properties (+ guarded
+                // ControllerSettingChanged/ControllerSliderSettingChanged). See NeverSyncFromHelper.
 
                 // [2.0 rebuild - slice 2] Stick deadzones are now helper-authoritative - the widget
                 // no longer seeds the sliders from its LocalSettings ControllerProfile here. The
@@ -1810,16 +1781,9 @@ namespace XboxGamingBar
                 // pushes its LocalSettings vibration here. User edits flow via the bound comboboxes
                 // (combobox -> helper); the helper persists (RouteProfileSave) + pushes back.
 
-                // Gyro settings
-                legionGyroTarget?.SetValue(profile.GyroTarget);
-                legionGyroSensitivityX?.SetValue(profile.GyroSensitivityX);
-                legionGyroSensitivityY?.SetValue(profile.GyroSensitivityY);
-                legionGyroInvertX?.SetValue(profile.GyroInvertX);
-                legionGyroInvertY?.SetValue(profile.GyroInvertY);
-                legionGyroMappingType?.SetValue(profile.GyroMappingType);
-                legionGyroActivationMode?.SetValue(profile.GyroActivationMode);
-                legionGyroActivationButton?.SetValue(profile.GyroActivationButton);
-                legionGyroDeadzone?.SetValue(profile.GyroDeadzone);
+                // [2.0 rebuild - slice 5] Gyro is helper-authoritative - the widget no longer pushes
+                // its LocalSettings gyro values here. User edits flow via the bound controls; the
+                // helper persists (RouteProfileSave) + pushes back.
 
                 // [2.0 rebuild - slice 2] Stick deadzones are helper-authoritative - the widget no
                 // longer pushes its LocalSettings deadzone to the helper here. User edits still flow

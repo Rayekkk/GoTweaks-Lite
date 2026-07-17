@@ -114,16 +114,12 @@ namespace XboxGamingBar.Data
             Function.LegionButtonPage,
             Function.LegionNintendoLayout,
             Function.LegionGamepadButtonMapping,
-            // Gyro
-            Function.LegionGyroTarget,
-            Function.LegionGyroSensitivityX,
-            Function.LegionGyroSensitivityY,
-            Function.LegionGyroInvertX,
-            Function.LegionGyroInvertY,
-            Function.LegionGyroMappingType,
-            Function.LegionGyroActivationMode,
-            Function.LegionGyroActivationButton,
-            Function.LegionGyroDeadzone,
+            // [2.0 rebuild - slice 5] Gyro REMOVED: helper-authoritative. The helper persists all
+            // gyro fields via RouteProfileSave (GyroSettings save-flag, §29; global-persistence bug
+            // fixed) and applies+pushes them at startup (now before BatchGet) / game switch. All gyro
+            // controls (comboboxes, sliders, invert toggles) use the already-guarded
+            // ControllerSettingChanged / ControllerSliderSettingChanged (skip save/send when
+            // isApplyingHelperUpdate), so the widget reflects the helper's pushed value cleanly.
             // [2.0 rebuild - slice 2] Stick deadzones REMOVED: helper-authoritative. The helper
             // persists them into its GameProfile (Program.LegionControllerHandlers.cs, save-flag
             // gated, §29) and applies+pushes them at startup / game switch
