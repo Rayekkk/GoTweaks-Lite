@@ -124,9 +124,13 @@ namespace XboxGamingBar.Data
             Function.LegionGyroActivationMode,
             Function.LegionGyroActivationButton,
             Function.LegionGyroDeadzone,
-            // Sticks
-            Function.LegionLeftStickDeadzone,
-            Function.LegionRightStickDeadzone,
+            // [2.0 rebuild - slice 2] Stick deadzones REMOVED: helper-authoritative. The helper
+            // persists them into its GameProfile (Program.LegionControllerHandlers.cs, save-flag
+            // gated, §29) and applies+pushes them at startup / game switch
+            // (ApplyLegionControllerSettingsFromProfile). The widget now REFLECTS the helper's
+            // pushed value (bound sliders + UpdateControllerSliderDisplays text), and no longer
+            // seeds them from its own LocalSettings ControllerProfile (removed from
+            // ApplyControllerProfile + SendControllerSettingsToHelper).
             // Triggers
             Function.LegionLeftTriggerStart,
             Function.LegionLeftTriggerEnd,

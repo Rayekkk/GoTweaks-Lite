@@ -1284,19 +1284,10 @@ namespace XboxGamingBar
                         LegionGyroDeadzoneValue.Text = profile.GyroDeadzone.ToString();
                 }
 
-                // Apply stick deadzones
-                if (LegionLeftStickDeadzoneSlider != null)
-                {
-                    LegionLeftStickDeadzoneSlider.Value = profile.LeftStickDeadzone;
-                    if (LegionLeftStickDeadzoneValue != null)
-                        LegionLeftStickDeadzoneValue.Text = $"{profile.LeftStickDeadzone}%";
-                }
-                if (LegionRightStickDeadzoneSlider != null)
-                {
-                    LegionRightStickDeadzoneSlider.Value = profile.RightStickDeadzone;
-                    if (LegionRightStickDeadzoneValue != null)
-                        LegionRightStickDeadzoneValue.Text = $"{profile.RightStickDeadzone}%";
-                }
+                // [2.0 rebuild - slice 2] Stick deadzones are now helper-authoritative - the widget
+                // no longer seeds the sliders from its LocalSettings ControllerProfile here. The
+                // sliders (and their % text via UpdateControllerSliderDisplays) reflect the helper's
+                // pushed value instead. See WidgetProperties.NeverSyncFromHelper.
 
                 // Apply trigger travel settings
                 if (LegionHairTriggersToggle != null)
@@ -1865,9 +1856,10 @@ namespace XboxGamingBar
                 legionGyroActivationButton?.SetValue(profile.GyroActivationButton);
                 legionGyroDeadzone?.SetValue(profile.GyroDeadzone);
 
-                // Stick deadzone settings
-                legionLeftStickDeadzone?.SetValue(profile.LeftStickDeadzone);
-                legionRightStickDeadzone?.SetValue(profile.RightStickDeadzone);
+                // [2.0 rebuild - slice 2] Stick deadzones are helper-authoritative - the widget no
+                // longer pushes its LocalSettings deadzone to the helper here. User edits still flow
+                // via the bound WidgetSliderProperty (slider -> helper), and the helper persists +
+                // pushes back. Removed to avoid the widget re-seeding stale values over the helper's.
 
                 // Trigger travel settings
                 legionLeftTriggerStart?.SetValue(profile.LeftTriggerStart);
