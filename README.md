@@ -1,8 +1,13 @@
 <div align="center">
 
-<img src="XboxGamingBarPackage/Images/GoTweaks-1024.png" width="128" height="128" alt="GoTweaks Lite icon" />
+<img src="XboxGamingBarPackage/Images/GoTweaks-1024.png" width="256" height="256" alt="GoTweaks Lite icon" />
 
 # 🎮 GoTweaks Lite
+<p align="center">
+  <a href="https://github.com/Rayekkk/GoTweaks-Lite/releases/latest"><img src="https://img.shields.io/github/v/release/Rayekkk/GoTweaks-Lite?display_name=tag&label=Latest%20Release&color=7C3AED&logo=github&logoColor=white" alt="Latest Release"></a>
+  <a href="https://github.com/Rayekkk/GoTweaks-Lite/releases"><img src="https://img.shields.io/github/downloads/Rayekkk/GoTweaks-Lite/total?label=Downloads&color=22C55E" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Rayekkk/GoTweaks-Lite" alt="License: MIT"></a>
+</p>
 
 **A stripped-down, Lenovo Legion Go 2–focused fork of [GoTweaks](https://github.com/corando98/GoTweaks).**
 
@@ -10,14 +15,7 @@ An Xbox Game Bar widget for controlling TDP, fans, RGB, controller remapping, gy
 profiles, and an OSD — rebuilt into a clean, predictable base tuned specifically for the
 **Legion Go 2 (AMD Ryzen Z2 Extreme)**.
 
-`C#` · `Xbox Game Bar widget` · `MIT source / GPL-3.0 binaries`
-
 </div>
-
-> [!NOTE]
-> **Installation differs from the original.** Download the latest release and run
-> **`GoTweaks-Setup.exe`** — see [Installation](#-installation) below — not the upstream
-> download-and-run-`Install.ps1` steps.
 
 ---
 
@@ -59,8 +57,9 @@ upstream, and why.
   replaces them all.
 - The beta **Sidebar overlay** — _Focus GoTweaks Lite_ now simply opens the Game Bar.
 - **Microsoft / bundled Default Game Profiles** — only your own per-game profiles remain.
-- The **Advanced panel** (core parking / affinity), the **AC/DC Power Plan** selector, and the debug
-  **Themes** selector — niche or no-ops on the Legion Go 2.
+- The **Advanced panel** (core parking / affinity), the **AC/DC Power Plan** selector, the debug
+  **Themes** selector, and the old **ViGEm** emulation backend (**VIIPER** is now the only one) —
+  niche, no-ops on the Legion Go 2, or superseded.
 
 > **Why:** a smaller, more predictable surface with fewer background systems that can silently
 > fight your settings.
@@ -68,23 +67,36 @@ upstream, and why.
 ### ➕ Added
 
 - **Auto SDR** — while HDR is on, automatically matches the SDR white level to screen brightness
-  so SDR content (desktop, most games) doesn't look washed out. _(Ported from the sibling Go2HDR
+  so SDR content (desktop, most games) doesn't look washed out, with a full **curve editor**
+  (Legion Go 2 preset or a custom, import/export-compatible curve). _(Built on the sibling Go2HDR
   project.)_
+- **Brightness Gesture** — SteamOS-style brightness control: hold a configurable button and tilt a
+  stick to fade the panel brightness up or down.
+- **Power & Sleep card** — power-button behavior, screen-off, and a GoTweaks-owned "hibernate
+  after" idle timer (input-aware, so a controller-only session isn't wrongly treated as idle),
+  all restored automatically on uninstall.
+- **Controller-combo tile hotkeys** — assign a 2-or-more-button controller combo (including the
+  Legion back paddles) to any Quick Settings tile to activate it without touching the widget.
+  _(Ported from upstream corando98/GoTweaks.)_
 - **Fix Task View Bug** _(Labs, opt-in)_ — a targeted fix for the Legion Go bug where, after a
   restart with a USB hub attached, focusing the desktop pops open Task View (Win+Tab) and buzzes
   the controller. It re-enumerates the controller's USB port once per boot — the software
   equivalent of physically replugging a pad. Enable it only if you have this bug.
+- **Single-file GUI installer** — `GoTweaks-Setup.exe` bundles the package + certificate and runs
+  the whole install behind a small progress window (see [Installation](#-installation)).
 
 ### 🔧 Reliability fixes
 
-- Correct **system-tray icon** (was the generic Windows icon).
-- Fixed **swapped CPU/GPU wattage sensors** on the Legion Go 2 so OSD labels match Adrenalin.
-- More reliable **AFMF toggle**, **fan-curve temperature** (now true CPU Tctl, not the chipset
-  sensor), and **Fan Full Speed** — a custom fan curve also survives sleep/hibernate now instead
-  of silently stopping.
+- Correct **system-tray icon**, fixed **swapped CPU/GPU wattage sensors** on the Legion Go 2 so OSD
+  labels match Adrenalin, more reliable **AFMF toggle**, true-CPU-Tctl **fan-curve temperature**,
+  and a **Fan Full Speed** / custom fan curve that survives sleep/hibernate instead of silently
+  stopping.
 - **Controller vibration & lighting persistence** across restarts, a **24-hour OSD clock**, extra
   navigation / media keys in the remap pickers, and improved **Lossless Scaling** runtime
-  detection & reliability.
+  detection, settings-sync, and reliability.
+- **Kill-then-relaunch** no longer wedges the helper, **Custom TDP** holds through gameplay and
+  power-source changes, and **controller status / battery** report correctly when the pads are
+  detached.
 - **Closing the app window no longer kills the active Game Bar widget.** GoTweaks Lite can also be
   opened as a standalone window (Start menu / taskbar) alongside the Game Bar overlay; closing that
   window used to silently kill the widget's connection — it's now minimized instead, and the widget
@@ -98,8 +110,11 @@ upstream, and why.
 
 A customizable dashboard of quick-access tiles for your most-used settings.
 
-- One-tap toggles for TDP Mode, Profile, Overlay, and Lossless Scaling
+- One-tap toggles for TDP Mode, Profile, Overlay, Lossless Scaling, AMD features, and more
+- **Assign a controller button combo to any tile** — hold the combo (paddles included) to fire it
+  hands-free
 - Custom keyboard-shortcut tiles you can add and remove
+- An optional built-in **brightness slider** and a live metrics row (CPU/GPU/memory, battery, fan)
 - Device-specific tiles that appear when supported hardware is detected
 
 ### ⚡ Performance Control
@@ -126,16 +141,17 @@ Automatically apply your preferred settings when each game launches.
   - TDP (SPL / SPPT / FPPT) and CPU settings
   - AMD Radeon features
   - Lossless Scaling configuration
-  - Legion Go controller settings
+  - Legion Go controller settings (per-category: lighting, vibration, button mappings, gyro,
+    Nintendo layout)
 
 ### 🕹️ Legion Go 2 Support
 
 Deep support for the Legion Go 2 with automatic device detection.
 
-**Performance modes**
-- Quiet, Balanced, Performance, and Custom
+**Fan & performance**
+- Quiet, Balanced, Performance, and Custom modes
 - Custom TDP with fine-grained control (SPL, SPPT, FPPT)
-- Fan Full Speed toggle
+- Custom fan curve and a Fan Full Speed toggle
 
 **Controller settings**
 - **Button Remapping** — customize the M2, M3, Y1, Y2, Y3 buttons
@@ -146,8 +162,8 @@ Deep support for the Legion Go 2 with automatic device detection.
 - **Stick Deadzones** — adjust left/right stick deadzones (0–50%)
 - **Gyroscope** — enable/disable with target selection, X/Y sensitivity, axis inversion, and
   activation mode (Hold/Toggle) with a button binding
-- **Vibration Mode** — configure vibration behavior
-- **Touchpad Haptics** — toggle haptic feedback
+- **Brightness Gesture** — hold a trigger button and tilt a stick/D-pad to fade panel brightness
+- **Vibration Mode** & **Touchpad Haptics** — configure vibration behavior and haptic feedback
 
 **RGB lighting**
 - Light mode, color, brightness, and speed control
@@ -156,6 +172,15 @@ Deep support for the Legion Go 2 with automatic device detection.
 **Other**
 - Touchpad toggle
 - Battery charge limit
+
+### 🔋 Power & Sleep
+
+Windows power behavior, read and written directly against the matching power-plan settings and
+restored on uninstall.
+
+- **Power Button behavior** and **Turn off screen after** (AC / DC)
+- **Hibernate after** — a GoTweaks-owned, input-aware idle timer (Windows has no built-in one)
+- **Disable Sleep Timer** shortcut
 
 ### 🎮 Controller Emulation (VIIPER)
 
@@ -195,16 +220,18 @@ detected)_.
 - Frame-generation modes (LSFG2, LSFG3)
 - Auto-scaling with configurable delay
 - Anime4K and FSR optimization options
-- Per-profile configurations
+- Per-profile configurations, with a clear "Scale" vs "Apply and Restart" distinction that lights
+  up only when you have unsaved changes
 
 ### 🖥️ Graphics Settings
 
 Display and resolution management.
 
-- Resolution control with auto-detection
-- Refresh-rate adjustment
+- Resolution and refresh-rate control with auto-detection (clearly gated to the built-in panel
+  when docked to an external monitor)
 - HDR toggle (when supported)
-- **Auto SDR** — match the SDR white level to screen brightness while HDR is active
+- **Auto SDR** — match the SDR white level to screen brightness while HDR is active, with an
+  editable curve
 
 ### 📊 Performance Overlay (OSD)
 
@@ -219,68 +246,28 @@ A real-time on-screen display powered by RivaTuner Statistics Server.
 
 Designed for full gamepad control — no mouse needed.
 
-- D-pad navigation between all controls
-- Visual focus indicators
-- Automatic scroll to the focused item
+- D-pad navigation between all controls, with auto-focus into a tab's content
+- High-visibility focus ring and automatic scroll to the focused item
 - Works with Xbox, PlayStation, and other controllers
 
 ---
 
 ## 📦 Installation
 
-GoTweaks Lite ships as a sideloaded MSIX package signed with a self-signed certificate, so the
-installer first tells Windows to trust that certificate.
+1. Download **`GoTweaks-Setup.exe`** from the latest release and run it. Click **Yes** on the UAC
+   prompt, then wait for the confirmation. _(Close the Game Bar overlay first if it's open —
+   `Win + G` to check.)_
+2. Open Xbox Game Bar (`Win + G`), open the **widget menu**, and enable **“GoTweaks Lite”**. The
+   first launch shows one more UAC prompt for the elevated helper; after that, launches are silent.
+3. _(For per-game profiles)_ Xbox Game Bar → **Settings** → **More Settings** → the **GoTweaks
+   Lite** widget → enable **“Know which game or app is in focus”**.
 
-### 1. Install
-
-1. Grab **`GoTweaks-Setup.exe`** from the latest release. That's the only file you need — the
-   package and the certificate are built into it.
-2. **Close the Game Bar overlay** if it's open (`Win + G` to check) — an open Game Bar keeps the
-   old version running and blocks the update.
-3. Double-click **`GoTweaks-Setup.exe`**.
-4. Click **Yes** on the UAC prompt — needed only to trust the certificate.
-5. A small progress window appears; wait for the **"GoTweaks Lite installed"** confirmation.
-
-> The release also lists a loose `GoTweaks_<version>.msixbundle` + `.cer` — those aren't for you
-> to download, GoTweaks Lite's own in-app "Check for Update" fetches them directly for later
-> updates. Ignore them for a first install.
+Everything is built into the one `.exe`, and installing over an existing version keeps your profiles
+and settings.
 
 > [!NOTE]
-> **Windows may show a "Windows protected your PC" SmartScreen warning** the first time you run
-> the installer — this is normal for a freshly downloaded, unsigned executable and not specific to
-> GoTweaks Lite. Click **More info** → **Run anyway** to continue.
-
-> If `GoTweaks-Setup.exe` is blocked outright, you can run the same steps yourself from source:
-> clone the repo, grab the loose `GoTweaks_<version>.msixbundle` + `.cer` from the release, put
-> `Installer\Install GoTweaks.ps1` in the same folder as those two, and from PowerShell in that
-> folder run:
-> ```powershell
-> powershell -ExecutionPolicy Bypass -File ".\Install GoTweaks.ps1"
-> ```
-> Right-click → **Run with PowerShell** does **not** work here — it skips the `-ExecutionPolicy
-> Bypass` the script needs, and fails with a "running scripts is disabled" error on most default
-> Windows setups.
-
-The installer trusts the certificate, closes blocking processes, and installs/updates the widget in
-place — your profiles and settings are kept.
-
-### 2. Enable the widget
-
-1. Open Xbox Game Bar (`Win + G`)
-2. Open the **widget menu**
-3. Find and enable **“GoTweaks Lite”**
-
-> The **first launch shows one more UAC prompt** — the elevated helper that drives the hardware
-> (TDP, fans, RGB) needs administrator rights. After that it registers a scheduled task, so future
-> launches are silent.
-
-### 3. Enable game detection
-
-Required for per-game profiles:
-
-1. Open Xbox Game Bar → **Settings** → **More Settings**
-2. Find the **GoTweaks Lite** widget
-3. Enable **“Know which game or app is in focus”**
+> Windows may show a **"Windows protected your PC" SmartScreen warning** — normal for a freshly
+> downloaded, unsigned executable. Click **More info** → **Run anyway**.
 
 ### Uninstalling
 
@@ -306,7 +293,7 @@ powershell -ExecutionPolicy Bypass -File ".\Uninstall-GoTweaks.ps1"
 | --- | --- |
 | **OS** | Windows 10 / 11 |
 | **Required** | Xbox Game Bar |
-| **Optional** | [RivaTuner Statistics Server](https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/) (OSD overlay) · [PawnIO](https://github.com/SuporteTI/PawnIO) (extended sensors: fan speed, GPU power) · [usbip-win2](https://github.com/vadimgrn/usbip-win2/releases) (controller emulation / VIIPER — installable in-app) · AMD GPU (Radeon features) · Legion Go 2 / Legion Go (device features) · Lossless Scaling (scaling integration) |
+| **Optional** | [RivaTuner Statistics Server](https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/) (OSD overlay) · [PawnIO](https://github.com/SuporteTI/PawnIO) (custom fan curve / Fan Full Speed) · [usbip-win2](https://github.com/vadimgrn/usbip-win2/releases) (controller emulation / VIIPER — installable in-app) · AMD GPU (Radeon features) · Legion Go 2 / Legion Go (device features) · Lossless Scaling (scaling integration) |
 
 > [!IMPORTANT]
 > **Smart App Control** may interfere with this application. If it doesn't work correctly, you may
@@ -322,10 +309,11 @@ Free and open source. Built with C#.
 | Library | Purpose |
 | --- | --- |
 | **LibreHardwareMonitor** | Hardware sensors and monitoring |
-| **RyzenAdj** | AMD TDP control |
+| **RyzenAdj** | AMD TDP control (non-Legion fallback path) |
 | **RTSSSharedMemoryNET** | Custom build with frametime-graph support, tuned for low CPU/memory use |
 | **ADLX** | AMD Display Library for Radeon features |
 | **PresentMon** | Rendered / displayed FPS and frame-generation metrics |
+| **PawnIO** | Direct EC access for the Legion Go 2 custom fan curve |
 | **libviiper** (usbip-win2) | USBIP-based virtual controller emulation with native gyro |
 
 ---
