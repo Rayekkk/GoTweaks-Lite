@@ -1637,6 +1637,26 @@ namespace XboxGamingBarHelper
             initTimer.Stop();
             Logger.Info($"[TIMING] Helper initialization (managers + properties): {initTimer.ElapsedMilliseconds}ms");
 
+            // [2.0 fix] Restore all global profile settings (TDP, CPUBoost, EPP, Legion mode,
+            // controller settings, etc.) BEFORE marking managers ready, so the widget's BatchGet
+            // (gated on _managersReady) returns the restored values rather than pre-apply defaults.
+            // The managers are fully constructed above; this apply has no dependency on the later
+            // init steps (PresentMon, driver probe, etc.). Guarded by isApplyingProfile so the
+            // property-change save handlers don't re-persist during the restore.
+            if (profileManager?.CurrentProfile != null)
+            {
+                Logger.Info($"Restoring global profile settings on startup: {profileManager.CurrentProfile.GameId.Name}");
+                isApplyingProfile = true;
+                try
+                {
+                    RestoreGlobalProfileSettings();
+                }
+                finally
+                {
+                    isApplyingProfile = false;
+                }
+            }
+
             // Mark managers as ready - BatchGet requests will now be processed
             // Pipe server was started earlier, widget may already be connected and waiting
             _managersReady = true;
@@ -1780,21 +1800,11 @@ namespace XboxGamingBarHelper
             // Load and apply the Legion R brightness gesture setting from LocalSettings
             LoadLegionRBrightnessGestureSetting();
 
-            // Restore all global profile settings (TDP, AutoTDP, CPUBoost, EPP, Legion mode, etc.)
-            // on startup so saved values are applied to hardware after device restart.
-            if (profileManager?.CurrentProfile != null)
-            {
-                Logger.Info($"Restoring global profile settings on startup: {profileManager.CurrentProfile.GameId.Name}");
-                isApplyingProfile = true;
-                try
-                {
-                    RestoreGlobalProfileSettings();
-                }
-                finally
-                {
-                    isApplyingProfile = false;
-                }
-            }
+            // [2.0 fix] Global profile restore MOVED to before `_managersReady = true` (above), so
+            // the BatchGet the widget makes on connect returns the RESTORED values, not pre-apply
+            // defaults. Previously it ran here (after managers-ready), so BatchGet raced ahead of it
+            // and the widget built its UI (e.g. Quick Settings vibration tiles) from helper defaults;
+            // the post-apply push updated the properties but not the already-built tile state.
 
             Logger.Info($"[TIMING] Helper fully initialized and ready");
 
