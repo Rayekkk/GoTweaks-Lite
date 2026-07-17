@@ -1244,9 +1244,11 @@ namespace XboxGamingBar
                     }
                 }
 
-                // [2.0 rebuild - slice 4] Vibration is helper-authoritative - the widget no longer
-                // seeds the comboboxes from its LocalSettings ControllerProfile here. They reflect the
-                // helper's pushed value via the bound properties. See WidgetProperties.NeverSyncFromHelper.
+                // Apply vibration settings
+                if (LegionVibrationComboBox != null)
+                    LegionVibrationComboBox.SelectedIndex = profile.VibrationLevel;
+                if (LegionVibrationModeComboBox != null)
+                    LegionVibrationModeComboBox.SelectedIndex = profile.VibrationMode - 1; // Mode is 1-based, index is 0-based
 
                 // Apply gyro settings
                 if (LegionGyroTargetComboBox != null)
@@ -1806,9 +1808,9 @@ namespace XboxGamingBar
         {
             try
             {
-                // [2.0 rebuild - slice 4] Vibration is helper-authoritative - the widget no longer
-                // pushes its LocalSettings vibration here. User edits flow via the bound comboboxes
-                // (combobox -> helper); the helper persists (RouteProfileSave) + pushes back.
+                // Vibration settings
+                legionVibration?.SetValue(profile.VibrationLevel);
+                legionVibrationMode?.SetValue(profile.VibrationMode);
 
                 // Gyro settings
                 legionGyroTarget?.SetValue(profile.GyroTarget);

@@ -77,13 +77,13 @@ namespace XboxGamingBar.Data
             Function.LegionLightBrightness,
             Function.LegionLightSpeed,
             Function.LegionPowerLight,
-            // [2.0 rebuild - slice 4] Vibration REMOVED: helper-authoritative. The old comment here
-            // ("helper does NOT persist across restarts") is STALE - since §29 the helper persists
-            // LegionVibration/Mode into its profile via RouteProfileSave (per-game if the Vibration
-            // save-flag is on, else global) and applies+pushes them at startup / game switch
-            // (ApplyLegionControllerSettingsFromProfile). The widget now reflects the helper's value
-            // (bound comboboxes; the SelectionChanged->ControllerSettingChanged->ApplyControllerSettingChange
-            // save/send is already guarded by isApplyingHelperUpdate) and no longer seeds them.
+            // Vibration - loaded from controller profiles; helper hard-defaults to Medium(2)/FPS(1)
+            // and does NOT persist across restarts. Without this guard, a BatchGet that races the
+            // widget's startup send leaks the helper default back into the combo, which fires
+            // SelectionChanged → ControllerSettingChanged → saves the default into the profile,
+            // so the user's vibration setting intermittently reverts after a console restart.
+            Function.LegionVibration,
+            Function.LegionVibrationMode,
 
             // ── All remaining controller-profile settings ────────────────────────────────
             // Every setting below is WIDGET-OWNED: persisted in the per-controller LocalSettings
