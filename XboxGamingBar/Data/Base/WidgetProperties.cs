@@ -71,12 +71,15 @@ namespace XboxGamingBar.Data
             // copy. The widget no longer loads/saves PerformanceOverlayLevel to LocalSettings
             // (see GamingWidget.PerformanceOverlay.cs). Helper push -> osd property ->
             // PerformanceOverlaySlider -> ValueChanged -> ComboBox keeps the UI in sync.
-            // Lighting - loaded from controller profiles; helper defaults to #FFFFFF
-            Function.LegionLightMode,
-            Function.LegionLightColor,
-            Function.LegionLightBrightness,
-            Function.LegionLightSpeed,
-            Function.LegionPowerLight,
+            // [2.0 rebuild - slice 6] Lighting REMOVED: helper-authoritative. The helper persists
+            // all lighting fields via RouteProfileSave (Lighting save-flag, §29; global-persistence
+            // bug fixed) and applies+pushes them at startup (now before BatchGet) / game switch. The
+            // bound properties reflect helper pushes into the mode combobox / color picker /
+            // brightness+speed sliders / power-light toggle; every save handler
+            // (ControllerSettingChanged / ControllerSliderSettingChanged) is already guarded by
+            // isApplyingHelperUpdate, and the view updates (preview, visibility) correctly follow.
+            // Widget no longer seeds lighting (ApplyControllerProfile + the seed-path
+            // SendLightingToHelper calls); user edits still send via ApplyControllerSettingChange.
             // [2.0 rebuild - slice 4] Vibration REMOVED: helper-authoritative. The old comment here
             // ("helper does NOT persist across restarts") is STALE - since §29 the helper persists
             // LegionVibration/Mode into its profile via RouteProfileSave (per-game if the Vibration

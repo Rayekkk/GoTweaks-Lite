@@ -1325,49 +1325,11 @@ namespace XboxGamingBar
                     }
                 }
 
-                // Apply lighting settings
-                if (LegionLightModeComboBox != null)
-                {
-                    LegionLightModeComboBox.SelectionChanged -= LegionLightModeComboBox_SelectionChanged;
-                    try
-                    {
-                        LegionLightModeComboBox.SelectedIndex = profile.LightMode;
-                    }
-                    finally
-                    {
-                        LegionLightModeComboBox.SelectionChanged += LegionLightModeComboBox_SelectionChanged;
-                    }
-                }
-                if (LegionColorPicker != null)
-                {
-                    LegionColorPicker.ColorChanged -= LegionColorPicker_ColorChanged;
-                    try
-                    {
-                        LegionColorPicker.Color = Windows.UI.Color.FromArgb(255, profile.LightColorR, profile.LightColorG, profile.LightColorB);
-                        if (LegionColorPreview != null)
-                        {
-                            LegionColorPreview.Background = new SolidColorBrush(LegionColorPicker.Color);
-                        }
-                    }
-                    finally
-                    {
-                        LegionColorPicker.ColorChanged += LegionColorPicker_ColorChanged;
-                    }
-                }
-                if (LegionSpeedSlider != null)
-                {
-                    LegionSpeedSlider.Value = profile.LightSpeed;
-                }
-                if (LegionBrightnessSlider != null)
-                {
-                    LegionBrightnessSlider.Value = profile.LightBrightness;
-                    if (LegionBrightnessValue != null)
-                        LegionBrightnessValue.Text = $"{profile.LightBrightness}%";
-                }
-                if (LegionPowerLightToggle != null)
-                {
-                    LegionPowerLightToggle.IsOn = profile.PowerLight;
-                }
+                // [2.0 rebuild - slice 6] Lighting is helper-authoritative - the widget no longer
+                // seeds the mode combobox / color picker / brightness+speed sliders / power-light
+                // toggle from its LocalSettings ControllerProfile here. They reflect the helper's
+                // pushed values via the bound properties (with guarded save handlers). See
+                // WidgetProperties.NeverSyncFromHelper.
 
                 Logger.Info($"Applied controller profile: Y1={FormatButtonMapping(profile.ButtonY1)}, Y2={FormatButtonMapping(profile.ButtonY2)}, Y3={FormatButtonMapping(profile.ButtonY3)}, M1={FormatButtonMapping(profile.ButtonM1)}, M2={FormatButtonMapping(profile.ButtonM2)}, M3={FormatButtonMapping(profile.ButtonM3)}, Nintendo={profile.NintendoLayout}, Vib={profile.VibrationLevel}, VibMode={profile.VibrationMode}, GyroTarget={profile.GyroTarget}, LDZ={profile.LeftStickDeadzone}, RDZ={profile.RightStickDeadzone}, GamepadMappings={profile.GamepadButtonMappings?.Count ?? 0}, DesktopControls={profile.DesktopControlsEnabled}, LightMode={profile.LightMode}");
 
@@ -1381,8 +1343,8 @@ namespace XboxGamingBar
                 // Send controller settings to helper (gyro, deadzone, vibration, triggers)
                 SendControllerSettingsToHelper(profile);
 
-                // Send lighting settings to helper
-                SendLightingToHelper(profile);
+                // [2.0 slice 6] Lighting seed removed - helper is authoritative and applies+pushes
+                // it at startup / game switch. User edits still send via ApplyControllerSettingChange.
 
                 // Re-evaluate enhanced remap UI after profile/UI values settle.
                 // This avoids startup ordering issues where improved input state arrives
@@ -1704,7 +1666,8 @@ namespace XboxGamingBar
                 Logger.Info("Re-pushing active controller profile to helper after pipe connect (recovery from cold-start race)");
                 SendButtonMappingsToHelper(profile, force: true);
                 SendControllerSettingsToHelper(profile);
-                SendLightingToHelper(profile);
+                // [2.0 slice 6] Lighting reseed removed - helper is authoritative (persists + applies
+                // + pushes). Button mappings still reseed here (buttons not yet migrated).
             }
             catch (Exception ex)
             {
