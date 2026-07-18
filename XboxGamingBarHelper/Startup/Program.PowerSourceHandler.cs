@@ -23,6 +23,18 @@ namespace XboxGamingBarHelper
             // to whatever the active profile / current property already holds).
             public static int? AcTdp = null;
             public static int? DcTdp = null;
+            // [2.0 rebuild - TDP Custom-triplet AC/DC fix] SPPT/FPPT per power state. Without
+            // these, an AC/DC transition in Legion Custom mode only ever reapplied the flat SPL
+            // (below) - LegionManager.ReassertCustomTDP (called via
+            // PerformanceManager.ApplyTDPInternal's IsInCustomMode branch) ignores a flat SetTDP
+            // call's value entirely and just re-pushes whatever's cached, so the per-state
+            // SPPT/FPPT split was silently never applied on a power-source change. Same clobber
+            // class as the profile-switch fix (commit 9e878f9), fixed the same way: push the full
+            // triplet via LegionManager.SetCustomTDP instead of the flat PerformanceManager.SetTDP.
+            public static int? AcTdpFast = null;
+            public static int? DcTdpFast = null;
+            public static int? AcTdpPeak = null;
+            public static int? DcTdpPeak = null;
 
             // Extended per-state values (build 2080+). Same null-means-no-override
             // convention. Covers the full set the widget previously sent piecemeal via
@@ -83,6 +95,10 @@ namespace XboxGamingBarHelper
 
                 PowerSourceProfileState.AcTdp = ParseInt("AcTdp");
                 PowerSourceProfileState.DcTdp = ParseInt("DcTdp");
+                PowerSourceProfileState.AcTdpFast = ParseInt("AcTdpFast");
+                PowerSourceProfileState.DcTdpFast = ParseInt("DcTdpFast");
+                PowerSourceProfileState.AcTdpPeak = ParseInt("AcTdpPeak");
+                PowerSourceProfileState.DcTdpPeak = ParseInt("DcTdpPeak");
 
                 PowerSourceProfileState.AcCpuBoost = ParseBool("AcCpuBoost");
                 PowerSourceProfileState.DcCpuBoost = ParseBool("DcCpuBoost");
@@ -98,13 +114,13 @@ namespace XboxGamingBarHelper
                 PowerSourceProfileState.DcFpsLimit = ParseInt("DcFpsLimit");
 
                 Logger.Info($"Applied PowerSourceProfileValues "
-                    + $"(AC: tdp={PowerSourceProfileState.AcTdp?.ToString() ?? "-"}W, "
+                    + $"(AC: tdp={PowerSourceProfileState.AcTdp?.ToString() ?? "-"}/{PowerSourceProfileState.AcTdpFast?.ToString() ?? "-"}/{PowerSourceProfileState.AcTdpPeak?.ToString() ?? "-"}W, "
                     + $"cpuBoost={PowerSourceProfileState.AcCpuBoost?.ToString() ?? "-"}, "
                     + $"epp={PowerSourceProfileState.AcCpuEpp?.ToString() ?? "-"}, "
                     + $"cpuState={PowerSourceProfileState.AcMinCpuState?.ToString() ?? "-"}–{PowerSourceProfileState.AcMaxCpuState?.ToString() ?? "-"}, "
                     + $"osMode={PowerSourceProfileState.AcOsPowerMode?.ToString() ?? "-"}, "
                     + $"fpsLimit={PowerSourceProfileState.AcFpsLimit?.ToString() ?? "-"}; "
-                    + $"DC: tdp={PowerSourceProfileState.DcTdp?.ToString() ?? "-"}W, "
+                    + $"DC: tdp={PowerSourceProfileState.DcTdp?.ToString() ?? "-"}/{PowerSourceProfileState.DcTdpFast?.ToString() ?? "-"}/{PowerSourceProfileState.DcTdpPeak?.ToString() ?? "-"}W, "
                     + $"cpuBoost={PowerSourceProfileState.DcCpuBoost?.ToString() ?? "-"}, "
                     + $"epp={PowerSourceProfileState.DcCpuEpp?.ToString() ?? "-"}, "
                     + $"cpuState={PowerSourceProfileState.DcMinCpuState?.ToString() ?? "-"}–{PowerSourceProfileState.DcMaxCpuState?.ToString() ?? "-"}, "
@@ -172,25 +188,44 @@ namespace XboxGamingBarHelper
                 }
                 else
                 {
-                    // Pick the per-state TDP value for the new power state, if the widget
-                    // has configured one via PowerSourceProfileValues. Falls back to the
-                    // helper's current cached TDP so behavior matches the pre-AC/DC-values
-                    // build for users who haven't configured per-state values.
+                    // Pick the per-state TDP triplet for the new power state, if the widget has
+                    // configured one via PowerSourceProfileValues. Falls back to the helper's
+                    // current cached Custom TDP triplet (GetCurrentTDPValues, reliable in Custom
+                    // mode - the WMI getter itself lies and returns preset values), then to the
+                    // flat cached TDP as a last resort - matches GameProfile.TDPFast/TDPPeak's own
+                    // "fall back to SPL" convention for legacy/unconfigured profiles.
+                    var (cachedSlow, cachedFast, cachedPeak) = legionManager.GetCurrentTDPValues();
+
                     int? perStateTdp = isOnAC ? PowerSourceProfileState.AcTdp : PowerSourceProfileState.DcTdp;
-                    int targetTdp = perStateTdp ?? performanceManager.TDP.Value;
+                    int targetTdp = perStateTdp ?? cachedSlow ?? performanceManager.TDP.Value;
+
+                    int? perStateTdpFast = isOnAC ? PowerSourceProfileState.AcTdpFast : PowerSourceProfileState.DcTdpFast;
+                    int targetTdpFast = perStateTdpFast ?? cachedFast ?? targetTdp;
+
+                    int? perStateTdpPeak = isOnAC ? PowerSourceProfileState.AcTdpPeak : PowerSourceProfileState.DcTdpPeak;
+                    int targetTdpPeak = perStateTdpPeak ?? cachedPeak ?? targetTdp;
+
                     if (targetTdp > 0)
                     {
                         string source = perStateTdp.HasValue ? $"per-state {(isOnAC ? "AC" : "DC")} profile" : "current cached value";
-                        Logger.Info($"Helper-side AC/DC handler: applying TDP {targetTdp}W from {source} (legionCustom={isLegionCustomMode})");
-                        // Update the helper's TDP property so the widget's slider stays
-                        // in sync (the property change pipes back to the widget). Use
-                        // SetValue rather than just calling SetTDP so the widget UI
-                        // reflects the new value.
+                        Logger.Info($"Helper-side AC/DC handler: applying Custom TDP {targetTdp}/{targetTdpFast}/{targetTdpPeak}W from {source} (legionCustom={isLegionCustomMode})");
+                        // Update the helper's TDP property so the widget's slider stays in sync
+                        // (the property change pipes back to the widget).
                         if (perStateTdp.HasValue && perStateTdp.Value != performanceManager.TDP.Value)
                         {
                             performanceManager.TDP.SetValue(targetTdp);
                         }
-                        performanceManager.SetTDP(targetTdp);
+                        // [TDP Custom-triplet AC/DC fix] The flat PerformanceManager.SetTDP used
+                        // here previously hit ApplyTDPInternal's IsInCustomMode branch, which calls
+                        // LegionManager.ReassertCustomTDP - that IGNORES the passed value and just
+                        // re-pushes whatever's cached, so the per-state SPPT/FPPT split was never
+                        // actually applied on an AC/DC transition (only ever the flat SPL, and even
+                        // that only indirectly via the cache). Push the full triplet directly via
+                        // SetCustomTDP instead - same method the widget's sliders and the
+                        // profile-switch fix (commit 9e878f9) already use, with its own built-in
+                        // mode-switch safety (pending-mode flush, hardware-confirm poll, atomic
+                        // apply+rollback).
+                        legionManager.SetCustomTDP(targetTdp, targetTdpFast, targetTdpPeak);
                     }
 
                     // TDP Boost removed — boost is always on (SPPT/FPPT applied directly), so there's

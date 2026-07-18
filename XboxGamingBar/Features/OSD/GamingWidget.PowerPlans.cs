@@ -95,6 +95,13 @@ namespace XboxGamingBar
                 var jsonObj = new Windows.Data.Json.JsonObject();
                 jsonObj["AcTdp"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.TDP);
                 jsonObj["DcTdp"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.TDP);
+                // SPPT/FPPT per power state - the helper needs the full Custom TDP triplet, not
+                // just SPL, to correctly reapply Custom-mode limits on an AC/DC transition (a flat
+                // TDP alone hits LegionManager.ReassertCustomTDP's cache-ignoring no-op).
+                jsonObj["AcTdpFast"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.TDPFast);
+                jsonObj["DcTdpFast"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.TDPFast);
+                jsonObj["AcTdpPeak"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.TDPPeak);
+                jsonObj["DcTdpPeak"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.TDPPeak);
 
                 // Extended per-state values (build 2080+) — helper applies these on AC/DC
                 // transitions independent of widget lifecycle, fixing FSE-only-helper drift.
