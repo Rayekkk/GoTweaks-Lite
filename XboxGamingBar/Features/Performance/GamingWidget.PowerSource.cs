@@ -71,6 +71,12 @@ namespace XboxGamingBar
             {
                 Logger.Info($"PowerSourceProfileToggle toggled globally to: {enabled}");
                 SavePowerSourceProfileSetting(enabled);
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19: this branch used to stop at persisting the flag, unlike its
+                // per-game sibling (which calls LoadOrCreateGameProfiles) - see that method's
+                // global counterpart, LoadOrCreateGlobalPowerSourceProfiles, for the full
+                // rationale (missing seeding left acProfile/dcProfile at hardcoded defaults).
+                LoadOrCreateGlobalPowerSourceProfiles();
             }
 
             UpdateGlobalProfileDisplayMode();

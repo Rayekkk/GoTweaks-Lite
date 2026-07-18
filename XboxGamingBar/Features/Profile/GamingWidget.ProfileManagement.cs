@@ -88,12 +88,6 @@ namespace XboxGamingBar
                 }
 
                 Logger.Info($"Loaded game AC/DC profiles for {currentGameName}");
-                // Sync the per-state values down to the helper so it can apply them on
-                // AC/DC transitions without the widget being awake. Without this the
-                // helper would push its cached (current-state) TDP and the user would see
-                // the slider update but hardware lag (the bug surfaced in build 2070
-                // testing on 2026-04-25).
-                SendPowerSourceProfileValuesToHelper();
             }
             else
             {
@@ -153,6 +147,67 @@ namespace XboxGamingBar
             // that share an exe (e.g. emulators like Citron / RetroArch where each game
             // produces a different window title) under a single collapsed parent card.
             EnsureGameExePathStored(currentGameName);
+
+            // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+            // 2026-07-19: moved out of the splitEnabled branch above so this fires on BOTH
+            // enabling AND disabling the per-game AC/DC split - previously only the enable path
+            // resynced, so turning the split off left the helper's persisted GameProfile holding
+            // stale _DC overrides until some unrelated edit happened to trigger a resync. Now
+            // disabling immediately pushes ac=dc=gameProfile (or globalProfile), correctly
+            // clearing the helper's _DC overrides back to "inherit AC".
+            SendPowerSourceProfileValuesToHelper();
+        }
+
+        /// <summary>
+        /// Global-scope counterpart to <see cref="LoadOrCreateGameProfiles"/>. Found missing in an
+        /// independent audit 2026-07-19: PowerSourceProfileToggle_Toggled's global-scope branch
+        /// used to only persist the enabled flag, with no seeding step at all - so the FIRST time
+        /// a user enabled the global AC/DC split, acProfile/dcProfile were still at
+        /// PerformanceProfile's hardcoded constructor defaults (TDP=15W, CPUBoost=false, etc.),
+        /// completely unrelated to the user's actual configured global settings. Switching to the
+        /// "AC"/"DC" edit tab right after would visibly snap the Custom TDP sliders to those
+        /// defaults and push a wrong OSPowerMode to the helper immediately. Mirrors
+        /// LoadOrCreateGameProfiles's per-game seeding pattern: seed acProfile/dcProfile from the
+        /// live globalProfile the first time each is needed, otherwise load the existing saved
+        /// values: then always resync to the helper (covers both enabling and disabling the split).
+        /// </summary>
+        private void LoadOrCreateGlobalPowerSourceProfiles()
+        {
+            var settings = ApplicationData.Current.LocalSettings;
+            bool splitEnabled = GetGlobalPowerSourceProfileEnabled();
+            bool hasAC = settings.Containers.ContainsKey("Profile_AC");
+            bool hasDC = settings.Containers.ContainsKey("Profile_DC");
+
+            if (splitEnabled)
+            {
+                if (!hasAC)
+                {
+                    acProfile = globalProfile.Clone();
+                    SaveProfileToStorage("AC", acProfile);
+                    Logger.Info("Initialized global AC profile (seed=global profile)");
+                }
+                else
+                {
+                    LoadProfileFromStorage("AC", acProfile);
+                }
+
+                if (!hasDC)
+                {
+                    dcProfile = globalProfile.Clone();
+                    SaveProfileToStorage("DC", dcProfile);
+                    Logger.Info("Initialized global DC profile (seed=global profile)");
+                }
+                else
+                {
+                    LoadProfileFromStorage("DC", dcProfile);
+                }
+
+                Logger.Info("Loaded global AC/DC profiles");
+            }
+
+            // Fires on both enable and disable - see LoadOrCreateGameProfiles's identical
+            // end-of-method call for why disabling must resync too.
+            SendPowerSourceProfileValuesToHelper();
         }
 
         /// <summary>

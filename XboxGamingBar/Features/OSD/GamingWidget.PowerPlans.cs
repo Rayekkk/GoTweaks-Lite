@@ -68,7 +68,20 @@ namespace XboxGamingBar
                 //      defaults (TDP=15W etc.) and the helper would clobber the user's
                 //      real global TDP on every AC/DC transition (logged as the
                 //      "global TDP=17 jumps to 15 on plug/unplug" bug).
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19: this used to omit the PerGameProfileToggle.IsOn check that every
+                // other "is per-game actually in effect" site in the codebase uses (e.g.
+                // GetTargetProfileName, GetPowerSourceProfileEnabledForCurrentContext,
+                // UpdateActiveProfileIndicator, UpdateGameProfileCardVisibility).
+                // GetPerGamePowerSourceProfileEnabled is only a per-game PREFERENCE ("does this
+                // game want its own AC/DC split if/when per-game profiles are used for it") - it
+                // says nothing about whether per-game profiles are currently active. Without this
+                // check, a game that previously had per-game profiles + its own AC/DC split
+                // enabled would keep resyncing its stale gameACProfile/gameDCProfile to the helper
+                // even after the user turned PerGameProfileToggle off (now editing/viewing the
+                // global scope) - silently sending the wrong data while the UI shows something else.
                 bool hasGameAcDc = HasValidGame(currentGameName)
+                    && (PerGameProfileToggle?.IsOn ?? false)
                     && GetPerGamePowerSourceProfileEnabled(currentGameName);
                 bool hasGlobalAcDc = GetGlobalPowerSourceProfileEnabled();
                 PerformanceProfile ac, dc;
