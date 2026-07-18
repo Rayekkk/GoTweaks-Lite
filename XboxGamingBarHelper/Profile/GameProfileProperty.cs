@@ -281,6 +281,273 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
+        // [2.0 rebuild - AC/DC persistence] DC (battery) override proxies. Same null-means-
+        // no-override convention as their AC counterparts above; needed so RouteProfileSave's
+        // onCurrent lambda (Action<GameProfileProperty>) can write them.
+        public int? TDP_DC
+        {
+            get { return value.TDP_DC; }
+            set
+            {
+                if (this.value.TDP_DC != value)
+                {
+                    this.value.TDP_DC = value;
+                }
+            }
+        }
+
+        public int? TDPFast_DC
+        {
+            get { return value.TDPFast_DC; }
+            set
+            {
+                if (this.value.TDPFast_DC != value)
+                {
+                    this.value.TDPFast_DC = value;
+                }
+            }
+        }
+
+        public int? TDPPeak_DC
+        {
+            get { return value.TDPPeak_DC; }
+            set
+            {
+                if (this.value.TDPPeak_DC != value)
+                {
+                    this.value.TDPPeak_DC = value;
+                }
+            }
+        }
+
+        public bool? CPUBoost_DC
+        {
+            get { return value.CPUBoost_DC; }
+            set
+            {
+                if (this.value.CPUBoost_DC != value)
+                {
+                    this.value.CPUBoost_DC = value;
+                }
+            }
+        }
+
+        public int? CPUEPP_DC
+        {
+            get { return value.CPUEPP_DC; }
+            set
+            {
+                if (this.value.CPUEPP_DC != value)
+                {
+                    this.value.CPUEPP_DC = value;
+                }
+            }
+        }
+
+        public int? MaxCPUState_DC
+        {
+            get { return value.MaxCPUState_DC; }
+            set
+            {
+                if (this.value.MaxCPUState_DC != value)
+                {
+                    this.value.MaxCPUState_DC = value;
+                }
+            }
+        }
+
+        public int? MinCPUState_DC
+        {
+            get { return value.MinCPUState_DC; }
+            set
+            {
+                if (this.value.MinCPUState_DC != value)
+                {
+                    this.value.MinCPUState_DC = value;
+                }
+            }
+        }
+
+        public int? FPSLimit_DC
+        {
+            get { return value.FPSLimit_DC; }
+            set
+            {
+                if (this.value.FPSLimit_DC != value)
+                {
+                    this.value.FPSLimit_DC = value;
+                }
+            }
+        }
+
+        public bool? HDREnabled_DC
+        {
+            get { return value.HDREnabled_DC; }
+            set
+            {
+                if (this.value.HDREnabled_DC != value)
+                {
+                    this.value.HDREnabled_DC = value;
+                }
+            }
+        }
+
+        public string Resolution_DC
+        {
+            get { return value.Resolution_DC; }
+            set
+            {
+                if (this.value.Resolution_DC != value)
+                {
+                    this.value.Resolution_DC = value;
+                }
+            }
+        }
+
+        public int? RefreshRate_DC
+        {
+            get { return value.RefreshRate_DC; }
+            set
+            {
+                if (this.value.RefreshRate_DC != value)
+                {
+                    this.value.RefreshRate_DC = value;
+                }
+            }
+        }
+
+        public bool? FluidMotionFrames_DC
+        {
+            get { return value.FluidMotionFrames_DC; }
+            set
+            {
+                if (this.value.FluidMotionFrames_DC != value)
+                {
+                    this.value.FluidMotionFrames_DC = value;
+                }
+            }
+        }
+
+        public bool? RadeonSuperResolution_DC
+        {
+            get { return value.RadeonSuperResolution_DC; }
+            set
+            {
+                if (this.value.RadeonSuperResolution_DC != value)
+                {
+                    this.value.RadeonSuperResolution_DC = value;
+                }
+            }
+        }
+
+        public int? RadeonSuperResolutionSharpness_DC
+        {
+            get { return value.RadeonSuperResolutionSharpness_DC; }
+            set
+            {
+                if (this.value.RadeonSuperResolutionSharpness_DC != value)
+                {
+                    this.value.RadeonSuperResolutionSharpness_DC = value;
+                }
+            }
+        }
+
+        public bool? ImageSharpening_DC
+        {
+            get { return value.ImageSharpening_DC; }
+            set
+            {
+                if (this.value.ImageSharpening_DC != value)
+                {
+                    this.value.ImageSharpening_DC = value;
+                }
+            }
+        }
+
+        public int? ImageSharpeningSharpness_DC
+        {
+            get { return value.ImageSharpeningSharpness_DC; }
+            set
+            {
+                if (this.value.ImageSharpeningSharpness_DC != value)
+                {
+                    this.value.ImageSharpeningSharpness_DC = value;
+                }
+            }
+        }
+
+        public bool? RadeonAntiLag_DC
+        {
+            get { return value.RadeonAntiLag_DC; }
+            set
+            {
+                if (this.value.RadeonAntiLag_DC != value)
+                {
+                    this.value.RadeonAntiLag_DC = value;
+                }
+            }
+        }
+
+        public bool? RadeonBoost_DC
+        {
+            get { return value.RadeonBoost_DC; }
+            set
+            {
+                if (this.value.RadeonBoost_DC != value)
+                {
+                    this.value.RadeonBoost_DC = value;
+                }
+            }
+        }
+
+        public int? RadeonBoostResolution_DC
+        {
+            get { return value.RadeonBoostResolution_DC; }
+            set
+            {
+                if (this.value.RadeonBoostResolution_DC != value)
+                {
+                    this.value.RadeonBoostResolution_DC = value;
+                }
+            }
+        }
+
+        public bool? RadeonChill_DC
+        {
+            get { return value.RadeonChill_DC; }
+            set
+            {
+                if (this.value.RadeonChill_DC != value)
+                {
+                    this.value.RadeonChill_DC = value;
+                }
+            }
+        }
+
+        public int? RadeonChillMinFPS_DC
+        {
+            get { return value.RadeonChillMinFPS_DC; }
+            set
+            {
+                if (this.value.RadeonChillMinFPS_DC != value)
+                {
+                    this.value.RadeonChillMinFPS_DC = value;
+                }
+            }
+        }
+
+        public int? RadeonChillMaxFPS_DC
+        {
+            get { return value.RadeonChillMaxFPS_DC; }
+            set
+            {
+                if (this.value.RadeonChillMaxFPS_DC != value)
+                {
+                    this.value.RadeonChillMaxFPS_DC = value;
+                }
+            }
+        }
+
         public GameId GameId
         {
             get { return value.GameId; }

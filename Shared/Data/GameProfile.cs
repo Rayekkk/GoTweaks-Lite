@@ -183,6 +183,36 @@ namespace Shared.Data
             }
         }
 
+        [XmlElement("TDPFast_DC")]
+        private int? tdpFastDC;
+        public int? TDPFast_DC
+        {
+            get { return tdpFastDC; }
+            set
+            {
+                if (tdpFastDC != value)
+                {
+                    tdpFastDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("TDPPeak_DC")]
+        private int? tdpPeakDC;
+        public int? TDPPeak_DC
+        {
+            get { return tdpPeakDC; }
+            set
+            {
+                if (tdpPeakDC != value)
+                {
+                    tdpPeakDC = value;
+                    Save();
+                }
+            }
+        }
+
         [XmlElement("CPUBoost_DC")]
         private bool? cpuBoostDC;
         public bool? CPUBoost_DC
@@ -396,6 +426,51 @@ namespace Shared.Data
             }
         }
 
+        [XmlElement("HDREnabled_DC")]
+        private bool? hdrEnabledDC;
+        public bool? HDREnabled_DC
+        {
+            get { return hdrEnabledDC; }
+            set
+            {
+                if (hdrEnabledDC != value)
+                {
+                    hdrEnabledDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("Resolution_DC")]
+        private string resolutionDC;
+        public string Resolution_DC
+        {
+            get { return resolutionDC; }
+            set
+            {
+                if (resolutionDC != value)
+                {
+                    resolutionDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RefreshRate_DC")]
+        private int? refreshRateDC;
+        public int? RefreshRate_DC
+        {
+            get { return refreshRateDC; }
+            set
+            {
+                if (refreshRateDC != value)
+                {
+                    refreshRateDC = value;
+                    Save();
+                }
+            }
+        }
+
         // [2.0 rebuild - Faza C2] AMD Radeon per-game feature toggles, gated as a group by the
         // single ProfileSaveFlagsState.AMDFeatures flag (same one-flag-many-fields pattern as
         // GyroSettings). Nullable - null means "never configured", distinct from explicitly off.
@@ -560,6 +635,174 @@ namespace Shared.Data
                 if (radeonChillMaxFPS != value)
                 {
                     radeonChillMaxFPS = value;
+                    Save();
+                }
+            }
+        }
+
+        // ========== AMD Radeon DC (Battery) Overrides ==========
+        // Same null-means-no-override convention as the other _DC fields above.
+
+        [XmlElement("FluidMotionFrames_DC")]
+        private bool? fluidMotionFramesDC;
+        public bool? FluidMotionFrames_DC
+        {
+            get { return fluidMotionFramesDC; }
+            set
+            {
+                if (fluidMotionFramesDC != value)
+                {
+                    fluidMotionFramesDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonSuperResolution_DC")]
+        private bool? radeonSuperResolutionDC;
+        public bool? RadeonSuperResolution_DC
+        {
+            get { return radeonSuperResolutionDC; }
+            set
+            {
+                if (radeonSuperResolutionDC != value)
+                {
+                    radeonSuperResolutionDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonSuperResolutionSharpness_DC")]
+        private int? radeonSuperResolutionSharpnessDC;
+        public int? RadeonSuperResolutionSharpness_DC
+        {
+            get { return radeonSuperResolutionSharpnessDC; }
+            set
+            {
+                if (radeonSuperResolutionSharpnessDC != value)
+                {
+                    radeonSuperResolutionSharpnessDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("ImageSharpening_DC")]
+        private bool? imageSharpeningDC;
+        public bool? ImageSharpening_DC
+        {
+            get { return imageSharpeningDC; }
+            set
+            {
+                if (imageSharpeningDC != value)
+                {
+                    imageSharpeningDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("ImageSharpeningSharpness_DC")]
+        private int? imageSharpeningSharpnessDC;
+        public int? ImageSharpeningSharpness_DC
+        {
+            get { return imageSharpeningSharpnessDC; }
+            set
+            {
+                if (imageSharpeningSharpnessDC != value)
+                {
+                    imageSharpeningSharpnessDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonAntiLag_DC")]
+        private bool? radeonAntiLagDC;
+        public bool? RadeonAntiLag_DC
+        {
+            get { return radeonAntiLagDC; }
+            set
+            {
+                if (radeonAntiLagDC != value)
+                {
+                    radeonAntiLagDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonBoost_DC")]
+        private bool? radeonBoostDC;
+        public bool? RadeonBoost_DC
+        {
+            get { return radeonBoostDC; }
+            set
+            {
+                if (radeonBoostDC != value)
+                {
+                    radeonBoostDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonBoostResolution_DC")]
+        private int? radeonBoostResolutionDC;
+        public int? RadeonBoostResolution_DC
+        {
+            get { return radeonBoostResolutionDC; }
+            set
+            {
+                if (radeonBoostResolutionDC != value)
+                {
+                    radeonBoostResolutionDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChill_DC")]
+        private bool? radeonChillDC;
+        public bool? RadeonChill_DC
+        {
+            get { return radeonChillDC; }
+            set
+            {
+                if (radeonChillDC != value)
+                {
+                    radeonChillDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChillMinFPS_DC")]
+        private int? radeonChillMinFPSDC;
+        public int? RadeonChillMinFPS_DC
+        {
+            get { return radeonChillMinFPSDC; }
+            set
+            {
+                if (radeonChillMinFPSDC != value)
+                {
+                    radeonChillMinFPSDC = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChillMaxFPS_DC")]
+        private int? radeonChillMaxFPSDC;
+        public int? RadeonChillMaxFPS_DC
+        {
+            get { return radeonChillMaxFPSDC; }
+            set
+            {
+                if (radeonChillMaxFPSDC != value)
+                {
+                    radeonChillMaxFPSDC = value;
                     Save();
                 }
             }
@@ -1191,6 +1434,8 @@ namespace Shared.Data
             tdpPeak = 0; // 0 = property getter falls back to TDP (SPL)
             // DC overrides (null = use AC value)
             tdpDC = null;
+            tdpFastDC = null;
+            tdpPeakDC = null;
             cpuBoostDC = null;
             cpuEppDC = null;
             maxCpuStateDC = null;
@@ -1204,10 +1449,13 @@ namespace Shared.Data
             // Additional profile settings (DC overrides)
             fpsLimitDC = null;
             osPowerModeDC = null;
-            // Display settings (shared AC/DC)
+            // Display settings (AC + DC overrides)
             hdrEnabled = null;
             resolution = null;
             refreshRate = null;
+            hdrEnabledDC = null;
+            resolutionDC = null;
+            refreshRateDC = null;
             // AMD Radeon per-game feature toggles (2.0 rebuild - Faza C2)
             fluidMotionFrames = null;
             radeonSuperResolution = null;
@@ -1220,6 +1468,18 @@ namespace Shared.Data
             radeonChill = null;
             radeonChillMinFPS = null;
             radeonChillMaxFPS = null;
+            // AMD Radeon DC overrides
+            fluidMotionFramesDC = null;
+            radeonSuperResolutionDC = null;
+            radeonSuperResolutionSharpnessDC = null;
+            imageSharpeningDC = null;
+            imageSharpeningSharpnessDC = null;
+            radeonAntiLagDC = null;
+            radeonBoostDC = null;
+            radeonBoostResolutionDC = null;
+            radeonChillDC = null;
+            radeonChillMinFPSDC = null;
+            radeonChillMaxFPSDC = null;
             // Overlay
             overlayLevel = null;
             // Legion controller remapping (shared AC/DC)

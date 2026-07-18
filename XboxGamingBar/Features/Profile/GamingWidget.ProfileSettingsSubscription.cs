@@ -171,6 +171,13 @@ namespace XboxGamingBar
 
             // Auto-save to current profile
             SaveCurrentSettingsToProfile(currentProfileName);
+
+            // [2.0 rebuild - AC/DC persistence] Resync the AC/DC pair to the helper so a live
+            // edit (e.g. flipping an AMD toggle while on battery) reaches the helper's persisted
+            // _DC fields promptly, not just at the next game switch/profile load/pipe reconnect.
+            // Reuses this method's own existing guards + debounce (SettingChangedDebounced's
+            // 300ms timer already coalesces rapid changes) rather than adding a second timer.
+            SendPowerSourceProfileValuesToHelper();
         }
 
         /// <summary>

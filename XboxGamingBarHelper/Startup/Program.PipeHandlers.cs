@@ -672,11 +672,18 @@ namespace XboxGamingBarHelper
                 // Import global profile settings (merge into existing global)
                 var globalProfile = profileManager.GlobalProfile;
                 globalProfile.TDP = import.GlobalProfile.TDP;
+                // [2.0 rebuild - AC/DC persistence] Pre-existing gap this uncovered: base
+                // TDPFast/TDPPeak were never in this merge block at all (only TDP was), unrelated
+                // to this fix but cheap to bundle in.
+                globalProfile.TDPFast = import.GlobalProfile.TDPFast;
+                globalProfile.TDPPeak = import.GlobalProfile.TDPPeak;
                 globalProfile.CPUBoost = import.GlobalProfile.CPUBoost;
                 globalProfile.CPUEPP = import.GlobalProfile.CPUEPP;
                 globalProfile.MaxCPUState = import.GlobalProfile.MaxCPUState;
                 globalProfile.MinCPUState = import.GlobalProfile.MinCPUState;
                 globalProfile.TDP_DC = import.GlobalProfile.TDP_DC;
+                globalProfile.TDPFast_DC = import.GlobalProfile.TDPFast_DC;
+                globalProfile.TDPPeak_DC = import.GlobalProfile.TDPPeak_DC;
                 globalProfile.CPUBoost_DC = import.GlobalProfile.CPUBoost_DC;
                 globalProfile.CPUEPP_DC = import.GlobalProfile.CPUEPP_DC;
                 globalProfile.MaxCPUState_DC = import.GlobalProfile.MaxCPUState_DC;
@@ -685,6 +692,34 @@ namespace XboxGamingBarHelper
                 globalProfile.FPSLimit_DC = import.GlobalProfile.FPSLimit_DC;
                 globalProfile.OSPowerMode = import.GlobalProfile.OSPowerMode;
                 globalProfile.OSPowerMode_DC = import.GlobalProfile.OSPowerMode_DC;
+                globalProfile.HDREnabled = import.GlobalProfile.HDREnabled;
+                globalProfile.HDREnabled_DC = import.GlobalProfile.HDREnabled_DC;
+                globalProfile.Resolution = import.GlobalProfile.Resolution;
+                globalProfile.Resolution_DC = import.GlobalProfile.Resolution_DC;
+                globalProfile.RefreshRate = import.GlobalProfile.RefreshRate;
+                globalProfile.RefreshRate_DC = import.GlobalProfile.RefreshRate_DC;
+                globalProfile.FluidMotionFrames = import.GlobalProfile.FluidMotionFrames;
+                globalProfile.FluidMotionFrames_DC = import.GlobalProfile.FluidMotionFrames_DC;
+                globalProfile.RadeonSuperResolution = import.GlobalProfile.RadeonSuperResolution;
+                globalProfile.RadeonSuperResolution_DC = import.GlobalProfile.RadeonSuperResolution_DC;
+                globalProfile.RadeonSuperResolutionSharpness = import.GlobalProfile.RadeonSuperResolutionSharpness;
+                globalProfile.RadeonSuperResolutionSharpness_DC = import.GlobalProfile.RadeonSuperResolutionSharpness_DC;
+                globalProfile.ImageSharpening = import.GlobalProfile.ImageSharpening;
+                globalProfile.ImageSharpening_DC = import.GlobalProfile.ImageSharpening_DC;
+                globalProfile.ImageSharpeningSharpness = import.GlobalProfile.ImageSharpeningSharpness;
+                globalProfile.ImageSharpeningSharpness_DC = import.GlobalProfile.ImageSharpeningSharpness_DC;
+                globalProfile.RadeonAntiLag = import.GlobalProfile.RadeonAntiLag;
+                globalProfile.RadeonAntiLag_DC = import.GlobalProfile.RadeonAntiLag_DC;
+                globalProfile.RadeonBoost = import.GlobalProfile.RadeonBoost;
+                globalProfile.RadeonBoost_DC = import.GlobalProfile.RadeonBoost_DC;
+                globalProfile.RadeonBoostResolution = import.GlobalProfile.RadeonBoostResolution;
+                globalProfile.RadeonBoostResolution_DC = import.GlobalProfile.RadeonBoostResolution_DC;
+                globalProfile.RadeonChill = import.GlobalProfile.RadeonChill;
+                globalProfile.RadeonChill_DC = import.GlobalProfile.RadeonChill_DC;
+                globalProfile.RadeonChillMinFPS = import.GlobalProfile.RadeonChillMinFPS;
+                globalProfile.RadeonChillMinFPS_DC = import.GlobalProfile.RadeonChillMinFPS_DC;
+                globalProfile.RadeonChillMaxFPS = import.GlobalProfile.RadeonChillMaxFPS;
+                globalProfile.RadeonChillMaxFPS_DC = import.GlobalProfile.RadeonChillMaxFPS_DC;
                 Logger.Info("Global profile settings imported");
                 importedCount++;
 

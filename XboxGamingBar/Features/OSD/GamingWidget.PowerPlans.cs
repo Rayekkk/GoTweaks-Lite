@@ -121,6 +121,42 @@ namespace XboxGamingBar
                 jsonObj["AcFpsLimit"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.FPSLimitEnabled ? ac.FPSLimitValue : 0);
                 jsonObj["DcFpsLimit"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.FPSLimitEnabled ? dc.FPSLimitValue : 0);
 
+                // [2.0 rebuild - AC/DC persistence] HDR/Resolution/RefreshRate + the 11 AMD Radeon
+                // fields - previously never sent to the helper at all (only the 9 fields above
+                // existed on the wire), so the helper's ephemeral cache (and now its persisted
+                // _DC fields) had no way to know these per-state values. RefreshRate is nullable on
+                // this side (unset = "never configured") - omit the key entirely rather than
+                // sending a sentinel 0, matching how the helper's ParseInt treats an absent key.
+                jsonObj["AcHdrEnabled"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.HDREnabled);
+                jsonObj["DcHdrEnabled"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.HDREnabled);
+                jsonObj["AcResolution"] = Windows.Data.Json.JsonValue.CreateStringValue(ac.Resolution ?? "");
+                jsonObj["DcResolution"] = Windows.Data.Json.JsonValue.CreateStringValue(dc.Resolution ?? "");
+                if (ac.RefreshRate.HasValue) jsonObj["AcRefreshRate"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RefreshRate.Value);
+                if (dc.RefreshRate.HasValue) jsonObj["DcRefreshRate"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RefreshRate.Value);
+
+                jsonObj["AcFluidMotionFrames"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.FluidMotionFrames);
+                jsonObj["DcFluidMotionFrames"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.FluidMotionFrames);
+                jsonObj["AcRadeonSuperResolution"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.RadeonSuperResolution);
+                jsonObj["DcRadeonSuperResolution"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.RadeonSuperResolution);
+                jsonObj["AcRadeonSuperResolutionSharpness"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RadeonSuperResolutionSharpness);
+                jsonObj["DcRadeonSuperResolutionSharpness"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonSuperResolutionSharpness);
+                jsonObj["AcImageSharpening"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.ImageSharpening);
+                jsonObj["DcImageSharpening"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.ImageSharpening);
+                jsonObj["AcImageSharpeningSharpness"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.ImageSharpeningSharpness);
+                jsonObj["DcImageSharpeningSharpness"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.ImageSharpeningSharpness);
+                jsonObj["AcRadeonAntiLag"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.RadeonAntiLag);
+                jsonObj["DcRadeonAntiLag"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.RadeonAntiLag);
+                jsonObj["AcRadeonBoost"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.RadeonBoost);
+                jsonObj["DcRadeonBoost"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.RadeonBoost);
+                jsonObj["AcRadeonBoostResolution"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RadeonBoostResolution);
+                jsonObj["DcRadeonBoostResolution"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonBoostResolution);
+                jsonObj["AcRadeonChill"] = Windows.Data.Json.JsonValue.CreateBooleanValue(ac.RadeonChill);
+                jsonObj["DcRadeonChill"] = Windows.Data.Json.JsonValue.CreateBooleanValue(dc.RadeonChill);
+                jsonObj["AcRadeonChillMinFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RadeonChillMinFPS);
+                jsonObj["DcRadeonChillMinFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonChillMinFPS);
+                jsonObj["AcRadeonChillMaxFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RadeonChillMaxFPS);
+                jsonObj["DcRadeonChillMaxFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonChillMaxFPS);
+
                 var request = new Windows.Foundation.Collections.ValueSet
                 {
                     { "Command", (int)Shared.Enums.Command.Set },

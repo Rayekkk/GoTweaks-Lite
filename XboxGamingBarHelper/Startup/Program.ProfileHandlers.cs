@@ -436,14 +436,21 @@ namespace XboxGamingBarHelper
         /// the losing side of a conflict (RIS, then AntiLag/Boost) before the winning side (RSR, then
         /// Chill), so the driver never briefly sees both enabled.
         /// </summary>
-        private static void ApplyAMDFeaturesFromProfile(Shared.Data.GameProfile profile)
+        // [2.0 rebuild - AC/DC persistence] isOnAC defaults to true so the two pre-existing call
+        // sites (RestoreGlobalProfileSettings, RunningGame_PropertyChanged - neither AC/DC-aware)
+        // are source- and behavior-compatible: they keep reading the base (AC) fields exactly as
+        // before. Program.PowerSourceHandler.cs's AC/DC reapply passes the real power state.
+        private static void ApplyAMDFeaturesFromProfile(Shared.Data.GameProfile profile, bool isOnAC = true)
         {
-            if (profile.FluidMotionFrames.HasValue)
-                amdManager.AMDFluidMotionFrameEnabled.SetValue(profile.FluidMotionFrames.Value);
+            bool? fluidMotionFrames = isOnAC ? profile.FluidMotionFrames : (profile.FluidMotionFrames_DC ?? profile.FluidMotionFrames);
+            if (fluidMotionFrames.HasValue)
+                amdManager.AMDFluidMotionFrameEnabled.SetValue(fluidMotionFrames.Value);
 
             // RSR and RIS are mutually exclusive - if both are configured true, prefer RSR.
-            bool? rsr = profile.RadeonSuperResolution;
-            bool? ris = profile.ImageSharpening;
+            bool? rsr = isOnAC ? profile.RadeonSuperResolution : (profile.RadeonSuperResolution_DC ?? profile.RadeonSuperResolution);
+            bool? ris = isOnAC ? profile.ImageSharpening : (profile.ImageSharpening_DC ?? profile.ImageSharpening);
+            int? risSharpness = isOnAC ? profile.ImageSharpeningSharpness : (profile.ImageSharpeningSharpness_DC ?? profile.ImageSharpeningSharpness);
+            int? rsrSharpness = isOnAC ? profile.RadeonSuperResolutionSharpness : (profile.RadeonSuperResolutionSharpness_DC ?? profile.RadeonSuperResolutionSharpness);
             if (rsr == true && ris == true)
             {
                 Logger.Warn("Profile has both RSR and RIS enabled - disabling RIS (mutually exclusive)");
@@ -451,18 +458,21 @@ namespace XboxGamingBarHelper
             }
             if (ris.HasValue)
                 amdManager.AMDImageSharpeningEnabled.SetValue(ris.Value);
-            if (profile.ImageSharpeningSharpness.HasValue)
-                amdManager.AMDImageSharpeningSharpness.SetValue(profile.ImageSharpeningSharpness.Value);
+            if (risSharpness.HasValue)
+                amdManager.AMDImageSharpeningSharpness.SetValue(risSharpness.Value);
             if (rsr.HasValue)
                 amdManager.AMDRadeonSuperResolutionEnabled.SetValue(rsr.Value);
-            if (profile.RadeonSuperResolutionSharpness.HasValue)
-                amdManager.AMDRadeonSuperResolutionSharpness.SetValue(profile.RadeonSuperResolutionSharpness.Value);
+            if (rsrSharpness.HasValue)
+                amdManager.AMDRadeonSuperResolutionSharpness.SetValue(rsrSharpness.Value);
 
             // Chill is mutually exclusive with Anti-Lag and Boost - if Chill is configured true
             // alongside either, disable Anti-Lag/Boost.
-            bool? antiLag = profile.RadeonAntiLag;
-            bool? boost = profile.RadeonBoost;
-            bool? chill = profile.RadeonChill;
+            bool? antiLag = isOnAC ? profile.RadeonAntiLag : (profile.RadeonAntiLag_DC ?? profile.RadeonAntiLag);
+            bool? boost = isOnAC ? profile.RadeonBoost : (profile.RadeonBoost_DC ?? profile.RadeonBoost);
+            bool? chill = isOnAC ? profile.RadeonChill : (profile.RadeonChill_DC ?? profile.RadeonChill);
+            int? boostResolution = isOnAC ? profile.RadeonBoostResolution : (profile.RadeonBoostResolution_DC ?? profile.RadeonBoostResolution);
+            int? chillMinFPS = isOnAC ? profile.RadeonChillMinFPS : (profile.RadeonChillMinFPS_DC ?? profile.RadeonChillMinFPS);
+            int? chillMaxFPS = isOnAC ? profile.RadeonChillMaxFPS : (profile.RadeonChillMaxFPS_DC ?? profile.RadeonChillMaxFPS);
             if (chill == true && (antiLag == true || boost == true))
             {
                 Logger.Warn("Profile has Chill with Anti-Lag/Boost enabled - disabling Anti-Lag and Boost (mutually exclusive)");
@@ -473,14 +483,14 @@ namespace XboxGamingBarHelper
                 amdManager.AMDRadeonAntiLagEnabled.SetValue(antiLag.Value);
             if (boost.HasValue)
                 amdManager.AMDRadeonBoostEnabled.SetValue(boost.Value);
-            if (profile.RadeonBoostResolution.HasValue)
-                amdManager.AMDRadeonBoostResolution.SetValue(profile.RadeonBoostResolution.Value);
+            if (boostResolution.HasValue)
+                amdManager.AMDRadeonBoostResolution.SetValue(boostResolution.Value);
             if (chill.HasValue)
                 amdManager.AMDRadeonChillEnabled.SetValue(chill.Value);
-            if (profile.RadeonChillMinFPS.HasValue)
-                amdManager.AMDRadeonChillMinFPS.SetValue(profile.RadeonChillMinFPS.Value);
-            if (profile.RadeonChillMaxFPS.HasValue)
-                amdManager.AMDRadeonChillMaxFPS.SetValue(profile.RadeonChillMaxFPS.Value);
+            if (chillMinFPS.HasValue)
+                amdManager.AMDRadeonChillMinFPS.SetValue(chillMinFPS.Value);
+            if (chillMaxFPS.HasValue)
+                amdManager.AMDRadeonChillMaxFPS.SetValue(chillMaxFPS.Value);
         }
 
         private static void CurrentProfile_PropertyChanged(object sender, PropertyChangedEventArgs e)
