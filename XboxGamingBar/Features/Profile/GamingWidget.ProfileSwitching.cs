@@ -405,29 +405,8 @@ namespace XboxGamingBar
                 Logger.Info($"LoadProfileSettings Legion check: legionGoDetected={legionGoDetected?.Value}, TDPModeComboBox={TDPModeComboBox != null}, isInitialSync={isInitialSync}");
                 if (legionGoDetected?.Value == true && TDPModeComboBox != null && !isInitialSync)
                 {
-                    int[] modeValues = { 1, 2, 3, 255 }; // Quiet, Balanced, Performance, Custom
-
                     if (profileName.StartsWith("Game_"))
                     {
-                        // Loading a game profile: save the source profile's TDP mode (not the current UI state)
-                        // This ensures we restore to the intended profile mode when the game closes
-                        if (savedLegionPerformanceMode < 0)
-                        {
-                            // Save from the correct source profile based on Power Source Profile toggle
-                            if (GetGlobalPowerSourceProfileEnabled())
-                            {
-                                var powerSupplyStatus = PowerManager.PowerSupplyStatus;
-                                bool isOnAC = powerSupplyStatus != PowerSupplyStatus.NotPresent;
-                                savedLegionPerformanceMode = isOnAC ? acProfile.LegionPerformanceMode : dcProfile.LegionPerformanceMode;
-                                Logger.Info($"Saved Legion Performance Mode from {(isOnAC ? "AC" : "DC")} profile: {GetLegionModeShortName(savedLegionPerformanceMode)} ({savedLegionPerformanceMode}) before game profile");
-                            }
-                            else
-                            {
-                                savedLegionPerformanceMode = globalProfile.LegionPerformanceMode;
-                                Logger.Info($"Saved Legion Performance Mode from global profile: {GetLegionModeShortName(savedLegionPerformanceMode)} ({savedLegionPerformanceMode}) before game profile");
-                            }
-                        }
-
                         // Apply game profile's TDP Mode if SaveTDP is enabled
                         if (SaveTDP)
                         {
@@ -450,102 +429,38 @@ namespace XboxGamingBar
                             Logger.Info($"SaveTDP disabled - deferring mode to helper for game profile: {profileName}");
                         }
                     }
-                    else if (savedLegionPerformanceMode >= 0)
-                    {
-                        // Loading Global/AC/DC profile and we have a saved mode to restore
-                        int index = Array.IndexOf(modeValues, savedLegionPerformanceMode);
-                        bool modeChanged = false;
-                        if (index >= 0 && (legionPerformanceMode.Value != savedLegionPerformanceMode || TDPModeComboBox.SelectedIndex != index))
-                        {
-                            if (TDPModeComboBox.SelectedIndex != index)
-                            {
-                                lastTDPModeIndex = index;
-                                TDPModeComboBox.SelectedIndex = index;
-                            }
-                            legionPerformanceMode?.ForceSetValue(savedLegionPerformanceMode);
-                            modeChanged = true;
-                            Logger.Info($"Restored Legion Performance Mode: {GetLegionModeShortName(savedLegionPerformanceMode)} ({savedLegionPerformanceMode}) after game closed");
-                        }
-                        // If restoring to Custom mode (255), reload the Custom power limits from the
-                        // profile (the boost sliders may still show the just-closed game's values) and
-                        // push them to hardware. The master TDP slider was removed, so we drive the
-                        // three Custom sliders directly.
-                        if (SaveTDP && savedLegionPerformanceMode == 255)
-                        {
-                            SetCustomTDPSlidersSilent(profile.TDP, profile.TDPFast, profile.TDPPeak);
-
-                            if (modeChanged)
-                            {
-                                _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-                                {
-                                    await Task.Delay(500); // Allow mode change to propagate to helper
-                                    if (SaveCPUEPP)
-                                    {
-                                        cpuEPP?.ForceSetValue((int)profile.CPUEPP);
-                                    }
-                                    ApplyCustomTDPSlidersToHelper(force: true);
-                                    Logger.Info($"Restored Custom TDP after mode change: SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W, EPP={profile.CPUEPP}");
-                                });
-                            }
-                            else
-                            {
-                                ApplyCustomTDPSlidersToHelper(force: true);
-                                Logger.Info($"Restored Custom TDP (already in Custom mode): SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W");
-                            }
-                        }
-                        savedLegionPerformanceMode = -1; // Clear saved mode
-                    }
                     else if (SaveTDP)
                     {
-                        // Loading Global profile directly (not returning from game) - apply profile's TDP Mode
-                        int profileMode = profile.LegionPerformanceMode;
+                        // [2.0 rebuild] Global/AC/DC profile load, including "returning from a closed
+                        // game" (this used to be a separate branch keyed off a widget-remembered
+                        // savedLegionPerformanceMode - removed, see below). LegionPerformanceMode AND
+                        // the Custom TDP triplet are now fully helper-authoritative for every path
+                        // that can reach LoadProfileSettings here: RestoreGlobalProfileSettings /
+                        // CurrentProfile_PropertyChanged / the AC-DC power-source handler all
+                        // independently call legionManager.LegionPerformanceMode.SetValue(...) AND (as
+                        // of today's TDP fixes) legionManager.SetCustomTDP(...) with the correct
+                        // saved/per-state values - the SAME data this block used to recompute from the
+                        // widget's own LocalSettings profile copy and push separately (ForceSetValue
+                        // mode, ApplyCustomTDPSlidersToHelper force-push, a 500ms-deferred CPUEPP
+                        // force-set to wait out the mode switch). That push raced the helper's own
+                        // autonomous apply - the exact "widget acting independently of the helper"
+                        // duplication that caused the AC/DC race bug found on-device earlier today.
+                        // Removed entirely: TDPModeComboBox already reflects the helper's mode push via
+                        // legionPerformanceMode's bound WidgetControlProperty
+                        // (TDPModeComboBox_SelectionChanged's own IsUpdatingUI branch already no-ops a
+                        // helper-driven change, so no re-send risk); the Custom sliders reflect via the
+                        // new LegionCustomTDPSlow/Fast/PeakProperty.OnValueSyncedFromHelper hook
+                        // (GamingWidget.LegionGo.cs's ApplyCustomTDPFromHelper). The mode-switch
+                        // sequencing (flush pending debounce, poll for hardware confirm before writing
+                        // TDP) is the helper's own LegionManager.SetCustomTDP's job now, not something
+                        // this widget needs to orchestrate with a Task.Delay.
+                        //
+                        // Just keep lastTDPModeIndex in step with the profile's mode, so a subsequent
+                        // real user click on the dropdown is correctly detected as a change (and not
+                        // mistaken for one, or vice versa) by TDPModeComboBox_SelectionChanged.
                         int modeIndex = GetProfileTDPModeIndex(profile);
-                        Logger.Info($"LoadProfileSettings: profileMode={profileMode}, modeIndex={modeIndex}, legionPerformanceMode.Value={legionPerformanceMode?.Value}, TDPModeComboBox.SelectedIndex={TDPModeComboBox?.SelectedIndex}");
-
-                        // Always update UI to match profile when loading Global profile
-                        // The internal value may already match (set by helper) but UI may be stale
-                        bool modeChanged = false;
                         if (modeIndex >= 0)
-                        {
-                            // Update lastTDPModeIndex FIRST to prevent TDPModeComboBox_SelectionChanged
-                            // from treating the profile load as a user-initiated change
                             lastTDPModeIndex = modeIndex;
-
-                            modeChanged = legionPerformanceMode.Value != profileMode;
-                            if (TDPModeComboBox.SelectedIndex != modeIndex)
-                                TDPModeComboBox.SelectedIndex = modeIndex;
-                            legionPerformanceMode?.ForceSetValue(profileMode);
-                            Logger.Info($"Applied profile TDP Mode: {GetLegionModeShortName(profileMode)} ({profileMode}) for {profileName}");
-
-                            // If Custom mode (255), push the profile's Custom SPL/SPPT/FPPT to hardware.
-                            // NOTE: tdp.ForceSetValue (Function.TDP) is NOT enough here — on Legion in
-                            // Custom the helper re-asserts its CACHED triplet (ReassertCustomTDP) and
-                            // ignores the flat value, so the profile's distinct SPPT/FPPT would never be
-                            // applied. Push the three dedicated Legion limit channels instead, matching
-                            // the "returning from game" restore path above.
-                            if (profileMode == 255)
-                            {
-                                if (modeChanged)
-                                {
-                                    _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-                                    {
-                                        await Task.Delay(500); // Allow mode change to propagate to helper
-                                        // Send deferred TDP-related settings
-                                        if (SaveCPUEPP)
-                                        {
-                                            cpuEPP?.ForceSetValue((int)profile.CPUEPP);
-                                        }
-                                        ApplyCustomTDPSlidersToHelper(force: true);
-                                        Logger.Info($"Applied profile Custom TDP after mode change: SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W, EPP={profile.CPUEPP} for {profileName}");
-                                    });
-                                }
-                                else
-                                {
-                                    ApplyCustomTDPSlidersToHelper(force: true);
-                                    Logger.Info($"Applied profile Custom TDP (already in Custom mode): SPL={profile.TDP}W, SPPT={profile.TDPFast}W, FPPT={profile.TDPPeak}W for {profileName}");
-                                }
-                            }
-                        }
                     }
 
                     // Update TDP slider enabled state based on mode

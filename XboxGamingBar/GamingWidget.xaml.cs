@@ -899,7 +899,6 @@ namespace XboxGamingBar
         private bool isInternalToggleDisable = false; // Indicates toggle is being disabled internally (game close)
         private bool isUserInitiatedProfileToggle = false; // Indicates user clicked Profile tile to toggle
         private bool isUserInitiatedTDPModeChange = false; // Indicates user clicked TDP Mode tile in Quick Tab
-        private int savedLegionPerformanceMode = -1; // Stores Legion mode before per-game profile (-1 = not saved)
         private bool isUpdatingPowerSourceProfileToggle = false; // Prevents programmatic toggle sync from triggering profile writes
         private const string GlobalPowerSourceProfileSettingKey = "PowerSourceProfileEnabled";
         private const string PerGamePowerSourceProfileSettingPrefix = "PerGamePowerSourceProfileEnabled_";
@@ -1352,9 +1351,9 @@ namespace XboxGamingBar
             // Headless wire channels for the absolute Custom SPL/SPPT/FPPT — driven manually from
             // the TDP / SPPT Boost / FPPT Boost sliders (see GamingWidget.LegionGo.cs). No slider
             // binding / debounce so limits apply live via WMI while dragging.
-            legionCustomTDPSlow = new LegionCustomTDPSlowProperty();
-            legionCustomTDPFast = new LegionCustomTDPFastProperty();
-            legionCustomTDPPeak = new LegionCustomTDPPeakProperty();
+            legionCustomTDPSlow = new LegionCustomTDPSlowProperty(this);
+            legionCustomTDPFast = new LegionCustomTDPFastProperty(this);
+            legionCustomTDPPeak = new LegionCustomTDPPeakProperty(this);
             legionFanFullSpeed = new LegionFanFullSpeedProperty(LegionFanFullSpeedToggle, this);
             legionUnlockFanCurve = new LegionUnlockFanCurveProperty(LegionUnlockFanCurveToggle, this);
 

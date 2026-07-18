@@ -11,28 +11,66 @@ namespace XboxGamingBar.Data
     // from those sliders and pushes them here via ForceSetValue on every slider change, so the limits
     // apply live through WMI while dragging. The absolute values are what gets persisted per profile
     // (GameProfile.TDP/TDPFast/TDPPeak), keeping wire + profile format backwards compatible.
+    //
+    // [2.0 rebuild - TDP helper-authoritative] OnValueSyncedFromHelper reflects a HELPER-INITIATED
+    // change (autonomous AC/DC reapply, profile switch on game launch/close, etc. - anything NOT
+    // driven by this widget's own slider drag) back into the sliders via
+    // GamingWidget.ApplyCustomTDPFromHelper, so the widget stops needing its own independent
+    // recompute-and-push on those events (see LoadProfileSettings). SetCustomTDPSlidersSilent
+    // already guards its slider writes with isUpdatingCustomTDPSliders, which
+    // CustomTDPSlow/Fast/PeakSlider_ValueChanged already check - no separate echo guard needed here.
 
     /// <summary>Absolute Custom SPL (base TDP) in watts.</summary>
     internal class LegionCustomTDPSlowProperty : WidgetProperty<int>
     {
-        public LegionCustomTDPSlowProperty() : base(15, null, Function.LegionCustomTDPSlow)
+        private readonly GamingWidget owner;
+
+        public LegionCustomTDPSlowProperty(GamingWidget inOwner) : base(15, null, Function.LegionCustomTDPSlow)
         {
+            owner = inOwner;
+        }
+
+        protected override void OnValueSyncedFromHelper()
+        {
+            if (owner == null) return;
+            var ignore = owner.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                () => owner.ApplyCustomTDPFromHelper());
         }
     }
 
     /// <summary>Absolute Custom SPPT (= SPL + SPPT Boost) in watts.</summary>
     internal class LegionCustomTDPFastProperty : WidgetProperty<int>
     {
-        public LegionCustomTDPFastProperty() : base(25, null, Function.LegionCustomTDPFast)
+        private readonly GamingWidget owner;
+
+        public LegionCustomTDPFastProperty(GamingWidget inOwner) : base(25, null, Function.LegionCustomTDPFast)
         {
+            owner = inOwner;
+        }
+
+        protected override void OnValueSyncedFromHelper()
+        {
+            if (owner == null) return;
+            var ignore = owner.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                () => owner.ApplyCustomTDPFromHelper());
         }
     }
 
     /// <summary>Absolute Custom FPPT (= SPL + FPPT Boost) in watts.</summary>
     internal class LegionCustomTDPPeakProperty : WidgetProperty<int>
     {
-        public LegionCustomTDPPeakProperty() : base(30, null, Function.LegionCustomTDPPeak)
+        private readonly GamingWidget owner;
+
+        public LegionCustomTDPPeakProperty(GamingWidget inOwner) : base(30, null, Function.LegionCustomTDPPeak)
         {
+            owner = inOwner;
+        }
+
+        protected override void OnValueSyncedFromHelper()
+        {
+            if (owner == null) return;
+            var ignore = owner.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                () => owner.ApplyCustomTDPFromHelper());
         }
     }
 }

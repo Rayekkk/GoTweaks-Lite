@@ -2149,6 +2149,24 @@ namespace XboxGamingBar
         }
 
         /// <summary>
+        /// Reflects a helper-initiated Custom TDP change (autonomous AC/DC reapply, profile switch
+        /// on game launch/close, etc.) into the sliders. Called from
+        /// LegionCustomTDPSlow/Fast/PeakProperty's OnValueSyncedFromHelper - reads all three
+        /// properties' current values (whichever of the 3 individual pushes has landed so far;
+        /// a push that arrives later just re-triggers another harmless resync to the same final
+        /// state) and reuses SetCustomTDPSlidersSilent, so this shares the exact same
+        /// slider-clamping/boost-range/label logic as a profile load.
+        /// </summary>
+        internal void ApplyCustomTDPFromHelper()
+        {
+            if (CustomTDPSlowSlider == null) return;
+            int slow = legionCustomTDPSlow?.Value ?? (int)CustomTDPSlowSlider.Value;
+            int fast = legionCustomTDPFast?.Value ?? slow;
+            int peak = legionCustomTDPPeak?.Value ?? slow;
+            SetCustomTDPSlidersSilent(slow, fast, peak);
+        }
+
+        /// <summary>
         /// Sets the three Custom sliders (and their value labels) from a profile's absolute
         /// SPL/SPPT/FPPT without triggering a send to the helper. SPPT/FPPT are converted back to
         /// boosts (clamped to the slider ranges). Used during profile load; the hardware apply is
