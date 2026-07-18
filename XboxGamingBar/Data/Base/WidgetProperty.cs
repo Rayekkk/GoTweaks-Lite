@@ -77,6 +77,14 @@ namespace XboxGamingBar.Data
         /// Override NotifyPropertyChanged to use App.SendMessageAsync for Named Pipe communication.
         /// We call InvokePropertyChanged directly to fire the INotifyPropertyChanged event.
         /// </summary>
+        /// <summary>
+        /// Called when a value arrives from the helper (SuppressRemoteSync path), after the
+        /// INotifyPropertyChanged event fires and before the (skipped) remote echo. Default is
+        /// a no-op — auto-bound controls already reflect the value via data binding. Overridden
+        /// by properties whose UI is composite and must be rebuilt from the pushed value.
+        /// </summary>
+        protected virtual void OnValueSyncedFromHelper() { }
+
         protected override async void NotifyPropertyChanged(string propertyName = "")
         {
             // Call InvokePropertyChanged directly to trigger INotifyPropertyChanged events
@@ -85,6 +93,12 @@ namespace XboxGamingBar.Data
             // Skip sending to remote if suppressed (e.g., during batch sync)
             if (SuppressRemoteSync)
             {
+                // SuppressRemoteSync is set on both sync paths (batch sync in WidgetProperties
+                // and an individual Set push in FunctionalProperties.HandlePipeMessage), so this
+                // is exactly the "value arrived from the helper" case. Give subclasses a chance
+                // to reflect it into composite UI that isn't auto-bound to a single control
+                // (Legion button remaps rebuild their whole per-button UI from the pushed JSON).
+                OnValueSyncedFromHelper();
                 return;
             }
 

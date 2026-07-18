@@ -1014,6 +1014,55 @@ namespace XboxGamingBar
             UpdateButtonGamepadComboControls(buttonName);
         }
 
+        /// <summary>
+        /// [2.0 rebuild - slice 7] Reflects a helper-pushed button remap into the composite UI.
+        /// The eight Legion button-remap properties are now helper-authoritative: the helper
+        /// persists + applies + pushes each mapping's JSON, and the widget rebuilds the per-button
+        /// UI from it (the property is not auto-bound to a single control). Guarded by
+        /// isLoadingControllerProfile so the ComboBox/tag updates don't fire ControllerSettingChanged
+        /// back into a save/send. Called from LegionButtonMappingProperty.OnValueSyncedFromHelper
+        /// on both sync paths (startup batch sync + individual Set push on game switch).
+        /// </summary>
+        internal void ApplyButtonMappingFromHelper(Function function, string json)
+        {
+            string buttonName = ButtonNameForFunction(function);
+            if (buttonName == null) return;
+
+            var mapping = ButtonMapping.FromJson(json);
+
+            bool prev = isLoadingControllerProfile;
+            isLoadingControllerProfile = true;
+            try
+            {
+                // Seed the stored per-button metadata GetButtonMappingFromUI reads on later user
+                // edits. ApplyButtonMappingToUI sets the gamepad-combo/turbo/mode stores from the
+                // mapping but not the keyboard-key store, so set that explicitly here (mirrors
+                // ApplyControllerProfile's separate SetStoredKeyboardKeys seeding).
+                SetStoredKeyboardKeys(buttonName, mapping.KeyboardKeys ?? new List<int>());
+                ApplyButtonMappingToUI(buttonName, mapping);
+            }
+            finally
+            {
+                isLoadingControllerProfile = prev;
+            }
+        }
+
+        private static string ButtonNameForFunction(Function function)
+        {
+            switch (function)
+            {
+                case Function.LegionButtonY1: return "Y1";
+                case Function.LegionButtonY2: return "Y2";
+                case Function.LegionButtonY3: return "Y3";
+                case Function.LegionButtonM1: return "M1";
+                case Function.LegionButtonM2: return "M2";
+                case Function.LegionButtonM3: return "M3";
+                case Function.LegionButtonDesktop: return "Desktop";
+                case Function.LegionButtonPage: return "Page";
+                default: return null;
+            }
+        }
+
         private void UpdateKeyboardKeyTags(string buttonName, List<int> keys)
         {
             var keyTags = FindName($"LegionButton{buttonName}KeyTags") as StackPanel;
@@ -1173,53 +1222,13 @@ namespace XboxGamingBar
 
             try
             {
-                // Store keyboard keys before applying UI
-                SetStoredKeyboardKeys("Y1", profile.ButtonY1?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("Y2", profile.ButtonY2?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("Y3", profile.ButtonY3?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("M1", profile.ButtonM1?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("M2", profile.ButtonM2?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("M3", profile.ButtonM3?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("Desktop", profile.ButtonDesktop?.KeyboardKeys ?? new List<int>());
-                SetStoredKeyboardKeys("Page", profile.ButtonPage?.KeyboardKeys ?? new List<int>());
-
-                // Store gamepad combo/turbo metadata before applying UI
-                SetStoredGamepadComboActions("Y1", profile.ButtonY1?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("Y2", profile.ButtonY2?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("Y3", profile.ButtonY3?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("M1", profile.ButtonM1?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("M2", profile.ButtonM2?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("M3", profile.ButtonM3?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("Desktop", profile.ButtonDesktop?.GamepadActions ?? new List<int>());
-                SetStoredGamepadComboActions("Page", profile.ButtonPage?.GamepadActions ?? new List<int>());
-
-                SetStoredButtonTurbo("Y1", profile.ButtonY1?.Turbo == true);
-                SetStoredButtonTurbo("Y2", profile.ButtonY2?.Turbo == true);
-                SetStoredButtonTurbo("Y3", profile.ButtonY3?.Turbo == true);
-                SetStoredButtonTurbo("M1", profile.ButtonM1?.Turbo == true);
-                SetStoredButtonTurbo("M2", profile.ButtonM2?.Turbo == true);
-                SetStoredButtonTurbo("M3", profile.ButtonM3?.Turbo == true);
-                SetStoredButtonTurbo("Desktop", profile.ButtonDesktop?.Turbo == true);
-                SetStoredButtonTurbo("Page", profile.ButtonPage?.Turbo == true);
-
-                SetStoredButtonGamepadMode("Y1", (profile.ButtonY1?.GamepadMode == 1 || (profile.ButtonY1?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("Y2", (profile.ButtonY2?.GamepadMode == 1 || (profile.ButtonY2?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("Y3", (profile.ButtonY3?.GamepadMode == 1 || (profile.ButtonY3?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("M1", (profile.ButtonM1?.GamepadMode == 1 || (profile.ButtonM1?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("M2", (profile.ButtonM2?.GamepadMode == 1 || (profile.ButtonM2?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("M3", (profile.ButtonM3?.GamepadMode == 1 || (profile.ButtonM3?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("Desktop", (profile.ButtonDesktop?.GamepadMode == 1 || (profile.ButtonDesktop?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-                SetStoredButtonGamepadMode("Page", (profile.ButtonPage?.GamepadMode == 1 || (profile.ButtonPage?.GamepadActions?.Count ?? 0) > 1) ? 1 : 0);
-
-                // Apply button mappings (with full type support)
-                ApplyButtonMappingToUI("Y1", profile.ButtonY1);
-                ApplyButtonMappingToUI("Y2", profile.ButtonY2);
-                ApplyButtonMappingToUI("Y3", profile.ButtonY3);
-                ApplyButtonMappingToUI("M1", profile.ButtonM1);
-                ApplyButtonMappingToUI("M2", profile.ButtonM2);
-                ApplyButtonMappingToUI("M3", profile.ButtonM3);
-                ApplyButtonMappingToUI("Desktop", profile.ButtonDesktop);
-                ApplyButtonMappingToUI("Page", profile.ButtonPage);
+                // [2.0 rebuild - slice 7] The eight Y1-Page button remaps are now helper-authoritative
+                // - the widget no longer seeds their stored metadata + composite UI from its
+                // LocalSettings ControllerProfile here. They reflect the helper's pushed JSON via
+                // ApplyButtonMappingFromHelper (LegionButtonMappingProperty.OnValueSyncedFromHelper),
+                // and are removed from WidgetProperties.NeverSyncFromHelper. User edits still send via
+                // SendButtonMappingsToHelper. (Nintendo layout + the gamepad-button-mapping dict below
+                // stay widget-owned for now - slice 8.)
 
                 // Apply Nintendo layout (with event unsubscription to prevent handler firing)
                 if (LegionNintendoLayoutToggle != null)
@@ -1337,8 +1346,11 @@ namespace XboxGamingBar
                 // Use 2 second window since HID commands take ~1.5s to complete (50ms per button × ~30 buttons)
                 lastProfileApplyTime = DateTime.Now;
 
-                // Send button mappings to helper
-                SendButtonMappingsToHelper(profile);
+                // [2.0 slice 7] Raw Y1-Page button remaps are helper-authoritative and applied+pushed
+                // by the helper - the widget must NOT reseed them here (would clobber the helper's
+                // persisted values with stale LocalSettings). Only the still-widget-owned gamepad
+                // mapping dict is (re)pushed.
+                SendGamepadButtonMappingsToHelper(profile);
 
                 // Send controller settings to helper (gyro, deadzone, vibration, triggers)
                 SendControllerSettingsToHelper(profile);
@@ -1623,25 +1635,37 @@ namespace XboxGamingBar
                 if (profile.ButtonPage != null)
                     legionButtonPage?.SendMapping(profile.ButtonPage.ToJson(), force);
 
-                // Send gamepad button mappings as JSON dictionary
-                // During profile loading, use gamepadButtonMappings (includes desktop control changes)
-                // Otherwise use profile.GamepadButtonMappings
-                var mappingsToSend = isLoadingControllerProfile ? gamepadButtonMappings : profile.GamepadButtonMappings;
-                if (mappingsToSend != null && mappingsToSend.Count > 0)
-                {
-                    var gamepadMappingsJson = SerializeGamepadButtonMappings(mappingsToSend);
-                    if (force) legionGamepadMapping?.ForceSetValue(gamepadMappingsJson);
-                    else legionGamepadMapping?.SetValue(gamepadMappingsJson);
-                }
-                else
-                {
-                    if (force) legionGamepadMapping?.ForceSetValue("");
-                    else legionGamepadMapping?.SetValue("");
-                }
+                // Gamepad-button-mapping dict (still widget-owned - slice 8).
+                SendGamepadButtonMappingsToHelper(profile, force);
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error sending button mappings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Sends only the gamepad-button-mapping dictionary (face/bumper/etc. arbitrary remaps +
+        /// Nintendo/Desktop presets) to the helper. Split out from SendButtonMappingsToHelper in
+        /// [2.0 slice 7] so the seed/resend paths can re-push this widget-owned channel WITHOUT
+        /// also re-pushing the now-helper-authoritative Y1-Page raw button remaps (which would
+        /// clobber the helper's persisted values with the widget's stale LocalSettings).
+        /// </summary>
+        private void SendGamepadButtonMappingsToHelper(ControllerProfile profile, bool force = false)
+        {
+            // During profile loading, use gamepadButtonMappings (includes desktop control changes)
+            // Otherwise use profile.GamepadButtonMappings
+            var mappingsToSend = isLoadingControllerProfile ? gamepadButtonMappings : profile.GamepadButtonMappings;
+            if (mappingsToSend != null && mappingsToSend.Count > 0)
+            {
+                var gamepadMappingsJson = SerializeGamepadButtonMappings(mappingsToSend);
+                if (force) legionGamepadMapping?.ForceSetValue(gamepadMappingsJson);
+                else legionGamepadMapping?.SetValue(gamepadMappingsJson);
+            }
+            else
+            {
+                if (force) legionGamepadMapping?.ForceSetValue("");
+                else legionGamepadMapping?.SetValue("");
             }
         }
 
@@ -1664,10 +1688,13 @@ namespace XboxGamingBar
                 if (profile == null) return;
 
                 Logger.Info("Re-pushing active controller profile to helper after pipe connect (recovery from cold-start race)");
-                SendButtonMappingsToHelper(profile, force: true);
+                // [2.0 slice 7] Raw Y1-Page button remaps are helper-authoritative - no cold-start
+                // reseed needed (the helper restored them from its own profile before BatchGet).
+                // Only the still-widget-owned gamepad mapping dict is re-pushed.
+                SendGamepadButtonMappingsToHelper(profile, force: true);
                 SendControllerSettingsToHelper(profile);
                 // [2.0 slice 6] Lighting reseed removed - helper is authoritative (persists + applies
-                // + pushes). Button mappings still reseed here (buttons not yet migrated).
+                // + pushes).
             }
             catch (Exception ex)
             {

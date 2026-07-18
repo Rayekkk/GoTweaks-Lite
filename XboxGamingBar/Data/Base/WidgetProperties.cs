@@ -88,33 +88,29 @@ namespace XboxGamingBar.Data
             // (bound comboboxes; the SelectionChanged->ControllerSettingChanged->ApplyControllerSettingChange
             // save/send is already guarded by isApplyingHelperUpdate) and no longer seeds them.
 
-            // ── All remaining controller-profile settings ────────────────────────────────
-            // Every setting below is WIDGET-OWNED: persisted in the per-controller LocalSettings
-            // profile, loaded at startup via ApplyControllerProfile, and re-pushed to the helper
-            // after pipe connect (ResendActiveControllerProfileToHelper). The helper only APPLIES
-            // them to hardware — it hard-defaults them at startup and never persists them. They
-            // are therefore vulnerable to the exact same BatchGet-race clobber as vibration/lighting
-            // (helper default leaks back → control change handler saves the default into the
-            // profile → user's setting reverts "sometimes" after a restart). The widget is the sole
-            // source of truth (it also drives per-game profile switching itself via
-            // ApplyControllerProfile, and re-pushes on connect via ResendActiveControllerProfileToHelper),
-            // so it must never accept these from the helper. (#vibration-persistence-fix follow-up —
-            // GoTweaks is the source of truth.)
+            // ── Remaining WIDGET-OWNED controller settings ───────────────────────────────
+            // As of the 2.0 rebuild only the two entries below are still widget-owned: persisted
+            // in the per-controller LocalSettings profile, loaded via ApplyControllerProfile, and
+            // re-pushed after pipe connect (ResendActiveControllerProfileToHelper). The helper only
+            // APPLIES them to hardware; the widget is the source of truth, so it must never accept
+            // these from the helper (BatchGet-race clobber). Everything else in this file's history
+            // has migrated to helper-authoritative (see the per-slice notes below).
             //
             // DELIBERATELY EXCLUDED (do NOT add): Function.LegionDesktopControls and
             // Function.LegionJoystickAsMouseMode. Those two are toggled by HOTKEY on the helper and
             // pushed back to the widget (Program.HotkeyHandlers.cs ForceSetValue) so the UI reflects
             // the hardware-button state — they are genuinely bidirectional and MUST keep syncing from
             // the helper. (Their defaults are the disabled state, so the startup clobber is benign.)
-            // Button remaps
-            Function.LegionButtonY1,
-            Function.LegionButtonY2,
-            Function.LegionButtonY3,
-            Function.LegionButtonM1,
-            Function.LegionButtonM2,
-            Function.LegionButtonM3,
-            Function.LegionButtonDesktop,
-            Function.LegionButtonPage,
+            // [2.0 rebuild - slice 7] The eight Y1-Page button remaps REMOVED: helper-authoritative.
+            // The helper persists each mapping via RouteProfileSave (buttons save-flag, §29) and
+            // applies+pushes them at startup (before BatchGet) / game switch
+            // (ApplyLegionControllerSettingsFromProfile). The widget reflects the pushed JSON by
+            // rebuilding the composite per-button UI in ApplyButtonMappingFromHelper
+            // (LegionButtonMappingProperty.OnValueSyncedFromHelper). User edits still send via
+            // SendButtonMappingsToHelper; the widget no longer seeds them in ApplyControllerProfile.
+            //
+            // STILL widget-owned (slice 8 - coupled with the Nintendo/Desktop preset logic that
+            // builds these on the widget side): the gamepad-button-mapping dict + Nintendo toggle.
             Function.LegionNintendoLayout,
             Function.LegionGamepadButtonMapping,
             // [2.0 rebuild - slice 5] Gyro REMOVED: helper-authoritative. The helper persists all
