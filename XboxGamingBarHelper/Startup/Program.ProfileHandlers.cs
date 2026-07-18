@@ -540,6 +540,15 @@ namespace XboxGamingBarHelper
                         // profileManager.CurrentProfile, regardless of the actual live power state -
                         // same gap as RestoreGlobalProfileSettings/RunningGame_PropertyChanged, fixed
                         // the same way.
+                        // [comment corrected, round 11 re-audit] This method's BODY is reachable in
+                        // practice only via the direct, non-event call from SystemManager's
+                        // sleep/resume handler (Program.PropertyHandlers.cs) - all 3 sites that call
+                        // profileManager.CurrentProfile.SetValue(...), which raises this as a real
+                        // PropertyChanged event too, already set isApplyingProfile=true first, so the
+                        // top-of-method guard always blocks re-entry via the event path. The fix here
+                        // is still real and exercised (sleep/resume needs it), just narrower in scope
+                        // than "any CurrentProfile change" - don't assume this runs on every profile
+                        // switch when reasoning about coverage elsewhere.
                         bool isOnAC = IsCurrentlyOnAC;
                         var cp = profileManager.CurrentProfile;
 
@@ -594,6 +603,33 @@ namespace XboxGamingBarHelper
                         powerManager.MaxCPUState.SetValue(isOnAC ? cp.MaxCPUState : (cp.MaxCPUState_DC ?? cp.MaxCPUState));
                         powerManager.MinCPUState.SetValue(isOnAC ? cp.MinCPUState : (cp.MinCPUState_DC ?? cp.MinCPUState));
                         profileManager.PerGameProfile.SetValue(cp.Use);
+
+                        // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                        // 2026-07-19 (round 11, re-checking round 10's own fix): this method also
+                        // never applied FPSLimit/HDR/Resolution/RefreshRate - unlike
+                        // RestoreGlobalProfileSettings and RunningGame_PropertyChanged, which both
+                        // do. Same pre-existing-gap class as the AMD/Legion-controller fix just
+                        // below.
+                        int? targetFpsLimit = isOnAC ? cp.FPSLimit : (cp.FPSLimit_DC ?? cp.FPSLimit);
+                        if (targetFpsLimit.HasValue && rtssManager?.FPSLimit != null)
+                        {
+                            rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
+                        }
+                        bool? targetHdr = isOnAC ? cp.HDREnabled : (cp.HDREnabled_DC ?? cp.HDREnabled);
+                        if (targetHdr.HasValue && systemManager?.HDREnabled != null)
+                        {
+                            systemManager.HDREnabled.SetValue(targetHdr.Value);
+                        }
+                        string targetResolution = isOnAC ? cp.Resolution : (cp.Resolution_DC ?? cp.Resolution);
+                        if (!string.IsNullOrEmpty(targetResolution) && systemManager?.Resolution != null)
+                        {
+                            systemManager.Resolution.SetValue(targetResolution);
+                        }
+                        int? targetRefreshRate = isOnAC ? cp.RefreshRate : (cp.RefreshRate_DC ?? cp.RefreshRate);
+                        if (targetRefreshRate.HasValue && systemManager?.RefreshRate != null)
+                        {
+                            systemManager.RefreshRate.SetValue(targetRefreshRate.Value);
+                        }
 
                         // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
                         // 2026-07-19: this method never applied the 11 AMD Radeon feature toggles at
@@ -696,6 +732,31 @@ namespace XboxGamingBarHelper
                     powerManager.CPUEPP.SetValue(isOnAC ? gameProfile.CPUEPP : (gameProfile.CPUEPP_DC ?? gameProfile.CPUEPP));
                     powerManager.MaxCPUState.SetValue(isOnAC ? gameProfile.MaxCPUState : (gameProfile.MaxCPUState_DC ?? gameProfile.MaxCPUState));
                     powerManager.MinCPUState.SetValue(isOnAC ? gameProfile.MinCPUState : (gameProfile.MinCPUState_DC ?? gameProfile.MinCPUState));
+
+                    // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                    // 2026-07-19 (round 11, re-checking round 10's own fix): this branch also never
+                    // applied FPSLimit/HDR/Resolution/RefreshRate - unlike RestoreGlobalProfileSettings
+                    // and RunningGame_PropertyChanged, which both do.
+                    int? targetFpsLimit = isOnAC ? gameProfile.FPSLimit : (gameProfile.FPSLimit_DC ?? gameProfile.FPSLimit);
+                    if (targetFpsLimit.HasValue && rtssManager?.FPSLimit != null)
+                    {
+                        rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
+                    }
+                    bool? targetHdr = isOnAC ? gameProfile.HDREnabled : (gameProfile.HDREnabled_DC ?? gameProfile.HDREnabled);
+                    if (targetHdr.HasValue && systemManager?.HDREnabled != null)
+                    {
+                        systemManager.HDREnabled.SetValue(targetHdr.Value);
+                    }
+                    string targetResolution = isOnAC ? gameProfile.Resolution : (gameProfile.Resolution_DC ?? gameProfile.Resolution);
+                    if (!string.IsNullOrEmpty(targetResolution) && systemManager?.Resolution != null)
+                    {
+                        systemManager.Resolution.SetValue(targetResolution);
+                    }
+                    int? targetRefreshRate = isOnAC ? gameProfile.RefreshRate : (gameProfile.RefreshRate_DC ?? gameProfile.RefreshRate);
+                    if (targetRefreshRate.HasValue && systemManager?.RefreshRate != null)
+                    {
+                        systemManager.RefreshRate.SetValue(targetRefreshRate.Value);
+                    }
 
                     // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
                     // 2026-07-19: this branch (manually toggling "Per-Game Profile" on) never
