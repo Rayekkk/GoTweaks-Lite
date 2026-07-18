@@ -182,7 +182,16 @@ namespace XboxGamingBar
             // Update game profile display (if game is running)
             if (HasValidGame(currentGameName))
             {
-                if (GetPerGamePowerSourceProfileEnabled(currentGameName))
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19: GetPerGamePowerSourceProfileEnabled is only a per-game PREFERENCE
+                // ("does this game want its own AC/DC split if/when per-game profiles are used"),
+                // not "is per-game actually in effect right now" - every other check for that
+                // composite concept (SendPowerSourceProfileValuesToHelper, GetTargetProfileName,
+                // UpdateActiveProfileIndicator, UpdateGameProfileCardVisibility) also ANDs in
+                // PerGameProfileToggle?.IsOn. Currently masked here by GameProfileCard's own
+                // visibility (controlled separately by UpdateGameProfileCardVisibility, which does
+                // have the gate), but fixing it directly avoids relying on that external mask.
+                if (GetPerGamePowerSourceProfileEnabled(currentGameName) && (PerGameProfileToggle?.IsOn ?? false))
                 {
                     // Show AC/DC game profiles - TDP Mode (Legion only)
                     GameACDCProfileTDPModeRow.Visibility = tdpModeVisibility;
