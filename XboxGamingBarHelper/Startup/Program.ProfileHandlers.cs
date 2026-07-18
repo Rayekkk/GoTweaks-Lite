@@ -595,6 +595,20 @@ namespace XboxGamingBarHelper
                         powerManager.MinCPUState.SetValue(isOnAC ? cp.MinCPUState : (cp.MinCPUState_DC ?? cp.MinCPUState));
                         profileManager.PerGameProfile.SetValue(cp.Use);
 
+                        // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                        // 2026-07-19: this method never applied the 11 AMD Radeon feature toggles at
+                        // all (pre-existing gap, not introduced by the AC/DC sweep - RunningGame_
+                        // PropertyChanged and RestoreGlobalProfileSettings both call this, this site
+                        // never did). A profile switch that reaches this method independently (not
+                        // via RunningGame_PropertyChanged/PerGameProfile_PropertyChanged, both of
+                        // which are blocked by isApplyingProfile while this one runs) silently left
+                        // AMD features unchanged instead of restoring the newly-active profile's
+                        // configured values.
+                        if (amdManager != null)
+                        {
+                            ApplyAMDFeaturesFromProfile(cp, isOnAC);
+                        }
+
                         // Apply Legion controller settings from profile (both global and per-game)
                         if (legionManager != null)
                         {
@@ -682,6 +696,24 @@ namespace XboxGamingBarHelper
                     powerManager.CPUEPP.SetValue(isOnAC ? gameProfile.CPUEPP : (gameProfile.CPUEPP_DC ?? gameProfile.CPUEPP));
                     powerManager.MaxCPUState.SetValue(isOnAC ? gameProfile.MaxCPUState : (gameProfile.MaxCPUState_DC ?? gameProfile.MaxCPUState));
                     powerManager.MinCPUState.SetValue(isOnAC ? gameProfile.MinCPUState : (gameProfile.MinCPUState_DC ?? gameProfile.MinCPUState));
+
+                    // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                    // 2026-07-19: this branch (manually toggling "Per-Game Profile" on) never
+                    // applied AMD Radeon features NOR Legion controller settings at all - a
+                    // pre-existing gap, not introduced by the AC/DC sweep. The comment above
+                    // ("same pattern as RestoreGlobalProfileSettings") states the intent but this
+                    // never actually matched it. Without this, manually enabling per-game profile
+                    // left AMD toggles and Legion button/gyro/vibration/lighting settings at
+                    // whatever the PREVIOUS profile had, instead of restoring this game's saved
+                    // values.
+                    if (amdManager != null)
+                    {
+                        ApplyAMDFeaturesFromProfile(gameProfile, isOnAC);
+                    }
+                    if (legionManager != null)
+                    {
+                        ApplyLegionControllerSettingsFromProfile();
+                    }
                 }
                 else
                 {

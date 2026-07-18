@@ -720,6 +720,15 @@ namespace XboxGamingBarHelper
                 globalProfile.RadeonChillMinFPS_DC = import.GlobalProfile.RadeonChillMinFPS_DC;
                 globalProfile.RadeonChillMaxFPS = import.GlobalProfile.RadeonChillMaxFPS;
                 globalProfile.RadeonChillMaxFPS_DC = import.GlobalProfile.RadeonChillMaxFPS_DC;
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19: LegionPerformanceMode/_DC were completely absent from this merge
+                // block - added later (round 5 of this project) as a live-edit save handler +
+                // apply-side fix, but this import path was never revisited, so restoring a backup
+                // silently dropped the AC/DC-differentiated TDP Mode preference for the Global
+                // profile (export/deserialize round-trip it fine; only this live-object merge
+                // missed it).
+                globalProfile.LegionPerformanceMode = import.GlobalProfile.LegionPerformanceMode;
+                globalProfile.LegionPerformanceMode_DC = import.GlobalProfile.LegionPerformanceMode_DC;
                 Logger.Info("Global profile settings imported");
                 importedCount++;
 
