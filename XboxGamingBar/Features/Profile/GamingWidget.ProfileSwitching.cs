@@ -285,21 +285,25 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Fired whenever an AMD feature property's value changes, from EITHER direction: a
-        /// genuine widget-side toggle click (already captured via SettingChanged ->
-        /// SaveCurrentSettingsToProfile through the control's own Toggled event) or a helper-
-        /// pushed update reflecting the real driver state (e.g. Anti-Lag/Boost/Chill changed
-        /// externally via AMD Software: Adrenalin Edition, or a hardware read-back on connect).
+        /// Fired whenever a helper-authoritative Profiles-tab-tracked property's value changes,
+        /// from EITHER direction: a genuine widget-side toggle click (already captured via
+        /// SettingChanged -> SaveCurrentSettingsToProfile through the control's own Toggled event)
+        /// or a helper-pushed update (e.g. Anti-Lag/Boost/Chill changed externally via AMD
+        /// Software: Adrenalin Edition, a hardware read-back on connect, or - since [2.0 rebuild -
+        /// Faza C3] - a game-switch push now that FPSLimit/HDR/Resolution/RefreshRate/the AMD
+        /// toggles are all helper-authoritative and LoadProfileSettings no longer seeds them).
         /// The helper-driven direction is deliberately skipped by SettingChanged's
         /// WidgetSliderProperty.HelperSyncCount guard, to avoid a startup BatchGet flood
-        /// clobbering a freshly-loaded profile - but that also means the profile table's AMD row
-        /// never learns about a driver-side change, and shows stale data (e.g. "Off") forever.
-        /// Deferring one dispatcher tick lets the isApplyingHelperUpdate window (set around the
-        /// whole HandlePipeMessage call in GamingWidget.PipeClient.cs) close before
+        /// clobbering a freshly-loaded profile - but that also means the profile table's row for
+        /// this setting never learns about the change, and shows stale data forever. Deferring one
+        /// dispatcher tick lets the isApplyingHelperUpdate window (set around the whole
+        /// HandlePipeMessage call in GamingWidget.PipeClient.cs) close before
         /// SaveCurrentSettingsToProfile's own guards (isLoadingProfile/isSwitchingProfile/
         /// isInitialSync) decide whether it's safe to resync the active profile + redraw the table.
+        /// Originally AMD-only (hence the historical name in the reflog); now shared by FPSLimit/
+        /// HDR/Resolution/RefreshRate too.
         /// </summary>
-        private void AMDFeatureProperty_ChangedResyncProfile(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void ProfileTrackedProperty_ChangedResyncProfile(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
@@ -412,63 +416,18 @@ namespace XboxGamingBar
                     // CPUBoost we just loaded from the profile or push false to the helper (#88 bug #4).
                     UpdateCPUBoostEnabledState(allowAutoDisable: false);
                 }
-                if (SaveAMDFeatures)
-                {
-                    // RSR and RIS are mutually exclusive - if both are enabled in profile, prefer RSR
-                    bool rsrEnabled = profile.RadeonSuperResolution;
-                    bool risEnabled = profile.ImageSharpening;
-                    if (rsrEnabled && risEnabled)
-                    {
-                        Logger.Warn("Profile has both RSR and RIS enabled - disabling RIS (mutually exclusive)");
-                        risEnabled = false;
-                    }
-
-                    // Chill is mutually exclusive with Anti-Lag and Boost - if Chill is enabled, disable the others
-                    bool antiLagEnabled = profile.RadeonAntiLag;
-                    bool boostEnabled = profile.RadeonBoost;
-                    bool chillEnabled = profile.RadeonChill;
-                    if (chillEnabled && (antiLagEnabled || boostEnabled))
-                    {
-                        Logger.Warn("Profile has Chill with Anti-Lag/Boost enabled - disabling Anti-Lag and Boost (mutually exclusive)");
-                        antiLagEnabled = false;
-                        boostEnabled = false;
-                    }
-
-                    AMDFluidMotionFrameToggle.IsOn = profile.FluidMotionFrames;
-                    AMDRadeonSuperResolutionToggle.IsOn = rsrEnabled;
-                    AMDRadeonSuperResolutionSharpnessSlider.Value = profile.RadeonSuperResolutionSharpness;
-                    AMDImageSharpeningToggle.IsOn = risEnabled;
-                    AMDImageSharpeningSlider.Value = profile.ImageSharpeningSharpness;
-                    AMDRadeonAntiLagToggle.IsOn = antiLagEnabled;
-                    AMDRadeonBoostToggle.IsOn = boostEnabled;
-                    AMDRadeonBoostResolutionSlider.Value = profile.RadeonBoostResolution;
-                    AMDRadeonChillToggle.IsOn = chillEnabled;
-                    AMDRadeonChillMinFPSSlider.Value = profile.RadeonChillMinFPS;
-                    AMDRadeonChillMaxFPSSlider.Value = profile.RadeonChillMaxFPS;
-                    // Send to helper explicitly using ForceSetValue to ensure AMD driver state is synchronized
-                    // even if the cached value appears unchanged (driver state may differ from cache)
-                    // Send RIS first (to disable it if needed), then RSR
-                    // Send Anti-Lag and Boost first (to disable them if needed), then Chill
-                    amdFluidMotionFrameEnabled?.ForceSetValue(profile.FluidMotionFrames);
-                    amdImageSharpeningEnabled?.ForceSetValue(risEnabled);
-                    amdImageSharpeningSharpness?.ForceSetValue((int)profile.ImageSharpeningSharpness);
-                    amdRadeonSuperResolutionEnabled?.ForceSetValue(rsrEnabled);
-                    amdRadeonSuperResolutionSharpness?.ForceSetValue((int)profile.RadeonSuperResolutionSharpness);
-                    amdRadeonAntiLagEnabled?.ForceSetValue(antiLagEnabled);
-                    amdRadeonBoostEnabled?.ForceSetValue(boostEnabled);
-                    amdRadeonBoostResolution?.ForceSetValue((int)profile.RadeonBoostResolution);
-                    amdRadeonChillEnabled?.ForceSetValue(chillEnabled);
-                    amdRadeonChillMinFPSProperty?.ForceSetValue((int)profile.RadeonChillMinFPS);
-                    amdRadeonChillMaxFPSProperty?.ForceSetValue((int)profile.RadeonChillMaxFPS);
-                }
-                if (SaveFPSLimit)
-                {
-                    FPSLimitToggle.IsOn = profile.FPSLimitEnabled;
-                    FPSLimitSlider.Value = profile.FPSLimitValue;
-                    // Send to helper explicitly (toggle/slider handlers may be blocked by flags)
-                    int fpsLimitValue = profile.FPSLimitEnabled ? profile.FPSLimitValue : 0;
-                    fpsLimit?.SetValue(fpsLimitValue);
-                }
+                // [2.0 rebuild - Faza C3] The 6 AMD Radeon toggles + FPSLimit are now
+                // helper-authoritative (Faza C1/C2 wired their RouteProfileSave persistence + apply-
+                // on-switch in the helper's RunningGame_PropertyChanged/RestoreGlobalProfileSettings).
+                // LoadProfileSettings no longer seeds the UI controls from this widget's LocalSettings
+                // PerformanceProfile nor ForceSetValue-pushes to the helper here - that was an
+                // unconditional overwrite (no isApplyingHelperUpdate guard, unlike TDP/CPUBoost/CPUEPP/
+                // CPUState above) that would clobber whatever the helper just applied on every game
+                // switch. The controls now reflect the helper's push via their own bound
+                // WidgetToggleProperty/WidgetSliderProperty; ProfileTrackedProperty_ChangedResyncProfile
+                // (wired in GamingWidget.xaml.cs) keeps the Profiles-tab card's LocalSettings snapshot
+                // in sync with that push so SaveCurrentSettingsToProfile's read of these controls still
+                // finds the correct value for profile-card display.
                 if (SaveOSPowerMode)
                 {
                     isLoadingOSPowerMode = true;
@@ -686,87 +645,12 @@ namespace XboxGamingBar
                     UpdateTDPSliderEnabledState();
                 }
 
-                // HDR
-                if (SaveHDR)
-                {
-                    // Only apply HDR if:
-                    // 1. This is an explicit profile switch (game detected/closed), OR
-                    // 2. No game is currently running (returning to desktop)
-                    bool shouldApplyHDR = isExplicitSwitch || !HasValidGame(currentGameName);
-
-                    if (shouldApplyHDR)
-                    {
-                        if (HDRToggle != null && hdrSupported?.Value == true)
-                        {
-                            HDRToggle.IsOn = profile.HDREnabled;
-                            hdrEnabled?.SetValue(profile.HDREnabled);
-                        }
-                    }
-                    else
-                    {
-                        Logger.Info($"Skipping HDR application - game is running and not an explicit switch");
-                    }
-                }
-
-                // Resolution
-                if (SaveResolution)
-                {
-                    // Only apply Resolution if:
-                    // 1. This is an explicit profile switch (game detected/closed), OR
-                    // 2. No game is currently running (returning to desktop)
-                    bool shouldApplyResolution = isExplicitSwitch || !HasValidGame(currentGameName);
-
-                    if (shouldApplyResolution)
-                    {
-                        if (ResolutionComboBox != null && !string.IsNullOrEmpty(profile.Resolution))
-                        {
-                            // Find and select matching resolution
-                            for (int i = 0; i < ResolutionComboBox.Items.Count; i++)
-                            {
-                                if (ResolutionComboBox.Items[i]?.ToString() == profile.Resolution)
-                                {
-                                    ResolutionComboBox.SelectedIndex = i;
-                                    resolution?.SetValue(profile.Resolution);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Logger.Info($"Skipping Resolution application - game is running and not an explicit switch");
-                    }
-                }
-
-                // Refresh Rate
-                if (SaveRefreshRate)
-                {
-                    // Only apply Refresh Rate if:
-                    // 1. This is an explicit profile switch (game detected/closed), OR
-                    // 2. No game is currently running (returning to desktop)
-                    bool shouldApplyRefreshRate = isExplicitSwitch || !HasValidGame(currentGameName);
-
-                    if (shouldApplyRefreshRate)
-                    {
-                        if (RefreshRatesComboBox != null && profile.RefreshRate.HasValue)
-                        {
-                            // Find and select matching refresh rate
-                            for (int i = 0; i < RefreshRatesComboBox.Items.Count; i++)
-                            {
-                                if (RefreshRatesComboBox.Items[i] is int rate && rate == profile.RefreshRate.Value)
-                                {
-                                    RefreshRatesComboBox.SelectedIndex = i;
-                                    refreshRate?.SetValue(profile.RefreshRate.Value);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Logger.Info($"Skipping RefreshRate application - game is running and not an explicit switch");
-                    }
-                }
+                // [2.0 rebuild - Faza C3] HDR/Resolution/RefreshRate are now helper-authoritative
+                // (same rationale as the AMD/FPSLimit removal above - these blocks unconditionally
+                // overwrote the UI + ForceSetValue-pushed to the helper on every switch, with no
+                // isApplyingHelperUpdate guard). The controls now reflect the helper's push via their
+                // own bound properties; ProfileTrackedProperty_ChangedResyncProfile keeps the
+                // Profiles-tab card snapshot in sync.
 
                 // Overlay Level
                 if (SaveOverlayLevel && PerformanceOverlayComboBox != null)

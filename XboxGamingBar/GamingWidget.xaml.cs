@@ -2017,16 +2017,34 @@ namespace XboxGamingBar
             if (runningGame != null)
                 runningGame.PropertyChanged += QuickSettingsProperty_Changed;
             if (fpsLimit != null)
+            {
                 fpsLimit.PropertyChanged += QuickSettingsProperty_Changed;
+                // [2.0 rebuild - Faza C3] FPSLimit is now helper-authoritative (LoadProfileSettings
+                // no longer seeds it) - resync the Profiles-tab card snapshot on every push so it
+                // doesn't go stale after a game switch or an external RTSS change.
+                fpsLimit.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            }
             if (osPowerMode != null)
                 osPowerMode.PropertyChanged += OSPowerMode_PropertyChanged;
             if (resolution != null)
             {
                 resolution.PropertyChanged += QuickSettingsProperty_Changed;
                 resolution.PropertyChanged += Resolution_PropertyChanged_OSD;
+                // [2.0 rebuild - Faza C3] Same resync as FPSLimit above.
+                resolution.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            }
+            if (refreshRate != null)
+            {
+                // [2.0 rebuild - Faza C3] RefreshRate is now helper-authoritative; had no subscription
+                // at all before (LoadProfileSettings' seed-and-push was its only consumer).
+                refreshRate.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (hdrEnabled != null)
+            {
                 hdrEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+                // [2.0 rebuild - Faza C3] Same resync as FPSLimit above.
+                hdrEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            }
             if (hdrSupported != null)
                 hdrSupported.PropertyChanged += QuickSettingsProperty_Changed;
             if (displayOrientation != null)
@@ -2036,30 +2054,30 @@ namespace XboxGamingBar
             if (amdFluidMotionFrameEnabled != null)
             {
                 amdFluidMotionFrameEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdFluidMotionFrameEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdFluidMotionFrameEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonSuperResolutionEnabled != null)
             {
                 amdRadeonSuperResolutionEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonSuperResolutionEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdRadeonSuperResolutionEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonAntiLagEnabled != null)
             {
                 amdRadeonAntiLagEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonAntiLagEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdRadeonAntiLagEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonChillEnabled != null)
             {
                 amdRadeonChillEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonChillEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdRadeonChillEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonBoostEnabled != null)
             {
                 amdRadeonBoostEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonBoostEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdRadeonBoostEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdImageSharpeningEnabled != null)
-                amdImageSharpeningEnabled.PropertyChanged += AMDFeatureProperty_ChangedResyncProfile;
+                amdImageSharpeningEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
 
             // Controller battery properties - update tile when battery status changes
             if (controllerBatteryLeft != null)
