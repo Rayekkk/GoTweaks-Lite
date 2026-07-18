@@ -88,13 +88,9 @@ namespace XboxGamingBar.Data
             // (bound comboboxes; the SelectionChanged->ControllerSettingChanged->ApplyControllerSettingChange
             // save/send is already guarded by isApplyingHelperUpdate) and no longer seeds them.
 
-            // ── Remaining WIDGET-OWNED controller settings ───────────────────────────────
-            // As of the 2.0 rebuild only the two entries below are still widget-owned: persisted
-            // in the per-controller LocalSettings profile, loaded via ApplyControllerProfile, and
-            // re-pushed after pipe connect (ResendActiveControllerProfileToHelper). The helper only
-            // APPLIES them to hardware; the widget is the source of truth, so it must never accept
-            // these from the helper (BatchGet-race clobber). Everything else in this file's history
-            // has migrated to helper-authoritative (see the per-slice notes below).
+            // ── NeverSyncFromHelper is now EMPTY (2.0 rebuild complete for controller settings) ──
+            // Every controller-profile setting has migrated to helper-authoritative. This HashSet is
+            // kept (rather than deleted) as the documented mechanism + history for the migration.
             //
             // DELIBERATELY EXCLUDED (do NOT add): Function.LegionDesktopControls and
             // Function.LegionJoystickAsMouseMode. Those two are toggled by HOTKEY on the helper and
@@ -108,11 +104,21 @@ namespace XboxGamingBar.Data
             // rebuilding the composite per-button UI in ApplyButtonMappingFromHelper
             // (LegionButtonMappingProperty.OnValueSyncedFromHelper). User edits still send via
             // SendButtonMappingsToHelper; the widget no longer seeds them in ApplyControllerProfile.
-            //
-            // STILL widget-owned (slice 8 - coupled with the Nintendo/Desktop preset logic that
-            // builds these on the widget side): the gamepad-button-mapping dict + Nintendo toggle.
-            Function.LegionNintendoLayout,
-            Function.LegionGamepadButtonMapping,
+            // [2.0 rebuild - slice 8] LegionGamepadButtonMapping (the arbitrary face/D-pad/stick-click
+            // remap dict, written only by the Nintendo-layout and Desktop-Controls presets - no
+            // dedicated UI exists for it since §29 removed the standalone "Gamepad Buttons" section)
+            // + LegionNintendoLayout (bool toggle) REMOVED: helper-authoritative, same RouteProfileSave
+            // pattern. LegionGamepadMappingProperty.OnValueSyncedFromHelper deserializes a helper push
+            // straight into the in-memory gamepadButtonMappings dict (no UI to rebuild). Nintendo's
+            // toggle needs no analogous hook: it's a plain auto-bound WidgetToggleProperty, and a
+            // helper-driven IsOn change already fires the existing (unguarded, pre-2.0)
+            // LegionNintendoLayout_Toggled handler - which recomputes A/B/X/Y into gamepadButtonMappings
+            // and resends it - the exact same "bidirectional toggle recomputes on any IsOn change"
+            // pattern LegionDesktopControls above has used all along. The widget no longer seeds either
+            // from ApplyControllerProfile, and the seed-path resend of gamepadButtonMappings
+            // (SendGamepadButtonMappingsToHelper) is removed from ApplyControllerProfile /
+            // ResendActiveControllerProfileToHelper - only the live-edit path (Nintendo/Desktop toggle
+            // handlers via SaveAndSendGamepadMappings) still sends it.
             // [2.0 rebuild - slice 5] Gyro REMOVED: helper-authoritative. The helper persists all
             // gyro fields via RouteProfileSave (GyroSettings save-flag, §29; global-persistence bug
             // fixed) and applies+pushes them at startup (now before BatchGet) / game switch. All gyro

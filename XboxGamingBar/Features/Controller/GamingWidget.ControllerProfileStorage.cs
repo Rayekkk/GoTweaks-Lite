@@ -1063,6 +1063,21 @@ namespace XboxGamingBar
             }
         }
 
+        /// <summary>
+        /// [2.0 rebuild - slice 8] Reflects a helper-pushed gamepad-button-mapping dict (the
+        /// Nintendo-layout / Desktop-Controls preset expansions) into the in-memory
+        /// gamepadButtonMappings dict. No UI is bound to this dict directly (§29 removed the
+        /// standalone "Gamepad Buttons" arbitrary-remap section), so unlike
+        /// ApplyButtonMappingFromHelper there's no composite UI to rebuild and no
+        /// isLoadingControllerProfile guard needed - nothing reacts to a dict mutation by itself.
+        /// Called from LegionGamepadMappingProperty.OnValueSyncedFromHelper (already dispatched to
+        /// the UI thread there).
+        /// </summary>
+        internal void ApplyGamepadButtonMappingsFromHelper(string json)
+        {
+            gamepadButtonMappings = DeserializeGamepadButtonMappings(json);
+        }
+
         private void UpdateKeyboardKeyTags(string buttonName, List<int> keys)
         {
             var keyTags = FindName($"LegionButton{buttonName}KeyTags") as StackPanel;
@@ -1227,31 +1242,14 @@ namespace XboxGamingBar
                 // LocalSettings ControllerProfile here. They reflect the helper's pushed JSON via
                 // ApplyButtonMappingFromHelper (LegionButtonMappingProperty.OnValueSyncedFromHelper),
                 // and are removed from WidgetProperties.NeverSyncFromHelper. User edits still send via
-                // SendButtonMappingsToHelper. (Nintendo layout + the gamepad-button-mapping dict below
-                // stay widget-owned for now - slice 8.)
+                // SendButtonMappingsToHelper.
 
-                // Apply Nintendo layout (with event unsubscription to prevent handler firing)
-                if (LegionNintendoLayoutToggle != null)
-                {
-                    LegionNintendoLayoutToggle.Toggled -= LegionNintendoLayout_Toggled;
-                    try
-                    {
-                        LegionNintendoLayoutToggle.IsOn = profile.NintendoLayout;
-                        // Apply or clear Nintendo layout mappings to match toggle state
-                        if (profile.NintendoLayout)
-                        {
-                            ApplyNintendoLayoutMappings();
-                        }
-                        else
-                        {
-                            ClearNintendoLayoutMappings();
-                        }
-                    }
-                    finally
-                    {
-                        LegionNintendoLayoutToggle.Toggled += LegionNintendoLayout_Toggled;
-                    }
-                }
+                // [2.0 rebuild - slice 8] Nintendo layout is now helper-authoritative - the widget no
+                // longer seeds LegionNintendoLayoutToggle.IsOn or calls Apply/ClearNintendoLayoutMappings
+                // from LocalSettings here. A helper push flips IsOn via the auto-bound
+                // LegionNintendoLayoutProperty, which (same as the already-bidirectional
+                // LegionDesktopControls below) fires the existing LegionNintendoLayout_Toggled handler
+                // and recomputes A/B/X/Y into gamepadButtonMappings itself. See NeverSyncFromHelper.
 
                 // [2.0 rebuild - slice 4] Vibration is helper-authoritative - the widget no longer
                 // seeds the comboboxes from its LocalSettings ControllerProfile here. They reflect the
@@ -1296,10 +1294,14 @@ namespace XboxGamingBar
                         LegionJoystickMouseSensValue.Text = profile.JoystickMouseSens.ToString();
                 }
 
-                // Apply gamepad button mappings
-                gamepadButtonMappings = profile.GamepadButtonMappings?.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.Clone()) ?? new Dictionary<string, ButtonMapping>();
+                // [2.0 rebuild - slice 8] gamepadButtonMappings (the arbitrary Nintendo/Desktop-preset
+                // remap dict) is now helper-authoritative - the widget no longer seeds it from
+                // LocalSettings here. A helper push (LegionGamepadMappingProperty.OnValueSyncedFromHelper
+                // -> ApplyGamepadButtonMappingsFromHelper) replaces the dict directly. The Desktop
+                // Controls block below still WRITES into gamepadButtonMappings from its own LocalSettings
+                // flag (pre-existing, accepted "benign" clobber per the DesktopControls/JoystickAsMouse
+                // note above - out of scope here); it just no longer gets synchronously resent from this
+                // method (see the removed send at the end of this method).
 
                 // Apply Desktop Controls toggle state (with event unsubscription to prevent handler firing)
                 if (LegionDesktopControlsToggle != null)
@@ -1346,11 +1348,11 @@ namespace XboxGamingBar
                 // Use 2 second window since HID commands take ~1.5s to complete (50ms per button × ~30 buttons)
                 lastProfileApplyTime = DateTime.Now;
 
-                // [2.0 slice 7] Raw Y1-Page button remaps are helper-authoritative and applied+pushed
-                // by the helper - the widget must NOT reseed them here (would clobber the helper's
-                // persisted values with stale LocalSettings). Only the still-widget-owned gamepad
-                // mapping dict is (re)pushed.
-                SendGamepadButtonMappingsToHelper(profile);
+                // [2.0 slice 7+8] The entire button-remap domain (raw Y1-Page + the gamepad-mapping
+                // dict + Nintendo layout) is now helper-authoritative and applied+pushed by the helper
+                // - the widget must NOT reseed/resend any of it here (would clobber the helper's
+                // persisted values with stale LocalSettings, and gamepadButtonMappings may not even be
+                // populated yet at this point in a cold start).
 
                 // Send controller settings to helper (gyro, deadzone, vibration, triggers)
                 SendControllerSettingsToHelper(profile);
@@ -1688,10 +1690,9 @@ namespace XboxGamingBar
                 if (profile == null) return;
 
                 Logger.Info("Re-pushing active controller profile to helper after pipe connect (recovery from cold-start race)");
-                // [2.0 slice 7] Raw Y1-Page button remaps are helper-authoritative - no cold-start
-                // reseed needed (the helper restored them from its own profile before BatchGet).
-                // Only the still-widget-owned gamepad mapping dict is re-pushed.
-                SendGamepadButtonMappingsToHelper(profile, force: true);
+                // [2.0 slice 7+8] The entire button-remap domain (raw Y1-Page + gamepad mapping dict +
+                // Nintendo layout) is helper-authoritative - no cold-start reseed needed (the helper
+                // restored it all from its own profile before BatchGet).
                 SendControllerSettingsToHelper(profile);
                 // [2.0 slice 6] Lighting reseed removed - helper is authoritative (persists + applies
                 // + pushes).

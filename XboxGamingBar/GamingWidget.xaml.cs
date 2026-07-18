@@ -1425,7 +1425,7 @@ namespace XboxGamingBar
             legionJoystickMouseSens = new LegionJoystickMouseSensProperty(LegionJoystickMouseSensSlider, this);
 
             // Gamepad button mapping property
-            legionGamepadMapping = new LegionGamepadMappingProperty();
+            legionGamepadMapping = new LegionGamepadMappingProperty(this);
 
             // Desktop controls preset (synced from helper for hotkey)
             legionDesktopControls = new LegionDesktopControlsProperty(LegionDesktopControlsToggle, this);
