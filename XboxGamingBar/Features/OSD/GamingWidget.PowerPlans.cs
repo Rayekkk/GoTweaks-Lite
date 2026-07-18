@@ -93,6 +93,13 @@ namespace XboxGamingBar
                 }
 
                 var jsonObj = new Windows.Data.Json.JsonObject();
+                // [2.0 rebuild - AC/DC persistence follow-up] LegionPerformanceMode (the TDP Mode
+                // dropdown: Quiet/Balanced/Performance/Custom) was missing from this payload
+                // entirely - found on-device 2026-07-18 ("TDP Mode" reported as not respecting the
+                // AC/DC split). The widget's own ac/dc profile objects already track this
+                // separately; it just never reached the helper.
+                jsonObj["AcLegionPerformanceMode"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.LegionPerformanceMode);
+                jsonObj["DcLegionPerformanceMode"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.LegionPerformanceMode);
                 jsonObj["AcTdp"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.TDP);
                 jsonObj["DcTdp"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.TDP);
                 // SPPT/FPPT per power state - the helper needs the full Custom TDP triplet, not

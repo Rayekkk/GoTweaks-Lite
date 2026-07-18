@@ -96,6 +96,17 @@ namespace XboxGamingBarHelper
                 PowerSourceProfileState.AcOsPowerMode = ParseInt("AcOsPowerMode");
                 PowerSourceProfileState.DcOsPowerMode = ParseInt("DcOsPowerMode");
 
+                // LegionPerformanceMode (TDP Mode dropdown) - gated on the same TDP flag as the
+                // triplet below, since it's the mode selector for the same feature.
+                int? acMode = ParseInt("AcLegionPerformanceMode");
+                if (acMode.HasValue)
+                {
+                    int? modeDcOverride = ResolveDcOverride(ParseInt("DcLegionPerformanceMode"), acMode.Value);
+                    RouteProfileSave(ProfileSaveFlagsState.TDP, "PowerSourceProfileValues:LegionPerformanceMode",
+                        cur => { cur.LegionPerformanceMode = acMode.Value; cur.LegionPerformanceMode_DC = modeDcOverride; },
+                        glo => { glo.LegionPerformanceMode = acMode.Value; glo.LegionPerformanceMode_DC = modeDcOverride; });
+                }
+
                 // TDP triplet.
                 int? acTdp = ParseInt("AcTdp");
                 if (acTdp.HasValue)
@@ -365,6 +376,21 @@ namespace XboxGamingBarHelper
                 // in-between value from a throwaway copy).
                 Shared.Data.GameProfile profile = profileManager.CurrentProfile.Value;
                 string state = isOnAC ? "AC" : "DC";
+
+                // [2.0 rebuild - AC/DC persistence follow-up] LegionPerformanceMode (TDP Mode)
+                // itself now switches on a real AC/DC transition too, same as every other
+                // TDP/CPU/AMD field - e.g. "Custom on AC, Balanced on DC" now actually applies.
+                // null means "not configured for this profile" (its own pre-existing doc comment:
+                // "don't change on profile switch") - only switch when a real value is set.
+                if (legionManager != null)
+                {
+                    int? targetMode = isOnAC ? profile.LegionPerformanceMode : (profile.LegionPerformanceMode_DC ?? profile.LegionPerformanceMode);
+                    if (targetMode.HasValue && targetMode.Value != legionManager.LegionPerformanceMode.Value)
+                    {
+                        Logger.Info($"Helper-side AC/DC handler: switching LegionPerformanceMode to {targetMode.Value} from persisted {state} profile");
+                        legionManager.LegionPerformanceMode.SetValue(targetMode.Value);
+                    }
+                }
 
                 bool isLegionCustomMode = legionManager != null && legionManager.CurrentPerformanceMode == 255;
 

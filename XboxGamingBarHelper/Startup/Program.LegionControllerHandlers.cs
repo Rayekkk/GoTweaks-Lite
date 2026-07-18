@@ -245,16 +245,36 @@ namespace XboxGamingBarHelper
                 profileManager.CurrentProfile.LegionControllerProfileEnabled = legionManager.LegionControllerProfileEnabled.Value;
             }
             // Performance mode (for per-game TDP mode switching)
+            // [2.0 rebuild - AC/DC persistence follow-up] Found missing on-device 2026-07-18:
+            // unlike every other TDP/CPU/AMD/HDR field, this handler never had an AC/DC split at
+            // all - it lives in this file (not Program.ProfileHandlers.cs), so it was missed
+            // during the earlier 19-handler sweep. Writes to the base (AC) or _DC field depending
+            // on IsCurrentlyOnAC, same convention as those handlers.
             else if (sender == legionManager?.LegionPerformanceMode)
             {
-                Logger.Info($"Saving LegionPerformanceMode to profile {profileName}");
-                profileManager.CurrentProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
+                bool isOnAC = IsCurrentlyOnAC;
+                Logger.Info($"Saving LegionPerformanceMode to profile {profileName} ({(isOnAC ? "AC" : "DC")})");
+                if (isOnAC)
+                {
+                    profileManager.CurrentProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
+                }
+                else
+                {
+                    profileManager.CurrentProfile.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
+                }
                 // Also save directly to GlobalProfile to ensure it's always in sync
                 // This fixes an issue where the restore reads from GlobalProfile but save goes to CurrentProfile
                 if (profileManager.CurrentProfile.IsGlobalProfile)
                 {
-                    profileManager.GlobalProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
-                    Logger.Debug($"Also saved LegionPerformanceMode to GlobalProfile directly: {legionManager.LegionPerformanceMode.Value}");
+                    if (isOnAC)
+                    {
+                        profileManager.GlobalProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
+                    }
+                    else
+                    {
+                        profileManager.GlobalProfile.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
+                    }
+                    Logger.Debug($"Also saved LegionPerformanceMode to GlobalProfile directly: {legionManager.LegionPerformanceMode.Value} ({(isOnAC ? "AC" : "DC")})");
                 }
             }
             // Lighting settings — share a single Lighting flag

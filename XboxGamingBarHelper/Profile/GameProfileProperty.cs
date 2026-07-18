@@ -957,6 +957,18 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
+        public int? LegionPerformanceMode_DC
+        {
+            get { return value.LegionPerformanceMode_DC; }
+            set
+            {
+                if (this.value.LegionPerformanceMode_DC != value)
+                {
+                    this.value.LegionPerformanceMode_DC = value;
+                }
+            }
+        }
+
         // Lighting properties
         public int? LegionLightMode
         {

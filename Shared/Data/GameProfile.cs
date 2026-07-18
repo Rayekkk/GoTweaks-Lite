@@ -1314,6 +1314,26 @@ namespace Shared.Data
             }
         }
 
+        // [2.0 rebuild - AC/DC persistence follow-up] Found missing on-device 2026-07-18: unlike
+        // TDP/CPU/AMD/HDR/etc, LegionPerformanceMode was never given an AC/DC split at all in the
+        // original Phase 1 sweep - its live-edit save handler lives in a different file
+        // (Program.LegionControllerHandlers.cs, not Program.ProfileHandlers.cs) and was missed.
+        // Same null-means-no-override convention as the other _DC fields.
+        [XmlElement("LegionPerformanceMode_DC")]
+        private int? legionPerformanceModeDC;
+        public int? LegionPerformanceMode_DC
+        {
+            get { return legionPerformanceModeDC; }
+            set
+            {
+                if (legionPerformanceModeDC != value)
+                {
+                    legionPerformanceModeDC = value;
+                    Save();
+                }
+            }
+        }
+
         // ========== Legion Controller Lighting ==========
 
         /// <summary>
@@ -1516,6 +1536,7 @@ namespace Shared.Data
             legionVibration = null;
             legionVibrationMode = null;
             legionPerformanceMode = null;
+            legionPerformanceModeDC = null;
             // Lighting settings
             legionLightMode = null;
             legionLightColor = null;
