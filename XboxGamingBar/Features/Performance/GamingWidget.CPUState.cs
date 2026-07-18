@@ -44,6 +44,39 @@ namespace XboxGamingBar
     public sealed partial class GamingWidget
     {
 
+        // [2.0 rebuild - Faza C-CPU] Set while a helper push is being reflected into the (headless,
+        // unbound) Max/MinCPUStateComboBox. Guards the SelectionChanged handlers below so the
+        // programmatic ComboBox update doesn't echo straight back to the helper as a "user edit"
+        // (MaxCPUStateProperty/MinCPUStateProperty's OnValueSyncedFromHelper dispatch queues this
+        // update via Dispatcher.RunAsync, which can run after isApplyingHelperUpdate has already
+        // been reset - unlike the synchronous pipe-push path, so that flag alone isn't sufficient).
+        private bool isApplyingCPUStateFromHelper = false;
+
+        /// <summary>
+        /// Reflects a helper-pushed Max/Min CPU State value into the ComboBox. Called from
+        /// MaxCPUStateProperty/MinCPUStateProperty's OnValueSyncedFromHelper.
+        /// </summary>
+        internal void ApplyCPUStateFromHelper(bool isMax, int value)
+        {
+            if (MinCPUStateComboBox == null || MaxCPUStateComboBox == null) return;
+
+            isApplyingCPUStateFromHelper = true;
+            try
+            {
+                SetCPUStateComboBoxValue(isMax ? MaxCPUStateComboBox : MinCPUStateComboBox, value);
+                if (isMax)
+                {
+                    // allowAutoDisable:false - never stomp the just-pushed CPUBoost value or push
+                    // to the helper from here, same reasoning as the profile-load call site (#88 bug #4).
+                    UpdateCPUBoostEnabledState(allowAutoDisable: false);
+                }
+            }
+            finally
+            {
+                isApplyingCPUStateFromHelper = false;
+            }
+        }
+
         /// <summary>
         /// Initializes CPU State comboboxes with percentage values (5%, 10%, 15%... 100%)
         /// </summary>
@@ -111,7 +144,7 @@ namespace XboxGamingBar
             if (MinCPUStateComboBox == null || MaxCPUStateComboBox == null)
                 return;
 
-            if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync)
+            if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync || isApplyingCPUStateFromHelper)
                 return;
 
             int minValue = GetSelectedCPUStateValue(MinCPUStateComboBox);
@@ -138,7 +171,7 @@ namespace XboxGamingBar
             if (MinCPUStateComboBox == null || MaxCPUStateComboBox == null)
                 return;
 
-            if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync)
+            if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync || isApplyingCPUStateFromHelper)
                 return;
 
             int minValue = GetSelectedCPUStateValue(MinCPUStateComboBox);

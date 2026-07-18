@@ -82,8 +82,6 @@ namespace XboxGamingBar
         public int? RefreshRate { get; set; } = null;
         // Overlay Level (0=Off, 1-4 for RTSS/AMD)
         public int OverlayLevel { get; set; } = 0;
-        // CPU Affinity as "pCores,eCores" string
-        public string CPUAffinity { get; set; } = "";
 
         public PerformanceProfile Clone()
         {
@@ -115,8 +113,7 @@ namespace XboxGamingBar
                 HDREnabled = this.HDREnabled,
                 Resolution = this.Resolution,
                 RefreshRate = this.RefreshRate,
-                OverlayLevel = this.OverlayLevel,
-                CPUAffinity = this.CPUAffinity
+                OverlayLevel = this.OverlayLevel
             };
         }
     }
@@ -1235,8 +1232,8 @@ namespace XboxGamingBar
             deleteGameProfile = new DeleteGameProfileProperty();
             cpuBoost = new CPUBoostProperty(CPUBoostToggle, this);
             cpuEPP = new CPUEPPProperty(80, CPUEPPSlider, this);
-            maxCPUState = new MaxCPUStateProperty();
-            minCPUState = new MinCPUStateProperty();
+            maxCPUState = new MaxCPUStateProperty(this);
+            minCPUState = new MinCPUStateProperty(this);
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
             //limitGPUClock = new LimitGPUClockProperty(LimitGPUClockToggle, this);
             //gpuClockMin = new GPUClockMinProperty(GPUClockMinSlider, this);
@@ -2031,6 +2028,17 @@ namespace XboxGamingBar
             }
             if (osPowerMode != null)
                 osPowerMode.PropertyChanged += OSPowerMode_PropertyChanged;
+            // [2.0 rebuild - Faza C-CPU] CPUBoost/CPUEPP/MaxCPUState/MinCPUState are now
+            // helper-authoritative (LoadProfileSettings no longer seeds/pushes them) - same
+            // resync as FPSLimit above, so the Profiles-tab card snapshot stays accurate.
+            if (cpuBoost != null)
+                cpuBoost.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            if (cpuEPP != null)
+                cpuEPP.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            if (maxCPUState != null)
+                maxCPUState.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
+            if (minCPUState != null)
+                minCPUState.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             if (resolution != null)
             {
                 resolution.PropertyChanged += QuickSettingsProperty_Changed;

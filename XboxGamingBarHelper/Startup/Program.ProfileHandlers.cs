@@ -56,7 +56,6 @@ namespace XboxGamingBarHelper
             public static bool Resolution = false;
             public static bool RefreshRate = false;
             public static bool OverlayLevel = false;
-            public static bool CPUAffinity = false;
             public static bool NintendoLayout = false;
             public static bool Vibration = false;
             public static bool Lighting = false;
@@ -81,7 +80,6 @@ namespace XboxGamingBarHelper
                 if (cfg.TryGetValue("Resolution", out var v10)) ProfileSaveFlagsState.Resolution = v10;
                 if (cfg.TryGetValue("RefreshRate", out var v11)) ProfileSaveFlagsState.RefreshRate = v11;
                 if (cfg.TryGetValue("OverlayLevel", out var v13)) ProfileSaveFlagsState.OverlayLevel = v13;
-                if (cfg.TryGetValue("CPUAffinity", out var v14)) ProfileSaveFlagsState.CPUAffinity = v14;
                 if (cfg.TryGetValue("NintendoLayout", out var v15)) ProfileSaveFlagsState.NintendoLayout = v15;
                 if (cfg.TryGetValue("Vibration", out var v16)) ProfileSaveFlagsState.Vibration = v16;
                 if (cfg.TryGetValue("Lighting", out var v17)) ProfileSaveFlagsState.Lighting = v17;
@@ -721,12 +719,12 @@ namespace XboxGamingBarHelper
         // exists on both sides (GameProfile.cs field + a live helper Function/property of the
         // MATCHING type) and whose save-flag was already scaffolded in ProfileSaveFlagsState but
         // never actually wired to a PropertyChanged handler. Same RouteProfileSave pattern as TDP
-        // above. (OSPowerMode/OverlayLevel/CPUAffinity were investigated and excluded - see
+        // above. (OSPowerMode/OverlayLevel were investigated and excluded - see
         // win32-2.0-migration.md: OSPowerMode's GameProfile field is a string left over from the
         // removed AC/DC Power Plan feature, type-mismatched with the live int power-slider
         // property; OverlayLevel is superseded by slice 1's helper-authoritative OSD for the RTSS
-        // case and has no helper property at all for the AMD-overlay-cycling case; CPUAffinity is
-        // unimplemented on both sides.)
+        // case and has no helper property at all for the AMD-overlay-cycling case. CPUAffinity was
+        // fully unimplemented on both sides - deleted rather than excluded, see the dead-code sweep.)
 
         private static void FPSLimit_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {

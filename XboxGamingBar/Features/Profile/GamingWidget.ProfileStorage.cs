@@ -86,7 +86,6 @@ namespace XboxGamingBar
             else
                 container.Values.Remove("RefreshRate");
             container.Values["OverlayLevel"] = profile.OverlayLevel;
-            container.Values["CPUAffinity"] = profile.CPUAffinity;
             // Last-saved timestamp drives the "modified Nm/h/d ago" line on the profile
             // card and the "Last Modified" sort option in the Profiles tab. Stored as
             // UTC ticks so it survives timezone changes.
@@ -140,7 +139,6 @@ namespace XboxGamingBar
                 profile.Resolution = container.Values.ContainsKey("Resolution") ? (string)container.Values["Resolution"] : "";
                 profile.RefreshRate = container.Values.ContainsKey("RefreshRate") ? (int?)container.Values["RefreshRate"] : null;
                 profile.OverlayLevel = container.Values.ContainsKey("OverlayLevel") ? (int)container.Values["OverlayLevel"] : 0;
-                profile.CPUAffinity = container.Values.ContainsKey("CPUAffinity") ? (string)container.Values["CPUAffinity"] : "";
 
                 Logger.Info($"Loaded {profileName} profile from storage");
             }

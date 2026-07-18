@@ -24,19 +24,12 @@ namespace XboxGamingBar.Data
 
         /// <summary>
         /// Sends the button mapping JSON to the helper. Sends even for "Disabled" state so the
-        /// helper clears the button on the controller. force bypasses the json==Value dedup for
-        /// cold-start recovery: the disconnected constructor-time send latches Value even though
-        /// the pipe write was suppressed (not yet connected), so a plain re-send would no-op.
+        /// helper clears the button on the controller.
         /// </summary>
-        public void SendMapping(string json, bool force = false)
+        public void SendMapping(string json)
         {
             if (json == null) return;
-            if (force)
-            {
-                Logger.Info($"{Function} force-sending mapping: {json}");
-                ForceSetValue(json);
-            }
-            else if (json != Value)
+            if (json != Value)
             {
                 Logger.Info($"{Function} sending mapping: {json}");
                 SetValue(json);

@@ -583,24 +583,6 @@ namespace Shared.Data
             }
         }
 
-        /// <summary>
-        /// CPU Affinity configuration as "activePCores,activeECores" string
-        /// </summary>
-        [XmlElement("CPUAffinity")]
-        private string cpuAffinity;
-        public string CPUAffinity
-        {
-            get { return cpuAffinity; }
-            set
-            {
-                if (cpuAffinity != value)
-                {
-                    cpuAffinity = value;
-                    Save();
-                }
-            }
-        }
-
         // ========== Legion Controller Remapping ==========
 
         [XmlElement("LegionButtonY1")]
@@ -1238,9 +1220,8 @@ namespace Shared.Data
             radeonChill = null;
             radeonChillMinFPS = null;
             radeonChillMaxFPS = null;
-            // Overlay and CPU affinity
+            // Overlay
             overlayLevel = null;
-            cpuAffinity = null;
             // Legion controller remapping (shared AC/DC)
             legionButtonY1 = null;
             legionButtonY2 = null;

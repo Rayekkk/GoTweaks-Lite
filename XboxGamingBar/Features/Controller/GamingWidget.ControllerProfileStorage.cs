@@ -1574,38 +1574,34 @@ namespace XboxGamingBar
         /// This method is only called from user-initiated changes (ControllerSettingChanged
         /// already has guards for profile loading), so we always want to send.
         /// </summary>
-        private void SendButtonMappingsToHelper(ControllerProfile profile, bool force = false)
+        private void SendButtonMappingsToHelper(ControllerProfile profile)
         {
             try
             {
                 // Always send button mappings, including "Disabled" (Type=0, GamepadAction=0)
                 // When user explicitly sets a button to Disabled, we need to send that to
                 // the helper so it clears the button mapping on the controller.
-                // force=true bypasses the per-property json==Value dedup so cold-start recovery
-                // (ResendActiveControllerProfileToHelper) actually re-pushes - the early sends
-                // during ApplyControllerProfile latch Value even though the pipe write was
-                // suppressed (not yet connected).
                 if (profile.ButtonY1 != null)
-                    legionButtonY1?.SendMapping(profile.ButtonY1.ToJson(), force);
+                    legionButtonY1?.SendMapping(profile.ButtonY1.ToJson());
                 if (profile.ButtonY2 != null)
-                    legionButtonY2?.SendMapping(profile.ButtonY2.ToJson(), force);
+                    legionButtonY2?.SendMapping(profile.ButtonY2.ToJson());
                 if (profile.ButtonY3 != null)
-                    legionButtonY3?.SendMapping(profile.ButtonY3.ToJson(), force);
+                    legionButtonY3?.SendMapping(profile.ButtonY3.ToJson());
                 if (profile.ButtonM1 != null)
-                    legionButtonM1?.SendMapping(profile.ButtonM1.ToJson(), force);
+                    legionButtonM1?.SendMapping(profile.ButtonM1.ToJson());
                 if (profile.ButtonM2 != null)
-                    legionButtonM2?.SendMapping(profile.ButtonM2.ToJson(), force);
+                    legionButtonM2?.SendMapping(profile.ButtonM2.ToJson());
                 if (profile.ButtonM3 != null)
-                    legionButtonM3?.SendMapping(profile.ButtonM3.ToJson(), force);
+                    legionButtonM3?.SendMapping(profile.ButtonM3.ToJson());
                 if (profile.ButtonDesktop != null)
-                    legionButtonDesktop?.SendMapping(profile.ButtonDesktop.ToJson(), force);
+                    legionButtonDesktop?.SendMapping(profile.ButtonDesktop.ToJson());
                 if (profile.ButtonPage != null)
-                    legionButtonPage?.SendMapping(profile.ButtonPage.ToJson(), force);
+                    legionButtonPage?.SendMapping(profile.ButtonPage.ToJson());
 
                 // Gamepad-button-mapping dict - live-edit send only (see
                 // SendGamepadButtonMappingsToHelper's doc comment; the property itself is
                 // helper-authoritative since slice 8, this is not a "widget-owned channel").
-                SendGamepadButtonMappingsToHelper(profile, force);
+                SendGamepadButtonMappingsToHelper(profile);
             }
             catch (Exception ex)
             {
@@ -1623,33 +1619,21 @@ namespace XboxGamingBar
         /// (called from the live-edit branch of SendButtonMappingsToHelper, and from
         /// SaveAndSendGamepadMappings for the Nintendo/Desktop-preset toggle handlers), not a seed.
         /// </summary>
-        private void SendGamepadButtonMappingsToHelper(ControllerProfile profile, bool force = false)
+        private void SendGamepadButtonMappingsToHelper(ControllerProfile profile)
         {
             // During profile loading, use gamepadButtonMappings (includes desktop control changes)
             // Otherwise use profile.GamepadButtonMappings
             var mappingsToSend = isLoadingControllerProfile ? gamepadButtonMappings : profile.GamepadButtonMappings;
             if (mappingsToSend != null && mappingsToSend.Count > 0)
             {
-                var gamepadMappingsJson = SerializeGamepadButtonMappings(mappingsToSend);
-                if (force) legionGamepadMapping?.ForceSetValue(gamepadMappingsJson);
-                else legionGamepadMapping?.SetValue(gamepadMappingsJson);
+                legionGamepadMapping?.SetValue(SerializeGamepadButtonMappings(mappingsToSend));
             }
             else
             {
-                if (force) legionGamepadMapping?.ForceSetValue("");
-                else legionGamepadMapping?.SetValue("");
+                legionGamepadMapping?.SetValue("");
             }
         }
 
-        /// <summary>
-        /// Re-pushes the currently active controller profile (button mappings, controller
-        /// settings, lighting) to the helper. Called from OnPipeConnectedAsync to recover
-        /// from the cold-start race where ApplyControllerProfile fires during widget
-        /// constructor before App.IsConnected becomes true — those early sends silently
-        /// drop into a not-yet-connected pipe and the helper never learns the user's
-        /// saved button remaps / gyro / vibration / triggers settings until the next
-        /// manual interaction.
-        /// </summary>
         /// <summary>
         /// Sends lighting settings to the helper via IPC
         /// </summary>

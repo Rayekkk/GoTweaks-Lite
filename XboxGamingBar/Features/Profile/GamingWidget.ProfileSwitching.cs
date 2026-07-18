@@ -327,19 +327,6 @@ namespace XboxGamingBar
             {
                 var profile = GetProfile(profileName);
 
-                // For Legion devices: check if we need to switch to Custom mode BEFORE sending any TDP-related settings
-                // This prevents TDP/TDPBoost/EPP from being ignored when helper is still in preset mode
-                bool legionSwitchingToCustom = false;
-                if (legionGoDetected?.Value == true && !isInitialSync)
-                {
-                    int profileMode = profile.LegionPerformanceMode;
-                    int modeIndex = GetProfileTDPModeIndex(profile);
-                    if (modeIndex >= 0 && legionPerformanceMode?.Value != profileMode)
-                    {
-                        legionSwitchingToCustom = profileMode == 255;
-                    }
-                }
-
                 // Apply only enabled settings to UI controls
                 if (SaveTDP)
                 {
@@ -378,62 +365,23 @@ namespace XboxGamingBar
                         tdp?.ForceSetValue((int)profile.TDP);
                     }
                 }
-                if (SaveCPUBoost)
-                {
-                    CPUBoostToggle.IsOn = profile.CPUBoost;
-                    // Send to helper explicitly — skip when helper triggered the switch
-                    if (!isApplyingHelperUpdate)
-                    {
-                        cpuBoost?.SetValue(profile.CPUBoost);
-                    }
-                }
-                if (SaveCPUEPP)
-                {
-                    // Set IsUpdatingUI to prevent EPP slider debounce timer
-                    if (cpuEPP != null) cpuEPP.IsUpdatingUI = true;
-                    try
-                    {
-                        CPUEPPSlider.Value = profile.CPUEPP;
-                    }
-                    finally
-                    {
-                        if (cpuEPP != null) cpuEPP.IsUpdatingUI = false;
-                    }
-                    // Send to helper explicitly (cast to int for property type)
-                    // For Legion devices switching to Custom mode: defer sending to helper until mode change is applied
-                    // Skip when helper triggered the switch
-                    if (!legionSwitchingToCustom && !isApplyingHelperUpdate)
-                    {
-                        cpuEPP?.SetValue((int)profile.CPUEPP);
-                    }
-                }
-                if (SaveCPUState)
-                {
-                    SetCPUStateComboBoxValue(MaxCPUStateComboBox, profile.MaxCPUState);
-                    SetCPUStateComboBoxValue(MinCPUStateComboBox, profile.MinCPUState);
-                    // Send to helper explicitly — skip when helper triggered the switch
-                    if (!isApplyingHelperUpdate)
-                    {
-                        maxCPUState?.SetValue(profile.MaxCPUState);
-                        minCPUState?.SetValue(profile.MinCPUState);
-                    }
-                    // Update CPU Boost enabled state based on Max CPU State.
-                    // allowAutoDisable:false — don't let a transient/stale combo value stomp the
-                    // CPUBoost we just loaded from the profile or push false to the helper (#88 bug #4).
-                    UpdateCPUBoostEnabledState(allowAutoDisable: false);
-                }
-                // [2.0 rebuild - Faza C3] The 6 AMD Radeon toggles + FPSLimit are now
-                // helper-authoritative (Faza C1/C2 wired their RouteProfileSave persistence + apply-
-                // on-switch in the helper's RunningGame_PropertyChanged/RestoreGlobalProfileSettings).
-                // LoadProfileSettings no longer seeds the UI controls from this widget's LocalSettings
-                // PerformanceProfile nor ForceSetValue-pushes to the helper here - that was an
-                // unconditional overwrite (no isApplyingHelperUpdate guard, unlike TDP/CPUBoost/CPUEPP/
-                // CPUState above) that would clobber whatever the helper just applied on every game
-                // switch. The controls now reflect the helper's push via their own bound
-                // WidgetToggleProperty/WidgetSliderProperty; ProfileTrackedProperty_ChangedResyncProfile
-                // (wired in GamingWidget.xaml.cs) keeps the Profiles-tab card's LocalSettings snapshot
-                // in sync with that push so SaveCurrentSettingsToProfile's read of these controls still
-                // finds the correct value for profile-card display.
+                // [2.0 rebuild - Faza C-CPU] CPUBoost/CPUEPP/MaxCPUState/MinCPUState, and Faza C3's
+                // 6 AMD Radeon toggles + FPSLimit, are all now helper-authoritative (the helper
+                // already independently applies all of them in RunningGame_PropertyChanged /
+                // RestoreGlobalProfileSettings / CurrentProfile_PropertyChanged / the AC-DC power-
+                // source handler). LoadProfileSettings no longer seeds these UI controls from this
+                // widget's LocalSettings PerformanceProfile nor ForceSetValue-pushes to the helper
+                // here - CPUBoost/CPUEPP/CPUState's old unconditional-except-isApplyingHelperUpdate
+                // push was a live clobber on every helper-autonomous switch (game close, AC/DC
+                // change) that this widget push could never correctly race against; the AMD/FPSLimit
+                // half was fixed the same way in Faza C3 (see that commit for the exact clobber
+                // symptom). The controls now reflect the helper's push via their own bound
+                // WidgetToggleProperty/WidgetSliderProperty (CPUBoost/CPUEPP) or the new
+                // OnValueSyncedFromHelper hook (the headless Max/MinCPUState, see
+                // GamingWidget.CPUState.cs's ApplyCPUStateFromHelper); ProfileTrackedProperty_
+                // ChangedResyncProfile (wired in GamingWidget.xaml.cs) keeps the Profiles-tab card's
+                // LocalSettings snapshot in sync with that push so SaveCurrentSettingsToProfile's
+                // read of these controls still finds the correct value for profile-card display.
                 if (SaveOSPowerMode)
                 {
                     isLoadingOSPowerMode = true;
