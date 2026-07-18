@@ -971,6 +971,14 @@ namespace XboxGamingBarHelper.AMD
             }
         }
 
+        // [AFMF-forces-AntiLag fix] Tracks whether WE forced Anti-Lag on because of AFMF, so it
+        // can be restored to its prior (off) state when AFMF turns back off. Without this, Anti-Lag
+        // stayed stuck on after disabling AFMF (found on-device 2026-07-18) - there was no "AFMF
+        // turned off" branch at all, only the force-on one. Only restores when WE were the ones who
+        // forced it - if the user had Anti-Lag on independently before enabling AFMF, turning AFMF
+        // off must not touch it.
+        private bool antiLagForcedByAfmf = false;
+
         private void AmdFluidMotionFrameEnabled(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (amdFluidMotionFrameEnabled)
@@ -978,12 +986,19 @@ namespace XboxGamingBarHelper.AMD
                 if (amdRadeonAntiLagSupported && !amdRadeonAntiLagEnabled)
                 {
                     Logger.Info($"AMD Fluid Motion Frame enabled, Radeon Anti-Lag should be enabled too.");
+                    antiLagForcedByAfmf = true;
                     amdRadeonAntiLagEnabled.SetValue(true);
                 }
                 else
                 {
                     Logger.Info($"AMD Fluid Motion Frame enabled but Radeon Anti-Lag is not supported or already enabled.");
                 }
+            }
+            else if (antiLagForcedByAfmf)
+            {
+                Logger.Info($"AMD Fluid Motion Frame disabled - restoring Radeon Anti-Lag to its prior (off) state.");
+                antiLagForcedByAfmf = false;
+                amdRadeonAntiLagEnabled.SetValue(false);
             }
         }
 

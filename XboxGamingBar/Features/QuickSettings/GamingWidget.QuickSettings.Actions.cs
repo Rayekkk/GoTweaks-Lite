@@ -568,6 +568,14 @@ namespace XboxGamingBar
 
         private void ToggleAntiLag()
         {
+            // Anti-Lag is mandatory (and its tile/toggle locked) whenever AFMF is on - see
+            // UpdateAntiLagLockState/the Quick Settings tile's IsEnabled. Guard here too in case
+            // something other than a tile tap reaches this (gamepad nav, etc).
+            if (amdFluidMotionFrameEnabled?.Value ?? false)
+            {
+                Logger.Debug("Ignoring Anti-Lag toggle - locked on while AFMF is enabled");
+                return;
+            }
             if (amdRadeonAntiLagEnabled != null && (amdRadeonAntiLagSupported?.Value ?? false))
             {
                 bool newValue = !amdRadeonAntiLagEnabled.Value;

@@ -640,15 +640,22 @@ namespace XboxGamingBar
                     rsrTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
                 }
 
-                // Anti-Lag tile
+                // Anti-Lag tile. Forced on (and locked) whenever AFMF is on - a real AMD driver
+                // requirement, not a free user choice in that state (mirrors the Profiles-tab
+                // toggle's own grey-out, GamingWidget.QuickSettings.Actions.cs's
+                // UpdateAntiLagLockState). Grey out the TILE (IsEnabled=false) so tapping it can't
+                // fight the forced state, but keep showing the red "On" visuals - Anti-Lag really
+                // is on in that state, this is a lock, not an "off" indicator.
                 if (qsTileMap.TryGetValue("AntiLag", out var antiLagTile) && antiLagTile.TileButton != null)
                 {
                     bool supported = amdRadeonAntiLagSupported?.Value ?? false;
                     bool enabled = amdRadeonAntiLagEnabled?.Value ?? false;
+                    bool lockedByAfmf = amdFluidMotionFrameEnabled?.Value ?? false;
                     antiLagTile.StateText.Text = !supported ? "N/A" : (enabled ? "On" : "Off");
                     antiLagTile.StateText.Foreground = enabled ? tileSeverityRedBrush : offForeground;
                     if (antiLagTile.AccentBar != null) antiLagTile.AccentBar.Background = enabled ? tileSeverityRedBrush : tileBarOffBrush;
                     antiLagTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
+                    antiLagTile.TileButton.IsEnabled = !lockedByAfmf;
                 }
 
                 // Radeon Chill tile
