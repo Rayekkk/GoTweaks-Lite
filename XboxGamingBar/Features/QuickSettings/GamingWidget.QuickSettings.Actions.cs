@@ -800,6 +800,9 @@ namespace XboxGamingBar
             if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
             {
                 SaveCurrentSettingsToProfile(currentProfileName);
+                // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's comment
+                // below - same missing-resync gap, found in an independent audit 2026-07-19.
+                SendPowerSourceProfileValuesToHelper();
             }
         }
 
@@ -854,6 +857,14 @@ namespace XboxGamingBar
             if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
             {
                 SaveCurrentSettingsToProfile(currentProfileName);
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19: like the Custom TDP sliders before their own fix, FPS Limit's 3
+                // custom-wired handlers (this one, the debounced slider tick, and the Quick
+                // Settings tile cycle above) saved only to the widget-local profile and never
+                // resynced to the helper's persisted AC/DC GameProfile - so a live FPS Limit
+                // edit could be silently reverted by a stale profile value on the next AC/DC
+                // transition or helper restart, same failure shape as the TDP bug (d2f9db0).
+                SendPowerSourceProfileValuesToHelper();
             }
         }
 
@@ -1013,6 +1024,9 @@ namespace XboxGamingBar
                 if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
                 {
                     SaveCurrentSettingsToProfile(currentProfileName);
+                    // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's
+                    // comment above - same missing-resync gap.
+                    SendPowerSourceProfileValuesToHelper();
                 }
             }
         }

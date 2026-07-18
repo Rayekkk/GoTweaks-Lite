@@ -360,10 +360,20 @@ namespace XboxGamingBarHelper
 
             Logger.Info($"Applying global profile settings: TDP={profileManager.GlobalProfile.TDP}, CPUBoost={profileManager.GlobalProfile.CPUBoost}, EPP={profileManager.GlobalProfile.CPUEPP}");
 
+            // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+            // 2026-07-19: this whole method used to read ONLY the base (AC) fields, regardless of
+            // the actual live power state - so restoring the global profile (e.g. on game close)
+            // while genuinely on battery applied the AC-side values instead of the configured DC
+            // overrides. No AC/DC transition event fires to correct it afterward (the power state
+            // didn't change). Same resolve pattern as Program.PowerSourceHandler.cs's
+            // ApplyPowerSourceChangeInternal.
+            bool isOnAC = IsCurrentlyOnAC;
+            var globalProfile = profileManager.GlobalProfile;
+
             // Restore LegionPerformanceMode from global profile if set
             if (legionManager != null)
             {
-                int? savedMode = profileManager.GlobalProfile.LegionPerformanceMode;
+                int? savedMode = isOnAC ? globalProfile.LegionPerformanceMode : (globalProfile.LegionPerformanceMode_DC ?? globalProfile.LegionPerformanceMode);
                 if (savedMode.HasValue)
                 {
                     int currentMode = legionManager.LegionPerformanceMode.Value;
@@ -375,7 +385,10 @@ namespace XboxGamingBarHelper
                 }
             }
 
-            performanceManager.TDP.SetProfileValue(profileManager.GlobalProfile.TDP);
+            int targetTdp = isOnAC ? globalProfile.TDP : (globalProfile.TDP_DC ?? globalProfile.TDP);
+            int targetTdpFast = isOnAC ? globalProfile.TDPFast : (globalProfile.TDPFast_DC ?? globalProfile.TDPFast);
+            int targetTdpPeak = isOnAC ? globalProfile.TDPPeak : (globalProfile.TDPPeak_DC ?? globalProfile.TDPPeak);
+            performanceManager.TDP.SetProfileValue(targetTdp);
             // [TDP Custom-mode fix] Same rationale as RunningGame_PropertyChanged's identical
             // addition - the flat TDP.SetProfileValue call is a no-op for the actual SPPT/FPPT in
             // Custom mode (ReassertCustomTDP re-pushes the PREVIOUS game's cached triplet, ignoring
@@ -383,32 +396,36 @@ namespace XboxGamingBarHelper
             // already-mode-switch-safe SetCustomTDP path the widget's sliders use.
             if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
             {
-                legionManager.SetCustomTDP(profileManager.GlobalProfile.TDP, profileManager.GlobalProfile.TDPFast, profileManager.GlobalProfile.TDPPeak);
+                legionManager.SetCustomTDP(targetTdp, targetTdpFast, targetTdpPeak);
             }
-            powerManager.CPUBoost.SetValue(profileManager.GlobalProfile.CPUBoost);
-            powerManager.CPUEPP.SetValue(profileManager.GlobalProfile.CPUEPP);
-            powerManager.MaxCPUState.SetValue(profileManager.GlobalProfile.MaxCPUState);
-            powerManager.MinCPUState.SetValue(profileManager.GlobalProfile.MinCPUState);
+            powerManager.CPUBoost.SetValue(isOnAC ? globalProfile.CPUBoost : (globalProfile.CPUBoost_DC ?? globalProfile.CPUBoost));
+            powerManager.CPUEPP.SetValue(isOnAC ? globalProfile.CPUEPP : (globalProfile.CPUEPP_DC ?? globalProfile.CPUEPP));
+            powerManager.MaxCPUState.SetValue(isOnAC ? globalProfile.MaxCPUState : (globalProfile.MaxCPUState_DC ?? globalProfile.MaxCPUState));
+            powerManager.MinCPUState.SetValue(isOnAC ? globalProfile.MinCPUState : (globalProfile.MinCPUState_DC ?? globalProfile.MinCPUState));
             // [2.0 rebuild - Faza C1] Nullable-gated (code review fix, also required to compile
             // now that FPSLimit/HDREnabled are int?/bool?).
-            if (profileManager.GlobalProfile.FPSLimit.HasValue)
+            int? targetFpsLimit = isOnAC ? globalProfile.FPSLimit : (globalProfile.FPSLimit_DC ?? globalProfile.FPSLimit);
+            if (targetFpsLimit.HasValue)
             {
-                rtssManager.FPSLimit.SetValue(profileManager.GlobalProfile.FPSLimit.Value);
+                rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
             }
-            if (profileManager.GlobalProfile.HDREnabled.HasValue)
+            bool? targetHdr = isOnAC ? globalProfile.HDREnabled : (globalProfile.HDREnabled_DC ?? globalProfile.HDREnabled);
+            if (targetHdr.HasValue)
             {
-                systemManager.HDREnabled.SetValue(profileManager.GlobalProfile.HDREnabled.Value);
+                systemManager.HDREnabled.SetValue(targetHdr.Value);
             }
-            if (!string.IsNullOrEmpty(profileManager.GlobalProfile.Resolution))
+            string targetResolution = isOnAC ? globalProfile.Resolution : (globalProfile.Resolution_DC ?? globalProfile.Resolution);
+            if (!string.IsNullOrEmpty(targetResolution))
             {
-                systemManager.Resolution.SetValue(profileManager.GlobalProfile.Resolution);
+                systemManager.Resolution.SetValue(targetResolution);
             }
-            if (profileManager.GlobalProfile.RefreshRate.HasValue)
+            int? targetRefreshRate = isOnAC ? globalProfile.RefreshRate : (globalProfile.RefreshRate_DC ?? globalProfile.RefreshRate);
+            if (targetRefreshRate.HasValue)
             {
-                systemManager.RefreshRate.SetValue(profileManager.GlobalProfile.RefreshRate.Value);
+                systemManager.RefreshRate.SetValue(targetRefreshRate.Value);
             }
             // [2.0 rebuild - Faza C2]
-            ApplyAMDFeaturesFromProfile(profileManager.GlobalProfile);
+            ApplyAMDFeaturesFromProfile(globalProfile, isOnAC);
             profileManager.PerGameProfile.SetValue(false);
 
             // Apply Legion controller settings from global profile
@@ -436,10 +453,15 @@ namespace XboxGamingBarHelper
         /// the losing side of a conflict (RIS, then AntiLag/Boost) before the winning side (RSR, then
         /// Chill), so the driver never briefly sees both enabled.
         /// </summary>
-        // [2.0 rebuild - AC/DC persistence] isOnAC defaults to true so the two pre-existing call
-        // sites (RestoreGlobalProfileSettings, RunningGame_PropertyChanged - neither AC/DC-aware)
-        // are source- and behavior-compatible: they keep reading the base (AC) fields exactly as
-        // before. Program.PowerSourceHandler.cs's AC/DC reapply passes the real power state.
+        // [2.0 rebuild - AC/DC persistence] isOnAC defaults to true only as a safety fallback for
+        // any future caller that doesn't have a real power-state reading handy. All FOUR profile-
+        // apply call sites (RestoreGlobalProfileSettings, CurrentProfile_PropertyChanged,
+        // PerGameProfile_PropertyChanged, RunningGame_PropertyChanged) now pass IsCurrentlyOnAC
+        // explicitly - found in an independent audit 2026-07-19 that they used to always read the
+        // base (AC) fields regardless of actual power state, so e.g. launching a game while
+        // already on battery applied the AC-side AMD settings instead of the configured DC
+        // overrides (no AC/DC transition event fires to correct it, since the power state didn't
+        // change). Program.PowerSourceHandler.cs's real AC/DC reapply also passes the real state.
         private static void ApplyAMDFeaturesFromProfile(Shared.Data.GameProfile profile, bool isOnAC = true)
         {
             bool? fluidMotionFrames = isOnAC ? profile.FluidMotionFrames : (profile.FluidMotionFrames_DC ?? profile.FluidMotionFrames);
@@ -513,11 +535,19 @@ namespace XboxGamingBarHelper
                         isApplyingProfile = true;
                         Logger.Info($"Profile changed to {profileManager.CurrentProfile.GameId.Name}, apply it.");
 
+                        // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                        // 2026-07-19: this whole block used to read ONLY the base (AC) fields off
+                        // profileManager.CurrentProfile, regardless of the actual live power state -
+                        // same gap as RestoreGlobalProfileSettings/RunningGame_PropertyChanged, fixed
+                        // the same way.
+                        bool isOnAC = IsCurrentlyOnAC;
+                        var cp = profileManager.CurrentProfile;
+
                         // For per-game profiles, apply the saved LegionPerformanceMode if set
                         // This ensures the correct TDP mode is applied when the game is detected
-                        if (profileManager.CurrentProfile.Use && legionManager != null)
+                        if (cp.Use && legionManager != null)
                         {
-                            int? savedMode = profileManager.CurrentProfile.LegionPerformanceMode;
+                            int? savedMode = isOnAC ? cp.LegionPerformanceMode : (cp.LegionPerformanceMode_DC ?? cp.LegionPerformanceMode);
                             if (savedMode.HasValue)
                             {
                                 int currentMode = legionManager.LegionPerformanceMode.Value;
@@ -546,7 +576,10 @@ namespace XboxGamingBarHelper
 
                         // Use SetProfileValue to ensure profile TDP takes precedence over in-flight widget messages
                         // All settings applied atomically under lock to prevent cross-contamination
-                        performanceManager.TDP.SetProfileValue(profileManager.CurrentProfile.TDP);
+                        int targetTdp = isOnAC ? cp.TDP : (cp.TDP_DC ?? cp.TDP);
+                        int targetTdpFast = isOnAC ? cp.TDPFast : (cp.TDPFast_DC ?? cp.TDPFast);
+                        int targetTdpPeak = isOnAC ? cp.TDPPeak : (cp.TDPPeak_DC ?? cp.TDPPeak);
+                        performanceManager.TDP.SetProfileValue(targetTdp);
                         // [TDP Custom-mode fix] Same rationale as RunningGame_PropertyChanged/
                         // RestoreGlobalProfileSettings' identical addition - the flat
                         // TDP.SetProfileValue call is a no-op for the actual SPPT/FPPT in Custom mode.
@@ -554,13 +587,13 @@ namespace XboxGamingBarHelper
                         // the block just above (SetPerformanceMode updates it synchronously).
                         if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
                         {
-                            legionManager.SetCustomTDP(profileManager.CurrentProfile.TDP, profileManager.CurrentProfile.TDPFast, profileManager.CurrentProfile.TDPPeak);
+                            legionManager.SetCustomTDP(targetTdp, targetTdpFast, targetTdpPeak);
                         }
-                        powerManager.CPUBoost.SetValue(profileManager.CurrentProfile.CPUBoost);
-                        powerManager.CPUEPP.SetValue(profileManager.CurrentProfile.CPUEPP);
-                        powerManager.MaxCPUState.SetValue(profileManager.CurrentProfile.MaxCPUState);
-                        powerManager.MinCPUState.SetValue(profileManager.CurrentProfile.MinCPUState);
-                        profileManager.PerGameProfile.SetValue(profileManager.CurrentProfile.Use);
+                        powerManager.CPUBoost.SetValue(isOnAC ? cp.CPUBoost : (cp.CPUBoost_DC ?? cp.CPUBoost));
+                        powerManager.CPUEPP.SetValue(isOnAC ? cp.CPUEPP : (cp.CPUEPP_DC ?? cp.CPUEPP));
+                        powerManager.MaxCPUState.SetValue(isOnAC ? cp.MaxCPUState : (cp.MaxCPUState_DC ?? cp.MaxCPUState));
+                        powerManager.MinCPUState.SetValue(isOnAC ? cp.MinCPUState : (cp.MinCPUState_DC ?? cp.MinCPUState));
+                        profileManager.PerGameProfile.SetValue(cp.Use);
 
                         // Apply Legion controller settings from profile (both global and per-game)
                         if (legionManager != null)
@@ -611,11 +644,15 @@ namespace XboxGamingBarHelper
                     Logger.Info($"Enable per-game profile for {systemManager.RunningGame.Value.GameId}");
                     gameProfile.Use = true;
 
+                    // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                    // 2026-07-19: same gap as RestoreGlobalProfileSettings/CurrentProfile_PropertyChanged.
+                    bool isOnAC = IsCurrentlyOnAC;
+
                     // Apply saved LegionPerformanceMode from game profile, or default to Custom (255) for new profiles.
                     // Previously this always switched to Custom, which overrode user-saved preset modes.
                     if (legionManager != null)
                     {
-                        int? savedMode = gameProfile.LegionPerformanceMode;
+                        int? savedMode = isOnAC ? gameProfile.LegionPerformanceMode : (gameProfile.LegionPerformanceMode_DC ?? gameProfile.LegionPerformanceMode);
                         if (savedMode.HasValue && savedMode.Value > 0)
                         {
                             if (legionManager.LegionPerformanceMode.Value != savedMode.Value)
@@ -640,11 +677,11 @@ namespace XboxGamingBarHelper
                     // must apply settings explicitly here (same pattern as RestoreGlobalProfileSettings).
                     profileManager.CurrentProfile.SetValue(gameProfile);
 
-                    performanceManager.TDP.SetProfileValue(gameProfile.TDP);
-                    powerManager.CPUBoost.SetValue(gameProfile.CPUBoost);
-                    powerManager.CPUEPP.SetValue(gameProfile.CPUEPP);
-                    powerManager.MaxCPUState.SetValue(gameProfile.MaxCPUState);
-                    powerManager.MinCPUState.SetValue(gameProfile.MinCPUState);
+                    performanceManager.TDP.SetProfileValue(isOnAC ? gameProfile.TDP : (gameProfile.TDP_DC ?? gameProfile.TDP));
+                    powerManager.CPUBoost.SetValue(isOnAC ? gameProfile.CPUBoost : (gameProfile.CPUBoost_DC ?? gameProfile.CPUBoost));
+                    powerManager.CPUEPP.SetValue(isOnAC ? gameProfile.CPUEPP : (gameProfile.CPUEPP_DC ?? gameProfile.CPUEPP));
+                    powerManager.MaxCPUState.SetValue(isOnAC ? gameProfile.MaxCPUState : (gameProfile.MaxCPUState_DC ?? gameProfile.MaxCPUState));
+                    powerManager.MinCPUState.SetValue(isOnAC ? gameProfile.MinCPUState : (gameProfile.MinCPUState_DC ?? gameProfile.MinCPUState));
                 }
                 else
                 {
@@ -977,9 +1014,16 @@ namespace XboxGamingBarHelper
 
                             // Apply all settings explicitly. CurrentProfile_PropertyChanged is blocked
                             // by isApplyingProfile, so we must apply here (same as PerGameProfile_PropertyChanged).
+                            // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                            // 2026-07-19: this whole block used to read ONLY the base (AC) fields off
+                            // runningGameProfile, regardless of the actual live power state - so a game
+                            // launching while genuinely on battery got the AC-side settings instead of
+                            // the configured DC overrides. Same gap/fix shape as
+                            // RestoreGlobalProfileSettings/CurrentProfile_PropertyChanged.
+                            bool isOnAC = IsCurrentlyOnAC;
                             if (legionManager != null)
                             {
-                                int? savedMode = runningGameProfile.LegionPerformanceMode;
+                                int? savedMode = isOnAC ? runningGameProfile.LegionPerformanceMode : (runningGameProfile.LegionPerformanceMode_DC ?? runningGameProfile.LegionPerformanceMode);
                                 if (savedMode.HasValue && savedMode.Value > 0)
                                 {
                                     if (legionManager.LegionPerformanceMode.Value != savedMode.Value)
@@ -995,7 +1039,10 @@ namespace XboxGamingBarHelper
                                 }
                             }
 
-                            performanceManager.TDP.SetProfileValue(runningGameProfile.TDP);
+                            int targetTdp = isOnAC ? runningGameProfile.TDP : (runningGameProfile.TDP_DC ?? runningGameProfile.TDP);
+                            int targetTdpFast = isOnAC ? runningGameProfile.TDPFast : (runningGameProfile.TDPFast_DC ?? runningGameProfile.TDPFast);
+                            int targetTdpPeak = isOnAC ? runningGameProfile.TDPPeak : (runningGameProfile.TDPPeak_DC ?? runningGameProfile.TDPPeak);
+                            performanceManager.TDP.SetProfileValue(targetTdp);
                             // [TDP Custom-mode fix, investigated + user-approved 2026-07-18] The flat
                             // TDP.SetProfileValue call above is a no-op for the actual hardware SPPT/
                             // FPPT when the resolved mode is Custom (255): PerformanceManager.
@@ -1017,41 +1064,45 @@ namespace XboxGamingBarHelper
                             // (mode unchanged across this switch, SetValue skipped).
                             if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
                             {
-                                legionManager.SetCustomTDP(runningGameProfile.TDP, runningGameProfile.TDPFast, runningGameProfile.TDPPeak);
+                                legionManager.SetCustomTDP(targetTdp, targetTdpFast, targetTdpPeak);
                             }
-                            powerManager.CPUBoost.SetValue(runningGameProfile.CPUBoost);
-                            powerManager.CPUEPP.SetValue(runningGameProfile.CPUEPP);
-                            powerManager.MaxCPUState.SetValue(runningGameProfile.MaxCPUState);
-                            powerManager.MinCPUState.SetValue(runningGameProfile.MinCPUState);
+                            powerManager.CPUBoost.SetValue(isOnAC ? runningGameProfile.CPUBoost : (runningGameProfile.CPUBoost_DC ?? runningGameProfile.CPUBoost));
+                            powerManager.CPUEPP.SetValue(isOnAC ? runningGameProfile.CPUEPP : (runningGameProfile.CPUEPP_DC ?? runningGameProfile.CPUEPP));
+                            powerManager.MaxCPUState.SetValue(isOnAC ? runningGameProfile.MaxCPUState : (runningGameProfile.MaxCPUState_DC ?? runningGameProfile.MaxCPUState));
+                            powerManager.MinCPUState.SetValue(isOnAC ? runningGameProfile.MinCPUState : (runningGameProfile.MinCPUState_DC ?? runningGameProfile.MinCPUState));
                             // [2.0 rebuild - Faza C1] Nullable-gated (code review fix) - matches
                             // Resolution/RefreshRate/AMD below; a profile that never explicitly set
                             // FPSLimit/HDR must not force it off/unlimited on activation.
-                            if (runningGameProfile.FPSLimit.HasValue)
+                            int? targetFpsLimit = isOnAC ? runningGameProfile.FPSLimit : (runningGameProfile.FPSLimit_DC ?? runningGameProfile.FPSLimit);
+                            if (targetFpsLimit.HasValue)
                             {
-                                rtssManager.FPSLimit.SetValue(runningGameProfile.FPSLimit.Value);
+                                rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
                             }
-                            if (runningGameProfile.HDREnabled.HasValue)
+                            bool? targetHdr = isOnAC ? runningGameProfile.HDREnabled : (runningGameProfile.HDREnabled_DC ?? runningGameProfile.HDREnabled);
+                            if (targetHdr.HasValue)
                             {
-                                systemManager.HDREnabled.SetValue(runningGameProfile.HDREnabled.Value);
+                                systemManager.HDREnabled.SetValue(targetHdr.Value);
                             }
-                            if (!string.IsNullOrEmpty(runningGameProfile.Resolution))
+                            string targetResolution = isOnAC ? runningGameProfile.Resolution : (runningGameProfile.Resolution_DC ?? runningGameProfile.Resolution);
+                            if (!string.IsNullOrEmpty(targetResolution))
                             {
-                                systemManager.Resolution.SetValue(runningGameProfile.Resolution);
+                                systemManager.Resolution.SetValue(targetResolution);
                             }
-                            if (runningGameProfile.RefreshRate.HasValue)
+                            int? targetRefreshRate = isOnAC ? runningGameProfile.RefreshRate : (runningGameProfile.RefreshRate_DC ?? runningGameProfile.RefreshRate);
+                            if (targetRefreshRate.HasValue)
                             {
-                                systemManager.RefreshRate.SetValue(runningGameProfile.RefreshRate.Value);
+                                systemManager.RefreshRate.SetValue(targetRefreshRate.Value);
                             }
                             // [2.0 rebuild - Faza C2] AMD toggles are nullable - only apply if this
                             // profile ever explicitly touched them (never force a default).
-                            ApplyAMDFeaturesFromProfile(runningGameProfile);
+                            ApplyAMDFeaturesFromProfile(runningGameProfile, isOnAC);
 
                             if (legionManager != null)
                             {
                                 ApplyLegionControllerSettingsFromProfile();
                             }
 
-                            Logger.Info($"Applied per-game profile settings for {systemManager.RunningGame.Value.GameId.Name}: TDP={runningGameProfile.TDP}");
+                            Logger.Info($"Applied per-game profile settings for {systemManager.RunningGame.Value.GameId.Name}: TDP={targetTdp} ({(isOnAC ? "AC" : "DC")})");
                         }
                         else
                         {
