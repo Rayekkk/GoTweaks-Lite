@@ -52,7 +52,16 @@ namespace XboxGamingBar
                 int index = PerformanceOverlayComboBox.SelectedIndex;
                 if (index >= 0)
                 {
-                    if (osdProvider == 1) // AMD
+                    // [2.0 rebuild - code review fix] osdProvider==1 (AMD) branch must not run
+                    // during a programmatic/helper-driven ComboBox update - since slice 1 made OSD
+                    // level helper-authoritative, PerformanceOverlaySlider_ValueChanged now also
+                    // fires from a helper push (BatchGet on connect, a hotkey toggle, etc.), setting
+                    // isLoadingPerformanceOverlaySetting=true around the ComboBox.SelectedIndex
+                    // assignment that triggers this handler. Without this guard, that helper-pushed
+                    // RTSS-style numeric OSD level got misread as "the user wants to toggle the AMD
+                    // overlay", injecting a real Ctrl+Shift+O keystroke via SendAMDOverlayToggle()
+                    // on every connect/sync when the AMD provider is selected.
+                    if (osdProvider == 1 && !isLoadingPerformanceOverlaySetting) // AMD
                     {
                         // For AMD: index 0 = Off, index 1-3 maps to AMD levels
                         if (index == 0 && amdOverlayLevel > 0)
@@ -74,7 +83,7 @@ namespace XboxGamingBar
                         // Note: We can't set specific AMD levels directly, only cycle
                         UpdateQuickSettingsTileStates();
                     }
-                    else // RTSS
+                    else if (osdProvider != 1) // RTSS
                     {
                         PerformanceOverlaySlider.Value = index;
                     }

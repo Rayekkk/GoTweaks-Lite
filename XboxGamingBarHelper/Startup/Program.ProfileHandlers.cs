@@ -128,9 +128,19 @@ namespace XboxGamingBarHelper
                 }
                 else
                 {
+                    // [code review fix] The above fix was still incomplete: onGlobal is
+                    // Action<GameProfile>, a VALUE type, so `onGlobal(glob)` mutates only the
+                    // delegate's own by-value parameter copy - `glob` in this scope was never
+                    // touched, making `profileManager.GlobalProfile = glob;` a no-op
+                    // self-reassignment. The mutation's Save() call still correctly updates the
+                    // shared cache dictionary AND queues the disk write (both keyed by GameId/Path,
+                    // reference-type fields untouched by the struct copy) - only the separate
+                    // in-memory GlobalProfile snapshot field was stale. RefreshGlobalProfile()
+                    // flushes that pending write then re-reads it from disk, correctly picking up
+                    // the change instead of the useless reassignment.
                     var glob = profileManager.GlobalProfile;
                     onGlobal(glob);
-                    profileManager.GlobalProfile = glob;
+                    profileManager.RefreshGlobalProfile();
                 }
             }
         }
@@ -372,9 +382,16 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.SetValue(profileManager.GlobalProfile.CPUEPP);
             powerManager.MaxCPUState.SetValue(profileManager.GlobalProfile.MaxCPUState);
             powerManager.MinCPUState.SetValue(profileManager.GlobalProfile.MinCPUState);
-            // [2.0 rebuild - Faza C1]
-            rtssManager.FPSLimit.SetValue(profileManager.GlobalProfile.FPSLimit);
-            systemManager.HDREnabled.SetValue(profileManager.GlobalProfile.HDREnabled);
+            // [2.0 rebuild - Faza C1] Nullable-gated (code review fix, also required to compile
+            // now that FPSLimit/HDREnabled are int?/bool?).
+            if (profileManager.GlobalProfile.FPSLimit.HasValue)
+            {
+                rtssManager.FPSLimit.SetValue(profileManager.GlobalProfile.FPSLimit.Value);
+            }
+            if (profileManager.GlobalProfile.HDREnabled.HasValue)
+            {
+                systemManager.HDREnabled.SetValue(profileManager.GlobalProfile.HDREnabled.Value);
+            }
             if (!string.IsNullOrEmpty(profileManager.GlobalProfile.Resolution))
             {
                 systemManager.Resolution.SetValue(profileManager.GlobalProfile.Resolution);
@@ -402,27 +419,57 @@ namespace XboxGamingBarHelper
         /// Shared.Data.GameProfile type). All fields are nullable - only apply what this profile
         /// ever explicitly touched, same convention as the gyro fields in
         /// ApplyLegionControllerSettingsFromProfile never forcing an unconfigured default.
+        ///
+        /// [code review fix] RSR/RIS and Chill/AntiLag/Boost are mutually exclusive on the driver
+        /// side; the widget's old LoadProfileSettings used to correct a profile that had both sides
+        /// of a pair enabled (e.g. from an external AMD Adrenalin change hitting both PropertyChanged
+        /// handlers independently) before applying. That correction was dropped when this method
+        /// replaced the widget's apply block in Faza C3 - restored here, HasValue-aware so it only
+        /// corrects pairs this profile actually configured. Send order matches the original: disable
+        /// the losing side of a conflict (RIS, then AntiLag/Boost) before the winning side (RSR, then
+        /// Chill), so the driver never briefly sees both enabled.
         /// </summary>
         private static void ApplyAMDFeaturesFromProfile(Shared.Data.GameProfile profile)
         {
             if (profile.FluidMotionFrames.HasValue)
                 amdManager.AMDFluidMotionFrameEnabled.SetValue(profile.FluidMotionFrames.Value);
-            if (profile.RadeonSuperResolution.HasValue)
-                amdManager.AMDRadeonSuperResolutionEnabled.SetValue(profile.RadeonSuperResolution.Value);
-            if (profile.RadeonSuperResolutionSharpness.HasValue)
-                amdManager.AMDRadeonSuperResolutionSharpness.SetValue(profile.RadeonSuperResolutionSharpness.Value);
-            if (profile.ImageSharpening.HasValue)
-                amdManager.AMDImageSharpeningEnabled.SetValue(profile.ImageSharpening.Value);
+
+            // RSR and RIS are mutually exclusive - if both are configured true, prefer RSR.
+            bool? rsr = profile.RadeonSuperResolution;
+            bool? ris = profile.ImageSharpening;
+            if (rsr == true && ris == true)
+            {
+                Logger.Warn("Profile has both RSR and RIS enabled - disabling RIS (mutually exclusive)");
+                ris = false;
+            }
+            if (ris.HasValue)
+                amdManager.AMDImageSharpeningEnabled.SetValue(ris.Value);
             if (profile.ImageSharpeningSharpness.HasValue)
                 amdManager.AMDImageSharpeningSharpness.SetValue(profile.ImageSharpeningSharpness.Value);
-            if (profile.RadeonAntiLag.HasValue)
-                amdManager.AMDRadeonAntiLagEnabled.SetValue(profile.RadeonAntiLag.Value);
-            if (profile.RadeonBoost.HasValue)
-                amdManager.AMDRadeonBoostEnabled.SetValue(profile.RadeonBoost.Value);
+            if (rsr.HasValue)
+                amdManager.AMDRadeonSuperResolutionEnabled.SetValue(rsr.Value);
+            if (profile.RadeonSuperResolutionSharpness.HasValue)
+                amdManager.AMDRadeonSuperResolutionSharpness.SetValue(profile.RadeonSuperResolutionSharpness.Value);
+
+            // Chill is mutually exclusive with Anti-Lag and Boost - if Chill is configured true
+            // alongside either, disable Anti-Lag/Boost.
+            bool? antiLag = profile.RadeonAntiLag;
+            bool? boost = profile.RadeonBoost;
+            bool? chill = profile.RadeonChill;
+            if (chill == true && (antiLag == true || boost == true))
+            {
+                Logger.Warn("Profile has Chill with Anti-Lag/Boost enabled - disabling Anti-Lag and Boost (mutually exclusive)");
+                antiLag = false;
+                boost = false;
+            }
+            if (antiLag.HasValue)
+                amdManager.AMDRadeonAntiLagEnabled.SetValue(antiLag.Value);
+            if (boost.HasValue)
+                amdManager.AMDRadeonBoostEnabled.SetValue(boost.Value);
             if (profile.RadeonBoostResolution.HasValue)
                 amdManager.AMDRadeonBoostResolution.SetValue(profile.RadeonBoostResolution.Value);
-            if (profile.RadeonChill.HasValue)
-                amdManager.AMDRadeonChillEnabled.SetValue(profile.RadeonChill.Value);
+            if (chill.HasValue)
+                amdManager.AMDRadeonChillEnabled.SetValue(chill.Value);
             if (profile.RadeonChillMinFPS.HasValue)
                 amdManager.AMDRadeonChillMinFPS.SetValue(profile.RadeonChillMinFPS.Value);
             if (profile.RadeonChillMaxFPS.HasValue)
@@ -884,9 +931,17 @@ namespace XboxGamingBarHelper
                             powerManager.CPUEPP.SetValue(runningGameProfile.CPUEPP);
                             powerManager.MaxCPUState.SetValue(runningGameProfile.MaxCPUState);
                             powerManager.MinCPUState.SetValue(runningGameProfile.MinCPUState);
-                            // [2.0 rebuild - Faza C1]
-                            rtssManager.FPSLimit.SetValue(runningGameProfile.FPSLimit);
-                            systemManager.HDREnabled.SetValue(runningGameProfile.HDREnabled);
+                            // [2.0 rebuild - Faza C1] Nullable-gated (code review fix) - matches
+                            // Resolution/RefreshRate/AMD below; a profile that never explicitly set
+                            // FPSLimit/HDR must not force it off/unlimited on activation.
+                            if (runningGameProfile.FPSLimit.HasValue)
+                            {
+                                rtssManager.FPSLimit.SetValue(runningGameProfile.FPSLimit.Value);
+                            }
+                            if (runningGameProfile.HDREnabled.HasValue)
+                            {
+                                systemManager.HDREnabled.SetValue(runningGameProfile.HDREnabled.Value);
+                            }
                             if (!string.IsNullOrEmpty(runningGameProfile.Resolution))
                             {
                                 systemManager.Resolution.SetValue(runningGameProfile.Resolution);

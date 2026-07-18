@@ -283,9 +283,14 @@ namespace Shared.Data
 
         // ========== Additional Profile Settings ==========
 
+        // [2.0 rebuild - code review fix] Nullable (was a non-nullable int, default 0) - unlike
+        // every other Faza C field (Resolution/RefreshRate/AMD toggles), FPSLimit was applied
+        // unconditionally on every game switch with no HasValue-style guard, so a per-game profile
+        // that never explicitly set it (AddNewProfile doesn't seed it) would silently zero the
+        // user's active FPS limiter to "unlimited" the moment that profile activated.
         [XmlElement("FPSLimit")]
-        private int fpsLimit;
-        public int FPSLimit
+        private int? fpsLimit;
+        public int? FPSLimit
         {
             get { return fpsLimit; }
             set
@@ -343,9 +348,12 @@ namespace Shared.Data
             }
         }
 
+        // [2.0 rebuild - code review fix] Nullable (was a non-nullable bool, default false) - same
+        // rationale as FPSLimit above: applied unconditionally, so a per-game profile that never
+        // touched HDR would silently disable it on activation.
         [XmlElement("HDREnabled")]
-        private bool hdrEnabled;
-        public bool HDREnabled
+        private bool? hdrEnabled;
+        public bool? HDREnabled
         {
             get { return hdrEnabled; }
             set
@@ -1209,13 +1217,13 @@ namespace Shared.Data
             dgpEnabledOnAC = null;
             dgpEnabledOnDC = null;
             // Additional profile settings (AC)
-            fpsLimit = 0;
+            fpsLimit = null;
             osPowerMode = null;
             // Additional profile settings (DC overrides)
             fpsLimitDC = null;
             osPowerModeDC = null;
             // Display settings (shared AC/DC)
-            hdrEnabled = false;
+            hdrEnabled = null;
             resolution = null;
             refreshRate = null;
             // AMD Radeon per-game feature toggles (2.0 rebuild - Faza C2)

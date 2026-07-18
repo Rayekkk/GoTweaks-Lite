@@ -1602,7 +1602,9 @@ namespace XboxGamingBar
                 if (profile.ButtonPage != null)
                     legionButtonPage?.SendMapping(profile.ButtonPage.ToJson(), force);
 
-                // Gamepad-button-mapping dict (still widget-owned - slice 8).
+                // Gamepad-button-mapping dict - live-edit send only (see
+                // SendGamepadButtonMappingsToHelper's doc comment; the property itself is
+                // helper-authoritative since slice 8, this is not a "widget-owned channel").
                 SendGamepadButtonMappingsToHelper(profile, force);
             }
             catch (Exception ex)
@@ -1614,9 +1616,12 @@ namespace XboxGamingBar
         /// <summary>
         /// Sends only the gamepad-button-mapping dictionary (face/bumper/etc. arbitrary remaps +
         /// Nintendo/Desktop presets) to the helper. Split out from SendButtonMappingsToHelper in
-        /// [2.0 slice 7] so the seed/resend paths can re-push this widget-owned channel WITHOUT
-        /// also re-pushing the now-helper-authoritative Y1-Page raw button remaps (which would
-        /// clobber the helper's persisted values with the widget's stale LocalSettings).
+        /// [2.0 slice 7] so the (now-removed) seed/resend paths could re-push this channel WITHOUT
+        /// also re-pushing the helper-authoritative Y1-Page raw button remaps. [2.0 slice 8]
+        /// LegionGamepadButtonMapping ITSELF also became helper-authoritative (see
+        /// WidgetProperties.NeverSyncFromHelper) - this method is now purely a LIVE-EDIT send path
+        /// (called from the live-edit branch of SendButtonMappingsToHelper, and from
+        /// SaveAndSendGamepadMappings for the Nintendo/Desktop-preset toggle handlers), not a seed.
         /// </summary>
         private void SendGamepadButtonMappingsToHelper(ControllerProfile profile, bool force = false)
         {

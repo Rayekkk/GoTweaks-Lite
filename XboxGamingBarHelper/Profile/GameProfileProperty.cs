@@ -71,8 +71,9 @@ namespace XboxGamingBarHelper.Profile
         }
 
         // [2.0 rebuild - Faza C1] Performance-tab settings whose GameProfile schema already
-        // existed but had no GameProfileProperty proxy yet.
-        public int FPSLimit
+        // existed but had no GameProfileProperty proxy yet. Nullable (code review fix) - see
+        // GameProfile.cs's FPSLimit/HDREnabled comments for why.
+        public int? FPSLimit
         {
             get { return value.FPSLimit; }
             set
@@ -84,7 +85,7 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
-        public bool HDREnabled
+        public bool? HDREnabled
         {
             get { return value.HDREnabled; }
             set
