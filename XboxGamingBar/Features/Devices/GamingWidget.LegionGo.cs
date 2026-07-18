@@ -2364,6 +2364,24 @@ namespace XboxGamingBar
             if (isGameProfile && perGameProfile?.Value != true) return;
 
             SaveCurrentSettingsToProfile(currentProfileName);
+
+            // [2.0 rebuild - AC/DC persistence follow-up] Found on-device audit 2026-07-18: unlike
+            // every other Performance-tab setting (CPU/AMD/HDR/FPSLimit, all wired via SettingChanged
+            // -> SendPowerSourceProfileValuesToHelper), the Custom TDP sliders only ever wrote to this
+            // widget-local PerformanceProfile (SaveCurrentSettingsToProfile above) - they never resynced
+            // to the helper's persisted GameProfile/GlobalProfile. LegionPerformanceMode itself is fine
+            // (it has its own direct Function.LegionPerformanceMode wire path with its own save handler
+            // in Program.LegionControllerHandlers.cs), but the SPL/SPPT/FPPT triplet has no such direct
+            // path - LegionCustomTDPSlow/Fast/Peak are headless ForceSetValue-only properties with no
+            // helper-side PropertyChanged save handler (by design, see LegionManager.SetCustomTDP's
+            // SetValueSilent usage - avoids a re-save race). Without this call, a live Custom TDP drag
+            // would apply correctly to hardware in the moment, but the helper's persisted profile stayed
+            // stale until some unrelated event (game switch, pipe reconnect, an AMD/CPU toggle) happened
+            // to resync it - so an AC/DC transition or helper restart in between could reapply the OLD
+            // wattage, silently reverting the drag. Reuses this method's own existing guards + the
+            // Custom-TDP-specific save debounce (CUSTOM_TDP_SAVE_DEBOUNCE_MS), same shape as
+            // SettingChanged's resync call.
+            SendPowerSourceProfileValuesToHelper();
         }
 
         /// <summary>
