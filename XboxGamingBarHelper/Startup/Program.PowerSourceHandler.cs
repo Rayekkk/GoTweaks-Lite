@@ -305,6 +305,53 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // [bug fix, found on-device 2026-07-18: AMD/CPU-cluster settings were being
+                // corrupted on every AC/DC transition] Applying a resolved value below via
+                // powerManager.X.SetValue()/amdManager.X.SetValue()/systemManager.X.SetValue()
+                // fires that property's own NotifyPropertyChanged - which is ALSO wired to the
+                // existing live single-field save handler for that same setting (e.g.
+                // RadeonAntiLag_PropertyChanged), since these are the SAME properties the user's
+                // live UI edits go through. Without this guard, reapplying (say) the DC-resolved
+                // RadeonAntiLag value to hardware would immediately trigger that handler to SAVE
+                // whatever was just applied back into the profile's BASE (AC) field via
+                // RouteProfileSave - silently overwriting the user's configured AC value with the
+                // DC one on every single transition. lock+isApplyingProfile is the existing,
+                // already-proven guard every other profile-apply site
+                // (RunningGame_PropertyChanged / RestoreGlobalProfileSettings /
+                // CurrentProfile_PropertyChanged) uses for exactly this reason - all the affected
+                // single-field handlers already check it. TDP was unaffected by this bug because
+                // LegionManager.SetCustomTDP updates its own cache via SetValueSilent (no
+                // NotifyPropertyChanged, so no re-save loop) - everything else in this method
+                // goes through a normal SetValue and needed this same protection.
+                lock (profileApplicationLock)
+                {
+                    if (isApplyingProfile)
+                    {
+                        Logger.Debug("Helper-side AC/DC handler: skipping - already applying a profile elsewhere");
+                        return;
+                    }
+
+                    try
+                    {
+                        isApplyingProfile = true;
+                        ApplyPowerSourceChangeInternal(isOnAC);
+                    }
+                    finally
+                    {
+                        isApplyingProfile = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Helper-side AC/DC handler: reapply TDP threw: {ex.Message}");
+            }
+        }
+
+        private static void ApplyPowerSourceChangeInternal(bool isOnAC)
+        {
+            try
+            {
                 // Reading .Value takes a STRUCT COPY of the live profile - safe to read fields
                 // from freely (getters have no side effect), but must never assign into this
                 // copy (GameProfile's setters call Save(), which would debounce-write a bogus
