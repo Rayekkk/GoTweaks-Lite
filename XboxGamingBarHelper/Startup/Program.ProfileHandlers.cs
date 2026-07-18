@@ -378,6 +378,15 @@ namespace XboxGamingBarHelper
             }
 
             performanceManager.TDP.SetProfileValue(profileManager.GlobalProfile.TDP);
+            // [TDP Custom-mode fix] Same rationale as RunningGame_PropertyChanged's identical
+            // addition - the flat TDP.SetProfileValue call is a no-op for the actual SPPT/FPPT in
+            // Custom mode (ReassertCustomTDP re-pushes the PREVIOUS game's cached triplet, ignoring
+            // this value). Push the global profile's actual triplet through the same
+            // already-mode-switch-safe SetCustomTDP path the widget's sliders use.
+            if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
+            {
+                legionManager.SetCustomTDP(profileManager.GlobalProfile.TDP, profileManager.GlobalProfile.TDPFast, profileManager.GlobalProfile.TDPPeak);
+            }
             powerManager.CPUBoost.SetValue(profileManager.GlobalProfile.CPUBoost);
             powerManager.CPUEPP.SetValue(profileManager.GlobalProfile.CPUEPP);
             powerManager.MaxCPUState.SetValue(profileManager.GlobalProfile.MaxCPUState);
@@ -530,6 +539,15 @@ namespace XboxGamingBarHelper
                         // Use SetProfileValue to ensure profile TDP takes precedence over in-flight widget messages
                         // All settings applied atomically under lock to prevent cross-contamination
                         performanceManager.TDP.SetProfileValue(profileManager.CurrentProfile.TDP);
+                        // [TDP Custom-mode fix] Same rationale as RunningGame_PropertyChanged/
+                        // RestoreGlobalProfileSettings' identical addition - the flat
+                        // TDP.SetProfileValue call is a no-op for the actual SPPT/FPPT in Custom mode.
+                        // legionManager.LegionPerformanceMode.Value reflects the resolved mode from
+                        // the block just above (SetPerformanceMode updates it synchronously).
+                        if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
+                        {
+                            legionManager.SetCustomTDP(profileManager.CurrentProfile.TDP, profileManager.CurrentProfile.TDPFast, profileManager.CurrentProfile.TDPPeak);
+                        }
                         powerManager.CPUBoost.SetValue(profileManager.CurrentProfile.CPUBoost);
                         powerManager.CPUEPP.SetValue(profileManager.CurrentProfile.CPUEPP);
                         powerManager.MaxCPUState.SetValue(profileManager.CurrentProfile.MaxCPUState);
@@ -927,6 +945,29 @@ namespace XboxGamingBarHelper
                             }
 
                             performanceManager.TDP.SetProfileValue(runningGameProfile.TDP);
+                            // [TDP Custom-mode fix, investigated + user-approved 2026-07-18] The flat
+                            // TDP.SetProfileValue call above is a no-op for the actual hardware SPPT/
+                            // FPPT when the resolved mode is Custom (255): PerformanceManager.
+                            // ApplyTDPInternal's IsInCustomMode branch calls LegionManager.
+                            // ReassertCustomTDP(), which ignores the passed-in value entirely and just
+                            // re-pushes whatever's cached in customTDPSlow/Fast/Peak - cache that, until
+                            // now, was only ever updated by the WIDGET's Custom TDP sliders. So a
+                            // per-game profile switch in Custom mode left the PREVIOUS profile's/game's
+                            // triplet on the hardware. Push the new profile's actual triplet through
+                            // SetCustomTDP - the same method the widget's sliders already use, which
+                            // handles the mode-switch-confirm sequencing itself (flushes a pending mode
+                            // debounce synchronously, polls hardware for Custom confirmation, applies
+                            // atomically with rollback, schedules a safety-net reapply if hardware
+                            // doesn't confirm in time). legionManager.LegionPerformanceMode.Value is
+                            // read AFTER the mode-resolution block above, so it reflects the resolved
+                            // mode whether SetValue was just called (SetPerformanceMode updates its
+                            // internal performanceMode field synchronously/optimistically, precisely so
+                            // a follow-up SetCustomTDP call sees the right mode) or was already correct
+                            // (mode unchanged across this switch, SetValue skipped).
+                            if (legionManager != null && legionManager.LegionPerformanceMode.Value == 255)
+                            {
+                                legionManager.SetCustomTDP(runningGameProfile.TDP, runningGameProfile.TDPFast, runningGameProfile.TDPPeak);
+                            }
                             powerManager.CPUBoost.SetValue(runningGameProfile.CPUBoost);
                             powerManager.CPUEPP.SetValue(runningGameProfile.CPUEPP);
                             powerManager.MaxCPUState.SetValue(runningGameProfile.MaxCPUState);

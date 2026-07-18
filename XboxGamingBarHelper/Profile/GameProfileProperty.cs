@@ -22,6 +22,33 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
+        // [TDP Custom-mode fix] Needed so CurrentProfile_PropertyChanged can read the Custom SPPT/
+        // FPPT triplet (GameProfile.TDPFast/TDPPeak's getters already fall back to TDP/SPL when
+        // unset, so these never read as 0).
+        public int TDPFast
+        {
+            get { return value.TDPFast; }
+            set
+            {
+                if (this.value.TDPFast != value)
+                {
+                    this.value.TDPFast = value;
+                }
+            }
+        }
+
+        public int TDPPeak
+        {
+            get { return value.TDPPeak; }
+            set
+            {
+                if (this.value.TDPPeak != value)
+                {
+                    this.value.TDPPeak = value;
+                }
+            }
+        }
+
         public bool CPUBoost
         {
             get { return value.CPUBoost; }
