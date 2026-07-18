@@ -52,13 +52,6 @@ namespace XboxGamingBar.Data
             Logger.Info($"[TIMING] Individual sync {count} properties: {syncTimer.ElapsedMilliseconds}ms ({syncTimer.ElapsedMilliseconds / Math.Max(1, count)}ms avg)");
         }
 
-        // Reserved for future startup-only skipping. Currently empty — lighting moved to
-        // NeverSyncFromHelper because the "helper has current state after initial sync"
-        // assumption is unreliable: if the first send races pipe connect, the helper's
-        // default (#FFFFFF) leaks back into the widget on the next batch sync and then
-        // into the profile on the next SaveControllerProfile, turning the lights white.
-        private static readonly HashSet<Function> WidgetOwnedPropertiesInitial = new HashSet<Function>();
-
         // Properties that should NEVER be synced from helper - widget is always the source of truth.
         // The helper applies values to hardware but doesn't persist them across restarts,
         // so the widget (which loads from controller profiles) is authoritative.
@@ -140,10 +133,6 @@ namespace XboxGamingBar.Data
             // LegionHairTriggers_Toggled (enablement always, preset+save only on user toggle).
         };
 
-        // Set to true during initial startup to skip widget-owned property sync (widget loaded from profiles/settings)
-        // After first sync, this is cleared so subsequent syncs include these from helper
-        public bool SkipWidgetOwnedSyncOnce { get; set; } = true;
-
         /// <summary>
         /// Attempt to sync all properties in a single batch request.
         /// Retries if helper returns NotReady (managers still initializing).
@@ -199,15 +188,6 @@ namespace XboxGamingBar.Data
 
                 // Build list of function IDs to request as JSON array
                 var jsonArray = new JsonArray();
-                // Always skip widget-owned properties during initial startup, even on retry
-                // The issue was that retries would include these properties, causing the helper's
-                // default values (e.g., #FFFFFF for lighting) to overwrite profile values
-                bool skipWidgetOwnedInitial = SkipWidgetOwnedSyncOnce;
-                if (skipWidgetOwnedInitial)
-                {
-                    Logger.Info("Skipping widget-owned properties in batch sync (initial startup - widget loaded from settings/profiles)");
-                }
-
                 foreach (var prop in properties.Values)
                 {
                     // Always skip properties that should never be synced from helper
@@ -215,17 +195,8 @@ namespace XboxGamingBar.Data
                     {
                         continue;
                     }
-                    // Skip widget-owned properties on initial sync only (widget is source of truth from profiles)
-                    // Subsequent syncs include them (helper may have applied game profiles)
-                    if (skipWidgetOwnedInitial && WidgetOwnedPropertiesInitial.Contains(prop.Function))
-                    {
-                        continue;
-                    }
                     jsonArray.Add(JsonValue.CreateNumberValue((int)prop.Function));
                 }
-
-                // Clear the skip flag after successful sync (not during NotReady retries)
-                // Moved to after success check below
 
                 // Create batch request
                 var request = new ValueSet
@@ -252,9 +223,6 @@ namespace XboxGamingBar.Data
                     Logger.Warn("Batch sync response missing BatchData");
                     return BatchSyncResult.Failed;
                 }
-
-                // Clear the skip flag after first successful sync
-                SkipWidgetOwnedSyncOnce = false;
 
                 // Parse batch response - format: { "functionId": { "Content": value, "UpdatedTime": time }, ... }
                 if (!JsonObject.TryParse(batchDataJson, out JsonObject batchData))

@@ -1237,39 +1237,15 @@ namespace XboxGamingBar
 
             try
             {
-                // [2.0 rebuild - slice 7] The eight Y1-Page button remaps are now helper-authoritative
-                // - the widget no longer seeds their stored metadata + composite UI from its
-                // LocalSettings ControllerProfile here. They reflect the helper's pushed JSON via
-                // ApplyButtonMappingFromHelper (LegionButtonMappingProperty.OnValueSyncedFromHelper),
-                // and are removed from WidgetProperties.NeverSyncFromHelper. User edits still send via
-                // SendButtonMappingsToHelper.
-
-                // [2.0 rebuild - slice 8] Nintendo layout is now helper-authoritative - the widget no
-                // longer seeds LegionNintendoLayoutToggle.IsOn or calls Apply/ClearNintendoLayoutMappings
-                // from LocalSettings here. A helper push flips IsOn via the auto-bound
-                // LegionNintendoLayoutProperty, which (same as the already-bidirectional
-                // LegionDesktopControls below) fires the existing LegionNintendoLayout_Toggled handler
-                // and recomputes A/B/X/Y into gamepadButtonMappings itself. See NeverSyncFromHelper.
-
-                // [2.0 rebuild - slice 4] Vibration is helper-authoritative - the widget no longer
-                // seeds the comboboxes from its LocalSettings ControllerProfile here. They reflect the
-                // helper's pushed value via the bound properties. See WidgetProperties.NeverSyncFromHelper.
-
-                // [2.0 rebuild - slice 5] Gyro is helper-authoritative - the widget no longer seeds
-                // the gyro comboboxes/sliders/toggles from its LocalSettings ControllerProfile here.
-                // They reflect the helper's pushed values via the bound properties (+ guarded
-                // ControllerSettingChanged/ControllerSliderSettingChanged). See NeverSyncFromHelper.
-
-                // [2.0 rebuild - slice 2] Stick deadzones are now helper-authoritative - the widget
-                // no longer seeds the sliders from its LocalSettings ControllerProfile here. The
-                // sliders (and their % text via UpdateControllerSliderDisplays) reflect the helper's
-                // pushed value instead. See WidgetProperties.NeverSyncFromHelper.
-
-                // [2.0 rebuild - slice 3] Trigger travel + HairTriggers are now helper-authoritative -
-                // the widget no longer seeds the sliders/toggle from its LocalSettings ControllerProfile
-                // here. They reflect the helper's pushed values (sliders via the bound properties +
-                // ControllerSliderSettingChanged text; toggle + slider-enablement via the guarded
-                // LegionHairTriggers_Toggled). See WidgetProperties.NeverSyncFromHelper.
+                // [2.0 rebuild - Faza B/slices 1-8] Button remaps (Y1-Page + gamepad-mapping dict +
+                // Nintendo layout), vibration, gyro, stick deadzones, and trigger travel + HairTriggers
+                // are all helper-authoritative now - the widget no longer seeds any of them from its
+                // LocalSettings ControllerProfile here. Each reflects the helper's pushed value via its
+                // own bound property (buttons via ApplyButtonMappingFromHelper /
+                // LegionButtonMappingProperty.OnValueSyncedFromHelper for the composite UI; everything
+                // else via plain bound WidgetToggleProperty/WidgetSliderProperty + the already-guarded
+                // ControllerSettingChanged/ControllerSliderSettingChanged/LegionHairTriggers_Toggled).
+                // See WidgetProperties.NeverSyncFromHelper (now empty) for the full history.
 
                 // Apply joystick as mouse settings
                 if (LegionJoystickAsMouseComboBox != null)
@@ -1336,29 +1312,18 @@ namespace XboxGamingBar
                     }
                 }
 
-                // [2.0 rebuild - slice 6] Lighting is helper-authoritative - the widget no longer
-                // seeds the mode combobox / color picker / brightness+speed sliders / power-light
-                // toggle from its LocalSettings ControllerProfile here. They reflect the helper's
-                // pushed values via the bound properties (with guarded save handlers). See
-                // WidgetProperties.NeverSyncFromHelper.
-
                 Logger.Info($"Applied controller profile: Y1={FormatButtonMapping(profile.ButtonY1)}, Y2={FormatButtonMapping(profile.ButtonY2)}, Y3={FormatButtonMapping(profile.ButtonY3)}, M1={FormatButtonMapping(profile.ButtonM1)}, M2={FormatButtonMapping(profile.ButtonM2)}, M3={FormatButtonMapping(profile.ButtonM3)}, Nintendo={profile.NintendoLayout}, Vib={profile.VibrationLevel}, VibMode={profile.VibrationMode}, GyroTarget={profile.GyroTarget}, LDZ={profile.LeftStickDeadzone}, RDZ={profile.RightStickDeadzone}, GamepadMappings={profile.GamepadButtonMappings?.Count ?? 0}, DesktopControls={profile.DesktopControlsEnabled}, LightMode={profile.LightMode}");
 
                 // Set timestamp BEFORE sending to prevent any queued events from causing duplicate sends
                 // Use 2 second window since HID commands take ~1.5s to complete (50ms per button × ~30 buttons)
                 lastProfileApplyTime = DateTime.Now;
 
-                // [2.0 slice 7+8] The entire button-remap domain (raw Y1-Page + the gamepad-mapping
-                // dict + Nintendo layout) is now helper-authoritative and applied+pushed by the helper
-                // - the widget must NOT reseed/resend any of it here (would clobber the helper's
-                // persisted values with stale LocalSettings, and gamepadButtonMappings may not even be
-                // populated yet at this point in a cold start).
-
-                // Send controller settings to helper (gyro, deadzone, vibration, triggers)
-                SendControllerSettingsToHelper(profile);
-
-                // [2.0 slice 6] Lighting seed removed - helper is authoritative and applies+pushes
-                // it at startup / game switch. User edits still send via ApplyControllerSettingChange.
+                // [2.0 rebuild] Everything but JoystickAsMouse + Desktop Controls above is now
+                // helper-authoritative (buttons, gamepad-mapping dict, Nintendo layout, vibration,
+                // gyro, deadzones, triggers, lighting) - applied+pushed by the helper at startup/game
+                // switch. The widget must NOT reseed/resend any of it here (would clobber the
+                // helper's persisted values with stale LocalSettings). User edits still flow via each
+                // setting's own bound property / ApplyControllerSettingChange.
 
                 // Re-evaluate enhanced remap UI after profile/UI values settle.
                 // This avoids startup ordering issues where improved input state arrives
@@ -1680,29 +1645,6 @@ namespace XboxGamingBar
         /// saved button remaps / gyro / vibration / triggers settings until the next
         /// manual interaction.
         /// </summary>
-        internal void ResendActiveControllerProfileToHelper()
-        {
-            try
-            {
-                var profile = (LegionControllerProfileToggle?.IsOn == true && HasValidGame(currentGameName))
-                    ? gameControllerProfile
-                    : globalControllerProfile;
-                if (profile == null) return;
-
-                Logger.Info("Re-pushing active controller profile to helper after pipe connect (recovery from cold-start race)");
-                // [2.0 slice 7+8] The entire button-remap domain (raw Y1-Page + gamepad mapping dict +
-                // Nintendo layout) is helper-authoritative - no cold-start reseed needed (the helper
-                // restored it all from its own profile before BatchGet).
-                SendControllerSettingsToHelper(profile);
-                // [2.0 slice 6] Lighting reseed removed - helper is authoritative (persists + applies
-                // + pushes).
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"ResendActiveControllerProfileToHelper failed: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// Sends lighting settings to the helper via IPC
         /// </summary>
@@ -1764,36 +1706,6 @@ namespace XboxGamingBar
         /// Sends all controller settings (gyro, deadzone, vibration, triggers) to the helper via IPC.
         /// This ensures the helper has the full profile even when the widget is closed.
         /// </summary>
-        private void SendControllerSettingsToHelper(ControllerProfile profile)
-        {
-            try
-            {
-                // [2.0 rebuild - slice 4] Vibration is helper-authoritative - the widget no longer
-                // pushes its LocalSettings vibration here. User edits flow via the bound comboboxes
-                // (combobox -> helper); the helper persists (RouteProfileSave) + pushes back.
-
-                // [2.0 rebuild - slice 5] Gyro is helper-authoritative - the widget no longer pushes
-                // its LocalSettings gyro values here. User edits flow via the bound controls; the
-                // helper persists (RouteProfileSave) + pushes back.
-
-                // [2.0 rebuild - slice 2] Stick deadzones are helper-authoritative - the widget no
-                // longer pushes its LocalSettings deadzone to the helper here. User edits still flow
-                // via the bound WidgetSliderProperty (slider -> helper), and the helper persists +
-                // pushes back. Removed to avoid the widget re-seeding stale values over the helper's.
-
-                // [2.0 rebuild - slice 3] Trigger travel + HairTriggers are helper-authoritative -
-                // the widget no longer pushes its LocalSettings values here. User edits flow via the
-                // bound properties (sliders) and LegionHairTriggers_Toggled (toggle); the helper
-                // persists + pushes back.
-
-                Logger.Info($"Sent controller settings to helper: Vib={profile.VibrationLevel}, VibMode={profile.VibrationMode}, GyroTarget={profile.GyroTarget}, LDZ={profile.LeftStickDeadzone}, RDZ={profile.RightStickDeadzone}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending controller settings: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// Updates the display text for controller setting sliders
         /// </summary>

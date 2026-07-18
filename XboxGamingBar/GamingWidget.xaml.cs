@@ -3563,10 +3563,10 @@ namespace XboxGamingBar
                     UpdateProfileDisplay();
                     RefreshLegionEnhancedRemapUi();
 
-                    // Recover from the cold-start race: ApplyControllerProfile fires during
-                    // widget constructor before App.IsConnected, so its Send* calls drop
-                    // into a not-yet-connected pipe. Re-push now that the pipe is up.
-                    ResendActiveControllerProfileToHelper();
+                    // [2.0 rebuild] ResendActiveControllerProfileToHelper (cold-start-race recovery
+                    // for the widget's Send* calls) removed - every controller setting is now
+                    // helper-authoritative, so there is nothing left for the widget to re-push; the
+                    // helper restores + applies its own profile before BatchGet.
 
                     // Same equality-skip gotcha applies: if helper's viiperDeviceType matches
                     // the widget's default ("xbox360"), no PropertyChanged fires and the Gyro →
