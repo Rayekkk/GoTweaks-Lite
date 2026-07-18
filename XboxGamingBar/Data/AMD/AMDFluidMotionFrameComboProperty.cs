@@ -32,7 +32,13 @@ namespace XboxGamingBar.Data
             int idx = UI.SelectedIndex;
             if (idx < 0 || idx == Value) return;
             Logger.Info($"{Function} ComboBox -> {idx}");
-            SetValue(idx);
+            // Bug fix: omitting the timestamp defaults SetValue's updatedTime to 0.
+            // PropertyUpdateArbiter (issue #79) coerces a 0 timestamp to "now" only when
+            // this property has never had a real prior timestamp - once ANY edit has
+            // succeeded (lastUpdatedTime > 0), a subsequent 0-timestamped edit is rejected
+            // as stale, silently dropping the change. WidgetToggleProperty already passes
+            // DateTime.Now.Ticks explicitly for exactly this reason; this class didn't.
+            SetValue(idx, DateTime.Now.Ticks);
         }
 
         protected override async void NotifyPropertyChanged(string propertyName = "")

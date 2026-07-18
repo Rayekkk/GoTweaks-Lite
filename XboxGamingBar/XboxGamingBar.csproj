@@ -96,7 +96,6 @@
     <Compile Include="Data\AMD\AMDFluidMotionFrameComboProperty.cs" />
     <Compile Include="Data\AMD\AMDFluidMotionFrameV1SupportedProperty.cs" />
     <Compile Include="Data\AMD\AMDRadeonBoostEnabledProperty.cs" />
-    <Compile Include="Data\AMD\AMDRadeonBoostResolutionProperty.cs" />
     <Compile Include="Data\AMD\AMDRadeonBoostSupportedProperty.cs" />
     <Compile Include="Data\AMD\AMDRadeonChillEnabledProperty.cs" />
     <Compile Include="Data\AMD\AMDRadeonChillMaxFPSProperty.cs" />

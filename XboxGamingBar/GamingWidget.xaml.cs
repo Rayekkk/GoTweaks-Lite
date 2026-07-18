@@ -623,7 +623,7 @@ namespace XboxGamingBar
         private readonly AMDRadeonAntiLagSupportedProperty amdRadeonAntiLagSupported;
         private readonly AMDRadeonBoostEnabledProperty amdRadeonBoostEnabled;
         private readonly AMDRadeonBoostSupportedProperty amdRadeonBoostSupported;
-        private readonly AMDRadeonBoostResolutionProperty amdRadeonBoostResolution;
+        private readonly IntTagComboProperty amdRadeonBoostResolution;
         private readonly AMDRadeonChillEnabledProperty amdRadeonChillEnabled;
         private readonly AMDRadeonChillSupportedProperty amdRadeonChillSupported;
         private readonly AMDRadeonChillMinFPSProperty amdRadeonChillMinFPSProperty;
@@ -1277,7 +1277,12 @@ namespace XboxGamingBar
             amdRadeonAntiLagSupported = new AMDRadeonAntiLagSupportedProperty(AMDRadeonAntiLagToggle, this);
             amdRadeonBoostEnabled = new AMDRadeonBoostEnabledProperty(AMDRadeonBoostToggle, this);
             amdRadeonBoostSupported = new AMDRadeonBoostSupportedProperty(AMDRadeonBoostToggle, this);
-            amdRadeonBoostResolution = new AMDRadeonBoostResolutionProperty(AMDRadeonBoostResolutionSlider, this);
+            // [feature] Quality/Performance ComboBox replaces the old raw 0/1 slider (2.0 rebuild).
+            // Tag values match AMDRadeonBoostResolutionProperty's existing helper-side mapping
+            // (Value==0 -> min resolution scale/aggressive downscale = Performance,
+            // Value==1 -> max/near-native = Quality) - order in the ComboBox is Quality-first to
+            // match how the user described it, independent of the Tag values' own ordering.
+            amdRadeonBoostResolution = new IntTagComboProperty(0, Function.AMDRadeonBoostResolution, AMDRadeonBoostResolutionComboBox, this);
             amdRadeonChillEnabled = new AMDRadeonChillEnabledProperty(AMDRadeonChillToggle, this);
             amdRadeonChillSupported = new AMDRadeonChillSupportedProperty(AMDRadeonChillToggle, this);
             amdRadeonChillMinFPSProperty = new AMDRadeonChillMinFPSProperty(AMDRadeonChillMinFPSSlider, this);

@@ -54,7 +54,12 @@ namespace XboxGamingBar.Data
                 if (newValue != Value)
                 {
                     Logger.Info($"{Function} combo box updated to {newValue}.");
-                    SetValue(newValue);
+                    // Bug fix: omitting the timestamp defaults SetValue's updatedTime to 0.
+                    // PropertyUpdateArbiter (issue #79) rejects a 0-timestamped edit as stale once
+                    // this property has ever had a real prior timestamp (i.e. every edit after the
+                    // first would silently no-op). Pass an explicit timestamp, matching
+                    // WidgetToggleProperty's convention.
+                    SetValue(newValue, DateTime.Now.Ticks);
                 }
             }
         }

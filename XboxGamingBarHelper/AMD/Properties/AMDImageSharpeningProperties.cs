@@ -54,15 +54,17 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
             base.NotifyPropertyChanged(propertyName);
 
+            // [bug fix] The widget's slider now sends the driver's raw sharpness scale directly
+            // (XAML Minimum="10" Maximum="100", matching this device's AMD Adrenalin range 1:1 -
+            // WYSIWYG), not a 0-100 percentage. The old proportional remap
+            // (min + Value/100*(max-min)) stretched the widget's 0-100 range onto the real
+            // 10-100 driver range, so e.g. a widget value of 50 became 55 on the driver -
+            // confirmed by on-device comparison against Adrenalin's own slider. Clamp to the
+            // queried range for safety (in case a different Radeon GPU ever reports a range
+            // that doesn't match the widget's hardcoded 10-100).
             (int min, int max) = Manager.AMDImageSharpeningSetting.GetSharpnessRange();
-            if (min == 0 && max == 100)
-            {
-                Manager.AMDImageSharpeningSetting.SetSharpness(Value);
-            }
-            else
-            {
-                Manager.AMDImageSharpeningSetting.SetSharpness((int)Math.Round(min + Value / 100.0f * (max - min)));
-            }
+            int clamped = Math.Max(min, Math.Min(max, Value));
+            Manager.AMDImageSharpeningSetting.SetSharpness(clamped);
         }
     }
 }

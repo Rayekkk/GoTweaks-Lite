@@ -155,8 +155,8 @@ namespace XboxGamingBar
             AMDRadeonAntiLagToggle.LostFocus += Control_LostFocus;
             AMDRadeonBoostToggle.GotFocus += Control_GotFocus;
             AMDRadeonBoostToggle.LostFocus += Control_LostFocus;
-            AMDRadeonBoostResolutionSlider.GotFocus += Control_GotFocus;
-            AMDRadeonBoostResolutionSlider.LostFocus += Control_LostFocus;
+            AMDRadeonBoostResolutionComboBox.GotFocus += Control_GotFocus;
+            AMDRadeonBoostResolutionComboBox.LostFocus += Control_LostFocus;
             AMDRadeonChillToggle.GotFocus += Control_GotFocus;
             AMDRadeonChillToggle.LostFocus += Control_LostFocus;
             AMDRadeonChillMinFPSSlider.GotFocus += Control_GotFocus;

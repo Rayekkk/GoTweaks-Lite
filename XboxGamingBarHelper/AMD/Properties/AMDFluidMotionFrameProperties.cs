@@ -64,6 +64,26 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        // Bug fix: force the ADLX call even when the accepted value equals the cache (same
+        // pattern as AMDFluidMotionFrameEnabledProperty above). GenericProperty.SetValue's
+        // equality-skip means NotifyPropertyChanged (and therefore SetAlgorithm) never fires
+        // when the cached value already matches - if the cache ever drifted from the real
+        // driver state (e.g. the widget's own value defaults to 0/Auto before its first real
+        // sync, or a prior SetAlgorithm call silently no-op'd), re-selecting that same index
+        // would never reach the driver. Reported symptom: every option worked except Auto
+        // (index 0), because that's the value a fresh/never-really-applied cache already sits at.
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            int prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
+                Manager.AMDFluidMotionFrameSettingV1?.SetAlgorithm((ADLX_AFMF_ALGORITHM)Value);
+            }
+            return result;
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -76,6 +96,19 @@ namespace XboxGamingBarHelper.AMD.Properties
     {
         public AMDFluidMotionFrameSearchModeProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDFluidMotionFrameSearchMode, inManager)
         {
+        }
+
+        // Bug fix: see AMDFluidMotionFrameAlgorithmProperty.SetValue above - same rationale.
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            int prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
+                Manager.AMDFluidMotionFrameSettingV1?.SetSearchMode((ADLX_AFMF_SEARCH_MODE_TYPE)Value);
+            }
+            return result;
         }
 
         protected override void NotifyPropertyChanged(string propertyName = "")
@@ -92,6 +125,19 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        // Bug fix: see AMDFluidMotionFrameAlgorithmProperty.SetValue above - same rationale.
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            int prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
+                Manager.AMDFluidMotionFrameSettingV1?.SetPerformanceMode((ADLX_AFMF_PERFORMANCE_MODE_TYPE)Value);
+            }
+            return result;
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -104,6 +150,20 @@ namespace XboxGamingBarHelper.AMD.Properties
     {
         public AMDFluidMotionFrameFastMotionResponseProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDFluidMotionFrameFastMotionResponse, inManager)
         {
+        }
+
+        // Bug fix: see AMDFluidMotionFrameAlgorithmProperty.SetValue above - same rationale.
+        // Reported symptom here: Blended Frames (index 1) worked, Repeat Frames (index 0) didn't.
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            int prev = Value;
+            bool result = base.SetValue(newValue, updatedTime);
+            if (result && prev == Value)
+            {
+                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
+                Manager.AMDFluidMotionFrameSettingV1?.SetFastMotionResponse((ADLX_AFMF_FAST_MOTION_RESP)Value);
+            }
+            return result;
         }
 
         protected override void NotifyPropertyChanged(string propertyName = "")

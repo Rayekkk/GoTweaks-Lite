@@ -68,7 +68,7 @@ namespace XboxGamingBar
             AMDImageSharpeningSlider.ValueChanged += SettingChangedDebounced;
             AMDRadeonAntiLagToggle.Toggled += AMDRadeonAntiLagToggle_Toggled;
             AMDRadeonBoostToggle.Toggled += AMDRadeonBoostToggle_Toggled;
-            AMDRadeonBoostResolutionSlider.ValueChanged += SettingChangedDebounced;
+            AMDRadeonBoostResolutionComboBox.SelectionChanged += SettingChanged;
             AMDRadeonChillToggle.Toggled += AMDRadeonChillToggle_Toggled;
             AMDRadeonChillMinFPSSlider.ValueChanged += SettingChangedDebounced;
             AMDRadeonChillMaxFPSSlider.ValueChanged += SettingChangedDebounced;

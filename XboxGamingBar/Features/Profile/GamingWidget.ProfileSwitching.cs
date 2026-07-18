@@ -241,7 +241,13 @@ namespace XboxGamingBar
                 profile.ImageSharpeningSharpness = AMDImageSharpeningSlider.Value;
                 profile.RadeonAntiLag = AMDRadeonAntiLagToggle.IsOn;
                 profile.RadeonBoost = AMDRadeonBoostToggle.IsOn;
-                profile.RadeonBoostResolution = AMDRadeonBoostResolutionSlider.Value;
+                // [feature] AMDRadeonBoostResolutionComboBox replaced the old 0/1 slider - read
+                // the selected item's Tag (matches IntTagComboProperty's own convention).
+                if (AMDRadeonBoostResolutionComboBox?.SelectedItem is ComboBoxItem radeonBoostItem
+                    && int.TryParse(radeonBoostItem.Tag as string, out int radeonBoostTag))
+                {
+                    profile.RadeonBoostResolution = radeonBoostTag;
+                }
                 profile.RadeonChill = AMDRadeonChillToggle.IsOn;
                 profile.RadeonChillMinFPS = AMDRadeonChillMinFPSSlider.Value;
                 profile.RadeonChillMaxFPS = AMDRadeonChillMaxFPSSlider.Value;

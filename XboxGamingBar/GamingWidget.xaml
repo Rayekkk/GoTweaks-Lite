@@ -2905,7 +2905,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Fluid Motion Frames" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="AMD Fluid Motion Frames 2.1" Style="{StaticResource CardTitleStyle}"/>
                                         <TextBlock Text="Frame generation — global setting; AMD Adrenalin per-game profiles override this"
                                                    Style="{StaticResource CardCaptionStyle}"
                                                    TextWrapping="Wrap"/>
@@ -2986,7 +2986,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Radeon Boost" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Radeon Boost 2" Style="{StaticResource CardTitleStyle}"/>
                                         <TextBlock Text="Dynamic resolution scaling" Style="{StaticResource CardCaptionStyle}"/>
                                     </StackPanel>
                                     <ToggleSwitch x:Name="AMDRadeonBoostToggle"
@@ -2994,14 +2994,15 @@
                                                   Style="{StaticResource ModernToggleStyle}"
                                                   IsEnabled="False" Width="52" HorizontalAlignment="Center"/>
                                 </Grid>
-                                <Slider x:Name="AMDRadeonBoostResolutionSlider"
-                                        Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="0" Maximum="1"
-                                        TickFrequency="1"
-                                        SnapsTo="Ticks"
-                                        TickPlacement="BottomRight"
-                                        IsEnabled="False"
-                                        Visibility="{Binding ElementName=AMDRadeonBoostToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <ComboBox x:Name="AMDRadeonBoostResolutionComboBox"
+                                          Style="{StaticResource ModernComboBoxStyle}"
+                                          Header="Mode"
+                                          HorizontalAlignment="Stretch"
+                                          IsEnabled="False"
+                                          Visibility="{Binding ElementName=AMDRadeonBoostToggle, Path=IsOn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <ComboBoxItem Content="Quality" Tag="1"/>
+                                    <ComboBoxItem Content="Performance" Tag="0"/>
+                                </ComboBox>
                             </StackPanel>
                         </Border>
 
@@ -3050,7 +3051,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Image Sharpening" Style="{StaticResource CardTitleStyle}"/>
+                                        <TextBlock Text="Radeon Image Sharpening" Style="{StaticResource CardTitleStyle}"/>
                                         <TextBlock Text="Sharpen in-game visuals" Style="{StaticResource CardCaptionStyle}"/>
                                     </StackPanel>
                                     <ToggleSwitch x:Name="AMDImageSharpeningToggle"
@@ -3060,7 +3061,7 @@
                                 </Grid>
                                 <Slider x:Name="AMDImageSharpeningSlider"
                                         Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="0" Maximum="100"
+                                        Minimum="10" Maximum="100"
                                         TickFrequency="10"
                                         SnapsTo="Ticks"
                                         TickPlacement="BottomRight"

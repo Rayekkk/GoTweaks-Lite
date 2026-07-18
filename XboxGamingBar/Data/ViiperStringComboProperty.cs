@@ -93,7 +93,10 @@ namespace XboxGamingBar.Data
             if (commit != null && commit != Value)
             {
                 Logger.Info($"{Function} combo settled at {commit} (debounced).");
-                SetValue(commit);
+                // Bug fix: see IntTagComboProperty's identical fix - omitting the timestamp
+                // defaults to 0, which PropertyUpdateArbiter (#79) rejects as stale once this
+                // property has a real prior timestamp (every edit after the first would no-op).
+                SetValue(commit, DateTime.Now.Ticks);
             }
         }
 
