@@ -59,6 +59,16 @@ namespace XboxGamingBar
             // Graphics settings (HDR and Resolution for profile feature)
             HDRToggle.Toggled += SettingChanged;
             ResolutionComboBox.SelectionChanged += SettingChanged;
+            // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+            // 2026-07-19 (round 13): unlike Resolution/HDR (both wired to SettingChanged here AND
+            // to ProfileTrackedProperty_ChangedResyncProfile for helper-pushed changes),
+            // RefreshRate only ever had the latter - which calls SaveCurrentSettingsToProfile but
+            // never SendPowerSourceProfileValuesToHelper(). Same failure shape as the already-fixed
+            // Custom TDP sliders / FPS Limit bugs: a live refresh-rate change (via this combobox OR
+            // the Quick Settings tile's CycleRefreshRate) saved locally but never resynced to the
+            // helper's persisted AC/DC GameProfile, so it could be silently reverted by a stale
+            // value on the next AC/DC transition or helper restart.
+            RefreshRatesComboBox.SelectionChanged += SettingChanged;
 
             // AMD settings
             AMDFluidMotionFrameToggle.Toggled += AMDFluidMotionFrameToggle_ProfileToggled;

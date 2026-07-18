@@ -252,18 +252,34 @@ namespace XboxGamingBarHelper
             // on IsCurrentlyOnAC, same convention as those handlers.
             else if (sender == legionManager?.LegionPerformanceMode)
             {
+                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
+                // 2026-07-19 (round 13): this handler always wrote into profileManager.CurrentProfile
+                // directly, bypassing RouteProfileSave/ProfileSaveFlagsState.TDP entirely - unlike
+                // every sibling handler (TDP_PropertyChanged, the AMD handlers, etc.) and unlike
+                // ApplyPowerSourceProfileValues's own explicit design comment ("LegionPerformanceMode
+                // ... gated on the same TDP flag as the triplet below, since it's the mode selector
+                // for the same feature"). With a per-game profile active and "Save TDP" unchecked,
+                // this used to capture the TDP Mode change into the per-game profile instead of
+                // routing to Global, contradicting the documented flag semantics and diverging from
+                // the wattage triplet's own (correctly-gated) behavior for the identical feature.
                 bool isOnAC = IsCurrentlyOnAC;
                 Logger.Info($"Saving LegionPerformanceMode to profile {profileName} ({(isOnAC ? "AC" : "DC")})");
-                if (isOnAC)
-                {
-                    profileManager.CurrentProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
-                }
-                else
-                {
-                    profileManager.CurrentProfile.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
-                }
+                RouteProfileSave(ProfileSaveFlagsState.TDP, "LegionPerformanceMode",
+                    cur =>
+                    {
+                        if (isOnAC) cur.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
+                        else cur.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
+                    },
+                    glo =>
+                    {
+                        if (isOnAC) glo.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
+                        else glo.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
+                    });
                 // Also save directly to GlobalProfile to ensure it's always in sync
-                // This fixes an issue where the restore reads from GlobalProfile but save goes to CurrentProfile
+                // This fixes an issue where the restore reads from GlobalProfile but save goes to
+                // CurrentProfile - profileManager.GlobalProfile is a separate struct field from the
+                // reference-type CurrentProfile property, so RouteProfileSave's onCurrent path above
+                // (used whenever CurrentProfile.IsGlobalProfile is true) doesn't touch it.
                 if (profileManager.CurrentProfile.IsGlobalProfile)
                 {
                     if (isOnAC)
