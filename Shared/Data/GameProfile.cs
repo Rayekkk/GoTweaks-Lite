@@ -388,6 +388,175 @@ namespace Shared.Data
             }
         }
 
+        // [2.0 rebuild - Faza C2] AMD Radeon per-game feature toggles, gated as a group by the
+        // single ProfileSaveFlagsState.AMDFeatures flag (same one-flag-many-fields pattern as
+        // GyroSettings). Nullable - null means "never configured", distinct from explicitly off.
+
+        [XmlElement("FluidMotionFrames")]
+        private bool? fluidMotionFrames;
+        public bool? FluidMotionFrames
+        {
+            get { return fluidMotionFrames; }
+            set
+            {
+                if (fluidMotionFrames != value)
+                {
+                    fluidMotionFrames = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonSuperResolution")]
+        private bool? radeonSuperResolution;
+        public bool? RadeonSuperResolution
+        {
+            get { return radeonSuperResolution; }
+            set
+            {
+                if (radeonSuperResolution != value)
+                {
+                    radeonSuperResolution = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonSuperResolutionSharpness")]
+        private int? radeonSuperResolutionSharpness;
+        public int? RadeonSuperResolutionSharpness
+        {
+            get { return radeonSuperResolutionSharpness; }
+            set
+            {
+                if (radeonSuperResolutionSharpness != value)
+                {
+                    radeonSuperResolutionSharpness = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("ImageSharpening")]
+        private bool? imageSharpening;
+        public bool? ImageSharpening
+        {
+            get { return imageSharpening; }
+            set
+            {
+                if (imageSharpening != value)
+                {
+                    imageSharpening = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("ImageSharpeningSharpness")]
+        private int? imageSharpeningSharpness;
+        public int? ImageSharpeningSharpness
+        {
+            get { return imageSharpeningSharpness; }
+            set
+            {
+                if (imageSharpeningSharpness != value)
+                {
+                    imageSharpeningSharpness = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonAntiLag")]
+        private bool? radeonAntiLag;
+        public bool? RadeonAntiLag
+        {
+            get { return radeonAntiLag; }
+            set
+            {
+                if (radeonAntiLag != value)
+                {
+                    radeonAntiLag = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonBoost")]
+        private bool? radeonBoost;
+        public bool? RadeonBoost
+        {
+            get { return radeonBoost; }
+            set
+            {
+                if (radeonBoost != value)
+                {
+                    radeonBoost = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonBoostResolution")]
+        private int? radeonBoostResolution;
+        public int? RadeonBoostResolution
+        {
+            get { return radeonBoostResolution; }
+            set
+            {
+                if (radeonBoostResolution != value)
+                {
+                    radeonBoostResolution = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChill")]
+        private bool? radeonChill;
+        public bool? RadeonChill
+        {
+            get { return radeonChill; }
+            set
+            {
+                if (radeonChill != value)
+                {
+                    radeonChill = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChillMinFPS")]
+        private int? radeonChillMinFPS;
+        public int? RadeonChillMinFPS
+        {
+            get { return radeonChillMinFPS; }
+            set
+            {
+                if (radeonChillMinFPS != value)
+                {
+                    radeonChillMinFPS = value;
+                    Save();
+                }
+            }
+        }
+
+        [XmlElement("RadeonChillMaxFPS")]
+        private int? radeonChillMaxFPS;
+        public int? RadeonChillMaxFPS
+        {
+            get { return radeonChillMaxFPS; }
+            set
+            {
+                if (radeonChillMaxFPS != value)
+                {
+                    radeonChillMaxFPS = value;
+                    Save();
+                }
+            }
+        }
+
         /// <summary>
         /// Performance overlay level (0=Off, 1=Basic, 2=Detailed, 3=Full for RTSS; 1-4 for AMD)
         /// </summary>
@@ -1049,6 +1218,18 @@ namespace Shared.Data
             hdrEnabled = false;
             resolution = null;
             refreshRate = null;
+            // AMD Radeon per-game feature toggles (2.0 rebuild - Faza C2)
+            fluidMotionFrames = null;
+            radeonSuperResolution = null;
+            radeonSuperResolutionSharpness = null;
+            imageSharpening = null;
+            imageSharpeningSharpness = null;
+            radeonAntiLag = null;
+            radeonBoost = null;
+            radeonBoostResolution = null;
+            radeonChill = null;
+            radeonChillMinFPS = null;
+            radeonChillMaxFPS = null;
             // Overlay and CPU affinity
             overlayLevel = null;
             cpuAffinity = null;

@@ -120,6 +120,139 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
+        // [2.0 rebuild - Faza C2] AMD Radeon per-game feature toggles.
+        public bool? FluidMotionFrames
+        {
+            get { return value.FluidMotionFrames; }
+            set
+            {
+                if (this.value.FluidMotionFrames != value)
+                {
+                    this.value.FluidMotionFrames = value;
+                }
+            }
+        }
+
+        public bool? RadeonSuperResolution
+        {
+            get { return value.RadeonSuperResolution; }
+            set
+            {
+                if (this.value.RadeonSuperResolution != value)
+                {
+                    this.value.RadeonSuperResolution = value;
+                }
+            }
+        }
+
+        public int? RadeonSuperResolutionSharpness
+        {
+            get { return value.RadeonSuperResolutionSharpness; }
+            set
+            {
+                if (this.value.RadeonSuperResolutionSharpness != value)
+                {
+                    this.value.RadeonSuperResolutionSharpness = value;
+                }
+            }
+        }
+
+        public bool? ImageSharpening
+        {
+            get { return value.ImageSharpening; }
+            set
+            {
+                if (this.value.ImageSharpening != value)
+                {
+                    this.value.ImageSharpening = value;
+                }
+            }
+        }
+
+        public int? ImageSharpeningSharpness
+        {
+            get { return value.ImageSharpeningSharpness; }
+            set
+            {
+                if (this.value.ImageSharpeningSharpness != value)
+                {
+                    this.value.ImageSharpeningSharpness = value;
+                }
+            }
+        }
+
+        public bool? RadeonAntiLag
+        {
+            get { return value.RadeonAntiLag; }
+            set
+            {
+                if (this.value.RadeonAntiLag != value)
+                {
+                    this.value.RadeonAntiLag = value;
+                }
+            }
+        }
+
+        public bool? RadeonBoost
+        {
+            get { return value.RadeonBoost; }
+            set
+            {
+                if (this.value.RadeonBoost != value)
+                {
+                    this.value.RadeonBoost = value;
+                }
+            }
+        }
+
+        public int? RadeonBoostResolution
+        {
+            get { return value.RadeonBoostResolution; }
+            set
+            {
+                if (this.value.RadeonBoostResolution != value)
+                {
+                    this.value.RadeonBoostResolution = value;
+                }
+            }
+        }
+
+        public bool? RadeonChill
+        {
+            get { return value.RadeonChill; }
+            set
+            {
+                if (this.value.RadeonChill != value)
+                {
+                    this.value.RadeonChill = value;
+                }
+            }
+        }
+
+        public int? RadeonChillMinFPS
+        {
+            get { return value.RadeonChillMinFPS; }
+            set
+            {
+                if (this.value.RadeonChillMinFPS != value)
+                {
+                    this.value.RadeonChillMinFPS = value;
+                }
+            }
+        }
+
+        public int? RadeonChillMaxFPS
+        {
+            get { return value.RadeonChillMaxFPS; }
+            set
+            {
+                if (this.value.RadeonChillMaxFPS != value)
+                {
+                    this.value.RadeonChillMaxFPS = value;
+                }
+            }
+        }
+
         public GameId GameId
         {
             get { return value.GameId; }

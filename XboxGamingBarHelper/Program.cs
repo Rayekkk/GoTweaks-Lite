@@ -1579,6 +1579,18 @@ namespace XboxGamingBarHelper
             systemManager.HDREnabled.PropertyChanged += HDREnabled_PropertyChanged;
             systemManager.Resolution.PropertyChanged += Resolution_PropertyChanged;
             systemManager.RefreshRate.PropertyChanged += RefreshRate_PropertyChanged;
+            // [2.0 rebuild - Faza C2]
+            amdManager.AMDFluidMotionFrameEnabled.PropertyChanged += AMDFluidMotionFrameEnabled_PropertyChanged;
+            amdManager.AMDRadeonSuperResolutionEnabled.PropertyChanged += AMDRadeonSuperResolutionEnabled_PropertyChanged;
+            amdManager.AMDRadeonSuperResolutionSharpness.PropertyChanged += AMDRadeonSuperResolutionSharpness_PropertyChanged;
+            amdManager.AMDImageSharpeningEnabled.PropertyChanged += AMDImageSharpeningEnabled_PropertyChanged;
+            amdManager.AMDImageSharpeningSharpness.PropertyChanged += AMDImageSharpeningSharpness_PropertyChanged;
+            amdManager.AMDRadeonAntiLagEnabled.PropertyChanged += AMDRadeonAntiLagEnabled_PropertyChanged;
+            amdManager.AMDRadeonBoostEnabled.PropertyChanged += AMDRadeonBoostEnabled_PropertyChanged;
+            amdManager.AMDRadeonBoostResolution.PropertyChanged += AMDRadeonBoostResolution_PropertyChanged;
+            amdManager.AMDRadeonChillEnabled.PropertyChanged += AMDRadeonChillEnabled_PropertyChanged;
+            amdManager.AMDRadeonChillMinFPS.PropertyChanged += AMDRadeonChillMinFPS_PropertyChanged;
+            amdManager.AMDRadeonChillMaxFPS.PropertyChanged += AMDRadeonChillMaxFPS_PropertyChanged;
             powerManager.HibernateTimeoutAC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
             powerManager.HibernateTimeoutDC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)

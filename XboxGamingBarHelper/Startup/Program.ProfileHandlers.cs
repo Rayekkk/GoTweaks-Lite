@@ -383,6 +383,8 @@ namespace XboxGamingBarHelper
             {
                 systemManager.RefreshRate.SetValue(profileManager.GlobalProfile.RefreshRate.Value);
             }
+            // [2.0 rebuild - Faza C2]
+            ApplyAMDFeaturesFromProfile(profileManager.GlobalProfile);
             profileManager.PerGameProfile.SetValue(false);
 
             // Apply Legion controller settings from global profile
@@ -390,6 +392,41 @@ namespace XboxGamingBarHelper
             {
                 ApplyLegionControllerSettingsFromProfile();
             }
+        }
+
+        /// <summary>
+        /// [2.0 rebuild - Faza C2] Applies the 6 AMD Radeon per-game feature toggles (11 fields
+        /// incl. their value sliders) from a GameProfile struct. Shared by both apply sites
+        /// (RunningGame_PropertyChanged's per-game block passes the TryGetProfile struct;
+        /// RestoreGlobalProfileSettings passes GlobalProfile - both are the same
+        /// Shared.Data.GameProfile type). All fields are nullable - only apply what this profile
+        /// ever explicitly touched, same convention as the gyro fields in
+        /// ApplyLegionControllerSettingsFromProfile never forcing an unconfigured default.
+        /// </summary>
+        private static void ApplyAMDFeaturesFromProfile(Shared.Data.GameProfile profile)
+        {
+            if (profile.FluidMotionFrames.HasValue)
+                amdManager.AMDFluidMotionFrameEnabled.SetValue(profile.FluidMotionFrames.Value);
+            if (profile.RadeonSuperResolution.HasValue)
+                amdManager.AMDRadeonSuperResolutionEnabled.SetValue(profile.RadeonSuperResolution.Value);
+            if (profile.RadeonSuperResolutionSharpness.HasValue)
+                amdManager.AMDRadeonSuperResolutionSharpness.SetValue(profile.RadeonSuperResolutionSharpness.Value);
+            if (profile.ImageSharpening.HasValue)
+                amdManager.AMDImageSharpeningEnabled.SetValue(profile.ImageSharpening.Value);
+            if (profile.ImageSharpeningSharpness.HasValue)
+                amdManager.AMDImageSharpeningSharpness.SetValue(profile.ImageSharpeningSharpness.Value);
+            if (profile.RadeonAntiLag.HasValue)
+                amdManager.AMDRadeonAntiLagEnabled.SetValue(profile.RadeonAntiLag.Value);
+            if (profile.RadeonBoost.HasValue)
+                amdManager.AMDRadeonBoostEnabled.SetValue(profile.RadeonBoost.Value);
+            if (profile.RadeonBoostResolution.HasValue)
+                amdManager.AMDRadeonBoostResolution.SetValue(profile.RadeonBoostResolution.Value);
+            if (profile.RadeonChill.HasValue)
+                amdManager.AMDRadeonChillEnabled.SetValue(profile.RadeonChill.Value);
+            if (profile.RadeonChillMinFPS.HasValue)
+                amdManager.AMDRadeonChillMinFPS.SetValue(profile.RadeonChillMinFPS.Value);
+            if (profile.RadeonChillMaxFPS.HasValue)
+                amdManager.AMDRadeonChillMaxFPS.SetValue(profile.RadeonChillMaxFPS.Value);
         }
 
         private static void CurrentProfile_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -698,6 +735,98 @@ namespace XboxGamingBarHelper
                 glo => glo.RefreshRate = systemManager.RefreshRate.Value);
         }
 
+        // [2.0 rebuild - Faza C2] The 6 AMD Radeon per-game feature toggles, all gated by the
+        // single ProfileSaveFlagsState.AMDFeatures flag (mirrors GyroSettings gating 9 controller
+        // properties with one flag). Same isApplyingProfile + cooldown guard shape as the others.
+
+        private static void AMDFluidMotionFrameEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "FluidMotionFrames",
+                cur => cur.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value,
+                glo => glo.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value);
+        }
+
+        private static void AMDRadeonSuperResolutionEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonSuperResolution",
+                cur => cur.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value,
+                glo => glo.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value);
+        }
+
+        private static void AMDRadeonSuperResolutionSharpness_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonSuperResolutionSharpness",
+                cur => cur.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value,
+                glo => glo.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value);
+        }
+
+        private static void AMDImageSharpeningEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "ImageSharpening",
+                cur => cur.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value,
+                glo => glo.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value);
+        }
+
+        private static void AMDImageSharpeningSharpness_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "ImageSharpeningSharpness",
+                cur => cur.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value,
+                glo => glo.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value);
+        }
+
+        private static void AMDRadeonAntiLagEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonAntiLag",
+                cur => cur.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value,
+                glo => glo.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value);
+        }
+
+        private static void AMDRadeonBoostEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonBoost",
+                cur => cur.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value,
+                glo => glo.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value);
+        }
+
+        private static void AMDRadeonBoostResolution_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonBoostResolution",
+                cur => cur.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value,
+                glo => glo.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value);
+        }
+
+        private static void AMDRadeonChillEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChill",
+                cur => cur.RadeonChill = amdManager.AMDRadeonChillEnabled.Value,
+                glo => glo.RadeonChill = amdManager.AMDRadeonChillEnabled.Value);
+        }
+
+        private static void AMDRadeonChillMinFPS_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChillMinFPS",
+                cur => cur.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value,
+                glo => glo.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value);
+        }
+
+        private static void AMDRadeonChillMaxFPS_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChillMaxFPS",
+                cur => cur.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value,
+                glo => glo.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value);
+        }
+
         private static void RunningGame_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // #66: drive PresentMon subprocess lifecycle from the same RunningGame signal.
@@ -766,6 +895,9 @@ namespace XboxGamingBarHelper
                             {
                                 systemManager.RefreshRate.SetValue(runningGameProfile.RefreshRate.Value);
                             }
+                            // [2.0 rebuild - Faza C2] AMD toggles are nullable - only apply if this
+                            // profile ever explicitly touched them (never force a default).
+                            ApplyAMDFeaturesFromProfile(runningGameProfile);
 
                             if (legionManager != null)
                             {
