@@ -1335,10 +1335,13 @@ namespace XboxGamingBarHelper.Performance
                         {
                             // On Legion in Custom mode the three explicit SPL/SPPT/FPPT limits (driven
                             // by the TDP / SPPT Boost / FPPT Boost sliders) are authoritative. A single
-                            // master-TDP write here must NOT collapse them to tdp/tdp/tdp — the
-                            // ReapplyTDP / power-source / global-profile paths all funnel through SetTDP
-                            // carrying the (Legion-meaningless) master value, which would otherwise slam
-                            // the console back to ~15W. Re-assert the cached Custom triplet instead.
+                            // master-TDP write here must NOT collapse them to tdp/tdp/tdp — any caller
+                            // that still funnels through the flat SetTDP (global-profile apply,
+                            // ReapplyTDP-style pipe requests if one is ever reintroduced) would
+                            // otherwise slam the console back to ~15W. Re-assert the cached Custom
+                            // triplet instead. (AC/DC transitions no longer go through this path at
+                            // all - Program.PowerSourceHandler.cs calls LegionManager.SetCustomTDP
+                            // directly with the full per-state triplet.)
                             if (legionManager.IsInCustomMode)
                             {
                                 legionManager.ReassertCustomTDP();

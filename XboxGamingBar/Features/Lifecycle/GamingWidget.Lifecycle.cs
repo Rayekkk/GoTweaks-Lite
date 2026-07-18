@@ -66,13 +66,6 @@ namespace XboxGamingBar
                 widget.GameBarDisplayModeChanged -= GamingWidget_GameBarDisplayModeChanged;
             }
 
-            // Stop power source TDP reapply timer
-            if (powerSourceTdpReapplyTimer != null)
-            {
-                powerSourceTdpReapplyTimer.Stop();
-                powerSourceTdpReapplyTimer = null;
-            }
-
             // Stop reconnection timeout timer
             StopReconnectionTimeoutTimer();
 

@@ -236,18 +236,6 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
-                // Handle "reapply TDP to hardware" request. After a power source change or
-                // Custom-mode re-entry, Windows/Legion firmware may silently reset TDP limits
-                // even though our cached value hasn't changed. Widget asks the helper to
-                // re-push the current TDP to hardware without going through the property
-                // system's equality check. Must NOT modify the profile's saved TDP (the old
-                // N-1/N trick did and corrupted global.xml by 1 W).
-                if (pipeMsg.Extra.ContainsKey("ReapplyTDP"))
-                {
-                    HandleReapplyTDP(pipeMsg);
-                    return;
-                }
-
                 // Widget fires this on each panel open so the brightness slider always shows the
                 // real current value (in case brightness was changed from another source) and grays
                 // out when the built-in panel is off (external monitor). Helper re-reads WMI live.
@@ -999,26 +987,6 @@ namespace XboxGamingBarHelper
                 responseMsg.RequestId = pipeMsg.RequestId;
                 pipeServer.SendMessage(responseMsg.ToJson());
             }
-        }
-
-        // ReapplyTDP: re-push the current cached TDP to hardware (after a power-source
-        // change / Custom re-entry). Must NOT modify the profile's saved TDP.
-        private static void HandleReapplyTDP(Shared.IPC.PipeMessage pipeMsg)
-        {
-            try
-            {
-                if (performanceManager != null)
-                {
-                    int currentTdp = performanceManager.TDP.Value;
-                    Logger.Info($"Pipe: ReapplyTDP request — re-pushing current {currentTdp}W to hardware");
-                    performanceManager.SetTDP(currentTdp);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Pipe: ReapplyTDP threw: {ex.Message}");
-            }
-            SendPipeAck(pipeMsg.RequestId);
         }
 
         // RefreshPanelBrightness: re-read the built-in panel brightness + availability from WMI and

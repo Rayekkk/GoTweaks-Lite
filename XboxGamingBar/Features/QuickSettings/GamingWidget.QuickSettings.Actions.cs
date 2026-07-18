@@ -251,61 +251,19 @@ namespace XboxGamingBar
                     isUserInitiatedTDPModeChange = false;
                 }
 
-                // If switching to Custom mode on Legion, schedule TDP reapply
-                if (isLegion && nextMode == 255)
-                {
-                    ScheduleQsTdpReapply();
-                }
+                // [2.0 rebuild - widget-pure-display] Used to schedule a 5-second-delayed generic
+                // "ReapplyTDP" pipe poke here as a widget-side safety net for "the mode switch might
+                // not have settled yet". Redundant: LegionManager.SetPerformanceMode (triggered
+                // directly by the legionPerformanceMode.SetValue(nextMode) call above) already has
+                // its own internal Custom-mode-entry safety net (polls hardware for Custom
+                // confirmation, re-applies cached limits, schedules its own delayed reapply) -
+                // helper-side, immediate, and correct regardless of what triggered the mode change
+                // (this tile, the dropdown, or a helper-autonomous restore). A widget timer nudging
+                // the helper to redo its own job is exactly the "widget doing something on its own"
+                // pattern the 2.0 architecture rules out (see memory: widget-pure-display-principle).
+                // Removed entirely, along with ScheduleQsTdpReapply/qsTdpReapplyTimer.
 
                 Logger.Info($"TDP Mode cycled from {currentMode} to {nextMode} (isLegion={isLegion})");
-            }
-        }
-
-        private void ScheduleQsTdpReapply()
-        {
-            try
-            {
-                // Cancel existing timer
-                if (qsTdpReapplyTimer != null)
-                {
-                    qsTdpReapplyTimer.Stop();
-                }
-
-                // Create new timer
-                qsTdpReapplyTimer = new Windows.UI.Xaml.DispatcherTimer();
-                qsTdpReapplyTimer.Interval = TimeSpan.FromSeconds(5);
-                qsTdpReapplyTimer.Tick += async (s, e) =>
-                {
-                    qsTdpReapplyTimer.Stop();
-                    // Reapply TDP - still in Custom mode?
-                    bool isCustomMode = TDPModeComboBox?.SelectedIndex == 3;
-                    if (isCustomMode)
-                    {
-                        // Ask the helper to re-push the current TDP to hardware. On Legion in Custom
-                        // mode the helper re-asserts the cached SPL/SPPT/FPPT (ReassertCustomTDP); the
-                        // master TDP slider was removed so there's no widget value to read here.
-                        try
-                        {
-                            if (App.IsConnected)
-                            {
-                                var request = new Windows.Foundation.Collections.ValueSet();
-                                request.Add("ReapplyTDP", true);
-                                await App.SendMessageAsync(request);
-                                Logger.Info("Quick Settings: Asked helper to reapply current TDP");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Warn($"Quick Settings: ReapplyTDP send failed: {ex.Message}");
-                        }
-                    }
-                };
-                qsTdpReapplyTimer.Start();
-                Logger.Info($"Quick Settings: Scheduled TDP reapply in 5 seconds");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error scheduling TDP reapply: {ex.Message}");
             }
         }
 

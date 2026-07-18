@@ -1745,10 +1745,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         /// <summary>
         /// Re-pushes the cached Custom SPL/SPPT/FPPT limits to hardware. Used by the master-TDP
-        /// reapply paths (ReapplyTDP / power-source change / global-profile apply) which carry a
-        /// SINGLE master TDP value — on Legion that value must NOT collapse the three independent
-        /// Custom limits to v/v/v. Re-asserts the cached triplet instead. No-op outside Custom mode
-        /// (preset modes are firmware-managed).
+        /// reapply paths (global-profile apply / any other PerformanceManager.SetTDP call while in
+        /// Custom mode) which carry a SINGLE master TDP value — on Legion that value must NOT
+        /// collapse the three independent Custom limits to v/v/v. Re-asserts the cached triplet
+        /// instead. No-op outside Custom mode (preset modes are firmware-managed). (The widget-side
+        /// "ReapplyTDP" pipe poke that used to also land here was removed - see memory:
+        /// widget-pure-display-principle - LegionManager's own internal reapply/safety-net timers
+        /// already cover what it was for.)
         /// </summary>
         public void ReassertCustomTDP()
         {

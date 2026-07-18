@@ -172,9 +172,6 @@ namespace XboxGamingBar
         private Dictionary<string, double> currentMetricsData = new Dictionary<string, double>();
         private bool currentMetricsIsCharging = false;
 
-        // Timer for TDP reapply when switching to Custom mode
-        private Windows.UI.Xaml.DispatcherTimer qsTdpReapplyTimer;
-
         /// <summary>
         /// Initialize Quick Settings resources and build tiles
         /// </summary>

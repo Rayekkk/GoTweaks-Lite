@@ -521,9 +521,6 @@ namespace XboxGamingBar
         // Widget unloading flag - prevents UI updates during shutdown
         private bool isUnloading = false;
 
-        // Power source change TDP reapply timer
-        private DispatcherTimer powerSourceTdpReapplyTimer = null;
-
         // Labs section - DAService status timer
         private DispatcherTimer daServiceStatusTimer = null;
         private bool daServiceIsRunning = false;

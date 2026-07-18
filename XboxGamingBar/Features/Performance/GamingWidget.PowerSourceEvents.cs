@@ -64,74 +64,18 @@ namespace XboxGamingBar
 
                 UpdateActiveProfileIndicator();
 
-                // Only reapply TDP after power source change if:
-                // 1. On Legion Go in Custom mode (255) - system changes TDP, need to restore
-                // 2. Power Source Profile toggle is enabled - user wants different profiles per power state
-                // For Legion preset modes (Quiet=1, Balanced=2, Performance=3), let the system handle TDP
-                bool isLegionCustomMode = legionGoDetected?.Value == true && legionPerformanceMode?.Value == 255;
-                bool powerSourceProfileEnabled = GetPowerSourceProfileEnabledForCurrentContext();
-
-                if (isLegionCustomMode || powerSourceProfileEnabled)
-                {
-                    SchedulePowerSourceTdpReapply();
-                }
+                // [2.0 rebuild - widget-pure-display] This used to schedule a 5-second-delayed
+                // generic "ReapplyTDP" pipe poke here (in Custom mode, or when a Power Source
+                // Profile split is enabled) as a widget-side safety net for "the hardware might not
+                // have settled yet". That's now fully redundant: Program.PowerSourceHandler.cs
+                // (helper-side) already reapplies the correct Custom TDP triplet - and the other
+                // AC/DC-mirrored fields (CPUBoost/CPUEPP/CPUState/OSPowerMode/FPSLimit) - IMMEDIATELY
+                // and correctly on this same OS event, independently of widget lifecycle. A widget
+                // timer nudging the helper to redo its own job on its own schedule is exactly the
+                // "widget doing something on its own" pattern the 2.0 architecture rules out (see
+                // memory: widget-pure-display-principle). Removed entirely, along with
+                // SchedulePowerSourceTdpReapply/powerSourceTdpReapplyTimer.
             });
-        }
-
-        /// <summary>
-        /// Schedules a TDP reapply 5 seconds after power source changes.
-        /// This ensures the TDP is properly applied after the system settles.
-        /// </summary>
-        private void SchedulePowerSourceTdpReapply()
-        {
-            try
-            {
-                // Cancel existing timer if any
-                if (powerSourceTdpReapplyTimer != null)
-                {
-                    powerSourceTdpReapplyTimer.Stop();
-                }
-
-                // Create and start timer
-                powerSourceTdpReapplyTimer = new DispatcherTimer();
-                powerSourceTdpReapplyTimer.Interval = TimeSpan.FromSeconds(5);
-                powerSourceTdpReapplyTimer.Tick += async (s, args) =>
-                {
-                    powerSourceTdpReapplyTimer.Stop();
-
-                    // Skip TDP reapply if not in Custom mode - preset modes manage TDP automatically
-                    if (legionGoDetected?.Value == true && legionPerformanceMode?.Value != 255)
-                    {
-                        Logger.Info($"Power source change: Skipping TDP reapply - using {GetLegionModeShortName(legionPerformanceMode?.Value ?? 0)} preset mode");
-                        return;
-                    }
-
-                    // Ask the helper to re-push the current TDP to hardware via a dedicated pipe
-                    // message. On Legion in Custom mode the helper re-asserts the cached
-                    // SPL/SPPT/FPPT (ReassertCustomTDP); the master TDP slider was removed so there's
-                    // no widget value to read here.
-                    try
-                    {
-                        if (App.IsConnected)
-                        {
-                            var request = new Windows.Foundation.Collections.ValueSet();
-                            request.Add("ReapplyTDP", true);
-                            await App.SendMessageAsync(request);
-                            Logger.Info("Power source change: Asked helper to reapply current TDP");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn($"Power source change: ReapplyTDP send failed: {ex.Message}");
-                    }
-                };
-                powerSourceTdpReapplyTimer.Start();
-                Logger.Info($"Power source change: Scheduled TDP reapply in 5 seconds");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error scheduling power source TDP reapply: {ex.Message}");
-            }
         }
 
     }
