@@ -209,12 +209,6 @@ namespace XboxGamingBarHelper
                     {
                         string source = perStateTdp.HasValue ? $"per-state {(isOnAC ? "AC" : "DC")} profile" : "current cached value";
                         Logger.Info($"Helper-side AC/DC handler: applying Custom TDP {targetTdp}/{targetTdpFast}/{targetTdpPeak}W from {source} (legionCustom={isLegionCustomMode})");
-                        // Update the helper's TDP property so the widget's slider stays in sync
-                        // (the property change pipes back to the widget).
-                        if (perStateTdp.HasValue && perStateTdp.Value != performanceManager.TDP.Value)
-                        {
-                            performanceManager.TDP.SetValue(targetTdp);
-                        }
                         // [TDP Custom-triplet AC/DC fix] The flat PerformanceManager.SetTDP used
                         // here previously hit ApplyTDPInternal's IsInCustomMode branch, which calls
                         // LegionManager.ReassertCustomTDP - that IGNORES the passed value and just
@@ -226,6 +220,26 @@ namespace XboxGamingBarHelper
                         // mode-switch safety (pending-mode flush, hardware-confirm poll, atomic
                         // apply+rollback).
                         legionManager.SetCustomTDP(targetTdp, targetTdpFast, targetTdpPeak);
+
+                        // Keep the flat TDP property's cache in sync too (SetValueSilent - do NOT
+                        // use SetValue/SetProfileValue here). On-device testing of this fix (2026-07-18)
+                        // caught a real race: TDPProperty.NotifyPropertyChanged unconditionally calls
+                        // Manager.SetTDP(Value), which in Custom mode re-enters ApplyTDPInternal ->
+                        // ReassertCustomTDP - a SECOND, fully independent apply of whatever's cached
+                        // at that instant. Since ApplyTDPValues above writes SPL/SPPT/FPPT one at a
+                        // time (each a separate slow WMI call) and only updates the cache at the very
+                        // end, a SetValue call here could observe/reassert a stale cache mid-flight
+                        // (worse: if TDPProperty's forceNextApply first-call flag is still set, or a
+                        // mode-switch happens to be pending, that second apply's own flush+confirm
+                        // sequence can take significantly longer than this one - it then finishes
+                        // LAST and overwrites the just-applied correct values with the stale ones it
+                        // captured at start, observed on-device as the Custom TDP triplet reverting to
+                        // the previous power state's SPPT/FPPT seconds after the transition). Custom
+                        // mode has no UI bound to the flat TDP property (removed per the master-slider
+                        // cleanup) - SetCustomTDP above already syncs the properties the Custom TDP
+                        // sliders actually read (LegionCustomTDPSlow/Fast/Peak) - so this is cache
+                        // bookkeeping only, no hardware re-apply needed or wanted.
+                        performanceManager.TDP.SetValueSilent(targetTdp);
                     }
 
                     // TDP Boost removed — boost is always on (SPPT/FPPT applied directly), so there's
