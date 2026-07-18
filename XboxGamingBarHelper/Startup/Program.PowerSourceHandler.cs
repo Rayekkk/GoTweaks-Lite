@@ -46,6 +46,13 @@ namespace XboxGamingBarHelper
         // the first real transition always fires (initial seeding is done in SystemManager).
         private static bool? _lastIsOnAC;
 
+        // [2.0 rebuild - AC/DC live-edit fix] Lets any live single-field save handler
+        // (TDP_PropertyChanged, the AMD/CPU-cluster *_PropertyChanged handlers, etc.) find out
+        // which power state to persist a live edit under - defaults to AC (true) when no real
+        // transition has fired yet, matching the pre-existing "base field = AC" convention so an
+        // early edit before the first PowerSourceChanged event lands where it always used to.
+        internal static bool IsCurrentlyOnAC => _lastIsOnAC ?? true;
+
         /// <summary>
         /// Persists the widget's per-state (AC/DC) values into the currently-targeted profile's
         /// base + _DC fields (real, durable GameProfile/GlobalProfile storage - see

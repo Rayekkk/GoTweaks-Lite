@@ -61,7 +61,7 @@ namespace XboxGamingBar
             ResolutionComboBox.SelectionChanged += SettingChanged;
 
             // AMD settings
-            AMDFluidMotionFrameToggle.Toggled += SettingChanged;
+            AMDFluidMotionFrameToggle.Toggled += AMDFluidMotionFrameToggle_ProfileToggled;
             AMDRadeonSuperResolutionToggle.Toggled += AMDRadeonSuperResolutionToggle_Toggled;
             AMDRadeonSuperResolutionSharpnessSlider.ValueChanged += SettingChangedDebounced;
             AMDImageSharpeningToggle.Toggled += AMDImageSharpeningToggle_Toggled;

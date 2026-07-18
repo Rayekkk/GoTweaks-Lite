@@ -720,9 +720,16 @@ namespace XboxGamingBarHelper
             // TDP while a per-game profile is active. Expect the change to land in GlobalProfile
             // (and the per-game TDP to remain whatever was saved before). Pre-flag baseline:
             // always wrote to CurrentProfile regardless of flag.
+            // [2.0 rebuild - AC/DC live-edit fix] Writes to the base (AC) or _DC field depending
+            // on the CURRENT power state (Program.PowerSourceHandler.cs's IsCurrentlyOnAC) - a
+            // live edit while on battery must land in the DC override, not silently overwrite the
+            // AC value. Found on-device 2026-07-18: every one of these handlers always wrote to
+            // base regardless of actual power state, so a live edit (or an AMD-driver-forced
+            // dependent change, e.g. AFMF forcing Anti-Lag on) silently corrupted the AC/DC split.
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.TDP, "TDP",
-                cur => cur.TDP = performanceManager.TDP,
-                glo => glo.TDP = performanceManager.TDP);
+                cur => { if (isOnAC) cur.TDP = performanceManager.TDP; else cur.TDP_DC = performanceManager.TDP; },
+                glo => { if (isOnAC) glo.TDP = performanceManager.TDP; else glo.TDP_DC = performanceManager.TDP; });
         }
 
         // [2.0 rebuild - Faza C1] The remaining Performance-tab settings whose schema already
@@ -749,9 +756,11 @@ namespace XboxGamingBarHelper
                 return;
             }
 
+            // [2.0 rebuild - AC/DC live-edit fix] See TDP_PropertyChanged's comment above.
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.FPSLimit, "FPSLimit",
-                cur => cur.FPSLimit = rtssManager.FPSLimit.Value,
-                glo => glo.FPSLimit = rtssManager.FPSLimit.Value);
+                cur => { if (isOnAC) cur.FPSLimit = rtssManager.FPSLimit.Value; else cur.FPSLimit_DC = rtssManager.FPSLimit.Value; },
+                glo => { if (isOnAC) glo.FPSLimit = rtssManager.FPSLimit.Value; else glo.FPSLimit_DC = rtssManager.FPSLimit.Value; });
         }
 
         private static void HDREnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -767,9 +776,11 @@ namespace XboxGamingBarHelper
                 return;
             }
 
+            // [2.0 rebuild - AC/DC live-edit fix] See TDP_PropertyChanged's comment above.
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.HDR, "HDREnabled",
-                cur => cur.HDREnabled = systemManager.HDREnabled.Value,
-                glo => glo.HDREnabled = systemManager.HDREnabled.Value);
+                cur => { if (isOnAC) cur.HDREnabled = systemManager.HDREnabled.Value; else cur.HDREnabled_DC = systemManager.HDREnabled.Value; },
+                glo => { if (isOnAC) glo.HDREnabled = systemManager.HDREnabled.Value; else glo.HDREnabled_DC = systemManager.HDREnabled.Value; });
         }
 
         private static void Resolution_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -785,9 +796,11 @@ namespace XboxGamingBarHelper
                 return;
             }
 
+            // [2.0 rebuild - AC/DC live-edit fix] See TDP_PropertyChanged's comment above.
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.Resolution, "Resolution",
-                cur => cur.Resolution = systemManager.Resolution.Value,
-                glo => glo.Resolution = systemManager.Resolution.Value);
+                cur => { if (isOnAC) cur.Resolution = systemManager.Resolution.Value; else cur.Resolution_DC = systemManager.Resolution.Value; },
+                glo => { if (isOnAC) glo.Resolution = systemManager.Resolution.Value; else glo.Resolution_DC = systemManager.Resolution.Value; });
         }
 
         private static void RefreshRate_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -803,101 +816,131 @@ namespace XboxGamingBarHelper
                 return;
             }
 
+            // [2.0 rebuild - AC/DC live-edit fix] See TDP_PropertyChanged's comment above.
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.RefreshRate, "RefreshRate",
-                cur => cur.RefreshRate = systemManager.RefreshRate.Value,
-                glo => glo.RefreshRate = systemManager.RefreshRate.Value);
+                cur => { if (isOnAC) cur.RefreshRate = systemManager.RefreshRate.Value; else cur.RefreshRate_DC = systemManager.RefreshRate.Value; },
+                glo => { if (isOnAC) glo.RefreshRate = systemManager.RefreshRate.Value; else glo.RefreshRate_DC = systemManager.RefreshRate.Value; });
         }
 
         // [2.0 rebuild - Faza C2] The 6 AMD Radeon per-game feature toggles, all gated by the
         // single ProfileSaveFlagsState.AMDFeatures flag (mirrors GyroSettings gating 9 controller
         // properties with one flag). Same isApplyingProfile + cooldown guard shape as the others.
 
+        // [2.0 rebuild - AC/DC live-edit fix] All 11 AMD handlers below now write to the base
+        // (AC) or _DC field depending on IsCurrentlyOnAC, same reasoning as TDP_PropertyChanged's
+        // comment further up.
+
         private static void AMDFluidMotionFrameEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "FluidMotionFrames",
-                cur => cur.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value,
-                glo => glo.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value);
+                cur => { if (isOnAC) cur.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value; else cur.FluidMotionFrames_DC = amdManager.AMDFluidMotionFrameEnabled.Value; },
+                glo => { if (isOnAC) glo.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value; else glo.FluidMotionFrames_DC = amdManager.AMDFluidMotionFrameEnabled.Value; });
         }
 
         private static void AMDRadeonSuperResolutionEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonSuperResolution",
-                cur => cur.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value,
-                glo => glo.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value);
+                cur => { if (isOnAC) cur.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value; else cur.RadeonSuperResolution_DC = amdManager.AMDRadeonSuperResolutionEnabled.Value; },
+                glo => { if (isOnAC) glo.RadeonSuperResolution = amdManager.AMDRadeonSuperResolutionEnabled.Value; else glo.RadeonSuperResolution_DC = amdManager.AMDRadeonSuperResolutionEnabled.Value; });
         }
 
         private static void AMDRadeonSuperResolutionSharpness_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonSuperResolutionSharpness",
-                cur => cur.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value,
-                glo => glo.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value);
+                cur => { if (isOnAC) cur.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value; else cur.RadeonSuperResolutionSharpness_DC = amdManager.AMDRadeonSuperResolutionSharpness.Value; },
+                glo => { if (isOnAC) glo.RadeonSuperResolutionSharpness = amdManager.AMDRadeonSuperResolutionSharpness.Value; else glo.RadeonSuperResolutionSharpness_DC = amdManager.AMDRadeonSuperResolutionSharpness.Value; });
         }
 
         private static void AMDImageSharpeningEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "ImageSharpening",
-                cur => cur.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value,
-                glo => glo.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value);
+                cur => { if (isOnAC) cur.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value; else cur.ImageSharpening_DC = amdManager.AMDImageSharpeningEnabled.Value; },
+                glo => { if (isOnAC) glo.ImageSharpening = amdManager.AMDImageSharpeningEnabled.Value; else glo.ImageSharpening_DC = amdManager.AMDImageSharpeningEnabled.Value; });
         }
 
         private static void AMDImageSharpeningSharpness_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "ImageSharpeningSharpness",
-                cur => cur.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value,
-                glo => glo.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value);
+                cur => { if (isOnAC) cur.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value; else cur.ImageSharpeningSharpness_DC = amdManager.AMDImageSharpeningSharpness.Value; },
+                glo => { if (isOnAC) glo.ImageSharpeningSharpness = amdManager.AMDImageSharpeningSharpness.Value; else glo.ImageSharpeningSharpness_DC = amdManager.AMDImageSharpeningSharpness.Value; });
         }
 
         private static void AMDRadeonAntiLagEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            // [AFMF-forces-AntiLag fix] AMDManager.cs's own AmdFluidMotionFrameEnabled handler
+            // force-enables Anti-Lag whenever AFMF turns on (a real AMD driver requirement, not a
+            // free user choice in that state) - that forced SetValue fires this same handler as a
+            // side effect. Saving it as if it were an independent edit pollutes the persisted
+            // Anti-Lag preference with a value that only reflects AFMF's requirement, not the
+            // user's actual preference for when AFMF is off. Skip the save entirely while AFMF is
+            // on; the widget greys out the Anti-Lag toggle in this state for the same reason
+            // (GamingWidget.QuickSettings.Actions.cs's AMDFluidMotionFrameToggle_ProfileToggled).
+            if (amdManager.AMDFluidMotionFrameEnabled.Value)
+            {
+                Logger.Debug("Skipping AMDRadeonAntiLagEnabled_PropertyChanged save - forced on by AFMF, not an independent choice");
+                return;
+            }
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonAntiLag",
-                cur => cur.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value,
-                glo => glo.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value);
+                cur => { if (isOnAC) cur.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value; else cur.RadeonAntiLag_DC = amdManager.AMDRadeonAntiLagEnabled.Value; },
+                glo => { if (isOnAC) glo.RadeonAntiLag = amdManager.AMDRadeonAntiLagEnabled.Value; else glo.RadeonAntiLag_DC = amdManager.AMDRadeonAntiLagEnabled.Value; });
         }
 
         private static void AMDRadeonBoostEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonBoost",
-                cur => cur.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value,
-                glo => glo.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value);
+                cur => { if (isOnAC) cur.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value; else cur.RadeonBoost_DC = amdManager.AMDRadeonBoostEnabled.Value; },
+                glo => { if (isOnAC) glo.RadeonBoost = amdManager.AMDRadeonBoostEnabled.Value; else glo.RadeonBoost_DC = amdManager.AMDRadeonBoostEnabled.Value; });
         }
 
         private static void AMDRadeonBoostResolution_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonBoostResolution",
-                cur => cur.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value,
-                glo => glo.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value);
+                cur => { if (isOnAC) cur.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value; else cur.RadeonBoostResolution_DC = amdManager.AMDRadeonBoostResolution.Value; },
+                glo => { if (isOnAC) glo.RadeonBoostResolution = amdManager.AMDRadeonBoostResolution.Value; else glo.RadeonBoostResolution_DC = amdManager.AMDRadeonBoostResolution.Value; });
         }
 
         private static void AMDRadeonChillEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChill",
-                cur => cur.RadeonChill = amdManager.AMDRadeonChillEnabled.Value,
-                glo => glo.RadeonChill = amdManager.AMDRadeonChillEnabled.Value);
+                cur => { if (isOnAC) cur.RadeonChill = amdManager.AMDRadeonChillEnabled.Value; else cur.RadeonChill_DC = amdManager.AMDRadeonChillEnabled.Value; },
+                glo => { if (isOnAC) glo.RadeonChill = amdManager.AMDRadeonChillEnabled.Value; else glo.RadeonChill_DC = amdManager.AMDRadeonChillEnabled.Value; });
         }
 
         private static void AMDRadeonChillMinFPS_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChillMinFPS",
-                cur => cur.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value,
-                glo => glo.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value);
+                cur => { if (isOnAC) cur.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value; else cur.RadeonChillMinFPS_DC = amdManager.AMDRadeonChillMinFPS.Value; },
+                glo => { if (isOnAC) glo.RadeonChillMinFPS = amdManager.AMDRadeonChillMinFPS.Value; else glo.RadeonChillMinFPS_DC = amdManager.AMDRadeonChillMinFPS.Value; });
         }
 
         private static void AMDRadeonChillMaxFPS_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
+            bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "RadeonChillMaxFPS",
-                cur => cur.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value,
-                glo => glo.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value);
+                cur => { if (isOnAC) cur.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value; else cur.RadeonChillMaxFPS_DC = amdManager.AMDRadeonChillMaxFPS.Value; },
+                glo => { if (isOnAC) glo.RadeonChillMaxFPS = amdManager.AMDRadeonChillMaxFPS.Value; else glo.RadeonChillMaxFPS_DC = amdManager.AMDRadeonChillMaxFPS.Value; });
         }
 
         private static void RunningGame_PropertyChanged(object sender, PropertyChangedEventArgs e)

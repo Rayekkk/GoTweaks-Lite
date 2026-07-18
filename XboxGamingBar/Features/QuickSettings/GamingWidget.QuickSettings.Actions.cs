@@ -882,6 +882,26 @@ namespace XboxGamingBar
         }
 
         /// <summary>
+        /// AFMF toggle changed - Anti-Lag is mandatory whenever AFMF is on (AMDManager.cs's own
+        /// AmdFluidMotionFrameEnabled handler force-enables it, a real AMD driver requirement, not
+        /// a free user choice in that state). Grey out the Anti-Lag toggle so the user can't fight
+        /// that - deliberately does NOT set Anti-Lag's IsOn itself; the bound property already
+        /// reflects the helper's actual value (widget-pure-display-principle: adjust the control's
+        /// enabled affordance, never independently force its value).
+        /// </summary>
+        private void AMDFluidMotionFrameToggle_ProfileToggled(object sender, RoutedEventArgs e)
+        {
+            UpdateAntiLagLockState();
+            SettingChanged(sender, e);
+        }
+
+        private void UpdateAntiLagLockState()
+        {
+            if (AMDRadeonAntiLagToggle == null || AMDFluidMotionFrameToggle == null) return;
+            AMDRadeonAntiLagToggle.IsEnabled = !AMDFluidMotionFrameToggle.IsOn;
+        }
+
+        /// <summary>
         /// Radeon Anti-Lag toggle changed - disable Chill if Anti-Lag is enabled (mutually exclusive)
         /// </summary>
         private void AMDRadeonAntiLagToggle_Toggled(object sender, RoutedEventArgs e)
