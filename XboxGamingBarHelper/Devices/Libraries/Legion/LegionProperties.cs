@@ -150,7 +150,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 case 1: // Keyboard
                     return keyboardKeys;
                 case 2: // Mouse
-                    return mouseButton > 0 ? new[] { mouseButton } : Array.Empty<int>();
+                    // The widget sends a 0-based mouse-combo index (0=Left, 1=Right, 2=Middle,
+                    // 3=ScrollUp, 4=ScrollDown, 5=ScrollLeft, 6=ScrollRight); the controller's
+                    // MouseButton enum is 1-based (LeftClick=0x01 .. ScrollRight=0x07), so shift
+                    // by one. Matches the joystick-as-mouse path (LegionManager.JoystickAsMouse.cs),
+                    // which already does mouseButton + 1. The old "mouseButton > 0 ? [mouseButton]"
+                    // was off-by-one for every entry AND silently dropped Left Click (index 0).
+                    return mouseButton >= 0 ? new[] { mouseButton + 1 } : Array.Empty<int>();
                 default:
                     return Array.Empty<int>();
             }
