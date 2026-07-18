@@ -1574,6 +1574,11 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.PropertyChanged += CPUEPP_PropertyChanged;
             powerManager.MaxCPUState.PropertyChanged += CPUState_PropertyChanged;
             powerManager.MinCPUState.PropertyChanged += CPUState_PropertyChanged;
+            // [2.0 rebuild - Faza C1]
+            rtssManager.FPSLimit.PropertyChanged += FPSLimit_PropertyChanged;
+            systemManager.HDREnabled.PropertyChanged += HDREnabled_PropertyChanged;
+            systemManager.Resolution.PropertyChanged += Resolution_PropertyChanged;
+            systemManager.RefreshRate.PropertyChanged += RefreshRate_PropertyChanged;
             powerManager.HibernateTimeoutAC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
             powerManager.HibernateTimeoutDC.PropertyChanged += UpdateHibernateTimeoutMonitorState;
             // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)

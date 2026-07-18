@@ -70,6 +70,56 @@ namespace XboxGamingBarHelper.Profile
             }
         }
 
+        // [2.0 rebuild - Faza C1] Performance-tab settings whose GameProfile schema already
+        // existed but had no GameProfileProperty proxy yet.
+        public int FPSLimit
+        {
+            get { return value.FPSLimit; }
+            set
+            {
+                if (this.value.FPSLimit != value)
+                {
+                    this.value.FPSLimit = value;
+                }
+            }
+        }
+
+        public bool HDREnabled
+        {
+            get { return value.HDREnabled; }
+            set
+            {
+                if (this.value.HDREnabled != value)
+                {
+                    this.value.HDREnabled = value;
+                }
+            }
+        }
+
+        public string Resolution
+        {
+            get { return value.Resolution; }
+            set
+            {
+                if (this.value.Resolution != value)
+                {
+                    this.value.Resolution = value;
+                }
+            }
+        }
+
+        public int? RefreshRate
+        {
+            get { return value.RefreshRate; }
+            set
+            {
+                if (this.value.RefreshRate != value)
+                {
+                    this.value.RefreshRate = value;
+                }
+            }
+        }
+
         public GameId GameId
         {
             get { return value.GameId; }

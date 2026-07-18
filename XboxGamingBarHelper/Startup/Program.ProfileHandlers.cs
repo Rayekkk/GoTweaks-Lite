@@ -372,6 +372,17 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.SetValue(profileManager.GlobalProfile.CPUEPP);
             powerManager.MaxCPUState.SetValue(profileManager.GlobalProfile.MaxCPUState);
             powerManager.MinCPUState.SetValue(profileManager.GlobalProfile.MinCPUState);
+            // [2.0 rebuild - Faza C1]
+            rtssManager.FPSLimit.SetValue(profileManager.GlobalProfile.FPSLimit);
+            systemManager.HDREnabled.SetValue(profileManager.GlobalProfile.HDREnabled);
+            if (!string.IsNullOrEmpty(profileManager.GlobalProfile.Resolution))
+            {
+                systemManager.Resolution.SetValue(profileManager.GlobalProfile.Resolution);
+            }
+            if (profileManager.GlobalProfile.RefreshRate.HasValue)
+            {
+                systemManager.RefreshRate.SetValue(profileManager.GlobalProfile.RefreshRate.Value);
+            }
             profileManager.PerGameProfile.SetValue(false);
 
             // Apply Legion controller settings from global profile
@@ -604,6 +615,89 @@ namespace XboxGamingBarHelper
                 glo => glo.TDP = performanceManager.TDP);
         }
 
+        // [2.0 rebuild - Faza C1] The remaining Performance-tab settings whose schema already
+        // exists on both sides (GameProfile.cs field + a live helper Function/property of the
+        // MATCHING type) and whose save-flag was already scaffolded in ProfileSaveFlagsState but
+        // never actually wired to a PropertyChanged handler. Same RouteProfileSave pattern as TDP
+        // above. (OSPowerMode/OverlayLevel/CPUAffinity were investigated and excluded - see
+        // win32-2.0-migration.md: OSPowerMode's GameProfile field is a string left over from the
+        // removed AC/DC Power Plan feature, type-mismatched with the live int power-slider
+        // property; OverlayLevel is superseded by slice 1's helper-authoritative OSD for the RTSS
+        // case and has no helper property at all for the AMD-overlay-cycling case; CPUAffinity is
+        // unimplemented on both sides.)
+
+        private static void FPSLimit_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile)
+            {
+                Logger.Debug($"Skipping FPSLimit_PropertyChanged - already applying profile (FPSLimit={rtssManager.FPSLimit.Value})");
+                return;
+            }
+            if (IsInProfileSwitchCooldown())
+            {
+                Logger.Debug($"Skipping FPSLimit_PropertyChanged - in profile switch cooldown (FPSLimit={rtssManager.FPSLimit.Value})");
+                return;
+            }
+
+            RouteProfileSave(ProfileSaveFlagsState.FPSLimit, "FPSLimit",
+                cur => cur.FPSLimit = rtssManager.FPSLimit.Value,
+                glo => glo.FPSLimit = rtssManager.FPSLimit.Value);
+        }
+
+        private static void HDREnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile)
+            {
+                Logger.Debug($"Skipping HDREnabled_PropertyChanged - already applying profile (HDREnabled={systemManager.HDREnabled.Value})");
+                return;
+            }
+            if (IsInProfileSwitchCooldown())
+            {
+                Logger.Debug($"Skipping HDREnabled_PropertyChanged - in profile switch cooldown (HDREnabled={systemManager.HDREnabled.Value})");
+                return;
+            }
+
+            RouteProfileSave(ProfileSaveFlagsState.HDR, "HDREnabled",
+                cur => cur.HDREnabled = systemManager.HDREnabled.Value,
+                glo => glo.HDREnabled = systemManager.HDREnabled.Value);
+        }
+
+        private static void Resolution_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile)
+            {
+                Logger.Debug($"Skipping Resolution_PropertyChanged - already applying profile (Resolution={systemManager.Resolution.Value})");
+                return;
+            }
+            if (IsInProfileSwitchCooldown())
+            {
+                Logger.Debug($"Skipping Resolution_PropertyChanged - in profile switch cooldown (Resolution={systemManager.Resolution.Value})");
+                return;
+            }
+
+            RouteProfileSave(ProfileSaveFlagsState.Resolution, "Resolution",
+                cur => cur.Resolution = systemManager.Resolution.Value,
+                glo => glo.Resolution = systemManager.Resolution.Value);
+        }
+
+        private static void RefreshRate_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (isApplyingProfile)
+            {
+                Logger.Debug($"Skipping RefreshRate_PropertyChanged - already applying profile (RefreshRate={systemManager.RefreshRate.Value})");
+                return;
+            }
+            if (IsInProfileSwitchCooldown())
+            {
+                Logger.Debug($"Skipping RefreshRate_PropertyChanged - in profile switch cooldown (RefreshRate={systemManager.RefreshRate.Value})");
+                return;
+            }
+
+            RouteProfileSave(ProfileSaveFlagsState.RefreshRate, "RefreshRate",
+                cur => cur.RefreshRate = systemManager.RefreshRate.Value,
+                glo => glo.RefreshRate = systemManager.RefreshRate.Value);
+        }
+
         private static void RunningGame_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // #66: drive PresentMon subprocess lifecycle from the same RunningGame signal.
@@ -661,6 +755,17 @@ namespace XboxGamingBarHelper
                             powerManager.CPUEPP.SetValue(runningGameProfile.CPUEPP);
                             powerManager.MaxCPUState.SetValue(runningGameProfile.MaxCPUState);
                             powerManager.MinCPUState.SetValue(runningGameProfile.MinCPUState);
+                            // [2.0 rebuild - Faza C1]
+                            rtssManager.FPSLimit.SetValue(runningGameProfile.FPSLimit);
+                            systemManager.HDREnabled.SetValue(runningGameProfile.HDREnabled);
+                            if (!string.IsNullOrEmpty(runningGameProfile.Resolution))
+                            {
+                                systemManager.Resolution.SetValue(runningGameProfile.Resolution);
+                            }
+                            if (runningGameProfile.RefreshRate.HasValue)
+                            {
+                                systemManager.RefreshRate.SetValue(runningGameProfile.RefreshRate.Value);
+                            }
 
                             if (legionManager != null)
                             {
