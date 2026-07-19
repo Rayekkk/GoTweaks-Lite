@@ -305,9 +305,7 @@ namespace XboxGamingBar
                 }
                 else
                 {
-                    // Fallback to Win+Ctrl+O (accessibility keyboard shortcut)
-                    QuickSettings.KeyboardShortcutHelper.SendShortcut("Win+Ctrl+O");
-                    Logger.Info("On-screen keyboard triggered via Win+Ctrl+O (fallback)");
+                    Logger.Warn("Cannot toggle the on-screen keyboard while the helper is disconnected");
                 }
             }
             catch (Exception ex)
