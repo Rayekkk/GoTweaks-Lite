@@ -312,9 +312,6 @@
     <Compile Include="Features\LosslessScaling\GamingWidget.ChillFPS.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Features\Hotkeys\GamingWidget.HotkeyInit.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Features\Lifecycle\GamingWidget.WidgetEvents.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
@@ -454,9 +451,6 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\GoTweaksUpdate\GamingWidget.GoTweaksUpdate.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Hotkeys\GamingWidget.HotkeyEventHandlers.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Hotkeys\GamingWidget.HotkeysUIHandlers.cs">

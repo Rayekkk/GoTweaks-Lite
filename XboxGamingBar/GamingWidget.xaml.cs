@@ -556,19 +556,8 @@ namespace XboxGamingBar
         private int heartbeatWatcherLastPid = 0;
         private volatile bool heartbeatWatcherReconnectInFlight = false;
 
-        // Hotkey watchers for Xbox controller button combos
-        private XboxGameBarHotkeyWatcher hotkeyMenuA = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuB = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuX = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuY = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuDpadUp = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuDpadDown = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuDpadLeft = null;
-        private XboxGameBarHotkeyWatcher hotkeyMenuDpadRight = null;
         private bool isLoadingHotkeys = false;
         private bool isHotkeysExpanded = false;
-        private readonly Dictionary<string, DateTime> hotkeyLastExecuted = new Dictionary<string, DateTime>();
-        private const int HotkeyDebounceMs = 300; // Minimum ms between hotkey executions
         private int lastNonZeroOsdLevel = 1; // Track last OSD level for toggle (default to Basic)
 
         // Properties
@@ -2946,7 +2935,6 @@ namespace XboxGamingBar
                 }
 
                 // Initialize hotkey watchers for controller button combos
-                InitializeHotkeyWatchers();
             }
             else
             {
@@ -3367,12 +3355,9 @@ namespace XboxGamingBar
                 // seed the helper on connect.  The helper owns the durable profile and sends a
                 // snapshot back for this display/edit cache instead.
                 await SyncPowerSourceProfilesFromHelperAsync();
-                // Without this, the helper's ControllerHotkeyMonitor only learns the
-                // widget's View+ABXY / Menu+DPad bindings on the next dropdown change.
-                // Before that, helper-side detection sits at the default-all-disabled
-                // state — which is fine in desktop mode (the widget's own watcher
-                // fires) but breaks every hotkey in FSE where the widget is suspended
-                // and only the helper is polling XInput. Issue #79 (kingvall).
+                // Render the helper-owned View+ABXY / Menu+DPad configuration. The
+                // helper monitor is the sole executor, including while the widget is
+                // suspended in full-screen exclusive mode.
                 LoadHotkeySettings();
                 // Same reasoning applies to quick-tile controller combos: without this a
                 // helper restart forgets every tile combo binding until the user re-opens
