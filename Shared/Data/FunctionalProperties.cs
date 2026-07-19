@@ -159,6 +159,16 @@ namespace Shared.Data
                         property.SuppressRemoteSync = false;
                     }
 
+                    // A property can accept the in-memory value (arbitration passes) yet still
+                    // fail the actual hardware/WMI/native apply performed inside its
+                    // NotifyPropertyChanged override. Consult the opt-in IHardwareApplyResult
+                    // hook so that case is reported truthfully instead of as Applied.
+                    if (accepted && property is IHardwareApplyResult hardwareResult && !hardwareResult.LastApplySucceeded)
+                    {
+                        accepted = false;
+                        reason = hardwareResult.LastApplyFailureReason ?? "The helper could not apply this value to hardware.";
+                    }
+
                     // Return the effective helper value, not the requested value or a generic
                     // "Success" token. This is additive wire metadata: older widgets ignore it,
                     // while 2.0 widgets render only this confirmed state.

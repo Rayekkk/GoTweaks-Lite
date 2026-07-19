@@ -1,4 +1,5 @@
 using NLog;
+using Shared.Data;
 using Shared.Enums;
 using System;
 using System.Collections.Generic;
@@ -179,7 +180,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Touchpad control
-    internal class LegionTouchpadEnabledProperty : HelperProperty<bool, LegionManager>
+    internal class LegionTouchpadEnabledProperty : HelperProperty<bool, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -191,6 +192,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         // round-trip and could cause an oscillation if it fails partway.
         internal bool SuppressHardwareApply { get; set; }
 
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public LegionTouchpadEnabledProperty(bool initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionTouchpadEnabled, inManager)
         {
         }
@@ -201,7 +205,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             Logger.Info($"LegionTouchpadEnabled changed to {Value}");
             if (!SuppressHardwareApply)
             {
-                Manager?.SetTouchpadEnabled(Value);
+                string reason = "Legion manager is not available.";
+                LastApplySucceeded = Manager != null && Manager.SetTouchpadEnabled(Value, out reason);
+                LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Touchpad could not be applied.");
+            }
+            else
+            {
+                // A hardware readback, not a user request - nothing was attempted, so there is
+                // nothing to report as failed.
+                LastApplySucceeded = true;
+                LastApplyFailureReason = null;
             }
         }
 
@@ -458,9 +471,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Fan full speed toggle
-    internal class LegionFanFullSpeedProperty : HelperProperty<bool, LegionManager>
+    internal class LegionFanFullSpeedProperty : HelperProperty<bool, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionFanFullSpeedProperty(bool initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionFanFullSpeed, inManager)
         {
@@ -470,7 +486,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionFanFullSpeed changed to {Value}");
-            Manager?.SetFanFullSpeed(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetFanFullSpeed(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Fan full speed could not be applied.");
         }
     }
 
@@ -729,9 +747,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Vibration level (0=Off, 1=Weak, 2=Medium, 3=Strong)
-    internal class LegionVibrationProperty : HelperProperty<int, LegionManager>
+    internal class LegionVibrationProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionVibrationProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionVibration, inManager)
         {
@@ -741,14 +762,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionVibration changed to {Value}");
-            Manager?.SetVibration(Value);
+            LastApplySucceeded = Manager != null && Manager.TrySetVibration(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Vibration intensity could not be applied.";
         }
     }
 
     // Power Light toggle
-    internal class LegionPowerLightProperty : HelperProperty<bool, LegionManager>
+    internal class LegionPowerLightProperty : HelperProperty<bool, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionPowerLightProperty(bool initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionPowerLight, inManager)
         {
@@ -758,14 +783,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionPowerLight changed to {Value}");
-            Manager?.SetPowerLight(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetPowerLight(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Power light could not be applied.");
         }
     }
 
     // Battery Charge Limit (80%)
-    internal class LegionChargeLimitProperty : HelperProperty<bool, LegionManager>
+    internal class LegionChargeLimitProperty : HelperProperty<bool, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionChargeLimitProperty(bool initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionChargeLimit, inManager)
         {
@@ -775,7 +805,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionChargeLimit changed to {Value}");
-            Manager?.SetChargeLimit(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetChargeLimit(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Charge limit could not be applied.");
         }
     }
 

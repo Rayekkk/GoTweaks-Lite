@@ -995,12 +995,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             return (slow, fast, peak);
         }
 
-        public void SetTouchpadEnabled(bool enabled)
+        public bool SetTouchpadEnabled(bool enabled, out string failureReason)
         {
+            failureReason = null;
             if (!isControllerConnected || controllerService == null)
             {
+                failureReason = "controller not connected";
                 Logger.Warn("Cannot set touchpad: controller not connected");
-                return;
+                return false;
             }
 
             try
@@ -1012,15 +1014,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     try { Settings.LocalSettingsHelper.SetValue("LegionTouchpadEnabled", enabled); }
                     catch (Exception persistEx) { Logger.Debug($"Failed to persist LegionTouchpadEnabled: {persistEx.Message}"); }
                     Logger.Info($"Touchpad {(enabled ? "enabled" : "disabled")}");
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set touchpad: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set touchpad: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting touchpad: {ex.Message}");
+                return false;
             }
         }
 
@@ -2753,12 +2758,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             return 100;
         }
 
-        public void SetFanFullSpeed(bool enabled)
+        public bool SetFanFullSpeed(bool enabled, out string failureReason)
         {
+            failureReason = null;
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set fan full speed: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -2778,15 +2785,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         try { EcFanCurveTick(null); }
                         catch (Exception tickEx) { Logger.Debug($"Immediate EC tick after full-speed toggle failed: {tickEx.Message}"); }
                     }
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set fan full speed: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set fan full speed: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting fan full speed: {ex.Message}");
+                return false;
             }
         }
 
@@ -2969,17 +2979,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
         }
 
-        public void SetVibration(int level)
+        public bool SetPowerLight(bool enabled, out string failureReason)
         {
-            TrySetVibration(level);
-        }
-
-        public void SetPowerLight(bool enabled)
-        {
+            failureReason = null;
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set power light: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -2989,24 +2996,29 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 {
                     powerLightEnabled = enabled;
                     Logger.Info($"Power light {(enabled ? "enabled" : "disabled")}");
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set power light: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set power light: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting power light: {ex.Message}");
+                return false;
             }
         }
 
-        public void SetChargeLimit(bool enabled)
+        public bool SetChargeLimit(bool enabled, out string failureReason)
         {
+            failureReason = null;
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set charge limit: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -3021,15 +3033,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     try { Settings.LocalSettingsHelper.SetValue("LegionChargeLimit", enabled); }
                     catch (Exception persistEx) { Logger.Debug($"Failed to persist LegionChargeLimit: {persistEx.Message}"); }
                     Logger.Info($"Battery charge limit (80%) {(enabled ? "enabled" : "disabled")}");
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set charge limit: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set charge limit: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting charge limit: {ex.Message}");
+                return false;
             }
         }
 
