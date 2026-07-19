@@ -1,5 +1,6 @@
 ﻿using NLog;
 using Shared.Enums;
+using Shared.IPC;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -126,6 +127,8 @@ namespace Shared.Data
                     response = property.AddValueSetContent(response);
                     break;
                 case Command.Set:
+                    bool accepted = false;
+                    string reason = null;
                     property.SuppressRemoteSync = true;
                     try
                     {
@@ -136,14 +139,36 @@ namespace Shared.Data
                             {
                                 updatedTime = Convert.ToInt64(timeObj);
                             }
-                            property.SetValue(content, updatedTime);
+                            accepted = property.SetValue(content, updatedTime);
+                            if (!accepted)
+                                reason = "The helper rejected an invalid or stale value.";
                         }
+                        else
+                        {
+                            reason = "The Set request did not contain a value.";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        accepted = false;
+                        reason = ex.Message;
+                        Logger.Error($"Failed to set property {function}: {ex}");
                     }
                     finally
                     {
                         property.SuppressRemoteSync = false;
                     }
-                    response.Add(nameof(Content), "Success");
+
+                    // Return the effective helper value, not the requested value or a generic
+                    // "Success" token. This is additive wire metadata: older widgets ignore it,
+                    // while 2.0 widgets render only this confirmed state.
+                    response = property.AddValueSetContent(response);
+                    response[PropertySetContract.OutcomeField] = accepted
+                        ? PropertySetContract.Applied
+                        : PropertySetContract.Rejected;
+                    response[PropertySetContract.RevisionField] = property.UpdatedTime;
+                    if (!accepted && !string.IsNullOrWhiteSpace(reason))
+                        response[PropertySetContract.ReasonField] = reason;
                     break;
                 default:
                     Logger.Warn($"Unknown command in pipe message: {command}");

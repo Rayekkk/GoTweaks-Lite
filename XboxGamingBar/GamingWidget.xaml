@@ -9400,6 +9400,22 @@
                                HorizontalAlignment="Center"/>
                 </Border>
 
+                <Border x:Name="SettingFailureBanner"
+                        Background="#CCB3261E"
+                        Padding="10,7"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Stretch"
+                        Visibility="Collapsed"
+                        CornerRadius="6"
+                        Margin="8">
+                    <TextBlock x:Name="SettingFailureText"
+                               Text="The helper could not apply a setting."
+                               Foreground="White"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
                 <!-- Update Available Banner - appears below connection banner when update is found -->
                 <Border x:Name="UpdateAvailableBanner"
                         Background="#2D7D2D"

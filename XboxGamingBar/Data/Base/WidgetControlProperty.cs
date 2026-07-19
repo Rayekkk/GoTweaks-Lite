@@ -37,6 +37,18 @@ namespace XboxGamingBar.Data
             }
         }
 
+        protected override async Task OnSetRequestPendingChanged(bool pending)
+        {
+            if (UI != null && Owner != null)
+                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => SetControlEnabled(!pending));
+        }
+
+        protected override async Task OnSetRequestFailed(string reason)
+        {
+            if (Owner is GamingWidget widget)
+                await widget.ShowSettingApplyFailureAsync(Function, reason);
+        }
+
         /// <summary>
         /// Called after batch sync completes. Enables the control since batch sync
         /// bypasses individual Sync() which normally handles enable/disable.

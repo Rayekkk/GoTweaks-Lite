@@ -43,6 +43,30 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        private DispatcherTimer settingFailureBannerTimer;
+
+        internal async Task ShowSettingApplyFailureAsync(Function function, string reason)
+        {
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (SettingFailureBanner == null || SettingFailureText == null) return;
+                string detail = string.IsNullOrWhiteSpace(reason) ? "The helper rejected the request." : reason;
+                SettingFailureText.Text = $"{function}: {detail}";
+                SettingFailureBanner.Visibility = Visibility.Visible;
+
+                if (settingFailureBannerTimer == null)
+                {
+                    settingFailureBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+                    settingFailureBannerTimer.Tick += (s, e) =>
+                    {
+                        settingFailureBannerTimer.Stop();
+                        if (SettingFailureBanner != null) SettingFailureBanner.Visibility = Visibility.Collapsed;
+                    };
+                }
+                settingFailureBannerTimer.Stop();
+                settingFailureBannerTimer.Start();
+            });
+        }
 
         /// <summary>
         /// Shows the connection status banner with appropriate color and message based on state.
