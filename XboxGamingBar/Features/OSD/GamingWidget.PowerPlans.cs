@@ -43,9 +43,10 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        // Monotonic widget-side intent revision. A late response must never overwrite the
-        // newer requested/confirmed state after rapid slider movement.
-        private long latestProfileIntentRevision;
+        // Monotonic revisions per functional field. A late response must never overwrite a
+        // newer value of the SAME field, but a CPU-slider response must not be discarded merely
+        // because the user independently changed HDR while it was in flight.
+        private readonly Dictionary<string, long> latestProfileIntentRevisions = new Dictionary<string, long>();
         // LocalSettings remains only a UI cache. On every connection it is refreshed from the
         // helper before any direct user edit can use it as an edit buffer.
         private async Task SyncPowerSourceProfilesFromHelperAsync(string snapshotJson = null)
@@ -120,7 +121,13 @@ namespace XboxGamingBar
         private async Task SendProfileFieldIntentAsync(string field, object value)
         {
             if (!App.IsConnected) return;
-            long intentRevision = ++latestProfileIntentRevision;
+            long intentRevision;
+            lock (latestProfileIntentRevisions)
+            {
+                latestProfileIntentRevisions.TryGetValue(field, out long latest);
+                intentRevision = latest + 1;
+                latestProfileIntentRevisions[field] = intentRevision;
+            }
             Windows.UI.Xaml.Controls.Control pendingControl = null;
             if (field == "CPUBoost") pendingControl = CPUBoostToggle;
             else if (field == "CPUEPP") pendingControl = CPUEPPSlider;
@@ -184,7 +191,12 @@ namespace XboxGamingBar
                     return;
                 }
                 var result = Windows.Data.Json.JsonObject.Parse(content);
-                if (intentRevision != latestProfileIntentRevision)
+                long latestForField;
+                lock (latestProfileIntentRevisions)
+                {
+                    latestProfileIntentRevisions.TryGetValue(field, out latestForField);
+                }
+                if (intentRevision != latestForField)
                 {
                     Logger.Debug($"Ignoring stale profile intent response for {field} (revision {intentRevision})");
                     return;
