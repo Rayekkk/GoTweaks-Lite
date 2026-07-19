@@ -1122,54 +1122,10 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Sends all button mappings to the helper via IPC.
-        /// Always sends mappings, including "Disabled" (default) state to clear buttons.
-        /// This method is only called from user-initiated changes (ControllerSettingChanged
-        /// already has guards for profile loading), so we always want to send.
-        /// </summary>
-        private void SendButtonMappingsToHelper(ControllerProfile profile)
-        {
-            try
-            {
-                // Always send button mappings, including "Disabled" (Type=0, GamepadAction=0)
-                // When user explicitly sets a button to Disabled, we need to send that to
-                // the helper so it clears the button mapping on the controller.
-                if (profile.ButtonY1 != null)
-                    legionButtonY1?.SendMapping(profile.ButtonY1.ToJson());
-                if (profile.ButtonY2 != null)
-                    legionButtonY2?.SendMapping(profile.ButtonY2.ToJson());
-                if (profile.ButtonY3 != null)
-                    legionButtonY3?.SendMapping(profile.ButtonY3.ToJson());
-                if (profile.ButtonM1 != null)
-                    legionButtonM1?.SendMapping(profile.ButtonM1.ToJson());
-                if (profile.ButtonM2 != null)
-                    legionButtonM2?.SendMapping(profile.ButtonM2.ToJson());
-                if (profile.ButtonM3 != null)
-                    legionButtonM3?.SendMapping(profile.ButtonM3.ToJson());
-                if (profile.ButtonDesktop != null)
-                    legionButtonDesktop?.SendMapping(profile.ButtonDesktop.ToJson());
-                if (profile.ButtonPage != null)
-                    legionButtonPage?.SendMapping(profile.ButtonPage.ToJson());
-
-                // Gamepad-button-mapping dict - live-edit send only (see
-                // SendGamepadButtonMappingsToHelper's doc comment; the property itself is
-                // helper-authoritative since slice 8, this is not a "widget-owned channel").
-                SendGamepadButtonMappingsToHelper(profile);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending button mappings: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Sends only the gamepad-button-mapping dictionary (face/bumper/etc. arbitrary remaps +
-        /// Nintendo/Desktop presets) to the helper. Split out from SendButtonMappingsToHelper in
-        /// [2.0 slice 7] so the (now-removed) seed/resend paths could re-push this channel WITHOUT
-        /// also re-pushing the helper-authoritative Y1-Page raw button remaps. [2.0 slice 8]
-        /// LegionGamepadButtonMapping ITSELF also became helper-authoritative (see
-        /// WidgetProperties.NeverSyncFromHelper) - this method is now purely a LIVE-EDIT send path
-        /// (called from the live-edit branch of SendButtonMappingsToHelper, and from
+        /// Nintendo/Desktop presets) to the helper. LegionGamepadButtonMapping itself is
+        /// helper-authoritative (see WidgetProperties.NeverSyncFromHelper) - this method is purely
+        /// a LIVE-EDIT send path (called from GamepadButtonRemapping's handlers and from
         /// SaveAndSendGamepadMappings for the Nintendo/Desktop-preset toggle handlers), not a seed.
         /// </summary>
         private void SendGamepadButtonMappingsToHelper(ControllerProfile profile)
@@ -1187,66 +1143,6 @@ namespace XboxGamingBar
             }
         }
 
-        /// <summary>
-        /// Sends lighting settings to the helper via IPC
-        /// </summary>
-        private void SendLightingToHelper(ControllerProfile profile)
-        {
-            try
-            {
-                // Only send lighting if the profile has explicit lighting settings saved
-                // This prevents old profiles (created before per-game lighting) from resetting to white
-                if (!profile.HasExplicitLighting)
-                {
-                    Logger.Info($"Skipping lighting update - profile has no explicit lighting settings");
-                    return;
-                }
-
-                // Defensive: if the saved color is pure white with default mode/brightness/speed,
-                // treat the profile as accidentally-flagged-explicit (we've seen the pre-fix race
-                // poison Global with #FFFFFF + HasExplicitLighting=true) and skip the push.
-                // A user genuinely picking white will have changed at least one other lighting
-                // field too, so this only filters the corruption pattern, not real choices.
-                bool isDefaultWhite = profile.LightColorR == 0xFF
-                                   && profile.LightColorG == 0xFF
-                                   && profile.LightColorB == 0xFF
-                                   && profile.LightMode == 1
-                                   && profile.LightSpeed == 50
-                                   && profile.LightBrightness >= 9; // default brightness range
-                if (isDefaultWhite)
-                {
-                    Logger.Warn($"Skipping lighting push - profile color is default white with default mode/speed (likely from a poisoned save). Adjust any lighting setting to re-enable.");
-                    return;
-                }
-
-                // Send light mode
-                legionLightMode?.SetValue(profile.LightMode);
-
-                // Send light color as hex string (RRGGBB format)
-                string colorHex = $"{profile.LightColorR:X2}{profile.LightColorG:X2}{profile.LightColorB:X2}";
-                legionLightColor?.SetValue(colorHex);
-
-                // Send light speed
-                legionLightSpeed?.SetValue(profile.LightSpeed);
-
-                // Send brightness
-                legionLightBrightness?.SetValue(profile.LightBrightness);
-
-                // Send power light
-                legionPowerLight?.SetValue(profile.PowerLight);
-
-                Logger.Info($"Sent lighting to helper: Mode={profile.LightMode}, Color=#{colorHex}, Speed={profile.LightSpeed}, Brightness={profile.LightBrightness}, PowerLight={profile.PowerLight}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending lighting settings: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Sends all controller settings (gyro, deadzone, vibration, triggers) to the helper via IPC.
-        /// This ensures the helper has the full profile even when the widget is closed.
-        /// </summary>
         /// <summary>
         /// Updates the display text for controller setting sliders
         /// </summary>

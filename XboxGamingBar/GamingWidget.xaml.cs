@@ -557,7 +557,6 @@ namespace XboxGamingBar
 
         private bool isLoadingHotkeys = false;
         private bool isHotkeysExpanded = false;
-        private int lastNonZeroOsdLevel = 1; // Track last OSD level for toggle (default to Basic)
 
         // Properties
         private readonly OSDProperty osd;
