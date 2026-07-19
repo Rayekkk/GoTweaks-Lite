@@ -2089,13 +2089,9 @@ namespace XboxGamingBar
             if (!force && prev == (spl, sppt, fppt)) return;
             lastSentCustomTDP = (spl, sppt, fppt);
 
-            // Per-limit dedup: each ForceSetValue is a separate ~300ms WMI write on the helper, so
-            // only push the limits that actually changed. A boost-slider drag then costs ONE write
-            // (just SPPT or FPPT); only a TDP (SPL) drag moves all three.
-            if (force || spl != prev.spl) legionCustomTDPSlow?.ForceSetValue(spl);
-            if (force || sppt != prev.sppt) legionCustomTDPFast?.ForceSetValue(sppt);
-            if (force || fppt != prev.fppt) legionCustomTDPPeak?.ForceSetValue(fppt);
-            Logger.Info($"Applied Custom power limits to helper: SPL={spl}W, SPPT={sppt}W, FPPT={fppt}W (force={force})");
+            // One atomic intent: never expose WMI to a partial SPL/SPPT/FPPT update.
+            _ = SendProfileFieldIntentAsync("CustomTDP", new[] { spl, sppt, fppt });
+            Logger.Info($"Requested Custom power limits from helper: SPL={spl}W, SPPT={sppt}W, FPPT={fppt}W (force={force})");
         }
 
         // ===== Live-apply throttle =====

@@ -297,7 +297,7 @@ namespace XboxGamingBarHelper
             string power = cfg.TryGetValue("Power", out var powerElement) ? powerElement.GetString() : null;
             bool hasValue = cfg.TryGetValue("Value", out var value);
             if (string.IsNullOrEmpty(field) || (scope != "Global" && scope != "PerGame") || (power != "AC" && power != "DC")
-                || (field != "CPUState" && !hasValue))
+                || (field != "CPUState" && field != "CustomTDP" && !hasValue))
             {
                 reason = "missing or invalid Field, Power, or Value";
                 Logger.Warn("Rejected SetProfileField: " + reason);
@@ -367,6 +367,19 @@ namespace XboxGamingBarHelper
                     if (dc) profile.CPUBoost_DC = false;
                     else profile.CPUBoost = false;
                 }
+            }
+            else if (field == "CustomTDP"
+                && cfg.TryGetValue("SlowValue", out var slowElement) && slowElement.TryGetInt32(out int slow)
+                && cfg.TryGetValue("FastValue", out var fastElement) && fastElement.TryGetInt32(out int fast)
+                && cfg.TryGetValue("PeakValue", out var peakElement) && peakElement.TryGetInt32(out int peak))
+            {
+                if (slow < 5 || peak > 50 || slow > fast || fast > peak)
+                {
+                    reason = "Custom TDP requires 5 <= SPL <= SPPT <= FPPT <= 50";
+                    return false;
+                }
+                if (dc) { profile.TDP_DC = slow; profile.TDPFast_DC = fast; profile.TDPPeak_DC = peak; }
+                else { profile.TDP = slow; profile.TDPFast = fast; profile.TDPPeak = peak; }
             }
             else
             {

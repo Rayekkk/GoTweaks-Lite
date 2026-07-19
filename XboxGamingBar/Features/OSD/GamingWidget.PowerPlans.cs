@@ -151,6 +151,12 @@ namespace XboxGamingBar
                     json["MinValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(cpuState[0]);
                     json["MaxValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(cpuState[1]);
                 }
+                else if (field == "CustomTDP" && value is int[] customTdp && customTdp.Length == 3)
+                {
+                    json["SlowValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(customTdp[0]);
+                    json["FastValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(customTdp[1]);
+                    json["PeakValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(customTdp[2]);
+                }
                 else if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);
                 else json["Value"] = Windows.Data.Json.JsonValue.CreateNumberValue(Convert.ToDouble(value));
 
@@ -246,6 +252,13 @@ namespace XboxGamingBar
                         if (FPSLimitValue != null) FPSLimitValue.Text = confirmed > 0 ? $"{confirmed} FPS" : "Off";
                     }
                     finally { isApplyingHelperUpdate = false; }
+                }
+                else if (field == "CustomTDP" && values.ContainsKey(prefix + "Tdp"))
+                {
+                    SetCustomTDPSlidersSilent(
+                        (int)values.GetNamedNumber(prefix + "Tdp"),
+                        (int)values.GetNamedNumber(prefix + "TdpFast"),
+                        (int)values.GetNamedNumber(prefix + "TdpPeak"));
                 }
             }
             catch (Exception ex)
