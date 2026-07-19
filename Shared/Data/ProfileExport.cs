@@ -6,7 +6,7 @@ namespace Shared.Data
 {
     /// <summary>
     /// Global widget settings that are not per-game.
-    /// Includes button remapping, device limits, OSD customization.
+    /// Includes button remapping and OSD customization.
     /// </summary>
     public class GlobalWidgetSettings
     {
@@ -39,12 +39,6 @@ namespace Shared.Data
         public string ScrollClick_Shortcut { get; set; }
         [XmlElement("ScrollClick_Command")]
         public string ScrollClick_Command { get; set; }
-
-        // Device TDP Limits
-        [XmlElement("DeviceTDPMin")]
-        public int? DeviceTDPMin { get; set; }
-        [XmlElement("DeviceTDPMax")]
-        public int? DeviceTDPMax { get; set; }
 
         // OSD Customization
         [XmlElement("OSD_TextSize")]

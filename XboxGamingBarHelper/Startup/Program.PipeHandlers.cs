@@ -520,7 +520,6 @@ namespace XboxGamingBarHelper
                         if (globalSettings != null)
                         {
                             Logger.Info("Pipe: Global widget settings included in export");
-                            Logger.Info($"  TDP Limits: Min={globalSettings.DeviceTDPMin}, Max={globalSettings.DeviceTDPMax}");
                         }
                     }
                     catch (Exception gsEx)

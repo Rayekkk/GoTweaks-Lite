@@ -258,10 +258,6 @@ namespace XboxGamingBarHelper
                 gs.ScrollClick_Shortcut = GetString("ScrollClick_Shortcut");
                 gs.ScrollClick_Command = GetString("ScrollClick_Command");
 
-                // Device TDP Limits
-                gs.DeviceTDPMin = GetInt("DeviceTDPMin");
-                gs.DeviceTDPMax = GetInt("DeviceTDPMax");
-
                 // OSD Customization
                 gs.OSD_TextSize = GetInt("OSD_TextSize");
                 gs.OSD_TextColor = GetString("OSD_TextColor");
@@ -288,8 +284,7 @@ namespace XboxGamingBarHelper
                 gs.OSD_L2_Columns = GetInt("OSD_L2_Columns");
                 gs.OSD_L3_Columns = GetInt("OSD_L3_Columns");
 
-                Logger.Info($"Parsed global settings: TDPMin={gs.DeviceTDPMin}, TDPMax={gs.DeviceTDPMax}, " +
-                           $"LegionL={gs.LegionL_Action}, LegionR={gs.LegionR_Action}");
+                Logger.Info($"Parsed global settings: LegionL={gs.LegionL_Action}, LegionR={gs.LegionR_Action}");
             }
             catch (Exception ex)
             {
