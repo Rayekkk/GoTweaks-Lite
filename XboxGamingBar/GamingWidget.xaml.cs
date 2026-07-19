@@ -1891,10 +1891,13 @@ namespace XboxGamingBar
             // [2.0 rebuild - Faza C-CPU] CPUBoost/CPUEPP/MaxCPUState/MinCPUState are now
             // helper-authoritative (LoadProfileSettings no longer seeds/pushes them) - same
             // resync as FPSLimit above, so the Profiles-tab card snapshot stays accurate.
+            // CPUBoost/CPUEPP also drive the CPUBoost/EPP Quick Settings tiles - this used to be a
+            // dangling if-chain (no braces) that never actually subscribed any of the four and
+            // instead accidentally gated resolution's subscription behind all of them being non-null.
             if (cpuBoost != null)
+                cpuBoost.PropertyChanged += QuickSettingsProperty_Changed;
             if (cpuEPP != null)
-            if (maxCPUState != null)
-            if (minCPUState != null)
+                cpuEPP.PropertyChanged += QuickSettingsProperty_Changed;
             if (resolution != null)
             {
                 resolution.PropertyChanged += QuickSettingsProperty_Changed;
@@ -1904,7 +1907,10 @@ namespace XboxGamingBar
             if (refreshRate != null)
             {
                 // [2.0 rebuild - Faza C3] RefreshRate is now helper-authoritative; had no subscription
-                // at all before (LoadProfileSettings' seed-and-push was its only consumer).
+                // at all before (LoadProfileSettings' seed-and-push was its only consumer). It also
+                // drives the RefreshRate Quick Settings tile label, which needs this like every
+                // other tile-backing property.
+                refreshRate.PropertyChanged += QuickSettingsProperty_Changed;
             }
             if (hdrEnabled != null)
             {
@@ -1938,6 +1944,39 @@ namespace XboxGamingBar
                 amdRadeonBoostEnabled.PropertyChanged += QuickSettingsProperty_Changed;
             }
             if (amdImageSharpeningEnabled != null)
+            {
+                amdImageSharpeningEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+            }
+
+            // Legion Touchpad/Touchscreen/LightMode/Vibration/VibrationMode/ChargeLimit/PowerLight/
+            // DesktopControls/RemapControls/FanFullSpeed and Controller-Emulation-available/enabled
+            // tiles never had a subscription here at all, so a tile-triggered change only reflected
+            // in its label after something else (e.g. tab navigation) unconditionally called
+            // UpdateQuickSettingsTileStates() - the tile action itself always worked.
+            if (legionTouchpadEnabled != null)
+                legionTouchpadEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+            if (touchscreenEnabled != null)
+                touchscreenEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionLightMode != null)
+                legionLightMode.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionChargeLimit != null)
+                legionChargeLimit.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionPowerLight != null)
+                legionPowerLight.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionDesktopControls != null)
+                legionDesktopControls.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionControllerProfile != null)
+                legionControllerProfile.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionFanFullSpeed != null)
+                legionFanFullSpeed.PropertyChanged += QuickSettingsProperty_Changed;
+            if (controllerEmulationAvailable != null)
+                controllerEmulationAvailable.PropertyChanged += QuickSettingsProperty_Changed;
+            if (controllerEmulationEnabled != null)
+                controllerEmulationEnabled.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionVibration != null)
+                legionVibration.PropertyChanged += QuickSettingsProperty_Changed;
+            if (legionVibrationMode != null)
+                legionVibrationMode.PropertyChanged += QuickSettingsProperty_Changed;
 
             // Controller battery properties - update tile when battery status changes
             if (controllerBatteryLeft != null)
