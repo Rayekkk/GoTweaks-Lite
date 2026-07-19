@@ -62,6 +62,13 @@ namespace XboxGamingBarHelper
                 // the inline if-chain used to run in). Handlers live below this method.
 
                 // Handle keyboard shortcut request
+                if (pipeMsg.Extra.TryGetValue("ExecuteQuickSetting", out object quickSettingValue) && quickSettingValue is string)
+                {
+                    HandleExecuteQuickSetting(pipeMsg);
+                    return;
+                }
+
+                // Handle keyboard shortcut request
                 if (pipeMsg.Extra.TryGetValue("SendKeyboardShortcut", out object shortcutValue) && shortcutValue is string)
                 {
                     HandleSendKeyboardShortcut(pipeMsg);
@@ -1382,7 +1389,19 @@ namespace XboxGamingBarHelper
                 // Content may be "" to clear all bindings.
                 else if (functionValue == (int)Function.TileHotkeyConfig)
                 {
-                    ApplyTileHotkeys(request.Content?.ToString() ?? "");
+                    if (request.Command == Command.Get)
+                    {
+                        Settings.LocalSettingsHelper.TryGetValue<string>(TileHotkeyConfigSettingsKey, out string savedTileConfig);
+                        response = new global::Windows.Foundation.Collections.ValueSet
+                        {
+                            { "Content", savedTileConfig ?? "[]" }
+                        };
+                    }
+                    else
+                    {
+                        ApplyTileHotkeyConfigIntent(request.Content?.ToString() ?? "");
+                        response = new global::Windows.Foundation.Collections.ValueSet { { "Content", "Applied" } };
+                    }
                 }
                 // Profile Save Flags: which settings the widget wants captured per-game vs.
                 // left as device-wide globals. Routes helper-side writes in the AutoTDP and

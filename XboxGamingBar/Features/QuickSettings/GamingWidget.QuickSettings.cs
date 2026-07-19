@@ -553,10 +553,6 @@ namespace XboxGamingBar
                     {
                         tile.Order = order;
                     }
-                    if (settings.Values.TryGetValue($"QS_{tile.Id}_Hotkey", out object hkVal) && hkVal is string hk)
-                    {
-                        tile.ControllerHotkey = hk;
-                    }
                 }
 
                 Logger.Info($"Quick Settings config loaded (columns: {qsColumnCount})");
@@ -583,11 +579,9 @@ namespace XboxGamingBar
                 {
                     settings.Values[$"QS_{tile.Id}_Visible"] = tile.IsVisible;
                     settings.Values[$"QS_{tile.Id}_Order"] = tile.Order;
-                    settings.Values[$"QS_{tile.Id}_Hotkey"] = tile.ControllerHotkey ?? "";
                 }
 
                 Logger.Info($"Quick Settings config saved (columns: {qsColumnCount})");
-                SendTileHotkeysToHelper();
             }
             catch (Exception ex)
             {
@@ -689,43 +683,57 @@ namespace XboxGamingBar
         }
 
         /// <summary>
-        /// Send all tiles that have a controller-combo binding to the helper as a JSON array
-        /// [{ "id", "name", "mask" }]. Sent on config save and on pipe connect.
+        /// Hydrate functional controller bindings from their helper-owned store. LocalSettings
+        /// retains only the tile layout; it is never an outbound authority for bindings.
         /// </summary>
-        internal void SendTileHotkeysToHelper()
+        internal async Task SyncTileHotkeysFromHelperAsync()
         {
             try
             {
                 if (!App.IsConnected) return;
-
-                var arr = new Windows.Data.Json.JsonArray();
-                foreach (var tile in qsTileDefinitions)
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    if (string.IsNullOrEmpty(tile.ControllerHotkey)) continue;
-                    if (!uint.TryParse(tile.ControllerHotkey, out uint mask) || mask == 0) continue;
-
-                    var o = new Windows.Data.Json.JsonObject
-                    {
-                        ["id"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.Id),
-                        ["name"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.Name ?? ""),
-                        ["mask"] = Windows.Data.Json.JsonValue.CreateNumberValue(mask)
-                    };
-                    arr.Add(o);
+                    { "Command", (int)Shared.Enums.Command.Get },
+                    { "Function", (int)Shared.Enums.Function.TileHotkeyConfig }
+                });
+                if (response == null || !response.TryGetValue("Content", out object raw)) return;
+                var bindings = Windows.Data.Json.JsonArray.Parse(raw?.ToString() ?? "[]");
+                foreach (var tile in qsTileDefinitions) tile.ControllerHotkey = null;
+                foreach (var value in bindings)
+                {
+                    var binding = value.GetObject();
+                    string id = binding.GetNamedString("id", "");
+                    var tile = qsTileDefinitions.FirstOrDefault(candidate => candidate.Id == id);
+                    if (tile != null) tile.ControllerHotkey = ((uint)binding.GetNamedNumber("mask", 0)).ToString();
                 }
-
-                var request = new Windows.Foundation.Collections.ValueSet
-                {
-                    { "Command", (int)Shared.Enums.Command.Set },
-                    { "Function", (int)Shared.Enums.Function.TileHotkeyConfig },
-                    { "Content", arr.Stringify() }
-                };
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info($"Sent {arr.Count} tile hotkey binding(s) to helper");
+                RebuildQuickSettingsTiles();
+                Logger.Info($"Hydrated {bindings.Count} tile hotkey binding(s) from helper");
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error sending tile hotkeys: {ex.Message}");
             }
+        }
+
+        private async Task SendTileHotkeyBindingIntentAsync(TileDefinition tile)
+        {
+            if (!App.IsConnected || tile == null) return;
+            uint.TryParse(tile.ControllerHotkey, out uint mask);
+            var intent = new Windows.Data.Json.JsonObject
+            {
+                ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetBinding"),
+                ["id"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.Id),
+                ["name"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.Name ?? ""),
+                ["mask"] = Windows.Data.Json.JsonValue.CreateNumberValue(mask)
+            };
+            if (!string.IsNullOrWhiteSpace(tile.CustomShortcut))
+                intent["shortcut"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.CustomShortcut);
+            await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+            {
+                { "Command", (int)Shared.Enums.Command.Set },
+                { "Function", (int)Shared.Enums.Function.TileHotkeyConfig },
+                { "Content", intent.Stringify() }
+            });
         }
 
         /// <summary>
@@ -849,13 +857,15 @@ namespace XboxGamingBar
                     }
 
                     tile.ControllerHotkey = mask.ToString();
-                    SaveQuickSettingsConfig();   // persists + SendTileHotkeysToHelper
+                    _ = SendTileHotkeyBindingIntentAsync(tile);
+                    SaveQuickSettingsConfig();
                     flyout.Hide();
                     RebuildQuickSettingsTiles();
                 };
                 clearBtn.Click += (s, e) =>
                 {
                     tile.ControllerHotkey = null;
+                    _ = SendTileHotkeyBindingIntentAsync(tile);
                     SaveQuickSettingsConfig();
                     flyout.Hide();
                     RebuildQuickSettingsTiles();

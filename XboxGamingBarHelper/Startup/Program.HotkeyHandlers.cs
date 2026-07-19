@@ -38,6 +38,7 @@ namespace XboxGamingBarHelper
     internal partial class Program
     {
         private const string ControllerHotkeyConfigSettingsKey = "ControllerHotkeyConfig";
+        private const string TileHotkeyConfigSettingsKey = "TileHotkeyConfig";
 
         /// <summary>
         /// Initializes the hotkey manager and registers global hotkeys
@@ -103,6 +104,8 @@ namespace XboxGamingBarHelper
                 // Helper-owned configuration must be restored before deciding whether the
                 // background monitor should run; the widget may be suspended indefinitely.
                 ApplyControllerHotkeyConfig(GetControllerHotkeyConfigSnapshot());
+                if (LocalSettingsHelper.TryGetValue<string>(TileHotkeyConfigSettingsKey, out var tileConfig))
+                    ApplyTileHotkeys(tileConfig, persist: false);
 
                 // Skip the 60Hz XInput polling thread until at least one combo is bound.
                 // ApplyControllerHotkeyConfig will call SyncControllerHotkeyMonitorRunState
@@ -152,7 +155,7 @@ namespace XboxGamingBarHelper
         /// Widget->helper: JSON array of tiles with a controller-combo binding
         /// [{ "id":..., "name":..., "mask":<uint> }]. Registers each with the monitor.
         /// </summary>
-        private static void ApplyTileHotkeys(string json)
+        private static void ApplyTileHotkeys(string json, bool persist = true)
         {
             try
             {
@@ -163,6 +166,7 @@ namespace XboxGamingBarHelper
                 }
 
                 controllerHotkeyMonitor.ClearTileHotkeys();
+                if (persist) LocalSettingsHelper.SetValue(TileHotkeyConfigSettingsKey, json ?? "");
 
                 int count = 0;
                 if (!string.IsNullOrWhiteSpace(json))
@@ -175,6 +179,7 @@ namespace XboxGamingBarHelper
                             {
                                 string id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
                                 string name = el.TryGetProperty("name", out var nEl) ? nEl.GetString() : "";
+                                string shortcut = el.TryGetProperty("shortcut", out var shortcutEl) ? shortcutEl.GetString() : null;
                                 uint mask = 0;
                                 // mask can exceed int range (Legion paddle high bits) - read as long.
                                 if (el.TryGetProperty("mask", out var mEl) && mEl.TryGetInt64(out var m)) mask = (uint)m;
@@ -182,8 +187,9 @@ namespace XboxGamingBarHelper
 
                                 string capturedId = id;
                                 string capturedName = name;
+                                string capturedShortcut = shortcut;
                                 controllerHotkeyMonitor.RegisterTileHotkey(mask,
-                                    () => FireTileHotkeyToWidget(capturedId, capturedName), name);
+                                    () => ExecuteQuickSettingAction(capturedId, capturedShortcut, out _), name);
                                 Logger.Info($"ControllerHotkey: registered tile combo '{name}' id={id} mask=0x{mask:X}");
                                 count++;
                             }
@@ -200,29 +206,227 @@ namespace XboxGamingBarHelper
             }
         }
 
-        /// <summary>Helper->widget: tell the widget a tile combo fired so it runs the tile action.</summary>
-        private static void FireTileHotkeyToWidget(string tileId, string name)
+        private static void HandleExecuteQuickSetting(Shared.IPC.PipeMessage pipeMsg)
         {
+            string tileId = pipeMsg.Extra.TryGetValue("ExecuteQuickSetting", out object idValue)
+                ? idValue?.ToString() : null;
+            string shortcut = pipeMsg.Extra.TryGetValue("CustomShortcut", out object shortcutValue)
+                ? shortcutValue?.ToString() : null;
+            bool success = ExecuteQuickSettingAction(tileId, shortcut, out string reason);
             try
             {
-                if (!IsPipeConnected)
+                if (pipeServer != null && pipeServer.IsConnected && pipeMsg.RequestId > 0)
                 {
-                    Logger.Info($"Tile combo '{name}' fired but widget not connected - id={tileId}");
-                    return;
+                    var response = new global::Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Success", success },
+                        { "Reason", reason ?? "" }
+                    };
+                    var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+                    responseMsg.RequestId = pipeMsg.RequestId;
+                    pipeServer.SendMessage(responseMsg.ToJson());
                 }
-                var msg = new Shared.IPC.PipeMessage
-                {
-                    Command = Shared.Enums.Command.Set,
-                    Function = Shared.Enums.Function.TileHotkeyFired,
-                    Content = tileId
-                };
-                SendPipeMessage(msg);
-                Logger.Info($"Tile combo '{name}' -> widget (id={tileId})");
             }
             catch (Exception ex)
             {
-                Logger.Error($"FireTileHotkeyToWidget error: {ex.Message}");
+                Logger.Error($"Quick setting response failed: {ex.Message}");
             }
+        }
+
+        private static void ApplyTileHotkeyConfigIntent(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return;
+            try
+            {
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                {
+                    if (document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        // Compatibility with pre-2.0 widgets that sent a full snapshot.
+                        ApplyTileHotkeys(json);
+                        return;
+                    }
+
+                    var root = document.RootElement;
+                    if (!root.TryGetProperty("Intent", out var intent)
+                        || intent.GetString() != "SetBinding"
+                        || !root.TryGetProperty("id", out var idElement)) return;
+                    string id = idElement.GetString();
+                    if (string.IsNullOrWhiteSpace(id)) return;
+                    string name = root.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : "";
+                    string shortcut = root.TryGetProperty("shortcut", out var shortcutElement) ? shortcutElement.GetString() : null;
+                    long mask = root.TryGetProperty("mask", out var maskElement) && maskElement.TryGetInt64(out long parsedMask)
+                        ? parsedMask : 0;
+
+                    LocalSettingsHelper.TryGetValue<string>(TileHotkeyConfigSettingsKey, out string currentJson);
+                    var entries = new List<Dictionary<string, object>>();
+                    if (!string.IsNullOrWhiteSpace(currentJson))
+                    {
+                        try
+                        {
+                            entries = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object>>>(currentJson)
+                                ?? entries;
+                        }
+                        catch (Exception ex) { Logger.Debug($"Discarding invalid saved tile bindings: {ex.Message}"); }
+                    }
+                    entries.RemoveAll(entry => entry.TryGetValue("id", out object existing)
+                        && existing?.ToString().Trim('"') == id);
+                    if (mask != 0)
+                    {
+                        var entry = new Dictionary<string, object>
+                        {
+                            { "id", id }, { "name", name ?? "" }, { "mask", mask }
+                        };
+                        if (!string.IsNullOrWhiteSpace(shortcut)) entry["shortcut"] = shortcut;
+                        entries.Add(entry);
+                    }
+                    ApplyTileHotkeys(System.Text.Json.JsonSerializer.Serialize(entries));
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"ApplyTileHotkeyConfigIntent failed: {ex.Message}");
+            }
+        }
+
+        private static bool ExecuteQuickSettingAction(string tileId, string customShortcut, out string reason)
+        {
+            reason = null;
+            if (!_managersReady) { reason = "helper managers are not ready"; return false; }
+            if (string.IsNullOrWhiteSpace(tileId)) { reason = "missing tile identifier"; return false; }
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(customShortcut))
+                {
+                    SendKeyboardShortcutViaInputInjector(customShortcut);
+                    return true;
+                }
+
+                bool Toggle(Function function)
+                {
+                    if (!properties.TryGetProperty(function, out FunctionalProperty property)
+                        || !(property.GetValue() is bool current)) return false;
+                    return property.SetValue(!current, DateTime.Now.Ticks);
+                }
+                bool Set(Function function, object value)
+                {
+                    return properties.TryGetProperty(function, out FunctionalProperty property)
+                        && property.SetValue(value, DateTime.Now.Ticks);
+                }
+                int Int(Function function, int fallback = 0)
+                {
+                    return properties.TryGetProperty(function, out FunctionalProperty property)
+                        && property.GetValue() is int current ? current : fallback;
+                }
+
+                switch (tileId)
+                {
+                    case "TDPMode":
+                        int mode = Int(Function.LegionPerformanceMode, 2);
+                        return Set(Function.LegionPerformanceMode, mode == 1 ? 2 : mode == 2 ? 3 : mode == 3 ? 255 : 1);
+                    case "Profile":
+                        if (systemManager?.RunningGame?.Value.IsValid() != true) { reason = "no active game"; return false; }
+                        return Toggle(Function.PerGameProfile);
+                    case "Overlay": return Set(Function.OSD, (Int(Function.OSD) + 1) % 4);
+                    case "PowerMode": return Set(Function.OSPowerMode, (Int(Function.OSPowerMode) + 1) % 3);
+                    case "FPSLimit":
+                        int maxRefresh = systemManager?.RefreshRates?.Value?.DefaultIfEmpty(60).Max() ?? 60;
+                        int limit = Int(Function.FPSLimit);
+                        int[] limits = { 0, maxRefresh, maxRefresh / 2, maxRefresh / 3 };
+                        int limitIndex = Array.IndexOf(limits, limit);
+                        return Set(Function.FPSLimit, limits[(limitIndex < 0 ? 0 : limitIndex + 1) % limits.Length]);
+                    case "Resolution":
+                        if (systemManager?.InternalPanelActive?.Value != true) { reason = "internal panel is inactive"; return false; }
+                        var resolutions = systemManager?.Resolutions?.Value?.Where(r => r != "1680x1050").ToList();
+                        if (resolutions == null || resolutions.Count == 0) { reason = "no supported resolutions"; return false; }
+                        string currentResolution = systemManager.Resolution.Value;
+                        int resolutionIndex = resolutions.IndexOf(currentResolution);
+                        return Set(Function.Resolution, resolutions[(resolutionIndex + 1) % resolutions.Count]);
+                    case "RefreshRate":
+                        if (systemManager?.InternalPanelActive?.Value != true) { reason = "internal panel is inactive"; return false; }
+                        int currentRate = Int(Function.RefreshRate, 60);
+                        int nextRate = currentRate >= 120 ? 60 : 120;
+                        if (systemManager?.RefreshRates?.Value?.Contains(nextRate) != true) { reason = $"{nextRate} Hz is unsupported"; return false; }
+                        return Set(Function.RefreshRate, nextRate);
+                    case "Rotation":
+                        if (systemManager?.InternalPanelActive?.Value != true) { reason = "internal panel is inactive"; return false; }
+                        return Set(Function.DisplayOrientation, Int(Function.DisplayOrientation) == 0 ? 1 : 0);
+                    case "HDR":
+                        if (systemManager?.HDRSupported?.Value != true) { reason = "HDR is unsupported"; return false; }
+                        return Toggle(Function.HDREnabled);
+                    case "LosslessScaling":
+                        if (losslessScalingManager?.LosslessScalingInstalled?.Value != true) { reason = "Lossless Scaling is not installed"; return false; }
+                        return Toggle(Function.LosslessScalingEnabled);
+                    case "RIS":
+                        if (amdManager?.AMDImageSharpeningSupported?.Value != true) { reason = "RIS is unsupported"; return false; }
+                        return Toggle(Function.AMDImageSharpeningEnabled);
+                    case "AFMF":
+                        if (amdManager?.AMDFluidMotionFrameSupported?.Value != true) { reason = "AFMF is unsupported"; return false; }
+                        return Toggle(Function.AMDFluidMotionFrameEnabled);
+                    case "RSR":
+                        if (amdManager?.AMDRadeonSuperResolutionSupported?.Value != true) { reason = "RSR is unsupported"; return false; }
+                        return Toggle(Function.AMDRadeonSuperResolutionEnabled);
+                    case "AntiLag":
+                        if (amdManager?.AMDFluidMotionFrameEnabled?.Value == true) { reason = "Anti-Lag is required while AFMF is enabled"; return false; }
+                        return Toggle(Function.AMDRadeonAntiLagEnabled);
+                    case "RadeonChill":
+                        if (amdManager?.AMDRadeonChillSupported?.Value != true) { reason = "Radeon Chill is unsupported"; return false; }
+                        return Toggle(Function.AMDRadeonChillEnabled);
+                    case "CPUBoost": return Toggle(Function.CPUBoost);
+                    case "EPP":
+                        int epp = Int(Function.CPUEPP, 80);
+                        return Set(Function.CPUEPP, epp == 0 ? 30 : epp == 30 ? 80 : epp == 80 ? 100 : 0);
+                    case "ScreenSaver": return Toggle(Function.ScreenSaverEnabled);
+                    case "Keyboard": TouchKeyboardHelper.Toggle(); return true;
+                    case "LegionTouchpad": return Toggle(Function.LegionTouchpadEnabled);
+                    case "Touchscreen": return Toggle(Function.TouchscreenEnabled);
+                    case "LegionLightMode": return Set(Function.LegionLightMode, (Int(Function.LegionLightMode) + 1) % 5);
+                    case "LegionVibration": return Set(Function.LegionVibration, (Int(Function.LegionVibration) + 1) % 4);
+                    case "LegionVibrationMode": return Set(Function.LegionVibrationMode, (Int(Function.LegionVibrationMode, 1) % 5) + 1);
+                    case "LegionDesktopControls": return Toggle(Function.LegionDesktopControls);
+                    case "LegionRemapControls": return Toggle(Function.LegionControllerProfileEnabled);
+                    case "LegionChargeLimit": return Toggle(Function.LegionChargeLimit);
+                    case "LegionPowerLight": return Toggle(Function.LegionPowerLight);
+                    case "LegionFanFullSpeed": return Toggle(Function.LegionFanFullSpeed);
+                    case "ControllerEmulation": return CycleControllerEmulationQuickTile(out reason);
+                    case "ActionTaskManager": SendKeyboardShortcutViaInputInjector("Ctrl+Shift+Escape"); return true;
+                    case "ActionExplorer": SendKeyboardShortcutViaInputInjector("Win+E"); return true;
+                    case "ActionEndTask":
+                        Task.Run(() => { SendKeyboardShortcutViaInputInjector("Alt+Tab"); Thread.Sleep(200); SendKeyboardShortcutViaInputInjector("Alt+F4"); });
+                        return true;
+                    case "Fullscreen":
+                        Task.Run(() => { SendKeyboardShortcutViaInputInjector("Alt+Tab"); Thread.Sleep(200); SendKeyboardShortcutViaInputInjector("F11"); });
+                        return true;
+                    case "ActionHibernate":
+                        return Windows.PowrProf.SetSuspendState(true, false, false);
+                    default: reason = $"unknown quick setting '{tileId}'"; return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                reason = ex.Message;
+                Logger.Error($"Quick setting {tileId} failed: {ex}");
+                return false;
+            }
+        }
+
+        private static bool CycleControllerEmulationQuickTile(out string reason)
+        {
+            reason = null;
+            if (controllerEmulationManager?.ControllerEmulationAvailable?.Value != true)
+            { reason = "controller emulation is unavailable"; return false; }
+            string[] cycle = { "xbox360", "dualshock4", "dualsenseedge", "steam-generic", "sony", "nintendo" };
+            bool enabled = controllerEmulationManager.ControllerEmulationEnabled.Value;
+            string current = settingsManager?.ViiperDeviceType?.Value ?? cycle[0];
+            if (!enabled)
+            {
+                settingsManager.ViiperDeviceType.SetValue(cycle[0]);
+                return controllerEmulationManager.ControllerEmulationEnabled.SetValue(true);
+            }
+            int index = Array.IndexOf(cycle, current);
+            if (index < 0 || index + 1 >= cycle.Length)
+                return controllerEmulationManager.ControllerEmulationEnabled.SetValue(false);
+            return settingsManager.ViiperDeviceType.SetValue(cycle[index + 1]);
         }
 
         /// <summary>

@@ -45,165 +45,49 @@ namespace XboxGamingBar
     {
 
         /// <summary>
-        /// Re-dispatch a tile activation that came from a controller combo (helper push).
-        /// Runs the exact same path as a physical tile tap so behavior is identical.
-        /// </summary>
-        private void SimulateTileHotkeyFired(string tileId)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(tileId)) return;
-                Logger.Info($"Controller combo fired tile: {tileId}");
-                var fake = new Windows.UI.Xaml.Controls.Button { Tag = tileId };
-                QuickSettingsTile_Click(fake, null);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"SimulateTileHotkeyFired error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handle Quick Settings tile clicks
+        /// Relay a direct tile intent. State-dependent cycling and action execution live in
+        /// the helper, so controller combos work even while the widget is suspended.
         /// </summary>
         private void QuickSettingsTile_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is string tileTag)
-            {
-                try
-                {
-                    // First check if it's in our local qsTileMap (includes custom shortcuts with GUID IDs)
-                    if (qsTileMap.TryGetValue(tileTag, out var mappedTile) && !string.IsNullOrEmpty(mappedTile.CustomShortcut))
-                    {
-                        _ = SendCustomShortcutAsync(mappedTile.CustomShortcut, mappedTile.Name);
-                    }
-                    // Fallback: Check QuickSettingsConfig by ID (tile IDs are now GUIDs)
-                    else if (QuickSettings.QuickSettingsConfig.Instance.GetTile(tileTag) is QuickSettings.QuickSettingsTile configTile
-                             && configTile.Type == QuickSettings.TileType.CustomShortcut
-                             && !string.IsNullOrEmpty(configTile.CustomShortcut))
-                    {
-                        _ = SendCustomShortcutAsync(configTile.CustomShortcut, configTile.Name);
-                    }
-                    else
-                    {
-                        switch (tileTag)
-                        {
-                            case "TDPMode":
-                                CycleTDPMode();
-                                break;
-                            case "Profile":
-                                TogglePerGameProfile();
-                                break;
-                            case "Overlay":
-                                CyclePerformanceOverlay();
-                                break;
-                            case "PowerMode":
-                                CyclePowerMode();
-                                break;
-                            case "FPSLimit":
-                                CycleFPSLimit();
-                                break;
-                            case "Resolution":
-                                CycleResolution();
-                                break;
-                            case "RefreshRate":
-                                CycleRefreshRate();
-                                break;
-                            case "Rotation":
-                                CycleRotation();
-                                break;
-                            case "HDR":
-                                ToggleHDR();
-                                break;
-                            case "LosslessScaling":
-                                ToggleLosslessScaling();
-                                break;
-                            case "RIS":
-                                ToggleRIS();
-                                break;
-                            case "AFMF":
-                                ToggleAFMF();
-                                break;
-                            case "RSR":
-                                ToggleRSR();
-                                break;
-                            case "AntiLag":
-                                ToggleAntiLag();
-                                break;
-                            case "RadeonChill":
-                                ToggleRadeonChill();
-                                break;
-                            case "CPUBoost":
-                                ToggleCPUBoost();
-                                break;
-                            case "EPP":
-                                CycleEPP();
-                                break;
-                            case "ScreenSaver":
-                                ToggleScreenSaver();
-                                break;
-                            case "Keyboard":
-                                TriggerOnScreenKeyboard();
-                                break;
-                            case "LegionTouchpad":
-                                ToggleLegionTouchpad();
-                                break;
-                            case "Touchscreen":
-                                ToggleTouchscreen();
-                                break;
-                            case "LegionLightMode":
-                                CycleLegionLightMode();
-                                break;
-                            case "LegionVibration":
-                                CycleLegionVibration();
-                                break;
-                            case "LegionVibrationMode":
-                                CycleLegionVibrationMode();
-                                break;
-                            case "LegionDesktopControls":
-                                ToggleLegionDesktopControls();
-                                break;
-                            case "LegionRemapControls":
-                                ToggleRemapControlsProfile();
-                                break;
-                            case "LegionChargeLimit":
-                                ToggleLegionChargeLimit();
-                                break;
-                            // Action tiles
-                            case "ActionTaskManager":
-                                LaunchTaskManager();
-                                break;
-                            case "ActionExplorer":
-                                LaunchExplorer();
-                                break;
-                            case "ActionEndTask":
-                                SendAltF4();
-                                break;
-                            case "Fullscreen":
-                                ToggleFullscreen();
-                                break;
-                            case "ActionHibernate":
-                                ExecuteHibernate();
-                                break;
-                            case "LegionPowerLight":
-                                ToggleLegionPowerLight();
-                                break;
-                            case "LegionFanFullSpeed":
-                                ToggleLegionFanFullSpeed();
-                                break;
-                            case "ControllerEmulation":
-                                ToggleControllerEmulation();
-                                break;
-                        }
-                    }
+                _ = SendQuickSettingActionAsync(tileTag);
+        }
 
-                    // Update tile states after action
-                    UpdateQuickSettingsTileStates();
-                }
-                catch (Exception ex)
+        private async Task SendQuickSettingActionAsync(string tileId)
+        {
+            string customShortcut = null;
+            if (qsTileMap.TryGetValue(tileId, out var mappedTile))
+                customShortcut = mappedTile.CustomShortcut;
+            if (string.IsNullOrWhiteSpace(customShortcut)
+                && QuickSettings.QuickSettingsConfig.Instance.GetTile(tileId) is QuickSettings.QuickSettingsTile configTile
+                && configTile.Type == QuickSettings.TileType.CustomShortcut)
+                customShortcut = configTile.CustomShortcut;
+
+            if (!App.IsConnected)
+            {
+                await ShowSettingApplyFailureAsync(Function.None, $"Quick setting {tileId}: helper disconnected.");
+                return;
+            }
+
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet { { "ExecuteQuickSetting", tileId } };
+                if (!string.IsNullOrWhiteSpace(customShortcut)) request["CustomShortcut"] = customShortcut;
+                var response = await App.SendMessageAsync(request) as Windows.Foundation.Collections.ValueSet;
+                bool success = response != null && response.TryGetValue("Success", out object result)
+                    && Convert.ToBoolean(result);
+                if (!success)
                 {
-                    Logger.Error($"Error handling Quick Settings tile click: {ex.Message}");
+                    string reason = response != null && response.TryGetValue("Reason", out object detail)
+                        ? detail?.ToString() : "helper did not confirm the action";
+                    await ShowSettingApplyFailureAsync(Function.None, $"Quick setting {tileId}: {reason}");
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Quick setting {tileId} request failed: {ex.Message}");
+                await ShowSettingApplyFailureAsync(Function.None, $"Quick setting {tileId}: {ex.Message}");
             }
         }
 
