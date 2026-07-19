@@ -54,8 +54,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDImageSharpeningSharpnessProperty : HelperProperty<int, AMDManager>
+    internal class AMDImageSharpeningSharpnessProperty : HelperProperty<int, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDImageSharpeningSharpnessProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDImageSharpeningSharpness, inManager)
         {
         }
@@ -74,7 +77,8 @@ namespace XboxGamingBarHelper.AMD.Properties
             // that doesn't match the widget's hardcoded 10-100).
             (int min, int max) = Manager.AMDImageSharpeningSetting.GetSharpnessRange();
             int clamped = Math.Max(min, Math.Min(max, Value));
-            Manager.AMDImageSharpeningSetting.SetSharpness(clamped);
+            LastApplySucceeded = Manager.AMDImageSharpeningSetting.SetSharpness(clamped);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Image Sharpening level could not be applied.";
         }
     }
 }

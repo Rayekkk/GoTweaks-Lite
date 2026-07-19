@@ -49,8 +49,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDRadeonBoostResolutionProperty : HelperProperty<int, AMDManager>
+    internal class AMDRadeonBoostResolutionProperty : HelperProperty<int, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonBoostResolutionProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonBoostResolution, inManager)
         {
         }
@@ -60,7 +63,8 @@ namespace XboxGamingBarHelper.AMD.Properties
             base.NotifyPropertyChanged(propertyName);
 
             (int min, int max) = Manager.AMDRadeonBoostSetting.GetResolutionRange();
-            Manager.AMDRadeonBoostSetting.SetResolution(Value == 0 ? min : max);
+            LastApplySucceeded = Manager.AMDRadeonBoostSetting.SetResolution(Value == 0 ? min : max);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Boost resolution could not be applied.";
         }
     }
 }

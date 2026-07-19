@@ -59,8 +59,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDRadeonSuperResolutionSharpnessProperty : HelperProperty<int, AMDManager>
+    internal class AMDRadeonSuperResolutionSharpnessProperty : HelperProperty<int, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonSuperResolutionSharpnessProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonSuperResolutionSharpness, inManager)
         {
         }
@@ -70,14 +73,10 @@ namespace XboxGamingBarHelper.AMD.Properties
             base.NotifyPropertyChanged(propertyName);
 
             (int min, int max) = Manager.AMDRadeonSuperResolutionSetting.GetSharpnessRange();
-            if (min == 0 && max == 100)
-            {
-                Manager.AMDRadeonSuperResolutionSetting.SetSharpness(Value);
-            }
-            else
-            {
-                Manager.AMDRadeonSuperResolutionSetting.SetSharpness((int)Math.Round(min + Value / 100.0f * (max - min)));
-            }
+            LastApplySucceeded = (min == 0 && max == 100)
+                ? Manager.AMDRadeonSuperResolutionSetting.SetSharpness(Value)
+                : Manager.AMDRadeonSuperResolutionSetting.SetSharpness((int)Math.Round(min + Value / 100.0f * (max - min)));
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Super Resolution sharpness could not be applied.";
         }
     }
 }

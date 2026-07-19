@@ -49,8 +49,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDRadeonChillMinFPSProperty : HelperProperty<int, AMDManager>
+    internal class AMDRadeonChillMinFPSProperty : HelperProperty<int, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonChillMinFPSProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonChillMinFPS, inManager)
         {
         }
@@ -59,12 +62,16 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
             base.NotifyPropertyChanged(propertyName);
 
-            Manager.AMDRadeonChillSetting.SetMinFPS(Value);
+            LastApplySucceeded = Manager.AMDRadeonChillSetting.SetMinFPS(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Chill minimum FPS could not be applied.";
         }
     }
 
-    internal class AMDRadeonChillMaxFPSProperty : HelperProperty<int, AMDManager>
+    internal class AMDRadeonChillMaxFPSProperty : HelperProperty<int, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonChillMaxFPSProperty(int inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonChillMaxFPS, inManager)
         {
         }
@@ -73,7 +80,8 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
             base.NotifyPropertyChanged(propertyName);
 
-            Manager.AMDRadeonChillSetting.SetMaxFPS(Value);
+            LastApplySucceeded = Manager.AMDRadeonChillSetting.SetMaxFPS(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Chill maximum FPS could not be applied.";
         }
     }
 }
