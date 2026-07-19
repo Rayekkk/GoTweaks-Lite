@@ -8,5 +8,12 @@ namespace XboxGamingBar.Data
         public AMDImageSharpeningEnabledProperty(ToggleSwitch inUI, Page inOwner) : base(false, Function.AMDImageSharpeningEnabled, inUI, inOwner)
         {
         }
+
+        // See AMDRadeonSuperResolutionEnabledProperty for the full rationale - same double-send
+        // bug (generic bound-control auto-send racing the SetProfileField intent from
+        // AMDImageSharpeningToggle_Toggled -> SettingChanged).
+        protected override void ToggleSwitch_ValueChanged(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+        }
     }
 }

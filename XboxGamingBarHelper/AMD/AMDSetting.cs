@@ -85,7 +85,12 @@ namespace XboxGamingBarHelper.AMD
             object result = setEnabledMethod.Invoke(adlxSetting, new object[1] { enabled });
             if (result is ADLX_RESULT adlxResult)
             {
-                if (adlxResult == ADLX_RESULT.ADLX_OK) return true;
+                // ADLX_ALREADY_ENABLED means the driver is already in the requested end state -
+                // a genuine no-op success, not a failure. Treating it as an error caused spurious
+                // "helper rejected an invalid or stale value" toasts even when the toggle's
+                // effective state was already correct (e.g. after a widget double-send race, or a
+                // mutual-exclusion correction re-asserting a value that already matched).
+                if (adlxResult == ADLX_RESULT.ADLX_OK || adlxResult == ADLX_RESULT.ADLX_ALREADY_ENABLED) return true;
                 Logger.Error($"{GetType().Name} SetEnabled({enabled}) returned {adlxResult}.");
                 return false;
             }

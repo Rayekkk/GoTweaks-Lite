@@ -1177,7 +1177,7 @@ namespace XboxGamingBar
             // (Value==0 -> min resolution scale/aggressive downscale = Performance,
             // Value==1 -> max/near-native = Quality) - order in the ComboBox is Quality-first to
             // match how the user described it, independent of the Tag values' own ordering.
-            amdRadeonBoostResolution = new IntTagComboProperty(0, Function.AMDRadeonBoostResolution, AMDRadeonBoostResolutionComboBox, this);
+            amdRadeonBoostResolution = new IntTagComboProperty(0, Function.AMDRadeonBoostResolution, AMDRadeonBoostResolutionComboBox, this, suppressAutoSend: true);
             amdRadeonChillEnabled = new AMDRadeonChillEnabledProperty(AMDRadeonChillToggle, this);
             amdRadeonChillSupported = new AMDRadeonChillSupportedProperty(AMDRadeonChillToggle, this);
             amdRadeonChillMinFPSProperty = new AMDRadeonChillMinFPSProperty(AMDRadeonChillMinFPSSlider, this);

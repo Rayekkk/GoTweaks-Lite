@@ -15,9 +15,16 @@ namespace XboxGamingBar.Data
     /// </summary>
     internal class IntTagComboProperty : WidgetControlProperty<int, ComboBox>
     {
-        public IntTagComboProperty(int initialValue, Function inFunction, ComboBox inUI, Page inOwner)
+        // Set true only for a Function whose control change is ALSO sent via an explicit
+        // SetProfileField intent elsewhere (e.g. AMDRadeonBoostResolutionComboBox ->
+        // SettingChanged) - otherwise this class's own send below would race that intent,
+        // the same double-send bug found in the AMD toggle/slider properties.
+        private readonly bool suppressAutoSend;
+
+        public IntTagComboProperty(int initialValue, Function inFunction, ComboBox inUI, Page inOwner, bool suppressAutoSend = false)
             : base(initialValue, inFunction, inUI, inOwner)
         {
+            this.suppressAutoSend = suppressAutoSend;
             if (UI != null)
             {
                 SyncSelectedIndexFromValue();
@@ -48,6 +55,8 @@ namespace XboxGamingBar.Data
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (suppressAutoSend) return;
+
             var selectedItem = UI.SelectedItem as ComboBoxItem;
             if (selectedItem?.Tag is string tagString && int.TryParse(tagString, out int newValue))
             {
