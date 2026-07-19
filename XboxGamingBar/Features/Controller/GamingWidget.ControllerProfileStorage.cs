@@ -1040,7 +1040,7 @@ namespace XboxGamingBar
                 // Seed the stored per-button metadata GetButtonMappingFromUI reads on later user
                 // edits. ApplyButtonMappingToUI sets the gamepad-combo/turbo/mode stores from the
                 // mapping but not the keyboard-key store, so set that explicitly here (mirrors
-                // ApplyControllerProfile's separate SetStoredKeyboardKeys seeding).
+                // Helper-synchronized mapping data is applied without triggering a new user intent.
                 SetStoredKeyboardKeys(buttonName, mapping.KeyboardKeys ?? new List<int>());
                 ApplyButtonMappingToUI(buttonName, mapping);
             }

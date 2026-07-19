@@ -92,7 +92,7 @@ namespace XboxGamingBar
             if (isLoadingControllerProfile)
             {
                 // Skip sending if this is a duplicate call during profile loading
-                // (the main send will happen via SendButtonMappingsToHelper at the end of ApplyControllerProfile)
+                // The helper publishes the confirmed mapping state after the active edit completes.
                 return;
             }
 
