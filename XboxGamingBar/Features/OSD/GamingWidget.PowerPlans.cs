@@ -45,20 +45,25 @@ namespace XboxGamingBar
     {
         // LocalSettings remains only a UI cache. On every connection it is refreshed from the
         // helper before any direct user edit can use it as an edit buffer.
-        private async Task SyncPowerSourceProfilesFromHelperAsync()
+        private async Task SyncPowerSourceProfilesFromHelperAsync(string snapshotJson = null)
         {
             try
             {
-                var request = new Windows.Foundation.Collections.ValueSet
+                string json = snapshotJson;
+                if (string.IsNullOrWhiteSpace(json))
                 {
-                    { "Command", (int)Shared.Enums.Command.Get },
-                    { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues }
-                };
-                var response = await App.PipeClient.SendRequestAsync(request);
-                if (response == null || !response.TryGetValue("Content", out object content) || !(content is string json) || string.IsNullOrWhiteSpace(json))
-                {
-                    Logger.Warn("Power-source profile snapshot was empty; leaving UI cache unchanged");
-                    return;
+                    var request = new Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Command", (int)Shared.Enums.Command.Get },
+                        { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues }
+                    };
+                    var response = await App.PipeClient.SendRequestAsync(request);
+                    if (response == null || !response.TryGetValue("Content", out object content) || !(content is string received) || string.IsNullOrWhiteSpace(received))
+                    {
+                        Logger.Warn("Power-source profile snapshot was empty; leaving UI cache unchanged");
+                        return;
+                    }
+                    json = received;
                 }
 
                 var values = Windows.Data.Json.JsonObject.Parse(json);
@@ -111,6 +116,10 @@ namespace XboxGamingBar
         private async Task SendProfileFieldIntentAsync(string field, object value)
         {
             if (!App.IsConnected) return;
+            Windows.UI.Xaml.Controls.Control pendingControl = null;
+            if (field == "CPUBoost") pendingControl = CPUBoostToggle;
+            else if (field == "CPUEPP") pendingControl = CPUEPPSlider;
+            if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
                 bool dc = currentProfileName != null && currentProfileName.EndsWith("_DC");
@@ -140,12 +149,47 @@ namespace XboxGamingBar
                 var result = Windows.Data.Json.JsonObject.Parse(content);
                 string outcome = result.GetNamedString("Outcome", "Rejected");
                 if (outcome != "Applied") Logger.Warn($"Profile intent {field} rejected: {result.GetNamedString("Reason", "unknown reason")}");
-                await SyncPowerSourceProfilesFromHelperAsync();
+                string snapshot = result.GetNamedString("Snapshot", "");
+                await SyncPowerSourceProfilesFromHelperAsync(snapshot);
+                ApplyConfirmedProfileFieldFromSnapshot(field, dc, snapshot);
             }
             catch (Exception ex)
             {
                 Logger.Warn($"Profile intent {field} failed: {ex.Message}");
                 await SyncPowerSourceProfilesFromHelperAsync();
+            }
+            finally
+            {
+                if (pendingControl != null) pendingControl.IsEnabled = true;
+            }
+        }
+
+        // ToggleSwitch and Slider visually change before their event reaches us. Replace that
+        // requested value with the helper-confirmed value on every response, including a
+        // rejection. SuppressRemoteSync makes this a display update, never a retry.
+        private void ApplyConfirmedProfileFieldFromSnapshot(string field, bool dc, string snapshotJson)
+        {
+            if (string.IsNullOrWhiteSpace(snapshotJson)) return;
+            try
+            {
+                var values = Windows.Data.Json.JsonObject.Parse(snapshotJson);
+                string prefix = dc ? "Dc" : "Ac";
+                if (field == "CPUBoost" && values.ContainsKey(prefix + "CpuBoost"))
+                {
+                    cpuBoost.SuppressRemoteSync = true;
+                    try { cpuBoost.ForceSetValue(values.GetNamedBoolean(prefix + "CpuBoost")); }
+                    finally { cpuBoost.SuppressRemoteSync = false; }
+                }
+                else if (field == "CPUEPP" && values.ContainsKey(prefix + "CpuEpp"))
+                {
+                    cpuEPP.SuppressRemoteSync = true;
+                    try { cpuEPP.ForceSetValue((int)values.GetNamedNumber(prefix + "CpuEpp")); }
+                    finally { cpuEPP.SuppressRemoteSync = false; }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to render confirmed {field} value: {ex.Message}");
             }
         }
 

@@ -11,5 +11,11 @@ namespace XboxGamingBar.Data
         public CPUBoostProperty(ToggleSwitch inUI, Page inOwner) : base(false, Function.CPUBoost, inUI, inOwner)
         {
         }
+
+        // Profile edits use the explicit SetProfileField intent. Do not let the generic
+        // bound-control path apply/send an optimistic value before helper validation.
+        protected override void ToggleSwitch_ValueChanged(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+        }
     }
 }

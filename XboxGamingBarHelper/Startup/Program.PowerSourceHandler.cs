@@ -347,6 +347,29 @@ namespace XboxGamingBarHelper
                 return false;
             }
 
+            // Apply only the currently-active AC/DC state. The other side is persisted now and
+            // the helper's power-source handler applies it on the next real transition.
+            // isApplyingProfile prevents the regular property handlers from treating this
+            // helper-owned apply as a second user edit.
+            if (dc != IsCurrentlyOnAC)
+            {
+                lock (profileApplicationLock)
+                {
+                    if (!isApplyingProfile)
+                    {
+                        try
+                        {
+                            isApplyingProfile = true;
+                            ApplyPowerSourceChangeInternal(IsCurrentlyOnAC);
+                        }
+                        finally
+                        {
+                            isApplyingProfile = false;
+                        }
+                    }
+                }
+            }
+
             Logger.Info($"Applied SetProfileField intent: {field} ({power}) to {profile.GameId.Name}");
             return true;
         }
