@@ -398,38 +398,6 @@ namespace XboxGamingBar
         /// pre-existing widget profiles that don't have GameExePath stamped in their
         /// LocalSettings container.
         /// </summary>
-        private Dictionary<string, string> BuildTitleToExeBasenameMap()
-        {
-            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                string profilesFolder = Path.Combine(ApplicationData.Current.LocalFolder.Path, "profiles");
-                if (!Directory.Exists(profilesFolder)) return map;
-
-                foreach (var xmlPath in Directory.GetFiles(profilesFolder, "*.xml"))
-                {
-                    try
-                    {
-                        var doc = System.Xml.Linq.XDocument.Load(xmlPath);
-                        var nameEl = doc.Descendants("Name").FirstOrDefault();
-                        if (nameEl != null && !string.IsNullOrEmpty(nameEl.Value))
-                        {
-                            map[nameEl.Value] = Path.GetFileNameWithoutExtension(xmlPath);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Debug($"BuildTitleToExeBasenameMap parse {xmlPath}: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"BuildTitleToExeBasenameMap enumerate failed: {ex.Message}");
-            }
-            return map;
-        }
-
         /// <summary>
         /// Builds the parent Border for a multi-profile exe group. Header shows the exe
         /// name and a "N profiles" badge; the muxc:Expander collapses the children by
