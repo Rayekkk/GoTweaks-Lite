@@ -172,9 +172,6 @@ namespace XboxGamingBar
         private bool isDebugExpanded = false;
         // Legacy values retained only while the reserved wire channel remains; no startup
         // load or active UI path reads or writes them.
-        private int deviceTDPMin = 4;
-        private int deviceTDPMax = 35;
-
         private bool isLoadingOSDConfig = false;
 
         private void OSDCustomizeLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -889,6 +886,7 @@ namespace XboxGamingBar
             }
         }
 
+#if false // Reserved TDPLimits wire ordinal; Lite has no device-limit control surface.
         private void ApplyTDPLimits()
         {
             // Master TDP slider removed — the Custom power-limit sliders use fixed ranges
@@ -952,6 +950,7 @@ namespace XboxGamingBar
                 Logger.Error($"Failed to load TDP limits: {ex.Message}");
             }
         }
+#endif
         private void OSDLayoutOption_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (isLoadingOSDConfig) return;

@@ -845,8 +845,6 @@ namespace XboxGamingBar
         private readonly HidHideInstalledProperty hidHideInstalled;
         private readonly InstallHidHideProperty installHidHide;
 
-        private readonly TDPLimitsProperty tdpLimits;
-
         // OS Power Mode
         private readonly OSPowerModeProperty osPowerMode;
         private bool isLoadingOSPowerMode = false;
@@ -1555,8 +1553,6 @@ namespace XboxGamingBar
             pawnIOInstalled.SetInstalledCallback(UpdatePawnIOInstalledUI);
             hidHideInstalled.SetInstalledCallback(UpdateHidHideInstalledUI);
 
-            tdpLimits = new TDPLimitsProperty("4,35");
-
             // OS Power Mode property
             osPowerMode = new OSPowerModeProperty();
 
@@ -1790,7 +1786,6 @@ namespace XboxGamingBar
                 installHidHide,
                 fpsLimit,
                 osPowerMode,
-                tdpLimits,
                 legionDesktopControls,
                 legionJoystickAsMouseMode,
                 legionJoystickMouseSens,
