@@ -1858,6 +1858,14 @@ namespace XboxGamingBar
                 return;
             }
 
+            // A TDP-mode selection is a direct user request. The helper validates, persists and
+            // applies it; this widget must not optimistically switch firmware mode or profile data.
+            if (legionGoDetected?.Value == true)
+            {
+                _ = SendProfileFieldIntentAsync("LegionPerformanceMode", GetCurrentPresetLegionMode());
+                return;
+            }
+
             // Check if switching away from Custom mode (to save slider value)
             // Use lastTDPModeIndex to check the PREVIOUS selection, not the new one
             bool wasCustomMode = lastTDPModeIndex >= 0 && IsCustomTdpModeIndex(lastTDPModeIndex);

@@ -138,6 +138,7 @@ namespace XboxGamingBar
             else if (field == "RefreshRate") pendingControl = RefreshRatesComboBox;
             else if (field == "HDR") pendingControl = HDRToggle;
             else if (field == "Resolution") pendingControl = ResolutionComboBox;
+            else if (field == "LegionPerformanceMode") pendingControl = TDPModeComboBox;
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -302,6 +303,17 @@ namespace XboxGamingBar
                     resolution.SuppressRemoteSync = true;
                     try { resolution.ForceSetValue(values.GetNamedString(prefix + "Resolution")); }
                     finally { resolution.SuppressRemoteSync = false; }
+                }
+                else if (field == "LegionPerformanceMode" && values.ContainsKey(prefix + "LegionPerformanceMode"))
+                {
+                    int confirmed = (int)values.GetNamedNumber(prefix + "LegionPerformanceMode");
+                    legionPerformanceMode.SuppressRemoteSync = true;
+                    try { legionPerformanceMode.ForceSetValue(confirmed); }
+                    finally { legionPerformanceMode.SuppressRemoteSync = false; }
+
+                    int confirmedIndex = confirmed == 1 ? 0 : confirmed == 2 ? 1 : confirmed == 3 ? 2 : 3;
+                    lastTDPModeIndex = confirmedIndex;
+                    UpdateTDPSliderEnabledState();
                 }
             }
             catch (Exception ex)

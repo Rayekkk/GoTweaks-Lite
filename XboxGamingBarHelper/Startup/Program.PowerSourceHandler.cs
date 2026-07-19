@@ -398,6 +398,18 @@ namespace XboxGamingBarHelper
                 if (dc) profile.Resolution_DC = resolution;
                 else profile.Resolution = resolution;
             }
+            else if (field == "LegionPerformanceMode" && value.TryGetInt32(out int legionPerformanceMode))
+            {
+                if (legionManager == null || (legionPerformanceMode != 1 && legionPerformanceMode != 2
+                    && legionPerformanceMode != 3 && legionPerformanceMode != 255))
+                {
+                    reason = "invalid Legion performance mode or unsupported device";
+                    Logger.Warn($"Rejected SetProfileField(LegionPerformanceMode): {legionPerformanceMode}");
+                    return false;
+                }
+                if (dc) profile.LegionPerformanceMode_DC = legionPerformanceMode;
+                else profile.LegionPerformanceMode = legionPerformanceMode;
+            }
             else if (field == "CPUState"
                 && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
                 && cfg.TryGetValue("MaxValue", out var maxElement) && maxElement.TryGetInt32(out int maxState))

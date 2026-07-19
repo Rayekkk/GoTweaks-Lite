@@ -55,8 +55,7 @@ namespace XboxGamingBar.Data
                 int newMode = PERFORMANCE_MODE_VALUES[selectedIndex];
                 if (newMode != Value)
                 {
-                    Logger.Info($"{Function} ComboBox updated to mode {newMode} (index {selectedIndex}).");
-                    SetValue(newMode);
+                    Logger.Info($"{Function} ComboBox requested mode {newMode} (index {selectedIndex}).");
                 }
                 // Show/hide custom TDP controls
                 _customTDPVisibilityCallback?.Invoke(newMode == 255);
