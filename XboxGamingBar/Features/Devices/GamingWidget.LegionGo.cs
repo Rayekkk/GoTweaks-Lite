@@ -1950,7 +1950,7 @@ namespace XboxGamingBar
                 else
                 {
                     Logger.Info($"Saving TDP Mode change to profile: {currentProfileName}");
-                    SaveCurrentSettingsToProfile(currentProfileName);
+                    Logger.Debug("Legacy widget profile save suppressed; helper owns TDP mode persistence");
                 }
             }
             else

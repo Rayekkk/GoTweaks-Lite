@@ -924,7 +924,6 @@ namespace XboxGamingBar
         private bool isLoadingControllerProfile = false;
         private bool isSwitchingControllerProfile = false;
         private DateTime lastProfileApplyTime = DateTime.MinValue; // Prevents duplicate sends from queued UI events
-        private int profileSwitchEpoch = 0; // Incremented on each LoadProfileSettings; used to skip stale deferred callbacks
 
         // Debounces the controller-profile save/send for slider drags (gyro sensitivity/
         // deadzone, stick deadzones, trigger travel, joystick-mouse sens, light brightness/
@@ -2026,7 +2025,6 @@ namespace XboxGamingBar
                 // [2.0 rebuild - Faza C3] FPSLimit is now helper-authoritative (LoadProfileSettings
                 // no longer seeds it) - resync the Profiles-tab card snapshot on every push so it
                 // doesn't go stale after a game switch or an external RTSS change.
-                fpsLimit.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (osPowerMode != null)
                 osPowerMode.PropertyChanged += OSPowerMode_PropertyChanged;
@@ -2034,31 +2032,24 @@ namespace XboxGamingBar
             // helper-authoritative (LoadProfileSettings no longer seeds/pushes them) - same
             // resync as FPSLimit above, so the Profiles-tab card snapshot stays accurate.
             if (cpuBoost != null)
-                cpuBoost.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             if (cpuEPP != null)
-                cpuEPP.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             if (maxCPUState != null)
-                maxCPUState.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             if (minCPUState != null)
-                minCPUState.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             if (resolution != null)
             {
                 resolution.PropertyChanged += QuickSettingsProperty_Changed;
                 resolution.PropertyChanged += Resolution_PropertyChanged_OSD;
                 // [2.0 rebuild - Faza C3] Same resync as FPSLimit above.
-                resolution.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (refreshRate != null)
             {
                 // [2.0 rebuild - Faza C3] RefreshRate is now helper-authoritative; had no subscription
                 // at all before (LoadProfileSettings' seed-and-push was its only consumer).
-                refreshRate.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (hdrEnabled != null)
             {
                 hdrEnabled.PropertyChanged += QuickSettingsProperty_Changed;
                 // [2.0 rebuild - Faza C3] Same resync as FPSLimit above.
-                hdrEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (hdrSupported != null)
                 hdrSupported.PropertyChanged += QuickSettingsProperty_Changed;
@@ -2069,30 +2060,24 @@ namespace XboxGamingBar
             if (amdFluidMotionFrameEnabled != null)
             {
                 amdFluidMotionFrameEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdFluidMotionFrameEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonSuperResolutionEnabled != null)
             {
                 amdRadeonSuperResolutionEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonSuperResolutionEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonAntiLagEnabled != null)
             {
                 amdRadeonAntiLagEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonAntiLagEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonChillEnabled != null)
             {
                 amdRadeonChillEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonChillEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdRadeonBoostEnabled != null)
             {
                 amdRadeonBoostEnabled.PropertyChanged += QuickSettingsProperty_Changed;
-                amdRadeonBoostEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
             }
             if (amdImageSharpeningEnabled != null)
-                amdImageSharpeningEnabled.PropertyChanged += ProfileTrackedProperty_ChangedResyncProfile;
 
             // Controller battery properties - update tile when battery status changes
             if (controllerBatteryLeft != null)
@@ -2539,7 +2524,6 @@ namespace XboxGamingBar
                             isSwitchingProfile = true;
                             try
                             {
-                                LoadOrCreateGameProfiles();
                                 UpdateActiveProfileIndicator();  // Critical: switch to the new game's profile!
 
                                 // Show notification for per-game profile
@@ -2784,7 +2768,7 @@ namespace XboxGamingBar
             UpdateActiveProfileScrollAnimation();
 
             // Switch profile if needed
-            SwitchProfile();
+            _ = SyncPowerSourceProfilesFromHelperAsync();
         }
 
         // Marquee storyboards for header text fields. Cached so successive calls can

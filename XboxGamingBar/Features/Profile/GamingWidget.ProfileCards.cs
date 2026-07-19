@@ -206,12 +206,12 @@ namespace XboxGamingBar
             // Without this step, profiles created in earlier builds never group, never
             // show their icon, and never show a "modified Xago" line — even though the
             // helper has all the info we need sitting in LocalState/profiles/*.xml.
-            BackfillLegacyContainersFromHelperXmls();
+            // Helper catalog entries already contain the authoritative executable path.
 
             // Pull the title→exe-basename map from the helper's per-exe XML profiles
             // so legacy widget profiles (saved before we started stamping GameExePath
             // into LocalSettings containers) can still be grouped by their owning exe.
-            var helperTitleMap = BuildTitleToExeBasenameMap();
+            var helperTitleMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             // Bucket every saved game profile by the exe it belongs to. Profiles for
             // the same exe (e.g. multiple titles played in Citron) collapse into one
@@ -285,23 +285,10 @@ namespace XboxGamingBar
         /// </summary>
         private int GetProfileTopTdp(string gameName)
         {
-            int max = int.MinValue;
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                foreach (var suffix in new[] { "", "_AC", "_DC" })
-                {
-                    var key = $"Profile_Game_{gameName}{suffix}";
-                    if (settings.Containers.ContainsKey(key)
-                        && settings.Containers[key].Values.TryGetValue("TDP", out var tdpObj))
-                    {
-                        int v = Convert.ToInt32(tdpObj);
-                        if (v > max) max = v;
-                    }
-                }
-            }
-            catch { }
-            return max;
+            return new[] { "", "_AC", "_DC" }
+                .Select(suffix => helperProfileCatalog.TryGetValue($"Game_{gameName}{suffix}", out var profile)
+                    ? (int)profile.TDP : int.MinValue)
+                .Max();
         }
 
         /// <summary>
@@ -313,31 +300,9 @@ namespace XboxGamingBar
         /// </summary>
         private string ResolveGroupKeyForProfile(string gameName, Dictionary<string, string> helperTitleMap)
         {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                foreach (var suffix in new[] { "", "_AC", "_DC" })
-                {
-                    var key = $"Profile_Game_{gameName}{suffix}";
-                    if (settings.Containers.ContainsKey(key)
-                        && settings.Containers[key].Values.TryGetValue("GameExePath", out var pathObj)
-                        && pathObj is string path
-                        && !string.IsNullOrEmpty(path))
-                    {
-                        return Path.GetFileNameWithoutExtension(path);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"ResolveGroupKeyForProfile({gameName}) container read failed: {ex.Message}");
-            }
-
-            if (helperTitleMap != null && helperTitleMap.TryGetValue(gameName, out var helperBasename))
-            {
-                return helperBasename;
-            }
-            return null;
+            return helperProfileCatalogPaths.TryGetValue(gameName, out var path) && !string.IsNullOrEmpty(path)
+                ? Path.GetFileNameWithoutExtension(path)
+                : null;
         }
 
         /// <summary>
@@ -981,26 +946,7 @@ namespace XboxGamingBar
         /// </summary>
         private string TryGetExePathForGame(string gameName)
         {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                foreach (var suffix in new[] { "", "_AC", "_DC" })
-                {
-                    var key = $"Profile_Game_{gameName}{suffix}";
-                    if (settings.Containers.ContainsKey(key)
-                        && settings.Containers[key].Values.TryGetValue("GameExePath", out var pathObj)
-                        && pathObj is string path
-                        && !string.IsNullOrEmpty(path))
-                    {
-                        return path;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"TryGetExePathForGame({gameName}) failed: {ex.Message}");
-            }
-            return null;
+            return helperProfileCatalogPaths.TryGetValue(gameName, out var path) ? path : null;
         }
 
         /// <summary>
@@ -1045,27 +991,7 @@ namespace XboxGamingBar
         /// </summary>
         private string GetMostRecentLastModifiedText(string gameName)
         {
-            DateTime? newest = null;
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                foreach (var suffix in new[] { "", "_AC", "_DC" })
-                {
-                    var key = $"Profile_Game_{gameName}{suffix}";
-                    if (settings.Containers.ContainsKey(key)
-                        && settings.Containers[key].Values.TryGetValue("LastModifiedUtc", out var ts)
-                        && ts is long ticks)
-                    {
-                        var dt = new DateTime(ticks, DateTimeKind.Utc);
-                        if (newest == null || dt > newest.Value) newest = dt;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug($"GetMostRecentLastModifiedText({gameName}) failed: {ex.Message}");
-            }
-            return newest.HasValue ? "modified " + FormatRelativeTime(newest.Value) : null;
+            return null;
         }
 
         /// <summary>
@@ -1075,24 +1001,7 @@ namespace XboxGamingBar
         /// </summary>
         private long GetMostRecentLastModifiedTicks(string gameName)
         {
-            long max = long.MinValue;
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                foreach (var suffix in new[] { "", "_AC", "_DC" })
-                {
-                    var key = $"Profile_Game_{gameName}{suffix}";
-                    if (settings.Containers.ContainsKey(key)
-                        && settings.Containers[key].Values.TryGetValue("LastModifiedUtc", out var ts)
-                        && ts is long ticks
-                        && ticks > max)
-                    {
-                        max = ticks;
-                    }
-                }
-            }
-            catch { }
-            return max;
+            return long.MinValue;
         }
 
         private static string FormatRelativeTime(DateTime utc)
