@@ -105,36 +105,6 @@ namespace XboxGamingBar
         private List<string> GetAllSavedGameProfiles()
         {
             return helperProfileCatalog.Keys.Where(k => k.StartsWith("Game_")).Select(k => k.Substring(5).Replace("_AC", "").Replace("_DC", "")).Distinct().OrderBy(n => n).ToList();
-            var gameNames = new HashSet<string>();
-            var settings = ApplicationData.Current.LocalSettings;
-
-            // Enumerate all containers looking for game profiles
-            foreach (var containerName in settings.Containers.Keys)
-            {
-                if (containerName.StartsWith("Profile_Game_"))
-                {
-                    // Extract game name from container key
-                    string gameName = containerName.Substring("Profile_Game_".Length);
-
-                    // Remove _AC or _DC suffix if present
-                    if (gameName.EndsWith("_AC"))
-                    {
-                        gameName = gameName.Substring(0, gameName.Length - 3);
-                    }
-                    else if (gameName.EndsWith("_DC"))
-                    {
-                        gameName = gameName.Substring(0, gameName.Length - 3);
-                    }
-
-                    gameNames.Add(gameName);
-                } else
-                {
-                    Logger.Info("Found no profile that starts with Profile_Game_");
-                    Logger.Info(containerName);
-                }
-            }
-
-            return gameNames.OrderBy(name => name).ToList();
         }
 
         // Set true once we've restored the user's saved sort mode into the ComboBox.
