@@ -1,4 +1,5 @@
-﻿using Shared.Enums;
+﻿using Shared.Data;
+using Shared.Enums;
 using XboxGamingBarHelper.Core;
 
 namespace XboxGamingBarHelper.AMD.Properties
@@ -10,8 +11,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDRadeonAntiLagEnabledProperty : HelperProperty<bool, AMDManager>
+    internal class AMDRadeonAntiLagEnabledProperty : HelperProperty<bool, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonAntiLagEnabledProperty(bool inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonAntiLagEnabled, inManager)
         {
         }
@@ -25,7 +29,7 @@ namespace XboxGamingBarHelper.AMD.Properties
             // of whether the cached value changed.
             if (result && prev == Value)
             {
-                Manager.AMDRadeonAntiLagSetting.SetEnabled(Value);
+                ApplyToDriver();
             }
             return result;
         }
@@ -34,7 +38,13 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
             base.NotifyPropertyChanged(propertyName);
 
-            Manager.AMDRadeonAntiLagSetting.SetEnabled(Value);
+            ApplyToDriver();
+        }
+
+        private void ApplyToDriver()
+        {
+            LastApplySucceeded = Manager.AMDRadeonAntiLagSetting.SetEnabled(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Anti-Lag could not be applied.";
         }
     }
 }

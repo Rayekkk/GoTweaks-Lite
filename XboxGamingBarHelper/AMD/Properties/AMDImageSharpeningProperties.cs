@@ -1,3 +1,4 @@
+using Shared.Data;
 using Shared.Enums;
 using System;
 using XboxGamingBarHelper.Core;
@@ -11,8 +12,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDImageSharpeningEnabledProperty : HelperProperty<bool, AMDManager>
+    internal class AMDImageSharpeningEnabledProperty : HelperProperty<bool, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDImageSharpeningEnabledProperty(bool inValue, AMDManager inManager) : base(inValue, null, Function.AMDImageSharpeningEnabled, inManager)
         {
         }
@@ -27,7 +31,7 @@ namespace XboxGamingBarHelper.AMD.Properties
             if (result && prev == Value)
             {
                 Manager.AMD3DSettingsChangedListener?.NotifyRISChanged();
-                Manager.AMDImageSharpeningSetting.SetEnabled(Value);
+                ApplyToDriver();
             }
             return result;
         }
@@ -40,7 +44,13 @@ namespace XboxGamingBarHelper.AMD.Properties
             // This prevents the listener from reading stale values when the driver callback fires
             Manager.AMD3DSettingsChangedListener?.NotifyRISChanged();
 
-            Manager.AMDImageSharpeningSetting.SetEnabled(Value);
+            ApplyToDriver();
+        }
+
+        private void ApplyToDriver()
+        {
+            LastApplySucceeded = Manager.AMDImageSharpeningSetting.SetEnabled(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Image Sharpening could not be applied.";
         }
     }
 

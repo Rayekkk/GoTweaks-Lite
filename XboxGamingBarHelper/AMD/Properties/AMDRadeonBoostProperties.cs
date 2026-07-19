@@ -1,4 +1,5 @@
-﻿using Shared.Enums;
+﻿using Shared.Data;
+using Shared.Enums;
 using System;
 using XboxGamingBarHelper.Core;
 
@@ -11,8 +12,11 @@ namespace XboxGamingBarHelper.AMD.Properties
         }
     }
 
-    internal class AMDRadeonBoostEnabledProperty : HelperProperty<bool, AMDManager>
+    internal class AMDRadeonBoostEnabledProperty : HelperProperty<bool, AMDManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AMDRadeonBoostEnabledProperty(bool inValue, AMDManager inManager) : base(inValue, null, Function.AMDRadeonBoostEnabled, inManager)
         {
         }
@@ -26,7 +30,7 @@ namespace XboxGamingBarHelper.AMD.Properties
             // of whether the cached value changed.
             if (result && prev == Value)
             {
-                Manager.AMDRadeonBoostSetting.SetEnabled(Value);
+                ApplyToDriver();
             }
             return result;
         }
@@ -35,7 +39,13 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
             base.NotifyPropertyChanged(propertyName);
 
-            Manager.AMDRadeonBoostSetting.SetEnabled(Value);
+            ApplyToDriver();
+        }
+
+        private void ApplyToDriver()
+        {
+            LastApplySucceeded = Manager.AMDRadeonBoostSetting.SetEnabled(Value);
+            LastApplyFailureReason = LastApplySucceeded ? null : "Radeon Boost could not be applied.";
         }
     }
 
