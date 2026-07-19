@@ -321,6 +321,20 @@ namespace XboxGamingBarHelper
             }
 
             bool dc = power == "DC";
+            // When AC/DC split isn't enabled for this profile, there is only one value (the
+            // base field) - every apply/resolve path in this file (ApplyPowerSourceChangeInternal's
+            // resolveAcValues, ApplyOSPowerModeFromProfile, ApplyAMDFeaturesFromProfile) already
+            // collapses to the base field whenever PowerSourceProfileEnabled is false, regardless
+            // of physical AC/DC state. Writing into the _DC shadow field here anyway - which is
+            // what "dc" alone would do, since the widget derives it purely from "is the device
+            // physically on battery right now" - would silently diverge from what those paths
+            // read: the write reports Applied, but the resolve step still sees the OLD base value
+            // and never re-applies it to hardware. This was the actual root cause of "changing the
+            // TDP Mode combobox on the Performance tab does nothing while on battery with AC/DC
+            // split off" (the Quick Settings tile is unaffected because it sets the
+            // LegionPerformanceMode property directly, bypassing this profile-field intent path
+            // entirely). Confirmed to affect every field below, not just LegionPerformanceMode.
+            bool writeDc = dc && profile.PowerSourceProfileEnabled;
             var previousProfile = profile;
             if (field == "TDP" && value.TryGetInt32(out int watts))
             {
@@ -330,19 +344,19 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(TDP): {watts}W outside 5-50W");
                     return false;
                 }
-                if (dc) profile.TDP_DC = watts;
+                if (writeDc) profile.TDP_DC = watts;
                 else profile.TDP = watts;
             }
             else if (field == "CPUEPP" && value.TryGetInt32(out int epp))
             {
                 if (epp < 0 || epp > 100) { reason = "CPUEPP outside 0-100"; Logger.Warn($"Rejected SetProfileField(CPUEPP): {epp}"); return false; }
-                if (dc) profile.CPUEPP_DC = epp;
+                if (writeDc) profile.CPUEPP_DC = epp;
                 else profile.CPUEPP = epp;
             }
             else if (field == "CPUBoost" && (value.ValueKind == System.Text.Json.JsonValueKind.True || value.ValueKind == System.Text.Json.JsonValueKind.False))
             {
                 bool enabled = value.GetBoolean();
-                if (dc) profile.CPUBoost_DC = enabled;
+                if (writeDc) profile.CPUBoost_DC = enabled;
                 else profile.CPUBoost = enabled;
             }
             else if (field == "FPSLimit" && value.TryGetInt32(out int fpsLimit))
@@ -355,7 +369,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(FPSLimit): {fpsLimit}");
                     return false;
                 }
-                if (dc) profile.FPSLimit_DC = fpsLimit;
+                if (writeDc) profile.FPSLimit_DC = fpsLimit;
                 else profile.FPSLimit = fpsLimit;
             }
             else if (field == "OSPowerMode" && value.TryGetInt32(out int osPowerMode))
@@ -366,7 +380,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(OSPowerMode): {osPowerMode}");
                     return false;
                 }
-                if (dc) profile.OSPowerMode_DC = osPowerMode.ToString();
+                if (writeDc) profile.OSPowerMode_DC = osPowerMode.ToString();
                 else profile.OSPowerMode = osPowerMode.ToString();
             }
             else if (field == "RefreshRate" && value.TryGetInt32(out int refreshRate))
@@ -378,7 +392,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(RefreshRate): {refreshRate}");
                     return false;
                 }
-                if (dc) profile.RefreshRate_DC = refreshRate;
+                if (writeDc) profile.RefreshRate_DC = refreshRate;
                 else profile.RefreshRate = refreshRate;
             }
             else if (field == "HDR" && (value.ValueKind == System.Text.Json.JsonValueKind.True || value.ValueKind == System.Text.Json.JsonValueKind.False))
@@ -390,7 +404,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn("Rejected SetProfileField(HDR): unsupported display");
                     return false;
                 }
-                if (dc) profile.HDREnabled_DC = hdrEnabled;
+                if (writeDc) profile.HDREnabled_DC = hdrEnabled;
                 else profile.HDREnabled = hdrEnabled;
             }
             else if (field == "Resolution" && value.ValueKind == System.Text.Json.JsonValueKind.String)
@@ -403,7 +417,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(Resolution): {resolution ?? "<null>"}");
                     return false;
                 }
-                if (dc) profile.Resolution_DC = resolution;
+                if (writeDc) profile.Resolution_DC = resolution;
                 else profile.Resolution = resolution;
             }
             else if (field == "LegionPerformanceMode" && value.TryGetInt32(out int legionPerformanceMode))
@@ -415,7 +429,7 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(LegionPerformanceMode): {legionPerformanceMode}");
                     return false;
                 }
-                if (dc) profile.LegionPerformanceMode_DC = legionPerformanceMode;
+                if (writeDc) profile.LegionPerformanceMode_DC = legionPerformanceMode;
                 else profile.LegionPerformanceMode = legionPerformanceMode;
             }
             else if (field == "CPUState"
@@ -428,14 +442,14 @@ namespace XboxGamingBarHelper
                     Logger.Warn($"Rejected SetProfileField(CPUState): min={minState}, max={maxState}");
                     return false;
                 }
-                if (dc) { profile.MinCPUState_DC = minState; profile.MaxCPUState_DC = maxState; }
+                if (writeDc) { profile.MinCPUState_DC = minState; profile.MaxCPUState_DC = maxState; }
                 else { profile.MinCPUState = minState; profile.MaxCPUState = maxState; }
 
                 // Windows cannot boost above a max CPU state below 100%. Keep this invariant in
                 // the helper-owned profile rather than letting the widget derive and push it.
                 if (maxState < 100)
                 {
-                    if (dc) profile.CPUBoost_DC = false;
+                    if (writeDc) profile.CPUBoost_DC = false;
                     else profile.CPUBoost = false;
                 }
             }
@@ -449,10 +463,10 @@ namespace XboxGamingBarHelper
                     reason = "Custom TDP requires 5 <= SPL <= SPPT <= FPPT <= 50";
                     return false;
                 }
-                if (dc) { profile.TDP_DC = slow; profile.TDPFast_DC = fast; profile.TDPPeak_DC = peak; }
+                if (writeDc) { profile.TDP_DC = slow; profile.TDPFast_DC = fast; profile.TDPPeak_DC = peak; }
                 else { profile.TDP = slow; profile.TDPFast = fast; profile.TDPPeak = peak; }
             }
-            else if (TryApplyAmdProfileField(field, value, dc, ref profile, out bool amdField, out reason))
+            else if (TryApplyAmdProfileField(field, value, writeDc, ref profile, out bool amdField, out reason))
             {
                 // The helper has persisted the requested AMD field and any resulting
                 // mutual-exclusion correction. Hardware application below is authoritative.
@@ -475,12 +489,16 @@ namespace XboxGamingBarHelper
             // helper-owned apply as a second user edit.
             if (field == "CustomTDP" && targetIsActive && dc != IsCurrentlyOnAC)
             {
-                int slow = dc ? (profile.TDP_DC ?? profile.TDP) : profile.TDP;
-                int fast = dc ? (profile.TDPFast_DC ?? profile.TDPFast) : profile.TDPFast;
-                int peak = dc ? (profile.TDPPeak_DC ?? profile.TDPPeak) : profile.TDPPeak;
+                // Use writeDc (not raw dc) here too: if split is disabled, a stale _DC value left
+                // over from when split used to be enabled must not shadow the base field - the
+                // same collapse-to-base rule ApplyPowerSourceChangeInternal's resolveAcValues
+                // already enforces for every other field.
+                int slow = writeDc ? (profile.TDP_DC ?? profile.TDP) : profile.TDP;
+                int fast = writeDc ? (profile.TDPFast_DC ?? profile.TDPFast) : profile.TDPFast;
+                int peak = writeDc ? (profile.TDPPeak_DC ?? profile.TDPPeak) : profile.TDPPeak;
                 if (legionManager == null || !legionManager.SetCustomTDP(slow, fast, peak))
                 {
-                    if (dc) { profile.TDP_DC = previousProfile.TDP_DC; profile.TDPFast_DC = previousProfile.TDPFast_DC; profile.TDPPeak_DC = previousProfile.TDPPeak_DC; }
+                    if (writeDc) { profile.TDP_DC = previousProfile.TDP_DC; profile.TDPFast_DC = previousProfile.TDPFast_DC; profile.TDPPeak_DC = previousProfile.TDPPeak_DC; }
                     else { profile.TDP = previousProfile.TDP; profile.TDPFast = previousProfile.TDPFast; profile.TDPPeak = previousProfile.TDPPeak; }
                     confirmedProfile = profile;
                     reason = "custom TDP WMI apply failed";
