@@ -1364,10 +1364,6 @@ namespace XboxGamingBarHelper
                 losslessScalingManager.LosslessScalingSize,
                 losslessScalingManager.LosslessScalingAutoScale,
                 losslessScalingManager.LosslessScalingAutoScaleDelay,
-                losslessScalingManager.LosslessScalingSaveAndRestart,
-                losslessScalingManager.LosslessScalingCreateProfile,
-                losslessScalingManager.LosslessScalingBringToForeground,
-                losslessScalingManager.LosslessScalingLaunch,
                 // The following were never registered here, so Set messages for them were
                 // silently rejected by FunctionalProperties.HandlePipeMessage ("Property X
                 // not found for pipe message") - the widget's Sharpness/ScaleFactor/
@@ -1389,7 +1385,6 @@ namespace XboxGamingBarHelper
                 losslessScalingManager.LosslessScalingResizeBeforeScaling,
                 losslessScalingManager.LosslessScalingLS1Type,
                 losslessScalingManager.LosslessScalingMaxFrameLatency,
-                losslessScalingManager.LosslessScalingResetProfile,
                 losslessScalingManager.LosslessScalingLS1Sharpness,
                 settingsManager.AutoStartRTSS,
                 settingsManager.UseManufacturerWMI,

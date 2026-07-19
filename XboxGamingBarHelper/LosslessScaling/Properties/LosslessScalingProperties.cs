@@ -171,38 +171,6 @@ namespace XboxGamingBarHelper.LosslessScaling.Properties
         }
     }
 
-    internal class LosslessScalingSaveAndRestartProperty : HelperProperty<bool, LosslessScalingManager>
-    {
-        public LosslessScalingSaveAndRestartProperty(bool inValue, LosslessScalingManager inManager)
-            : base(inValue, null, Function.LosslessScalingSaveAndRestart, inManager)
-        {
-        }
-    }
-
-    internal class LosslessScalingCreateProfileProperty : HelperProperty<string, LosslessScalingManager>
-    {
-        public LosslessScalingCreateProfileProperty(string inValue, LosslessScalingManager inManager)
-            : base(inValue, null, Function.LosslessScalingCreateProfile, inManager)
-        {
-        }
-    }
-
-    internal class LosslessScalingBringToForegroundProperty : HelperProperty<bool, LosslessScalingManager>
-    {
-        public LosslessScalingBringToForegroundProperty(bool inValue, LosslessScalingManager inManager)
-            : base(inValue, null, Function.LosslessScalingBringToForeground, inManager)
-        {
-        }
-    }
-
-    internal class LosslessScalingLaunchProperty : HelperProperty<bool, LosslessScalingManager>
-    {
-        public LosslessScalingLaunchProperty(bool inValue, LosslessScalingManager inManager)
-            : base(inValue, null, Function.LosslessScalingLaunch, inManager)
-        {
-        }
-    }
-
     // --- Additional Settings.xml fields (added 2026-05-01) ---
     // Each property mirrors a single XML field on the active LS profile.
     // The widget owns the source-of-truth for user input; helper persists it
@@ -256,11 +224,6 @@ namespace XboxGamingBarHelper.LosslessScaling.Properties
             : base(inValue, null, Function.LosslessScalingMaxFrameLatency, inManager) { }
     }
 
-    internal class LosslessScalingResetProfileProperty : HelperProperty<bool, LosslessScalingManager>
-    {
-        public LosslessScalingResetProfileProperty(bool inValue, LosslessScalingManager inManager)
-            : base(inValue, null, Function.LosslessScalingResetProfile, inManager) { }
-    }
 
     // LS1's own sharpness field (Settings.xml "LS1Sharpness"), separate from the general
     // Sharpness field used by FSR/NIS/SGSR/BCAS.

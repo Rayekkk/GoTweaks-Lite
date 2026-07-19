@@ -120,18 +120,6 @@ namespace XboxGamingBarHelper.LosslessScaling
         private readonly LosslessScalingAutoScaleDelayProperty losslessScalingAutoScaleDelay;
         public LosslessScalingAutoScaleDelayProperty LosslessScalingAutoScaleDelay => losslessScalingAutoScaleDelay;
 
-        private readonly LosslessScalingSaveAndRestartProperty losslessScalingSaveAndRestart;
-        public LosslessScalingSaveAndRestartProperty LosslessScalingSaveAndRestart => losslessScalingSaveAndRestart;
-
-        private readonly LosslessScalingCreateProfileProperty losslessScalingCreateProfile;
-        public LosslessScalingCreateProfileProperty LosslessScalingCreateProfile => losslessScalingCreateProfile;
-
-        private readonly LosslessScalingBringToForegroundProperty losslessScalingBringToForeground;
-        public LosslessScalingBringToForegroundProperty LosslessScalingBringToForeground => losslessScalingBringToForeground;
-
-        private readonly LosslessScalingLaunchProperty losslessScalingLaunch;
-        public LosslessScalingLaunchProperty LosslessScalingLaunch => losslessScalingLaunch;
-
         // --- Additional Settings.xml fields (added 2026-05-01) ---
         private readonly LosslessScalingSyncModeProperty losslessScalingSyncMode;
         public LosslessScalingSyncModeProperty LosslessScalingSyncMode => losslessScalingSyncMode;
@@ -156,9 +144,6 @@ namespace XboxGamingBarHelper.LosslessScaling
 
         private readonly LosslessScalingMaxFrameLatencyProperty losslessScalingMaxFrameLatency;
         public LosslessScalingMaxFrameLatencyProperty LosslessScalingMaxFrameLatency => losslessScalingMaxFrameLatency;
-
-        private readonly LosslessScalingResetProfileProperty losslessScalingResetProfile;
-        public LosslessScalingResetProfileProperty LosslessScalingResetProfile => losslessScalingResetProfile;
 
         private readonly LosslessScalingLS1SharpnessProperty losslessScalingLS1Sharpness;
         public LosslessScalingLS1SharpnessProperty LosslessScalingLS1Sharpness => losslessScalingLS1Sharpness;
@@ -244,10 +229,6 @@ namespace XboxGamingBarHelper.LosslessScaling
             losslessScalingSize = new LosslessScalingSizeProperty(settings.Size, this);
             losslessScalingAutoScale = new LosslessScalingAutoScaleProperty(settings.AutoScale, this);
             losslessScalingAutoScaleDelay = new LosslessScalingAutoScaleDelayProperty(settings.AutoScaleDelay, this);
-            losslessScalingSaveAndRestart = new LosslessScalingSaveAndRestartProperty(false, this);
-            losslessScalingCreateProfile = new LosslessScalingCreateProfileProperty("", this);
-            losslessScalingBringToForeground = new LosslessScalingBringToForegroundProperty(false, this);
-            losslessScalingLaunch = new LosslessScalingLaunchProperty(false, this);
 
             // Additional Settings.xml-backed properties
             losslessScalingSyncMode = new LosslessScalingSyncModeProperty(settings.SyncMode, this);
@@ -258,16 +239,10 @@ namespace XboxGamingBarHelper.LosslessScaling
             losslessScalingResizeBeforeScaling = new LosslessScalingResizeBeforeScalingProperty(settings.ResizeBeforeScaling, this);
             losslessScalingLS1Type = new LosslessScalingLS1TypeProperty(settings.LS1Type, this);
             losslessScalingMaxFrameLatency = new LosslessScalingMaxFrameLatencyProperty(settings.MaxFrameLatency, this);
-            losslessScalingResetProfile = new LosslessScalingResetProfileProperty(false, this);
             losslessScalingLS1Sharpness = new LosslessScalingLS1SharpnessProperty(settings.LS1Sharpness, this);
 
             // Subscribe to action properties
             losslessScalingEnabled.PropertyChanged += LosslessScalingEnabled_PropertyChanged;
-            losslessScalingSaveAndRestart.PropertyChanged += LosslessScalingSaveAndRestart_PropertyChanged;
-            losslessScalingCreateProfile.PropertyChanged += LosslessScalingCreateProfile_PropertyChanged;
-            losslessScalingBringToForeground.PropertyChanged += LosslessScalingBringToForeground_PropertyChanged;
-            losslessScalingLaunch.PropertyChanged += LosslessScalingLaunch_PropertyChanged;
-            losslessScalingResetProfile.PropertyChanged += LosslessScalingResetProfile_PropertyChanged;
 
             inputInjector = InputInjector.TryCreate();
 
@@ -1352,128 +1327,6 @@ namespace XboxGamingBarHelper.LosslessScaling
             catch (Exception ex)
             {
                 Logger.Error($"Error in LosslessScalingEnabled_PropertyChanged: {ex.Message}");
-            }
-        }
-
-        private async void LosslessScalingSaveAndRestart_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            try
-            {
-                if (!losslessScalingSaveAndRestart.Value)
-                    return;
-
-                Logger.Info("Save and Restart triggered");
-
-                // Write settings to the current profile
-                string profileToWrite;
-                lock (stateLock) { profileToWrite = currentProfileName; }
-                WriteSettingsToProfile(profileToWrite);
-
-                // Kill Lossless Scaling if running
-                if (IsRunning())
-                {
-                    Logger.Info("Closing Lossless Scaling...");
-                    var processes = Process.GetProcessesByName(PROCESS_NAME);
-                    foreach (var proc in processes)
-                    {
-                        try
-                        {
-                            proc.Kill();
-                            proc.WaitForExit(5000);
-                        }
-                        finally
-                        {
-                            proc.Dispose();
-                        }
-                    }
-                    await Task.Delay(1000);
-                }
-
-                // Restart Lossless Scaling
-                Logger.Info("Restarting Lossless Scaling...");
-                await LaunchLosslessScalingAsync();
-
-                // Reset the trigger
-                losslessScalingSaveAndRestart.SetValue(false, DateTime.Now.Ticks);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error in LosslessScalingSaveAndRestart_PropertyChanged: {ex.Message}");
-            }
-        }
-
-        private void LosslessScalingCreateProfile_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            string value = losslessScalingCreateProfile.Value;
-            if (string.IsNullOrEmpty(value))
-                return;
-
-            // Value format: "GameName<||>ExePath" - using <||> as delimiter to avoid conflicts with | in window titles
-            var parts = value.Split(new[] { "<||>" }, StringSplitOptions.None);
-            if (parts.Length >= 2)
-            {
-                string gameName = parts[0];
-                string exePath = parts[1];
-                CreateProfile(gameName, exePath);
-            }
-
-            // Reset the trigger
-            losslessScalingCreateProfile.SetValue("", DateTime.Now.Ticks);
-        }
-
-        private void LosslessScalingBringToForeground_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (!losslessScalingBringToForeground.Value)
-                return;
-
-            Logger.Info("Bring to foreground triggered");
-            BringToForeground();
-
-            // Reset the trigger
-            losslessScalingBringToForeground.SetValue(false, DateTime.Now.Ticks);
-        }
-
-        private async void LosslessScalingLaunch_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            try
-            {
-                if (!losslessScalingLaunch.Value)
-                    return;
-
-                Logger.Info("Launch triggered from widget");
-                await LaunchLosslessScalingAsync();
-
-                // Reset the trigger
-                losslessScalingLaunch.SetValue(false, DateTime.Now.Ticks);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error in LosslessScalingLaunch_PropertyChanged: {ex.Message}");
-            }
-        }
-
-        // Reset the active LS profile back to the LS-default values, then push
-        // the new state up to the widget so its UI reflects the reset without
-        // needing the user to switch profiles.
-        private void LosslessScalingResetProfile_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            try
-            {
-                if (!losslessScalingResetProfile.Value)
-                    return;
-
-                Logger.Info("Reset profile triggered from widget");
-                var defaults = new LosslessScalingSettings(); // class defaults double as LS defaults
-                UpdatePropertiesFromSettings(defaults);
-                // Don't write to XML here — the widget will Apply-and-Restart if the
-                // user wants the change persisted to LS. That keeps Reset reversible
-                // until the user explicitly commits.
-
-                losslessScalingResetProfile.SetValue(false, DateTime.Now.Ticks);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error in LosslessScalingResetProfile_PropertyChanged: {ex.Message}");
             }
         }
 
