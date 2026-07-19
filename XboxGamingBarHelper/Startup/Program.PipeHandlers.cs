@@ -2400,9 +2400,7 @@ namespace XboxGamingBarHelper
 
             try
             {
-                // Widget settings may be passed in Content
-                string widgetSettings = request.Content;
-                string exportPath = ExportAllData(widgetSettings);
+                string exportPath = ExportAllData();
                 response.Add(nameof(Function), functionValue);
                 response.Add("Content", exportPath);
                 response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
@@ -2432,13 +2430,9 @@ namespace XboxGamingBarHelper
                 }
                 else
                 {
-                    var (summary, widgetSettings) = ImportAllData(importPath);
+                    string summary = ImportAllData(importPath);
                     response.Add(nameof(Function), functionValue);
                     response.Add("Content", summary);
-                    if (!string.IsNullOrEmpty(widgetSettings))
-                    {
-                        response.Add("WidgetSettings", widgetSettings);
-                    }
                     response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
                     Logger.Info($"Pipe: ImportAllData completed from {importPath}");
                 }

@@ -754,14 +754,10 @@ namespace XboxGamingBar
                     return;
                 }
 
-                // Gather widget LocalSettings to include in export
-                string widgetSettingsJson = GatherWidgetSettingsForExport();
-
                 // Send request to helper to export all data
                 var message = new Windows.Foundation.Collections.ValueSet();
                 message.Add("Command", (int)Shared.Enums.Command.Set);
                 message.Add("Function", (int)Shared.Enums.Function.ExportAllData);
-                message.Add("Content", widgetSettingsJson);
                 var result = await App.SendMessageAsync(message);
 
                 if (result != null && result.TryGetValue("Content", out object contentObj))
@@ -826,8 +822,7 @@ namespace XboxGamingBar
                     "This will:\n" +
                     "• Import all per-game profiles\n" +
                     "• Import global settings\n" +
-                    "• Import helper settings\n" +
-                    "• Apply widget settings\n\n" +
+                    "• Import helper settings\n\n" +
                     "Existing data will be overwritten. Continue?",
                     "Import All Data");
 
@@ -863,17 +858,6 @@ namespace XboxGamingBar
                 {
                     string summary = contentObj?.ToString() ?? "Import completed";
 
-                    // Check if widget settings were returned
-                    if (result.TryGetValue("WidgetSettings", out object widgetSettingsObj))
-                    {
-                        string widgetSettingsJson = widgetSettingsObj?.ToString();
-                        if (!string.IsNullOrEmpty(widgetSettingsJson))
-                        {
-                            ApplyImportedWidgetSettings(widgetSettingsJson);
-                            summary += "\n\nWidget settings have been applied.";
-                        }
-                    }
-
                     // Show result dialog
                     var resultDialog = new Windows.UI.Popups.MessageDialog(summary, "Import Complete");
                     await resultDialog.ShowAsync();
@@ -894,121 +878,6 @@ namespace XboxGamingBar
                 Logger.Error($"Failed to import all data: {ex.Message}");
                 ImportAllDataButton.Content = "Import All Data";
                 ImportAllDataButton.IsEnabled = true;
-            }
-        }
-
-        /// <summary>
-        /// Gathers widget LocalSettings as JSON for export.
-        /// </summary>
-        private string GatherWidgetSettingsForExport()
-        {
-            try
-            {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                var jsonObj = new Windows.Data.Json.JsonObject();
-
-                // Export all known settings keys
-                var keysToExport = new[]
-                {
-                    // OSD settings
-                    "OSDConfig", "OLEDConfig",
-                    // Profile settings
-                    "ProfileMatchByExe", "ProfileGamesOnly", "ProfileCustomGamePath", "ProfileBlacklistPaths",
-                    // Legion settings
-                    "LegionL_Action", "LegionL_Shortcut", "LegionL_Command",
-                    "LegionR_Action", "LegionR_Shortcut", "LegionR_Command",
-                    "LegionTouchpadVibration", "LegionDesktopControls",
-                    // Controller hotkey settings
-                    "ControllerHotkeyConfig",
-                    // Display settings
-                    "RefreshRateProfile",
-                    // Other settings
-                    "TdpMethod"
-                };
-
-                foreach (var key in keysToExport)
-                {
-                    if (settings.Values.ContainsKey(key))
-                    {
-                        var value = settings.Values[key];
-                        if (value is bool boolVal)
-                            jsonObj[key] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolVal);
-                        else if (value is int intVal)
-                            jsonObj[key] = Windows.Data.Json.JsonValue.CreateNumberValue(intVal);
-                        else if (value is double doubleVal)
-                            jsonObj[key] = Windows.Data.Json.JsonValue.CreateNumberValue(doubleVal);
-                        else if (value is string strVal)
-                            jsonObj[key] = Windows.Data.Json.JsonValue.CreateStringValue(strVal);
-                    }
-                }
-
-                return jsonObj.Stringify();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to gather widget settings for export: {ex.Message}");
-                return "{}";
-            }
-        }
-
-        /// <summary>
-        /// Applies imported widget settings from JSON.
-        /// </summary>
-        private void ApplyImportedWidgetSettings(string json)
-        {
-            try
-            {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-
-                if (!Windows.Data.Json.JsonObject.TryParse(json, out Windows.Data.Json.JsonObject jsonObj))
-                {
-                    Logger.Error("Failed to parse imported widget settings JSON");
-                    return;
-                }
-
-                int importedCount = 0;
-                foreach (var key in jsonObj.Keys)
-                {
-                    try
-                    {
-                        var jsonValue = jsonObj[key];
-                        object value = null;
-
-                        switch (jsonValue.ValueType)
-                        {
-                            case Windows.Data.Json.JsonValueType.Boolean:
-                                value = jsonValue.GetBoolean();
-                                break;
-                            case Windows.Data.Json.JsonValueType.Number:
-                                // Try to preserve int vs double
-                                double numVal = jsonValue.GetNumber();
-                                if (numVal == Math.Floor(numVal) && numVal >= int.MinValue && numVal <= int.MaxValue)
-                                    value = (int)numVal;
-                                else
-                                    value = numVal;
-                                break;
-                            case Windows.Data.Json.JsonValueType.String:
-                                value = jsonValue.GetString();
-                                break;
-                        }
-
-                        if (value != null)
-                        {
-                            settings.Values[key] = value;
-                            importedCount++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn($"Failed to import setting '{key}': {ex.Message}");
-                    }
-                }
-
-                Logger.Info($"Applied {importedCount} widget settings from import");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to apply imported widget settings: {ex.Message}");
             }
         }
 

@@ -19,6 +19,8 @@ namespace XboxGamingBarHelper.Settings
         private static string _fallbackSettingsPath;
         private static bool _useLocalSettings = true;
 
+        internal static string SettingsFilePath => _fallbackSettingsPath;
+
         static LocalSettingsHelper()
         {
             // Check if we can use LocalSettings
@@ -302,6 +304,50 @@ namespace XboxGamingBarHelper.Settings
             {
                 _fallbackSettings[key] = value;
                 SaveFallback();
+            }
+        }
+
+        internal static void ImportFromFile(string sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(_fallbackSettingsPath))
+                throw new InvalidOperationException("Canonical helper settings path is unavailable");
+            var imported = TryLoadSettingsDict(sourcePath);
+            if (imported == null)
+                throw new InvalidDataException("Imported helper settings are empty or invalid JSON");
+
+            var normalized = new Dictionary<string, object>();
+            foreach (var pair in imported)
+            {
+                object value = NormalizeImportedValue(pair.Value);
+                if (value == null) continue;
+                normalized[pair.Key] = value;
+
+                if (_useLocalSettings)
+                {
+                    try { ApplicationData.Current.LocalSettings.Values[pair.Key] = value; }
+                    catch (Exception ex) { Logger.Debug($"Failed to import LocalSettings key {pair.Key}: {ex.Message}"); }
+                }
+            }
+
+            _fallbackSettings = normalized;
+            SaveFallback();
+            Logger.Info($"Imported {normalized.Count} helper setting(s) from {sourcePath}");
+        }
+
+        private static object NormalizeImportedValue(object value)
+        {
+            if (!(value is JsonElement element)) return value;
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.True: return true;
+                case JsonValueKind.False: return false;
+                case JsonValueKind.String: return element.GetString();
+                case JsonValueKind.Number:
+                    if (element.TryGetInt32(out int intValue)) return intValue;
+                    if (element.TryGetInt64(out long longValue)) return longValue;
+                    if (element.TryGetDouble(out double doubleValue)) return doubleValue;
+                    return null;
+                default: return null;
             }
         }
 

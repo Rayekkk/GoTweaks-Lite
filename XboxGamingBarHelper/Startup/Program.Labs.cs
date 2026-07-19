@@ -367,17 +367,16 @@ namespace XboxGamingBarHelper
         }
 
         /// <summary>
-        /// Export all GoTweaks data: profiles, settings, Q-learning model, OSD config.
+        /// Export all helper-owned GoTweaks data: profiles, settings and restore data.
         /// Creates a comprehensive backup folder on the Desktop.
         /// </summary>
-        /// <param name="widgetSettings">JSON string of widget LocalSettings to include in export</param>
         /// <returns>Path to the export folder</returns>
-        private static string ExportAllData(string widgetSettings = null)
+        private static string ExportAllData()
         {
             var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var exportFolderName = $"GoTweaks_Backup_{DateTime.Now:yyyy-MM-dd_HHmmss}";
             var exportPath = Path.Combine(desktopPath, exportFolderName);
-            ExportDataToFolder(exportPath, widgetSettings);
+            ExportDataToFolder(exportPath);
             return exportPath;
         }
 
@@ -386,7 +385,7 @@ namespace XboxGamingBarHelper
         /// the silent migration-snapshot staging in Program.MigrationStaging.cs (which targets
         /// a fixed non-Desktop path instead of a timestamped Desktop backup folder).
         /// </summary>
-        private static void ExportDataToFolder(string exportPath, string widgetSettings)
+        private static void ExportDataToFolder(string exportPath)
         {
             // Create export folder structure
             Directory.CreateDirectory(exportPath);
@@ -397,7 +396,7 @@ namespace XboxGamingBarHelper
             var manifest = new System.Text.StringBuilder();
             manifest.AppendLine("{");
             manifest.AppendLine($"  \"exportDate\": \"{DateTime.Now:O}\",");
-            manifest.AppendLine($"  \"version\": \"1.0\",");
+            manifest.AppendLine($"  \"version\": \"2.0\",");
             manifest.AppendLine($"  \"appVersion\": \"{typeof(Program).Assembly.GetName().Version}\",");
 
             // 1. Export per-game profiles
@@ -424,26 +423,13 @@ namespace XboxGamingBarHelper
                 itemCount++;
             }
 
-            // 3. Export Q-learning model (AutoTDP)
+            // 3. Resolve package LocalState for restore metadata.
             var localStatePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Packages", PackageConstants.PackageFamilyName, "LocalState"
             );
-            var qTablePath = Path.Combine(localStatePath, "autotdp_qtable.json");
-            if (File.Exists(qTablePath))
-            {
-                var destPath = Path.Combine(exportPath, "autotdp_qtable.json");
-                File.Copy(qTablePath, destPath, true);
-                itemCount++;
-                Logger.Info("Exported Q-learning model");
-            }
-
-            // 4. Export helper settings (from LocalCache/settings.json)
-            var localCachePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages", PackageConstants.PackageFamilyName, "LocalCache"
-            );
-            var helperSettingsPath = Path.Combine(localCachePath, "settings.json");
+            // 3. Export the same canonical settings file LocalSettingsHelper writes.
+            var helperSettingsPath = Settings.LocalSettingsHelper.SettingsFilePath;
             if (File.Exists(helperSettingsPath))
             {
                 var destPath = Path.Combine(exportPath, "helper_settings.json");
@@ -452,16 +438,7 @@ namespace XboxGamingBarHelper
                 Logger.Info("Exported helper settings");
             }
 
-            // 5. Export widget settings (passed from widget)
-            if (!string.IsNullOrEmpty(widgetSettings))
-            {
-                var destPath = Path.Combine(exportPath, "widget_settings.json");
-                File.WriteAllText(destPath, widgetSettings);
-                itemCount++;
-                Logger.Info("Exported widget settings");
-            }
-
-            // 6. Export system restore data
+            // 4. Export system restore data
             var systemRestorePath = Path.Combine(localStatePath, "system_restore_data.json");
             if (File.Exists(systemRestorePath))
             {
@@ -474,9 +451,7 @@ namespace XboxGamingBarHelper
             manifest.AppendLine($"  \"profileCount\": {profileNames.Count},");
             manifest.AppendLine($"  \"profiles\": [{string.Join(", ", profileNames.Select(p => $"\"{p}\""))}],");
             manifest.AppendLine($"  \"hasGlobalProfile\": {(File.Exists(globalProfilePath) ? "true" : "false")},");
-            manifest.AppendLine($"  \"hasQTable\": {(File.Exists(qTablePath) ? "true" : "false")},");
             manifest.AppendLine($"  \"hasHelperSettings\": {(File.Exists(helperSettingsPath) ? "true" : "false")},");
-            manifest.AppendLine($"  \"hasWidgetSettings\": {(!string.IsNullOrEmpty(widgetSettings) ? "true" : "false")},");
             manifest.AppendLine($"  \"totalItems\": {itemCount}");
             manifest.AppendLine("}");
 
@@ -489,8 +464,8 @@ namespace XboxGamingBarHelper
         /// Import all GoTweaks data from a backup folder.
         /// </summary>
         /// <param name="importPath">Path to the backup folder</param>
-        /// <returns>Summary of imported items and widget settings JSON to apply</returns>
-        private static (string summary, string widgetSettings) ImportAllData(string importPath)
+        /// <returns>Summary of imported helper-owned items.</returns>
+        private static string ImportAllData(string importPath)
         {
             if (!Directory.Exists(importPath))
             {
@@ -503,7 +478,6 @@ namespace XboxGamingBarHelper
 
             int importedCount = 0;
             int skippedCount = 0;
-            string widgetSettings = null;
 
             // 1. Import per-game profiles
             var srcProfilesFolder = Path.Combine(importPath, "profiles");
@@ -552,19 +526,13 @@ namespace XboxGamingBarHelper
             }
 
 
-            // 4. Import helper settings
+            // 3. Import helper settings
             var srcHelperSettings = Path.Combine(importPath, "helper_settings.json");
             if (File.Exists(srcHelperSettings))
             {
                 try
                 {
-                    var localCachePath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", PackageConstants.PackageFamilyName, "LocalCache"
-                    );
-                    Directory.CreateDirectory(localCachePath);
-                    var destPath = Path.Combine(localCachePath, "settings.json");
-                    File.Copy(srcHelperSettings, destPath, true);
+                    Settings.LocalSettingsHelper.ImportFromFile(srcHelperSettings);
                     importedCount++;
                     summary.AppendLine("✓ Imported helper settings");
                 }
@@ -575,24 +543,7 @@ namespace XboxGamingBarHelper
                 }
             }
 
-            // 5. Read widget settings (to be applied by widget)
-            var srcWidgetSettings = Path.Combine(importPath, "widget_settings.json");
-            if (File.Exists(srcWidgetSettings))
-            {
-                try
-                {
-                    widgetSettings = File.ReadAllText(srcWidgetSettings);
-                    importedCount++;
-                    summary.AppendLine("✓ Widget settings loaded (will be applied)");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Failed to read widget settings: {ex.Message}");
-                    summary.AppendLine($"✗ Failed to read widget settings: {ex.Message}");
-                }
-            }
-
-            // 6. Import system restore data
+            // 4. Import system restore data
             var srcSystemRestore = Path.Combine(importPath, "system_restore_data.json");
             if (File.Exists(srcSystemRestore))
             {
@@ -617,10 +568,10 @@ namespace XboxGamingBarHelper
             summary.AppendLine();
             summary.AppendLine($"Total: {importedCount} imported, {skippedCount} skipped");
             summary.AppendLine();
-            summary.AppendLine("Note: Restart the widget to apply all changes.");
+            summary.AppendLine("Note: Restart GoTweaks to apply all imported settings.");
 
             Logger.Info($"Import complete: {importedCount} imported, {skippedCount} skipped");
-            return (summary.ToString(), widgetSettings);
+            return summary.ToString();
         }
 
         /// <summary>

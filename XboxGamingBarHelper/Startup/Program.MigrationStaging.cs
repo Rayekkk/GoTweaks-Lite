@@ -53,11 +53,9 @@ namespace XboxGamingBarHelper
                     Directory.Delete(PendingFolder, recursive: true);
                 }
 
-                // widgetSettings intentionally null - widget-side ApplicationData.LocalSettings
-                // (hotkeys, OSD layout, QuickSettings toggles, etc.) is UWP-sandboxed and can't
-                // be read from outside package context anyway; only helper-side data (profiles,
-                // helper settings.json, system restore data) can be usefully staged here.
-                ExportDataToFolder(PendingFolder, widgetSettings: null);
+                // Functional state is helper-owned in 2.0. Widget-only presentation choices
+                // are intentionally outside the migration snapshot.
+                ExportDataToFolder(PendingFolder);
 
                 Logger.Debug($"StageMigrationSnapshot: staged to {PendingFolder}");
             }
