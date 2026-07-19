@@ -856,9 +856,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Button Y1 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonY1Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonY1Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonY1Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonY1, inManager)
         {
@@ -869,14 +872,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonY1 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(0, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(0, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Y1 button mapping could not be applied.");
         }
     }
 
     // Button Y2 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonY2Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonY2Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonY2Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonY2, inManager)
         {
@@ -887,14 +895,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonY2 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(1, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(1, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Y2 button mapping could not be applied.");
         }
     }
 
     // Button Y3 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonY3Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonY3Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonY3Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonY3, inManager)
         {
@@ -905,14 +918,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonY3 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(2, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(2, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Y3 button mapping could not be applied.");
         }
     }
 
     // Button M1 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonM1Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonM1Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonM1Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonM1, inManager)
         {
@@ -923,14 +941,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonM1 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(3, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(3, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "M1 button mapping could not be applied.");
         }
     }
 
     // Button M2 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonM2Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonM2Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonM2Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonM2, inManager)
         {
@@ -941,14 +964,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonM2 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(4, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(4, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "M2 button mapping could not be applied.");
         }
     }
 
     // Button M3 remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
-    internal class LegionButtonM3Property : HelperProperty<string, LegionManager>
+    internal class LegionButtonM3Property : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonM3Property(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonM3, inManager)
         {
@@ -959,15 +987,20 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonM3 applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetButtonMappingAdvanced(5, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetButtonMappingAdvanced(5, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "M3 button mapping could not be applied.");
         }
     }
 
     // Button Desktop remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
     // Default: Win+G (Game Bar)
-    internal class LegionButtonDesktopProperty : HelperProperty<string, LegionManager>
+    internal class LegionButtonDesktopProperty : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonDesktopProperty(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonDesktop, inManager)
         {
@@ -978,15 +1011,20 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonDesktop applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetLegionButtonMapping(GamepadButton.DesktopButton, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLegionButtonMapping(GamepadButton.DesktopButton, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Desktop button mapping could not be applied.");
         }
     }
 
     // Button Page remap (JSON ButtonMapping: Type, GamepadAction, KeyboardKeys[], MouseButton)
     // Default: Win+Tab (Task View)
-    internal class LegionButtonPageProperty : HelperProperty<string, LegionManager>
+    internal class LegionButtonPageProperty : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionButtonPageProperty(string initialValue, LegionManager inManager) : base(initialValue ?? "", null, Function.LegionButtonPage, inManager)
         {
@@ -997,14 +1035,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionButtonPage applying mapping: {Value}");
             var (type, gamepadAction, keyboardKeys, mouseButton) = ButtonMappingParser.Parse(Value);
-            Manager?.SetLegionButtonMapping(GamepadButton.PageButton, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton));
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLegionButtonMapping(GamepadButton.PageButton, type, ButtonMappingParser.GetMappingValues(type, gamepadAction, keyboardKeys, mouseButton), out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Page button mapping could not be applied.");
         }
     }
 
     // Nintendo layout toggle (A↔B, X↔Y swap)
-    internal class LegionNintendoLayoutProperty : HelperProperty<bool, LegionManager>
+    internal class LegionNintendoLayoutProperty : HelperProperty<bool, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionNintendoLayoutProperty(bool initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionNintendoLayout, inManager)
         {
@@ -1014,7 +1057,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionNintendoLayout changed to {Value}");
-            Manager?.SetNintendoLayout(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetNintendoLayout(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Nintendo layout could not be applied.");
         }
     }
 

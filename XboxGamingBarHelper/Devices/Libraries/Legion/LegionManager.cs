@@ -3111,7 +3111,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         public void SetButtonMapping(int buttonIndex, int actionIndex)
         {
             // Forward to advanced method with gamepad type
-            SetButtonMappingAdvanced(buttonIndex, 0, new int[] { actionIndex });
+            SetButtonMappingAdvanced(buttonIndex, 0, new int[] { actionIndex }, out _);
         }
 
         /// <summary>
@@ -3120,15 +3120,17 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// <param name="buttonIndex">Button index: 0=Y1, 1=Y2, 2=Y3, 3=M1, 4=M2, 5=M3</param>
         /// <param name="mappingType">0=Gamepad, 1=Keyboard, 2=Mouse</param>
         /// <param name="values">Mapping values (gamepad action, keyboard keys[], or mouse button)</param>
-        public void SetButtonMappingAdvanced(int buttonIndex, int mappingType, int[] values)
+        public bool SetButtonMappingAdvanced(int buttonIndex, int mappingType, int[] values, out string failureReason)
         {
+            failureReason = null;
             try
             {
                 using var controller = new LegionGoController();
                 if (!controller.Connect())
                 {
+                    failureReason = "controller not connected";
                     Logger.Warn("Cannot set button mapping: controller not connected");
-                    return;
+                    return false;
                 }
 
                 // Map button index to RemappableButton enum
@@ -3179,15 +3181,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
                 if (!success)
                 {
+                    failureReason = $"controller rejected the mapping write for {remapButton}";
                     Logger.Error($"Failed to set button mapping for {remapButton}");
                 }
 
                 // Delay to allow controller firmware to process command before next one
                 System.Threading.Thread.Sleep(HID_COMMAND_DELAY_MS);
+                return success;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting button mapping: {ex.Message}");
+                return false;
             }
         }
 
@@ -3197,15 +3203,17 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// <param name="button">The GamepadButton to map (DesktopButton=0x25, PageButton=0x26)</param>
         /// <param name="mappingType">0=Gamepad, 1=Keyboard, 2=Mouse</param>
         /// <param name="values">Mapping values (key codes, button codes, etc.)</param>
-        public void SetLegionButtonMapping(GamepadButton button, int mappingType, int[] values)
+        public bool SetLegionButtonMapping(GamepadButton button, int mappingType, int[] values, out string failureReason)
         {
+            failureReason = null;
             try
             {
                 using var controller = new LegionGoController();
                 if (!controller.Connect())
                 {
+                    failureReason = "controller not connected";
                     Logger.Warn($"Cannot set {button} mapping: controller not connected");
-                    return;
+                    return false;
                 }
 
                 var type = (MappingType)(mappingType + 1); // 0->Gamepad(1), 1->Keyboard(2), 2->Mouse(3)
@@ -3217,9 +3225,10 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     if (values.Length == 0 || values[0] == 0)
                     {
                         // Disabled - clear the mapping
-                        controller.ClearGamepadButtonMapping(button);
+                        bool cleared = controller.ClearGamepadButtonMapping(button);
                         Logger.Info($"{button} mapping cleared (disabled)");
-                        return;
+                        if (!cleared) failureReason = $"controller rejected clearing {button} mapping";
+                        return cleared;
                     }
                     var action = RemapActionHelper.GetByIndex(values[0]);
                     mappings = new byte[] { (byte)action };
@@ -3236,29 +3245,35 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
                 if (!success)
                 {
+                    failureReason = $"controller rejected the mapping write for {button}";
                     Logger.Error($"Failed to set {button} mapping");
                 }
 
                 System.Threading.Thread.Sleep(HID_COMMAND_DELAY_MS);
+                return success;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting {button} mapping: {ex.Message}");
+                return false;
             }
         }
 
         /// <summary>
         /// Sets the Nintendo layout mode (swaps A↔B and X↔Y face buttons).
         /// </summary>
-        public void SetNintendoLayout(bool enabled)
+        public bool SetNintendoLayout(bool enabled, out string failureReason)
         {
+            failureReason = null;
             try
             {
                 using var controller = new LegionGoController();
                 if (!controller.Connect())
                 {
+                    failureReason = "controller not connected";
                     Logger.Warn("Cannot set Nintendo layout: controller not connected");
-                    return;
+                    return false;
                 }
 
                 bool success = controller.SetNintendoLayout(enabled);
@@ -3269,12 +3284,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 }
                 else
                 {
+                    failureReason = "controller rejected the Nintendo layout write";
                     Logger.Error("Failed to set Nintendo layout");
                 }
+                return success;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting Nintendo layout: {ex.Message}");
+                return false;
             }
         }
 
