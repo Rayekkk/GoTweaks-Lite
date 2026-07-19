@@ -103,11 +103,17 @@ namespace XboxGamingBar.Data
             // + LegionNintendoLayout (bool toggle) REMOVED: helper-authoritative, same RouteProfileSave
             // pattern. LegionGamepadMappingProperty.OnValueSyncedFromHelper deserializes a helper push
             // straight into the in-memory gamepadButtonMappings dict (no UI to rebuild). Nintendo's
-            // toggle needs no analogous hook: it's a plain auto-bound WidgetToggleProperty, and a
-            // helper-driven IsOn change already fires the existing (unguarded, pre-2.0)
-            // LegionNintendoLayout_Toggled handler - which recomputes A/B/X/Y into gamepadButtonMappings
-            // and resends it - the exact same "bidirectional toggle recomputes on any IsOn change"
-            // pattern LegionDesktopControls above has used all along. The widget no longer seeds either
+            // toggle is a plain auto-bound WidgetToggleProperty, and a helper-driven IsOn change fires
+            // the existing LegionNintendoLayout_Toggled handler, which recomputes A/B/X/Y into
+            // gamepadButtonMappings and resends it. [Section-1 audit correction, superseding the
+            // original note here] This is NOT the same "bidirectional toggle" pattern as
+            // LegionDesktopControls/LegionJoystickAsMouseMode above - those two are genuinely
+            // hotkey-toggleable on the helper, so a push there is real external state the widget must
+            // reflect by recomputing. NintendoLayout has no hotkey (verified against
+            // Program.HotkeyHandlers.cs) - it's an ordinary profile-persisted setting, and the handler
+            // was simply missing an isApplyingHelperUpdate guard (fixed in
+            // GamingWidget.NintendoLayoutPreset.cs - now reflects without recomputing/resending on a
+            // helper push, same as every other toggle handler). The widget no longer seeds either
             // from ApplyControllerProfile, and the seed-path resend of gamepadButtonMappings
             // (SendGamepadButtonMappingsToHelper) is removed from ApplyControllerProfile /
             // ResendActiveControllerProfileToHelper - only the live-edit path (Nintendo/Desktop toggle

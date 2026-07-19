@@ -10,12 +10,6 @@ namespace XboxGamingBar.Data
     /// </summary>
     internal class LegionLightModeProperty : WidgetControlProperty<int, ComboBox>
     {
-        /// <summary>
-        /// Flag to indicate when the UI is being updated programmatically (from helper sync).
-        /// When true, SelectionChanged events should not trigger profile saves.
-        /// </summary>
-        public bool IsUpdatingUI { get; private set; }
-
         public LegionLightModeProperty(ComboBox inUI, Page inOwner) : base(1, Function.LegionLightMode, inUI, inOwner)
         {
             if (UI != null)
@@ -50,15 +44,20 @@ namespace XboxGamingBar.Data
                     if (UI.Items.Count > Value && UI.SelectedIndex != Value)
                     {
                         Logger.Info($"{Function} combo box selected index {Value}.");
-                        // Set flag to prevent SelectionChanged from triggering profile saves
-                        IsUpdatingUI = true;
+                        // [audit fix - Section 1] Was a private IsUpdatingUI flag nobody outside this
+                        // class ever read (dead - ComboBox_SelectionChanged above didn't check it
+                        // either). Replaced with the shared WidgetSliderProperty.HelperSyncCount
+                        // counter (same one WidgetToggleProperty/WidgetSliderProperty use) so
+                        // ControllerSettingChanged's HelperSyncCount > 0 guard actually sees this
+                        // update and suppresses the resend it would otherwise trigger.
+                        WidgetSliderProperty.HelperSyncCount++;
                         try
                         {
                             UI.SelectedIndex = Value;
                         }
                         finally
                         {
-                            IsUpdatingUI = false;
+                            WidgetSliderProperty.HelperSyncCount--;
                         }
                     }
                 });

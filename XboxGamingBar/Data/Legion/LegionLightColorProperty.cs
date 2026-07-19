@@ -1,6 +1,5 @@
 using Shared.Enums;
 using System;
-using System.Threading.Tasks;
 using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Controls;
@@ -20,71 +19,22 @@ namespace XboxGamingBar.Data
         /// </summary>
         public bool IsUpdatingUI { get; private set; }
 
-        /// <summary>
-        /// Tracks whether a color has been explicitly set from a saved profile.
-        /// When true, sync from helper will be ignored to preserve the user's saved color.
-        /// </summary>
-        public bool HasSavedProfileColor { get; private set; }
-
         public LegionLightColorProperty(muxc.ColorPicker inUI, Page inOwner) : base("#FFFFFF", Function.LegionLightColor, inUI, inOwner)
         {
             // Don't initialize color in constructor - let the sync from helper set it
         }
 
-        /// <summary>
-        /// Called when a color is loaded from a saved profile.
-        /// Marks the color as user-saved to prevent it from being overwritten by helper sync.
-        /// </summary>
-        public void SetFromProfile(string colorHex)
-        {
-            if (!string.IsNullOrEmpty(colorHex) && !IsDefaultWhite(colorHex))
-            {
-                HasSavedProfileColor = true;
-                Logger.Info($"{Function} color loaded from profile: {colorHex} (will be preserved during sync)");
-            }
-            SetValue(colorHex);
-        }
-
-        /// <summary>
-        /// Override Sync to preserve user's saved color.
-        /// The widget is the source of truth for lighting settings, not the helper.
-        /// The helper has a hardcoded default of #FFFFFF which would overwrite the user's saved color.
-        /// </summary>
-        public override async Task Sync()
-        {
-            // If we have a saved profile color, skip sync from helper to preserve it
-            // The helper doesn't persist lighting settings and would return its default #FFFFFF
-            if (HasSavedProfileColor)
-            {
-                Logger.Info($"{Function} skipping sync - preserving saved profile color: {Value}");
-
-                // Still need to enable the control after "sync"
-                if (UI != null && Owner != null)
-                {
-                    await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                    {
-                        UI.IsEnabled = true;
-                        UpdateUIColor();
-                    });
-                }
-                return;
-            }
-
-            // No saved color, proceed with normal sync from helper
-            await base.Sync();
-        }
-
-        /// <summary>
-        /// Checks if a color hex string represents the default white color.
-        /// </summary>
-        private bool IsDefaultWhite(string colorHex)
-        {
-            if (string.IsNullOrEmpty(colorHex))
-                return true;
-
-            string normalized = colorHex.TrimStart('#').ToUpperInvariant();
-            return normalized == "FFFFFF";
-        }
+        // [audit fix - Section 1, 2.0 rebuild] Removed SetFromProfile/HasSavedProfileColor/the Sync()
+        // override - together they made the widget the source of truth for lighting color ("The
+        // widget is the source of truth for lighting settings, not the helper", the override's own
+        // former doc comment), permanently skipping all future helper->widget color sync for the rest
+        // of the session the first time any non-white color reached SendLightingToHelper. That was
+        // true pre-migration (the helper didn't persist lighting); since Faza slice 6 the helper DOES
+        // persist + apply lighting via RouteProfileSave, so this directly contradicted the 2.0
+        // architecture (widget = pure display, never overrides the helper). The call site
+        // (SendLightingToHelper) now calls the inherited SetValue(colorHex) directly, same as its 4
+        // sibling lighting fields (mode/speed/brightness/power light) - real Sync() now runs
+        // unconditionally, like every other property.
 
         /// <summary>
         /// Called from the ColorChanged event handler in code-behind
@@ -106,8 +56,16 @@ namespace XboxGamingBar.Data
                 if (UI != null && !string.IsNullOrEmpty(Value))
                 {
                     Color color = ParseHexColor(Value);
-                    // Set flag to prevent ColorChanged from triggering profile saves
+                    // Set flag to prevent ColorChanged from triggering profile saves. Also bump the
+                    // shared WidgetSliderProperty.HelperSyncCount [audit fix - Section 1]:
+                    // LegionColorPicker_ColorChanged (GamingWidget.LegionGo.cs) unconditionally calls
+                    // ControllerSliderSettingChanged after this UI.Color write - that handler only
+                    // checks HelperSyncCount (plus isApplyingHelperUpdate, which OnColorChanged's own
+                    // hexColor != Value check makes redundant here anyway), not this class's own
+                    // IsUpdatingUI, so without this a helper-driven color push would still fall
+                    // through as a live edit and re-trigger the send-everything bug this audit fixed.
                     IsUpdatingUI = true;
+                    WidgetSliderProperty.HelperSyncCount++;
                     try
                     {
                         UI.Color = color;
@@ -115,6 +73,7 @@ namespace XboxGamingBar.Data
                     finally
                     {
                         IsUpdatingUI = false;
+                        WidgetSliderProperty.HelperSyncCount--;
                     }
                 }
             }

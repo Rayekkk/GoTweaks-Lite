@@ -1250,9 +1250,17 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             Logger.Info($"LegionHairTriggers changed to {Value}");
             if (Value)
             {
-                // Hair triggers: start at 0%, full at 1% (instant response)
-                Manager?.SetLeftTriggerTravel(0, 1);
-                Manager?.SetRightTriggerTravel(0, 1);
+                // [audit fix - Section 1] Was SetLeftTriggerTravel(0, 1) - backwards. The HID end%
+                // is encoded as distance FROM full travel (see GamingWidget.TriggerTravel.cs's own
+                // "Hair triggers: Start=0, End=99 ... end=99 means trigger fully pressed at 1%
+                // travel" comment, the widget's own preset, which was already correct) - end=1
+                // meant "fully pressed only at 99% travel", nearly the OPPOSITE of a hair trigger.
+                // On a direct toggle this self-corrected ~500ms later via the widget's slider
+                // resend, but any profile-driven apply (game launch/switch/global restore, all via
+                // Program.ProfileHandlers.cs's ApplyLegionControllerSettingsFromProfile) landed this
+                // wrong (0,1) HID write last with no widget round-trip to fix it.
+                Manager?.SetLeftTriggerTravel(0, 99);
+                Manager?.SetRightTriggerTravel(0, 99);
             }
             // When turned off, the individual slider values will be re-applied by the widget
         }

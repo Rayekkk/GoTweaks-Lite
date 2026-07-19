@@ -48,6 +48,24 @@ namespace XboxGamingBar
             if (isLoadingControllerProfile || isSwitchingControllerProfile)
                 return;
 
+            // [audit fix - Section 1] Was missing entirely, unlike every sibling toggle handler
+            // (e.g. LegionHairTriggers_Toggled). The WidgetProperties.cs comment justifying this
+            // toggle's lack of a guard claims parity with LegionDesktopControls/
+            // LegionJoystickAsMouseMode (genuinely hotkey-bidirectional, so a helper push there is
+            // real external state the widget must reflect by recomputing) - but there is no hotkey
+            // for NintendoLayout (verified: no match in Program.HotkeyHandlers.cs), so that parity
+            // doesn't hold. Without this guard, a helper-driven IsOn push (game launch, global
+            // restore, profile switch outside the narrow 2s window below) caused the widget to
+            // independently recompute A/B/X/Y and resend Function.LegionGamepadButtonMapping - the
+            // "widget reacts to a non-user event and pushes computed state" violation - and risked
+            // a redundant second HID remap layering on top of the correct one LegionManager.
+            // SetNintendoLayout's own NotifyPropertyChanged already applies.
+            if (isApplyingHelperUpdate)
+            {
+                Logger.Info("Nintendo Layout reflected from helper - not recomputing/resending mappings");
+                return;
+            }
+
             // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
             if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
             {

@@ -43,7 +43,20 @@ namespace XboxGamingBar.Data
                     if (UI.Items.Count > Value && UI.SelectedIndex != Value)
                     {
                         Logger.Info($"{Function} combo box selected index {Value}.");
-                        UI.SelectedIndex = Value;
+                        // [audit fix - Section 1] Increment the shared counter (same one
+                        // WidgetSliderProperty/WidgetToggleProperty use) so ControllerSettingChanged's
+                        // WidgetSliderProperty.HelperSyncCount > 0 guard correctly suppresses a
+                        // helper-driven change from being treated as a live user edit - this class
+                        // previously had no such signal at all.
+                        WidgetSliderProperty.HelperSyncCount++;
+                        try
+                        {
+                            UI.SelectedIndex = Value;
+                        }
+                        finally
+                        {
+                            WidgetSliderProperty.HelperSyncCount--;
+                        }
                     }
                 });
             }

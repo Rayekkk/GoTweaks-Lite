@@ -1501,7 +1501,10 @@ namespace XboxGamingBar
             // Update slider value displays immediately - only the save/send is debounced
             UpdateControllerSliderDisplays(sender);
 
-            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate)
+            // [audit fix - Section 1] See ApplyControllerSettingChange's comment for why
+            // HelperSyncCount is needed alongside isApplyingHelperUpdate here.
+            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate
+                || WidgetSliderProperty.HelperSyncCount > 0)
                 return;
             if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
                 return;
@@ -1530,8 +1533,21 @@ namespace XboxGamingBar
 
         private void ApplyControllerSettingChange(object sender)
         {
-            // Don't save during profile loading, switching, widget unloading, or helper sync
-            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate)
+            // Don't save during profile loading, switching, widget unloading, or helper sync.
+            // [audit fix - Section 1] isApplyingHelperUpdate alone isn't sufficient: it's reset
+            // (PipeClient.cs's outer Dispatcher.RunAsync callback) before a per-property
+            // NotifyPropertyChanged's own NESTED Dispatcher.RunAsync (WidgetSliderProperty /
+            // WidgetToggleProperty / the Legion*ComboBox properties) actually runs and fires this
+            // control's ValueChanged/SelectionChanged/Toggled event - a helper-driven push could
+            // reach here with isApplyingHelperUpdate already false and be treated as a live user
+            // edit. WidgetSliderProperty.HelperSyncCount is incremented/decremented synchronously
+            // around that same nested UI write (self-consistent regardless of dispatch timing), so
+            // checking it here closes the race. Confirmed root cause of a real bug: this path's
+            // SendLightingToHelper call latches LegionLightColorProperty.HasSavedProfileColor,
+            // which then PERMANENTLY blocks all future helper->widget lighting-color sync for the
+            // rest of the session - triggered by something as unrelated as a deadzone slider drag.
+            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate
+                || WidgetSliderProperty.HelperSyncCount > 0)
                 return;
 
             // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
@@ -1670,9 +1686,8 @@ namespace XboxGamingBar
                 legionLightMode?.SetValue(profile.LightMode);
 
                 // Send light color as hex string (RRGGBB format)
-                // Use SetFromProfile to mark as user-saved, preventing sync from overwriting with helper's default
                 string colorHex = $"{profile.LightColorR:X2}{profile.LightColorG:X2}{profile.LightColorB:X2}";
-                legionLightColor?.SetFromProfile(colorHex);
+                legionLightColor?.SetValue(colorHex);
 
                 // Send light speed
                 legionLightSpeed?.SetValue(profile.LightSpeed);
