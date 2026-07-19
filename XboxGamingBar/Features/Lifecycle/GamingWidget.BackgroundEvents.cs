@@ -136,30 +136,6 @@ namespace XboxGamingBar
                     // Active scope is helper-owned; never recompute it from widget
                     // controls, power events or LocalSettings after backgrounding.
                     _ = SyncPowerSourceProfilesFromHelperAsync();
-#if false // Legacy local profile reload could apply stale widget-owned settings.
-                    try
-                    {
-                        string expectedProfile = GetTargetProfileName();
-                        if (expectedProfile != currentProfileName)
-                        {
-                            // Profile changed (game started/closed) - explicit switch, apply HDR/Resolution
-                            Logger.Info($"Profile changed while in background: '{currentProfileName}' -> '{expectedProfile}'");
-                            currentProfileName = expectedProfile;
-                            LoadProfileSettings(currentProfileName, isExplicitSwitch: true);
-                        }
-                        else
-                        {
-                            // Same profile, just reloading UI - don't override game's resolution
-                            // (e.g., TDP slider may show game value instead of global profile value)
-                            Logger.Info($"Reloading profile settings after returning from background: {currentProfileName}");
-                            LoadProfileSettings(currentProfileName);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error($"Error reloading profile after returning from background: {ex.Message}");
-                    }
-#endif
                 });
             }
             else
