@@ -43,6 +43,7 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        #if false // Pre-2.0 LocalSettings controller-profile persistence.
         private void SaveControllerProfileToStorage(string profileName, ControllerProfile profile)
         {
             // Never save to "No game detected" profile
@@ -325,6 +326,8 @@ namespace XboxGamingBar
                 Logger.Error($"Error inheriting main lighting settings: {ex.Message}");
             }
         }
+
+        #endif
 
         private void InitializeButtonMappingEvents(string buttonName)
         {
@@ -1231,6 +1234,7 @@ namespace XboxGamingBar
             _buttonKeyboardKeys[buttonName] = new List<int>(keys ?? new List<int>());
         }
 
+        #if false // Pre-2.0 widget-side controller-profile application.
         private void ApplyControllerProfile(ControllerProfile profile)
         {
             isLoadingControllerProfile = true;
@@ -1336,18 +1340,15 @@ namespace XboxGamingBar
             }
         }
 
+        #endif
+
         private ControllerProfile GetCurrentControllerProfileFromUI()
         {
-            // Get the current profile to preserve lighting if color picker isn't available
-            // This prevents the color from resetting to white when saving from non-Legion tabs
-            var currentProfile = (LegionControllerProfileToggle?.IsOn == true && HasValidGame(currentGameName))
-                ? gameControllerProfile
-                : globalControllerProfile;
-
-            // Use color picker value if available, otherwise preserve existing color
-            byte colorR = LegionColorPicker != null ? LegionColorPicker.Color.R : currentProfile.LightColorR;
-            byte colorG = LegionColorPicker != null ? LegionColorPicker.Color.G : currentProfile.LightColorG;
-            byte colorB = LegionColorPicker != null ? LegionColorPicker.Color.B : currentProfile.LightColorB;
+            // This object is an ephemeral intent payload. UI values are helper-confirmed
+            // display cache, so never fall back to a separate widget profile.
+            byte colorR = LegionColorPicker != null ? LegionColorPicker.Color.R : (byte)255;
+            byte colorG = LegionColorPicker != null ? LegionColorPicker.Color.G : (byte)255;
+            byte colorB = LegionColorPicker != null ? LegionColorPicker.Color.B : (byte)255;
 
             return new ControllerProfile
             {
@@ -1392,19 +1393,32 @@ namespace XboxGamingBar
                 // Desktop Controls preset
                 DesktopControlsEnabled = LegionDesktopControlsToggle?.IsOn ?? false,
                 // Lighting - preserve existing color if color picker not available
-                LightMode = LegionLightModeComboBox?.SelectedIndex ?? currentProfile.LightMode,
+                LightMode = LegionLightModeComboBox?.SelectedIndex ?? 1,
                 LightColorR = colorR,
                 LightColorG = colorG,
                 LightColorB = colorB,
-                LightSpeed = (int)(LegionSpeedSlider?.Value ?? currentProfile.LightSpeed),
-                LightBrightness = (int)(LegionBrightnessSlider?.Value ?? currentProfile.LightBrightness),
-                PowerLight = LegionPowerLightToggle?.IsOn ?? currentProfile.PowerLight,
+                LightSpeed = (int)(LegionSpeedSlider?.Value ?? 50),
+                LightBrightness = (int)(LegionBrightnessSlider?.Value ?? 50),
+                PowerLight = LegionPowerLightToggle?.IsOn ?? true,
                 HasExplicitLighting = true  // Mark as having explicit lighting since we're capturing from UI
             };
         }
 
         private void LegionControllerProfileToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            // WidgetToggleProperty already relays this direct user intent to the helper.
+            // The helper validates the active game, persists the profile flag and applies
+            // the resulting scope. Never load/create/switch a widget-local profile here.
+            if (isApplyingHelperUpdate)
+                return;
+
+            if (!HasValidGame(currentGameName))
+            {
+                Logger.Warn("Ignoring controller-profile enable request without a valid game");
+                return;
+            }
+
+#if false // Pre-2.0 LocalSettings controller-profile implementation.
             // Protect entire toggle change sequence
             isSwitchingControllerProfile = true;
 
@@ -1477,6 +1491,7 @@ namespace XboxGamingBar
             {
                 isSwitchingControllerProfile = false;
             }
+#endif
         }
 
         private void ControllerSettingChanged(object sender, object e)
@@ -1554,22 +1569,9 @@ namespace XboxGamingBar
             if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
                 return;
 
-            // Get current profile from UI
-            ControllerProfile profile;
-            if (LegionControllerProfileToggle?.IsOn == true && HasValidGame(currentGameName))
-            {
-                // Save to game controller profile
-                gameControllerProfile = GetCurrentControllerProfileFromUI();
-                SaveControllerProfileToStorage($"Game_{currentGameName}", gameControllerProfile);
-                profile = gameControllerProfile;
-            }
-            else
-            {
-                // Save to global controller profile
-                globalControllerProfile = GetCurrentControllerProfileFromUI();
-                SaveControllerProfileToStorage("Global", globalControllerProfile);
-                profile = globalControllerProfile;
-            }
+            // This is a transient payload for the direct user edit below, never a
+            // durable widget profile. Persistence and scope resolution happen in helper.
+            ControllerProfile profile = GetCurrentControllerProfileFromUI();
 
             // Send button mappings to helper
             SendButtonMappingsToHelper(profile);

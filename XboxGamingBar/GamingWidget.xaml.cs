@@ -919,8 +919,6 @@ namespace XboxGamingBar
         private const string PerGamePowerSourceProfileSettingPrefix = "PerGamePowerSourceProfileEnabled_";
 
         // Controller profile state
-        private ControllerProfile globalControllerProfile = new ControllerProfile();
-        private ControllerProfile gameControllerProfile = new ControllerProfile();
         private bool isLoadingControllerProfile = false;
         private bool isSwitchingControllerProfile = false;
         private DateTime lastProfileApplyTime = DateTime.MinValue; // Prevents duplicate sends from queued UI events
@@ -1912,12 +1910,6 @@ namespace XboxGamingBar
             // display cache from LocalSettings; the initial helper snapshot fills it.
             isCleanInstall = false;
 
-            // Load global controller profile from storage
-            LoadControllerProfileFromStorage("Global", globalControllerProfile);
-
-            // Clean up any invalid "No game detected" profiles
-            CleanupInvalidProfiles();
-
             // Load saved Power Source Profile toggle state BEFORE attaching event handler
             LoadPowerSourceProfileSetting();
 
@@ -1940,9 +1932,9 @@ namespace XboxGamingBar
             // Subscribe to settings changes for auto-save
             SubscribeToSettingsChanges();
 
-            // Apply global controller profile to UI controls
-            // (ApplyControllerProfile will clear isLoadingControllerProfile when done)
-            ApplyControllerProfile(globalControllerProfile);
+            // Controller settings are hydrated exclusively from helper pushes/batch sync.
+            // Do not seed the UI from the obsolete widget ControllerProfile_* cache.
+            isLoadingControllerProfile = false;
 
             // Subscribe to power source profile toggle changes to update game profile card
             PowerSourceProfileToggle.Toggled += PowerSourceToggle_Changed;
@@ -2613,6 +2605,12 @@ namespace XboxGamingBar
             {
                 LegionControllerProfileToggle.IsEnabled = HasValidGame(newGameName);
 
+                // The helper owns profile selection, persistence and application. Its
+                // LegionControllerProfileEnabled push renders the confirmed toggle state.
+                // A game-change event in the widget must never load or apply a local profile.
+                return;
+
+#if false // Removed LocalSettings controller-profile switcher retained temporarily for source-history context.
                 if (!HasValidGame(newGameName))
                 {
                     // No valid game, turn off and disable toggle, switch to global profile
@@ -2696,6 +2694,7 @@ namespace XboxGamingBar
                         }
                     }
                 }
+#endif
             }
         }
 

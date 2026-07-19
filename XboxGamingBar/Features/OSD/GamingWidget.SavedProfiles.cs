@@ -91,6 +91,14 @@ namespace XboxGamingBar
 
         private void RefreshSavedProfilesList()
         {
+            // Controller settings live inside helper-owned game profiles. The former
+            // ControllerProfile_* LocalSettings browser must not present stale local
+            // snapshots as active configuration.
+            SavedProfilesList.ItemsSource = new List<SavedProfileInfo>();
+            NoSavedProfilesText.Visibility = Visibility.Visible;
+            return;
+
+#if false // Pre-2.0 LocalSettings controller-profile browser.
             try
             {
                 var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
@@ -280,6 +288,7 @@ namespace XboxGamingBar
             {
                 Logger.Error($"Failed to refresh saved profiles list: {ex.Message}");
             }
+#endif
         }
 
         /// <summary>
@@ -329,6 +338,12 @@ namespace XboxGamingBar
 
         private void DeleteSavedProfile_Click(object sender, RoutedEventArgs e)
         {
+            // A controller profile is not a separate local artifact any more. Deleting
+            // it must be implemented as an explicit helper-side game-profile action.
+            Logger.Info("Ignoring obsolete local controller-profile delete action");
+            return;
+
+#if false // Pre-2.0 LocalSettings controller-profile deletion.
             if (sender is Button btn && btn.Tag is string profileKey)
             {
                 try
@@ -357,6 +372,7 @@ namespace XboxGamingBar
                     Logger.Error($"Failed to delete profile {profileKey}: {ex.Message}");
                 }
             }
+#endif
         }
 
     }
