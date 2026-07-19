@@ -46,50 +46,7 @@ namespace XboxGamingBar
 
         private void SaveProfileToStorage(string profileName, PerformanceProfile profile)
         {
-            // Never save to "No game detected" profile (case-insensitive check)
-            if (profileName.IndexOf("No game detected", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                Logger.Warn($"Attempted to save to storage with invalid profile name: {profileName}, skipping");
-                return;
-            }
-
-            var settings = ApplicationData.Current.LocalSettings;
-            var container = settings.CreateContainer($"Profile_{profileName}", ApplicationDataCreateDisposition.Always);
-
-            container.Values["TDP"] = profile.TDP;          // SPL (Slow)
-            container.Values["TDPFast"] = profile.TDPFast;   // SPPT (Fast)
-            container.Values["TDPPeak"] = profile.TDPPeak;   // FPPT (Peak)
-            container.Values["CPUBoost"] = profile.CPUBoost;
-            container.Values["CPUEPP"] = profile.CPUEPP;
-            container.Values["MaxCPUState"] = profile.MaxCPUState;
-            container.Values["MinCPUState"] = profile.MinCPUState;
-            container.Values["FluidMotionFrames"] = profile.FluidMotionFrames;
-            container.Values["RadeonSuperResolution"] = profile.RadeonSuperResolution;
-            container.Values["RadeonSuperResolutionSharpness"] = profile.RadeonSuperResolutionSharpness;
-            container.Values["ImageSharpening"] = profile.ImageSharpening;
-            container.Values["ImageSharpeningSharpness"] = profile.ImageSharpeningSharpness;
-            container.Values["RadeonAntiLag"] = profile.RadeonAntiLag;
-            container.Values["RadeonBoost"] = profile.RadeonBoost;
-            container.Values["RadeonBoostResolution"] = profile.RadeonBoostResolution;
-            container.Values["RadeonChill"] = profile.RadeonChill;
-            container.Values["RadeonChillMinFPS"] = profile.RadeonChillMinFPS;
-            container.Values["RadeonChillMaxFPS"] = profile.RadeonChillMaxFPS;
-            container.Values["FPSLimitEnabled"] = profile.FPSLimitEnabled;
-            container.Values["FPSLimitValue"] = profile.FPSLimitValue;
-            container.Values["OSPowerMode"] = profile.OSPowerMode;
-            container.Values["LegionPerformanceMode"] = profile.LegionPerformanceMode;
-            container.Values["TDPModeIndex"] = profile.TDPModeIndex;
-            container.Values["HDREnabled"] = profile.HDREnabled;
-            container.Values["Resolution"] = profile.Resolution;
-            if (profile.RefreshRate.HasValue)
-                container.Values["RefreshRate"] = profile.RefreshRate.Value;
-            else
-                container.Values.Remove("RefreshRate");
-            container.Values["OverlayLevel"] = profile.OverlayLevel;
-            // Last-saved timestamp drives the "modified Nm/h/d ago" line on the profile
-            // card and the "Last Modified" sort option in the Profiles tab. Stored as
-            // UTC ticks so it survives timezone changes.
-            container.Values["LastModifiedUtc"] = DateTime.UtcNow.Ticks;
+            Logger.Debug($"Ignoring legacy widget profile save for {profileName}; helper owns persistence");
         }
 
         private void LoadProfileFromStorage(string profileName, PerformanceProfile profile)
@@ -105,6 +62,8 @@ namespace XboxGamingBar
                 profile.RadeonAntiLag = copy.RadeonAntiLag; profile.RadeonBoost = copy.RadeonBoost; profile.RadeonChill = copy.RadeonChill;
                 return;
             }
+            // No LocalSettings fallback: a missing helper-cache entry is intentionally blank.
+            return;
             var settings = ApplicationData.Current.LocalSettings;
             if (settings.Containers.ContainsKey($"Profile_{profileName}"))
             {

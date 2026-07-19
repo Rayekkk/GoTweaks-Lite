@@ -104,8 +104,7 @@ namespace XboxGamingBar
 
         private List<string> GetAllSavedGameProfiles()
         {
-            if (App.IsConnected)
-                return helperProfileCatalog.Keys.Where(k => k.StartsWith("Game_")).Select(k => k.Substring(5).Replace("_AC", "").Replace("_DC", "")).Distinct().OrderBy(n => n).ToList();
+            return helperProfileCatalog.Keys.Where(k => k.StartsWith("Game_")).Select(k => k.Substring(5).Replace("_AC", "").Replace("_DC", "")).Distinct().OrderBy(n => n).ToList();
             var gameNames = new HashSet<string>();
             var settings = ApplicationData.Current.LocalSettings;
 
@@ -601,10 +600,10 @@ namespace XboxGamingBar
             {
                 // Load profiles
                 var settings = ApplicationData.Current.LocalSettings;
-                bool hasAC = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}_AC") : settings.Containers.ContainsKey($"Profile_Game_{gameName}_AC");
-                bool hasDC = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}_DC") : settings.Containers.ContainsKey($"Profile_Game_{gameName}_DC");
+                bool hasAC = helperProfileCatalog.ContainsKey($"Game_{gameName}_AC");
+                bool hasDC = helperProfileCatalog.ContainsKey($"Game_{gameName}_DC");
                 bool hasACDC = hasAC || hasDC;
-                bool hasSingle = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}") : settings.Containers.ContainsKey($"Profile_Game_{gameName}");
+                bool hasSingle = helperProfileCatalog.ContainsKey($"Game_{gameName}");
                 bool gamePowerSourceSplit = GetPerGamePowerSourceProfileEnabled(gameName);
 
                 Border profileCard = new Border
