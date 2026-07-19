@@ -139,12 +139,6 @@ namespace XboxGamingBarHelper.AMD
             get { return amdFluidMotionFrameV1Supported; }
         }
 
-        private AMDFluidMotionFrameAlgorithmProperty amdFluidMotionFrameAlgorithm;
-        public AMDFluidMotionFrameAlgorithmProperty AMDFluidMotionFrameAlgorithm
-        {
-            get { return amdFluidMotionFrameAlgorithm; }
-        }
-
         private AMDFluidMotionFrameSearchModeProperty amdFluidMotionFrameSearchMode;
         public AMDFluidMotionFrameSearchModeProperty AMDFluidMotionFrameSearchMode
         {
@@ -548,8 +542,6 @@ namespace XboxGamingBarHelper.AMD
             // wrapper when available and defaults when not, with V1Supported gating the UI.
             bool v1Available = amdFluidMotionFrameSettingV1 != null && amdFluidMotionFrameSettingV1.IsAlgorithmSupported();
             amdFluidMotionFrameV1Supported = new AMDFluidMotionFrameV1SupportedProperty(v1Available, this);
-            amdFluidMotionFrameAlgorithm = new AMDFluidMotionFrameAlgorithmProperty(
-                v1Available ? (int)amdFluidMotionFrameSettingV1.GetAlgorithm() : 0, this);
             amdFluidMotionFrameSearchMode = new AMDFluidMotionFrameSearchModeProperty(
                 v1Available ? (int)amdFluidMotionFrameSettingV1.GetSearchMode() : 0, this);
             amdFluidMotionFramePerformanceMode = new AMDFluidMotionFramePerformanceModeProperty(
@@ -909,7 +901,6 @@ namespace XboxGamingBarHelper.AMD
                 // probe (issue #90) these were never constructed; Program.cs
                 // registers them for pipe routing so a null NREs on Get.
                 amdFluidMotionFrameV1Supported = amdFluidMotionFrameV1Supported ?? new AMDFluidMotionFrameV1SupportedProperty(false, this);
-                amdFluidMotionFrameAlgorithm = amdFluidMotionFrameAlgorithm ?? new AMDFluidMotionFrameAlgorithmProperty(0, this);
                 amdFluidMotionFrameSearchMode = amdFluidMotionFrameSearchMode ?? new AMDFluidMotionFrameSearchModeProperty(0, this);
                 amdFluidMotionFramePerformanceMode = amdFluidMotionFramePerformanceMode ?? new AMDFluidMotionFramePerformanceModeProperty(0, this);
                 amdFluidMotionFrameFastMotionResponse = amdFluidMotionFrameFastMotionResponse ?? new AMDFluidMotionFrameFastMotionResponseProperty(0, this);

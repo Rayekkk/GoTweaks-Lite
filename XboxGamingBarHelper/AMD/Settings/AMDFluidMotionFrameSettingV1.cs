@@ -101,9 +101,13 @@ namespace XboxGamingBarHelper.AMD.Settings
                 return false;
             }
             var result = adlxSetting.SetSearchMode(value);
-            if (result != ADLX_RESULT.ADLX_OK)
+            // ADLX_ALREADY_ENABLED means the driver is already at the requested value (confirmed
+            // via on-device logging - this specific driver returns it for AFMF_SEARCH_MODE_AUTO
+            // every time, not just on a genuine no-op), same false-failure pattern already fixed
+            // for AMDSetting.SetEnabled - not a real error.
+            if (result != ADLX_RESULT.ADLX_OK && result != ADLX_RESULT.ADLX_ALREADY_ENABLED)
                 Logger.Error($"AMDFluidMotionFrameSettingV1.SetSearchMode({value}) returned {result}.");
-            return result == ADLX_RESULT.ADLX_OK;
+            return result == ADLX_RESULT.ADLX_OK || result == ADLX_RESULT.ADLX_ALREADY_ENABLED;
         }
 
         public ADLX_AFMF_PERFORMANCE_MODE_TYPE GetPerformanceMode()
@@ -132,9 +136,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 return false;
             }
             var result = adlxSetting.SetPerformanceMode(value);
-            if (result != ADLX_RESULT.ADLX_OK)
+            // See SetSearchMode - same ADLX_ALREADY_ENABLED false-failure, confirmed on-device.
+            if (result != ADLX_RESULT.ADLX_OK && result != ADLX_RESULT.ADLX_ALREADY_ENABLED)
                 Logger.Error($"AMDFluidMotionFrameSettingV1.SetPerformanceMode({value}) returned {result}.");
-            return result == ADLX_RESULT.ADLX_OK;
+            return result == ADLX_RESULT.ADLX_OK || result == ADLX_RESULT.ADLX_ALREADY_ENABLED;
         }
 
         public ADLX_AFMF_FAST_MOTION_RESP GetFastMotionResponse()
@@ -163,9 +168,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 return false;
             }
             var result = adlxSetting.SetFastMotionResponse(value);
-            if (result != ADLX_RESULT.ADLX_OK)
+            // See SetSearchMode - same ADLX_ALREADY_ENABLED false-failure, confirmed on-device.
+            if (result != ADLX_RESULT.ADLX_OK && result != ADLX_RESULT.ADLX_ALREADY_ENABLED)
                 Logger.Error($"AMDFluidMotionFrameSettingV1.SetFastMotionResponse({value}) returned {result}.");
-            return result == ADLX_RESULT.ADLX_OK;
+            return result == ADLX_RESULT.ADLX_OK || result == ADLX_RESULT.ADLX_ALREADY_ENABLED;
         }
     }
 }

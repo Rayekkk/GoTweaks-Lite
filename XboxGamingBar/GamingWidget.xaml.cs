@@ -595,7 +595,6 @@ namespace XboxGamingBar
         private readonly AMDRadeonSuperResolutionSharpnessProperty amdRadeonSuperResolutionSharpness;
         private readonly AMDFluidMotionFrameEnabledProperty amdFluidMotionFrameEnabled;
         private readonly AMDFluidMotionFrameSupportedProperty amdFluidMotionFrameSupported;
-        private readonly AMDFluidMotionFrameComboProperty amdFluidMotionFrameAlgorithm;
         private readonly AMDFluidMotionFrameComboProperty amdFluidMotionFrameSearchMode;
         private readonly AMDFluidMotionFrameComboProperty amdFluidMotionFramePerformanceMode;
         private readonly AMDFluidMotionFrameComboProperty amdFluidMotionFrameFastMotionResponse;
@@ -1159,12 +1158,10 @@ namespace XboxGamingBar
             amdRadeonSuperResolutionSharpness = new AMDRadeonSuperResolutionSharpnessProperty(AMDRadeonSuperResolutionSharpnessSlider, this);
             amdFluidMotionFrameEnabled = new AMDFluidMotionFrameEnabledProperty(AMDFluidMotionFrameToggle, this);
             amdFluidMotionFrameSupported = new AMDFluidMotionFrameSupportedProperty(AMDFluidMotionFrameToggle, this);
-            amdFluidMotionFrameAlgorithm = new AMDFluidMotionFrameComboProperty(Function.AMDFluidMotionFrameAlgorithm, AMDFluidMotionFrameAlgorithmComboBox, this);
             amdFluidMotionFrameSearchMode = new AMDFluidMotionFrameComboProperty(Function.AMDFluidMotionFrameSearchMode, AMDFluidMotionFrameSearchModeComboBox, this);
             amdFluidMotionFramePerformanceMode = new AMDFluidMotionFrameComboProperty(Function.AMDFluidMotionFramePerformanceMode, AMDFluidMotionFramePerformanceModeComboBox, this);
             amdFluidMotionFrameFastMotionResponse = new AMDFluidMotionFrameComboProperty(Function.AMDFluidMotionFrameFastMotionResponse, AMDFluidMotionFrameFastMotionResponseComboBox, this);
             amdFluidMotionFrameV1Supported = new AMDFluidMotionFrameV1SupportedProperty(this,
-                AMDFluidMotionFrameAlgorithmComboBox,
                 AMDFluidMotionFrameSearchModeComboBox,
                 AMDFluidMotionFramePerformanceModeComboBox,
                 AMDFluidMotionFrameFastMotionResponseComboBox);
@@ -1534,7 +1531,6 @@ namespace XboxGamingBar
                 amdRadeonSuperResolutionSharpness,
                 amdFluidMotionFrameEnabled,
                 amdFluidMotionFrameSupported,
-                amdFluidMotionFrameAlgorithm,
                 amdFluidMotionFrameSearchMode,
                 amdFluidMotionFramePerformanceMode,
                 amdFluidMotionFrameFastMotionResponse,

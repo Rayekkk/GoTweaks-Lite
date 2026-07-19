@@ -2917,17 +2917,8 @@
                                                   IsEnabled="False"/>
                                 </Grid>
                                 <!-- AFMF 2.x extended controls (ADLX 1.5+). Visible when AFMF is on,
-                                     each ComboBox is enabled only when the v1 interface is live. -->
-                                <ComboBox x:Name="AMDFluidMotionFrameAlgorithmComboBox"
-                                          Style="{StaticResource ModernComboBoxStyle}"
-                                          Header="Algorithm"
-                                          HorizontalAlignment="Stretch"
-                                          IsEnabled="False"
-                                          Visibility="{x:Bind AMDFluidMotionFrameToggle.IsOn, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}">
-                                    <ComboBoxItem Content="Auto"/>
-                                    <ComboBoxItem Content="Enhanced"/>
-                                    <ComboBoxItem Content="Standard"/>
-                                </ComboBox>
+                                     each ComboBox is enabled only when the v1 interface is live.
+                                     Algorithm removed - not an Adrenalin-exposed setting. -->
                                 <ComboBox x:Name="AMDFluidMotionFrameSearchModeComboBox"
                                           Style="{StaticResource ModernComboBoxStyle}"
                                           Header="Search mode"

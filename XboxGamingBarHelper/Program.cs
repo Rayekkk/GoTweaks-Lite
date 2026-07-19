@@ -1326,7 +1326,6 @@ namespace XboxGamingBarHelper
                 amdManager.AMDFluidMotionFrameEnabled,
                 amdManager.AMDFluidMotionFrameSupported,
                 amdManager.AMDFluidMotionFrameV1Supported,
-                amdManager.AMDFluidMotionFrameAlgorithm,
                 amdManager.AMDFluidMotionFrameSearchMode,
                 amdManager.AMDFluidMotionFramePerformanceMode,
                 amdManager.AMDFluidMotionFrameFastMotionResponse,
