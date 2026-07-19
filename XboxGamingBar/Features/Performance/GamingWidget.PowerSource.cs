@@ -71,46 +71,5 @@ namespace XboxGamingBar
             }
         }
 
-        private void LoadPowerSourceProfileSetting()
-        {
-            try
-            {
-                if (PowerSourceProfileToggle == null) return;
-                var settings = ApplicationData.Current.LocalSettings;
-                bool enabled = false;
-                if (settings.Values.TryGetValue(GlobalPowerSourceProfileSettingKey, out object val) && val is bool saved)
-                {
-                    enabled = saved;
-                }
-
-                isUpdatingPowerSourceProfileToggle = true;
-                try
-                {
-                    PowerSourceProfileToggle.IsOn = enabled;
-                }
-                finally
-                {
-                    isUpdatingPowerSourceProfileToggle = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading PowerSourceProfile setting: {ex.Message}");
-            }
-        }
-
-        private void SavePowerSourceProfileSetting(bool enabled)
-        {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values[GlobalPowerSourceProfileSettingKey] = enabled;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving PowerSourceProfile setting: {ex.Message}");
-            }
-        }
-
     }
 }

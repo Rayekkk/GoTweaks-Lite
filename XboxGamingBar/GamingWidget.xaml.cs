@@ -902,8 +902,6 @@ namespace XboxGamingBar
         private bool isUserInitiatedProfileToggle = false; // Indicates user clicked Profile tile to toggle
         private bool isUserInitiatedTDPModeChange = false; // Indicates user clicked TDP Mode tile in Quick Tab
         private bool isUpdatingPowerSourceProfileToggle = false; // Prevents programmatic toggle sync from triggering profile writes
-        private const string GlobalPowerSourceProfileSettingKey = "PowerSourceProfileEnabled";
-        private const string PerGamePowerSourceProfileSettingPrefix = "PerGamePowerSourceProfileEnabled_";
 
         // Controller profile state
         private bool isLoadingControllerProfile = false;
@@ -937,44 +935,9 @@ namespace XboxGamingBar
             return gameName.Trim();
         }
 
-        private string GetPerGamePowerSourceProfileSettingKey(string gameName)
-        {
-            return $"{PerGamePowerSourceProfileSettingPrefix}{gameName}";
-        }
-
-        private bool HasGameSingleProfile(string gameName)
-        {
-            if (!HasValidGame(gameName))
-                return false;
-
-            var settings = ApplicationData.Current.LocalSettings;
-            return settings.Containers.ContainsKey($"Profile_Game_{gameName}");
-        }
-
-        private bool HasGamePowerSplitProfiles(string gameName)
-        {
-            if (!HasValidGame(gameName))
-                return false;
-
-            var settings = ApplicationData.Current.LocalSettings;
-            return settings.Containers.ContainsKey($"Profile_Game_{gameName}_AC")
-                || settings.Containers.ContainsKey($"Profile_Game_{gameName}_DC");
-        }
-
-        private bool HasAnyGameProfile(string gameName)
-        {
-            return HasGameSingleProfile(gameName) || HasGamePowerSplitProfiles(gameName);
-        }
-
         private bool GetGlobalPowerSourceProfileEnabled()
         {
             if (hasHelperGlobalPowerSourceSplit) return helperGlobalPowerSourceSplit;
-            var settings = ApplicationData.Current.LocalSettings;
-            if (settings.Values.TryGetValue(GlobalPowerSourceProfileSettingKey, out object val) && val is bool enabled)
-            {
-                return enabled;
-            }
-
             return false;
         }
 
@@ -982,45 +945,7 @@ namespace XboxGamingBar
         {
             if (hasHelperGamePowerSourceSplit && helperGamePowerSourceSplitGameName == gameName)
                 return helperGamePowerSourceSplit;
-            if (!HasValidGame(gameName))
-            {
-                return GetGlobalPowerSourceProfileEnabled();
-            }
-
-            var settings = ApplicationData.Current.LocalSettings;
-            string settingKey = GetPerGamePowerSourceProfileSettingKey(gameName);
-            if (settings.Values.TryGetValue(settingKey, out object val) && val is bool enabled)
-            {
-                return enabled;
-            }
-
-            bool hasSplitProfiles = HasGamePowerSplitProfiles(gameName);
-            bool hasSingleProfile = HasGameSingleProfile(gameName);
-
-            // Prefer single-profile mode when both profile shapes exist and no explicit
-            // per-game split setting has been saved yet.
-            if (hasSingleProfile)
-            {
-                return false;
-            }
-
-            if (hasSplitProfiles)
-            {
-                return true;
-            }
-
             return GetGlobalPowerSourceProfileEnabled();
-        }
-
-        private void SavePerGamePowerSourceProfileSetting(string gameName, bool enabled)
-        {
-            if (!HasValidGame(gameName))
-            {
-                return;
-            }
-
-            var settings = ApplicationData.Current.LocalSettings;
-            settings.Values[GetPerGamePowerSourceProfileSettingKey(gameName)] = enabled;
         }
 
         private bool GetPowerSourceProfileEnabledForCurrentContext()
@@ -1892,9 +1817,6 @@ namespace XboxGamingBar
             // display cache from LocalSettings; the initial helper snapshot fills it.
             isCleanInstall = false;
 
-            // Load saved Power Source Profile toggle state BEFORE attaching event handler
-            LoadPowerSourceProfileSetting();
-
             // Initialize power source profile
             PowerSourceProfileToggle.Toggled += PowerSourceProfileToggle_Toggled;
             SyncPowerSourceProfileToggleForCurrentContext();
@@ -2464,53 +2386,8 @@ namespace XboxGamingBar
                         // applies it. The widget only refreshes its confirmed display cache.
                         _ = SyncPowerSourceProfilesFromHelperAsync();
                     }
-                    else
-                    {
-                    // Valid game detected
-                    var settings = ApplicationData.Current.LocalSettings;
-                    bool hasExistingProfile = HasAnyGameProfile(currentGameName);
-
-                    // Check if user explicitly disabled per-game profile for this game
-                    string disabledKey = $"PerGameProfileDisabled_{currentGameName}";
-                    bool userDisabledProfile = settings.Values.ContainsKey(disabledKey) && (bool)settings.Values[disabledKey];
-
-                    // Auto-enable per-game toggle ONLY if profile already exists for this game
-                    // Do NOT carry over toggle state from previous game - that causes unwanted profile creation
-                    // Respect user's preference if they explicitly disabled it
-                    if (hasExistingProfile && !userDisabledProfile)
-                    {
-                        if (!PerGameProfileToggle.IsOn)
-                        {
-                            Logger.Info($"Auto-enabling per-game profile for {currentGameName} (profile exists)");
-                            PerGameProfileToggle.IsOn = true;  // This will trigger PerGameProfileToggle_Changed
-                        }
-                        else
-                        {
-                            // Already on, need to switch to new game's profile
-                            // Protect this sequence from auto-saves
-                            isSwitchingProfile = true;
-                            try
-                            {
-                                UpdateActiveProfileIndicator();  // Critical: switch to the new game's profile!
-
-                                // Show notification for per-game profile
-                                _ = ShowProfileNotificationAsync(currentGameName, isPerGameProfile: true);
-                            }
-                            finally
-                            {
-                                isSwitchingProfile = false;
-                            }
-                        }
-                    }
-                    else if (PerGameProfileToggle?.IsOn == true)
-                    {
-                        // New game doesn't have a profile - turn off toggle to prevent auto-creation
-                        Logger.Info($"Disabling per-game toggle for {currentGameName} (no existing profile)");
-                        isInternalToggleDisable = true;
-                        PerGameProfileToggle.IsOn = false;
-                        isInternalToggleDisable = false;
-                    }
-                    }
+                    // When disconnected, retain the last confirmed helper state. The widget
+                    // must not infer profile existence or toggle scopes from local storage.
                 }
 
                 SyncPowerSourceProfileToggleForCurrentContext();
