@@ -195,8 +195,12 @@ namespace XboxGamingBarHelper.ControllerEmulation
         {
         }
 
+        // updatedTime==0 must be coerced to "now" here too - the value passed to base.SetValue
+        // below is statically typed int, so it binds to the protected SetValue(ValueType,long)
+        // overload directly, skipping the object-overload's own coercion (see
+        // LegionPerformanceModeProperty.SetValue for the failure mode this caused elsewhere).
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(30, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(30, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
 
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
@@ -216,7 +220,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         }
 
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
 
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
@@ -245,7 +249,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroVerticalRatioProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroVerticalRatio, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(10, System.Math.Min(200, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(10, System.Math.Min(200, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -260,7 +264,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroCurvePresetProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroCurvePreset, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(2, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(2, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -275,7 +279,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroTightenThresholdProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTightenThreshold, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(500, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(500, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -290,7 +294,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroTightenGainProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTightenGain, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(100, System.Math.Min(300, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(100, System.Math.Min(300, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -318,7 +322,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroTouchDeactivateThresholdProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateThreshold, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -333,7 +337,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroTouchDeactivateHoldoffProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(1000, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(1000, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -348,7 +352,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         public ControllerEmulationStickGyroSmoothingProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroSmoothing, manager) { }
         public override bool SetValue(object newValue, long updatedTime = 0)
-            => base.SetValue(System.Math.Max(0, System.Math.Min(90, System.Convert.ToInt32(newValue))), updatedTime);
+            => base.SetValue(System.Math.Max(0, System.Math.Min(90, System.Convert.ToInt32(newValue))), updatedTime == 0 ? System.DateTime.Now.Ticks : updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);

@@ -32,6 +32,11 @@ namespace XboxGamingBarHelper.Systems
                 Logger.Warn($"Auto SDR curve rejected before state update: {error}");
                 return false;
             }
+            // normalized is statically typed string, so this binds to the protected
+            // SetValue(ValueType,long) overload directly, skipping the object-overload's
+            // updatedTime==0 -> "now" coercion. See LegionPerformanceModeProperty.SetValue
+            // for the full failure mode this caused (silently ignored no-timestamp callers).
+            if (updatedTime == 0) updatedTime = System.DateTime.Now.Ticks;
             return base.SetValue(normalized, updatedTime);
         }
 

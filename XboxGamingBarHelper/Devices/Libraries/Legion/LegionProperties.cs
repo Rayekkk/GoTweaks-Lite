@@ -427,6 +427,17 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
 
             bool isSame = incoming == value;
+            // The object-overload base.SetValue(object,long) coerces updatedTime==0 to "now"
+            // before forwarding - but incoming is statically typed int here, so this call binds
+            // directly to the protected SetValue(ValueType,long) overload, which has NO such
+            // coercion and hands 0 straight to PropertyUpdateArbiter. Once this property has any
+            // real prior timestamp (true after its first ever real update), the arbiter treats a
+            // literal 0 as stale/no-info and silently rejects it - found on-device: every internal
+            // caller that doesn't pass an explicit timestamp (e.g. ApplyPowerSourceChangeInternal,
+            // called from the TDP Mode combobox's SetProfileField intent) got silently ignored
+            // after the first successful mode change, while the Quick Settings tile kept working
+            // because it always passes DateTime.Now.Ticks explicitly.
+            if (updatedTime == 0) updatedTime = DateTime.Now.Ticks;
             var result = base.SetValue(incoming, updatedTime);
 
             // Force apply even when the cached value is already the same.
