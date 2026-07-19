@@ -1029,18 +1029,21 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
         }
 
-        public void SetLightMode(int mode)
+        public bool SetLightMode(int mode, out string failureReason)
         {
+            failureReason = null;
             // Check if we have a valid controller for RGB
             bool hasGoSController = isGoSControllerConnected && goSController != null;
             bool hasStandardController = isControllerConnected && controllerService != null;
 
             if (!hasGoSController && !hasStandardController)
             {
+                failureReason = "no RGB controller connected";
                 Logger.Warn("Cannot set light mode: no RGB controller connected");
-                return;
+                return false;
             }
 
+            bool success = false;
             try
             {
                 // Parse current color
@@ -1049,7 +1052,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 // Use Go S controller if available (Legion Go S uses different HID protocol)
                 if (hasGoSController)
                 {
-                    bool success = false;
                     switch (mode)
                     {
                         case 0: // Disabled/Off
@@ -1079,6 +1081,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     }
                     else
                     {
+                        failureReason = "Go S controller rejected the light mode write";
                         Logger.Error($"Failed to set light mode on Go S controller");
                     }
                 }
@@ -1089,7 +1092,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     // invalid byte that the firmware silently rejects (and leaves the light
                     // in whatever state it was previously). Route mode=0 through SetRgbEnabled
                     // for both controllers, mirroring the Go S branch above.
-                    bool success;
                     if (mode == 0)
                     {
                         var leftOff = controllerService.SetRgbEnabled(Controller.Left, false);
@@ -1102,6 +1104,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         }
                         else
                         {
+                            failureReason = $"L={leftOff.Message}, R={rightOff.Message}";
                             Logger.Error($"Failed to disable stick lights: L={leftOff.Message}, R={rightOff.Message}");
                         }
                     }
@@ -1122,6 +1125,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         }
                         else
                         {
+                            failureReason = result.Message;
                             Logger.Error($"Failed to set light mode: {result.Message}");
                         }
                     }
@@ -1129,10 +1133,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
             catch (Exception ex)
             {
+                success = false;
+                failureReason = ex.Message;
                 Logger.Error($"Error setting light mode: {ex.Message}");
             }
             // Re-read hardware state so the Info card reflects the new mode promptly.
             RequestDeviceStatusRefresh();
+            return success;
         }
 
         public void RestoreLightSettings()
@@ -1178,7 +1185,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             // sync of LegionLightMode is the authoritative source for the user's static mode.
 
             Logger.Info($"Restoring light settings: mode={lightMode}, color={lightColor}, brightness={lightBrightness}");
-            SetLightMode(lightMode);
+            SetLightMode(lightMode, out _);
         }
 
         /// <summary>
@@ -1252,8 +1259,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         }
 
 
-        public void SetLightColor(string hexColor)
+        public bool SetLightColor(string hexColor, out string failureReason)
         {
+            failureReason = null;
             // An external color set is a real source of truth for the light state.
             _lightStateKnown = true;
 
@@ -1262,10 +1270,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
             if (!hasGoSController && !hasStandardController)
             {
+                failureReason = "no RGB controller connected";
                 Logger.Warn("Cannot set light color: no RGB controller connected");
-                return;
+                return false;
             }
 
+            bool success = false;
             try
             {
                 ParseHexColor(hexColor, out byte r, out byte g, out byte b);
@@ -1283,7 +1293,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         _ => LegionGoSController.RgbMode.Solid
                     };
 
-                    bool success = goSController.SetRgbMode(goSMode, r, g, b, lightBrightness, lightSpeed);
+                    success = goSController.SetRgbMode(goSMode, r, g, b, lightBrightness, lightSpeed);
                     if (success)
                     {
                         lightColor = hexColor;
@@ -1291,6 +1301,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     }
                     else
                     {
+                        failureReason = "Go S controller rejected the light color write";
                         Logger.Error($"Failed to set light color on Go S controller");
                     }
                 }
@@ -1303,19 +1314,22 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     if (lightMode == 0)
                     {
                         lightColor = hexColor;
+                        success = true;
                         Logger.Info($"Light color cached as {hexColor} (mode is Off, not pushing profile)");
                     }
                     else
                     {
                         RgbMode rgbMode = (RgbMode)lightMode;
                         var result = controllerService.SetStickLightMode(rgbMode, r, g, b, lightBrightness / 100f, lightSpeed / 100f);
-                        if (result.Success)
+                        success = result.Success;
+                        if (success)
                         {
                             lightColor = hexColor;
                             Logger.Info($"Light color set to {hexColor}");
                         }
                         else
                         {
+                            failureReason = result.Message;
                             Logger.Error($"Failed to set light color: {result.Message}");
                         }
                     }
@@ -1323,10 +1337,13 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
             catch (Exception ex)
             {
+                success = false;
+                failureReason = ex.Message;
                 Logger.Error($"Error setting light color: {ex.Message}");
             }
             // Re-read hardware state so the Info card reflects the new color/mode promptly.
             RequestDeviceStatusRefresh();
+            return success;
         }
 
         private void ParseHexColor(string hexColor, out byte r, out byte g, out byte b)
@@ -1347,8 +1364,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
         }
 
-        public void SetLightBrightness(int brightness)
+        public bool SetLightBrightness(int brightness, out string failureReason)
         {
+            failureReason = null;
             // An external brightness set is a real source of truth for the light state.
             _lightStateKnown = true;
 
@@ -1357,10 +1375,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
             if (!hasGoSController && !hasStandardController)
             {
+                failureReason = "no RGB controller connected";
                 Logger.Warn("Cannot set light brightness: no RGB controller connected");
-                return;
+                return false;
             }
 
+            bool success = false;
             try
             {
                 brightness = Math.Max(0, Math.Min(100, brightness));
@@ -1378,7 +1398,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         _ => LegionGoSController.RgbMode.Solid
                     };
 
-                    bool success = goSController.SetRgbMode(goSMode, r, g, b, brightness, lightSpeed);
+                    success = goSController.SetRgbMode(goSMode, r, g, b, brightness, lightSpeed);
                     if (success)
                     {
                         lightBrightness = brightness;
@@ -1386,6 +1406,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     }
                     else
                     {
+                        failureReason = "Go S controller rejected the light brightness write";
                         Logger.Error($"Failed to set light brightness on Go S controller");
                     }
                 }
@@ -1397,19 +1418,22 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     if (lightMode == 0)
                     {
                         lightBrightness = brightness;
+                        success = true;
                         Logger.Info($"Light brightness cached as {brightness}% (mode is Off, not pushing profile)");
                     }
                     else
                     {
                         RgbMode rgbMode = (RgbMode)lightMode;
                         var result = controllerService.SetStickLightMode(rgbMode, r, g, b, brightness / 100f, lightSpeed / 100f);
-                        if (result.Success)
+                        success = result.Success;
+                        if (success)
                         {
                             lightBrightness = brightness;
                             Logger.Info($"Light brightness set to {brightness}%");
                         }
                         else
                         {
+                            failureReason = result.Message;
                             Logger.Error($"Failed to set light brightness: {result.Message}");
                         }
                     }
@@ -1417,12 +1441,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
             catch (Exception ex)
             {
+                success = false;
+                failureReason = ex.Message;
                 Logger.Error($"Error setting light brightness: {ex.Message}");
             }
+            return success;
         }
 
-        public void SetLightSpeed(int speed)
+        public bool SetLightSpeed(int speed, out string failureReason)
         {
+            failureReason = null;
             // An external speed set is a real source of truth for the light state.
             _lightStateKnown = true;
 
@@ -1431,10 +1459,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
             if (!hasGoSController && !hasStandardController)
             {
+                failureReason = "no RGB controller connected";
                 Logger.Warn("Cannot set light speed: no RGB controller connected");
-                return;
+                return false;
             }
 
+            bool success = false;
             try
             {
                 speed = Math.Max(0, Math.Min(100, speed));
@@ -1452,7 +1482,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         _ => LegionGoSController.RgbMode.Solid
                     };
 
-                    bool success = goSController.SetRgbMode(goSMode, r, g, b, lightBrightness, speed);
+                    success = goSController.SetRgbMode(goSMode, r, g, b, lightBrightness, speed);
                     if (success)
                     {
                         lightSpeed = speed;
@@ -1460,6 +1490,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     }
                     else
                     {
+                        failureReason = "Go S controller rejected the light speed write";
                         Logger.Error($"Failed to set light speed on Go S controller");
                     }
                 }
@@ -1468,19 +1499,22 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     if (lightMode == 0)
                     {
                         lightSpeed = speed;
+                        success = true;
                         Logger.Info($"Light speed cached as {speed}% (mode is Off, not pushing profile)");
                     }
                     else
                     {
                         RgbMode rgbMode = (RgbMode)lightMode;
                         var result = controllerService.SetStickLightMode(rgbMode, r, g, b, lightBrightness / 100f, speed / 100f);
-                        if (result.Success)
+                        success = result.Success;
+                        if (success)
                         {
                             lightSpeed = speed;
                             Logger.Info($"Light speed set to {speed}%");
                         }
                         else
                         {
+                            failureReason = result.Message;
                             Logger.Error($"Failed to set light speed: {result.Message}");
                         }
                     }
@@ -1488,8 +1522,11 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
             catch (Exception ex)
             {
+                success = false;
+                failureReason = ex.Message;
                 Logger.Error($"Error setting light speed: {ex.Message}");
             }
+            return success;
         }
 
         public void SetPerformanceMode(int mode)

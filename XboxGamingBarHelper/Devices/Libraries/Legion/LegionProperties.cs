@@ -233,11 +233,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Light mode (0=Off, 1=Solid, 2=Pulse, 3=Dynamic, 4=Spiral)
-    internal class LegionLightModeProperty : HelperProperty<int, LegionManager>
+    internal class LegionLightModeProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool _hasUserModified = false;
         private int _initialValue;
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionLightModeProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionLightMode, inManager)
         {
@@ -257,22 +260,30 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 }
                 else
                 {
+                    // Nothing was attempted, so there is nothing to report as failed.
                     Logger.Debug($"LegionLightMode: Skipping device write - value unchanged from initial ({Value})");
+                    LastApplySucceeded = true;
+                    LastApplyFailureReason = null;
                     return;
                 }
             }
 
             Logger.Info($"LegionLightMode changed to {Value}");
-            Manager?.SetLightMode(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLightMode(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Light mode could not be applied.");
         }
     }
 
     // Light color (hex string "#RRGGBB")
-    internal class LegionLightColorProperty : HelperProperty<string, LegionManager>
+    internal class LegionLightColorProperty : HelperProperty<string, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool _hasUserModified = false;
         private string _initialValue;
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionLightColorProperty(string initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionLightColor, inManager)
         {
@@ -293,21 +304,28 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 else
                 {
                     Logger.Debug($"LegionLightColor: Skipping device write - value unchanged from initial ({Value})");
+                    LastApplySucceeded = true;
+                    LastApplyFailureReason = null;
                     return;
                 }
             }
 
             Logger.Info($"LegionLightColor changed to {Value}");
-            Manager?.SetLightColor(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLightColor(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Light color could not be applied.");
         }
     }
 
     // Light brightness (0-100)
-    internal class LegionLightBrightnessProperty : HelperProperty<int, LegionManager>
+    internal class LegionLightBrightnessProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool _hasUserModified = false;
         private int _initialValue;
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionLightBrightnessProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionLightBrightness, inManager)
         {
@@ -328,21 +346,28 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 else
                 {
                     Logger.Debug($"LegionLightBrightness: Skipping device write - value unchanged from initial ({Value})");
+                    LastApplySucceeded = true;
+                    LastApplyFailureReason = null;
                     return;
                 }
             }
 
             Logger.Info($"LegionLightBrightness changed to {Value}");
-            Manager?.SetLightBrightness(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLightBrightness(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Light brightness could not be applied.");
         }
     }
 
     // Light speed (0-100, for animated modes)
-    internal class LegionLightSpeedProperty : HelperProperty<int, LegionManager>
+    internal class LegionLightSpeedProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool _hasUserModified = false;
         private int _initialValue;
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionLightSpeedProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionLightSpeed, inManager)
         {
@@ -363,12 +388,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 else
                 {
                     Logger.Debug($"LegionLightSpeed: Skipping device write - value unchanged from initial ({Value})");
+                    LastApplySucceeded = true;
+                    LastApplyFailureReason = null;
                     return;
                 }
             }
 
             Logger.Info($"LegionLightSpeed changed to {Value}");
-            Manager?.SetLightSpeed(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.SetLightSpeed(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Light speed could not be applied.");
         }
     }
 
