@@ -129,10 +129,6 @@ namespace XboxGamingBar
         {
             screenSaverEnabled = !screenSaverEnabled;
 
-            // Persist setting
-            var settings = ApplicationData.Current.LocalSettings;
-            settings.Values[ScreenSaverEnabledKey] = screenSaverEnabled;
-
             // Start or stop countdown timer
             if (screenSaverEnabled)
             {
@@ -154,7 +150,12 @@ namespace XboxGamingBar
                         { "Function", (int)Shared.Enums.Function.ScreenSaverEnabled },
                         { "Content", screenSaverEnabled }
                     };
-                    await App.SendMessageAsync(request);
+                    var response = await App.SendMessageAsync(request);
+                    if (response != null && response.TryGetValue("Content", out object content))
+                    {
+                        screenSaverEnabled = Convert.ToBoolean(content);
+                        if (screenSaverEnabled) StartScreenSaverCountdown(); else StopScreenSaverCountdown();
+                    }
                 }
             }
             catch (Exception ex)

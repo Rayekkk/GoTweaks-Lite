@@ -113,10 +113,8 @@ namespace XboxGamingBar
         private bool quickMetricsEnabled = false;
         private bool isUpdatingMetricCheckboxes = false;
         private bool screenSaverEnabled = false;
-        private const string ScreenSaverEnabledKey = "QS_ScreenSaverEnabled";
         private const int ScreenSaverTimeoutSeconds = 60;
         private DispatcherTimer screenSaverCountdownTimer;
-        private const string QuickMetricsEnabledKey = "QS_MetricsEnabled";
         private const string QuickMetricsSelectionKey = "QS_MetricsSelection";
 
         // Optional built-in display brightness slider (hidden by default, revealed under Customize)
@@ -499,26 +497,10 @@ namespace XboxGamingBar
                     qsColumnCount = Math.Max(3, Math.Min(5, colCount));  // Clamp to 3-5
                 }
 
-                // Load Quick Metrics toggle state
-                if (settings.Values.TryGetValue(QuickMetricsEnabledKey, out object metricsVal) && metricsVal is bool metricsEnabled)
-                {
-                    quickMetricsEnabled = metricsEnabled;
-                }
-
                 // Load Brightness Slider toggle state
                 if (settings.Values.TryGetValue(BrightnessSliderEnabledKey, out object brightVal) && brightVal is bool brightEnabled)
                 {
                     brightnessSliderEnabled = brightEnabled;
-                }
-
-                // Load Screen Saver toggle state
-                if (settings.Values.TryGetValue(ScreenSaverEnabledKey, out object ssVal) && ssVal is bool ssEnabled)
-                {
-                    screenSaverEnabled = ssEnabled;
-                    if (screenSaverEnabled)
-                    {
-                        StartScreenSaverCountdown();
-                    }
                 }
 
                 // Load Quick Metrics selection
@@ -613,52 +595,50 @@ namespace XboxGamingBar
             }
         }
 
-        /// <summary>
-        /// Send Quick Metrics enabled state to helper
-        /// </summary>
-        private void SendQuickMetricsEnabledToHelper()
+        private async Task RequestQuickMetricsEnabledFromHelperAsync()
         {
             try
             {
                 if (!App.IsConnected) return;
-
-                var request = new Windows.Foundation.Collections.ValueSet
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Command", (int)Shared.Enums.Command.Get },
                     { "Function", (int)Shared.Enums.Function.QuickMetricsEnabled },
-                    { "Content", quickMetricsEnabled }
-                };
-                // Fire-and-forget: helper processes this but doesn't send a response,
-                // so using SendRequestAsync would timeout after 10s for no reason
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info($"Sent Quick Metrics enabled state to helper: {quickMetricsEnabled}");
+                });
+                if (response != null && response.TryGetValue("Content", out object content))
+                {
+                    quickMetricsEnabled = Convert.ToBoolean(content);
+                    if (QuickMetricsToggle != null) QuickMetricsToggle.IsOn = quickMetricsEnabled;
+                    if (QuickMetricsRow != null) QuickMetricsRow.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    if (MetricsSelectionPanel != null) MetricsSelectionPanel.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    if (quickMetricsEnabled) RebuildMetricsGrid();
+                }
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error sending Quick Metrics enabled state: {ex.Message}");
+                Logger.Error($"Error requesting Quick Metrics enabled state: {ex.Message}");
             }
         }
 
-        private void SendScreenSaverEnabledToHelper()
+        private async Task RequestScreenSaverEnabledFromHelperAsync()
         {
             try
             {
                 if (!App.IsConnected) return;
-
-                var request = new Windows.Foundation.Collections.ValueSet
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Command", (int)Shared.Enums.Command.Get },
                     { "Function", (int)Shared.Enums.Function.ScreenSaverEnabled },
-                    { "Content", screenSaverEnabled }
-                };
-                // Fire-and-forget: helper processes this but doesn't send a response,
-                // so using SendRequestAsync would timeout after 10s for no reason
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info($"Sent Screen Saver enabled state to helper: {screenSaverEnabled}");
+                });
+                if (response != null && response.TryGetValue("Content", out object content))
+                {
+                    screenSaverEnabled = Convert.ToBoolean(content);
+                    if (screenSaverEnabled) StartScreenSaverCountdown(); else StopScreenSaverCountdown();
+                }
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error sending Screen Saver enabled state: {ex.Message}");
+                Logger.Error($"Error requesting Screen Saver enabled state: {ex.Message}");
             }
         }
 

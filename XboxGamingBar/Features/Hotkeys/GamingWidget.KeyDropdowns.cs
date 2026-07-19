@@ -253,17 +253,11 @@ namespace XboxGamingBar
 
         private void SaveLegionLKeys()
         {
-            var keysString = GetKeysAsString("LegionL");
-            ApplicationData.Current.LocalSettings.Values["LegionL_Shortcut"] = keysString;
-            SaveLegionRemapSettings();
             ApplyLegionButtonConfig(true);
         }
 
         private void SaveLegionRKeys()
         {
-            var keysString = GetKeysAsString("LegionR");
-            ApplicationData.Current.LocalSettings.Values["LegionR_Shortcut"] = keysString;
-            SaveLegionRemapSettings();
             ApplyLegionButtonConfig(false);
         }
 

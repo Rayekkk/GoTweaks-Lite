@@ -71,14 +71,6 @@ namespace XboxGamingBar
             if (BrightnessGestureAxisComboBox != null)
                 BrightnessGestureAxisComboBox.SelectionChanged += BrightnessGestureAxisComboBox_SelectionChanged;
 
-            // Load saved Legion remap settings
-            LoadLegionRemapSettings();
-
-            // Load the saved brightness gesture settings (guarded - see
-            // _brightnessGestureLoaded below, ToggleSwitch/ListView fire their change
-            // events even for this programmatic assignment)
-            LoadBrightnessGestureSettings();
-
             // Mark Labs section as initialized (enables event handlers)
             labsSectionInitialized = true;
 
@@ -97,9 +89,9 @@ namespace XboxGamingBar
                 {
                     await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                     {
-                        ApplyLegionRemapSettingsToHelper();
+                        _ = RequestLegionRemapSettingsFromHelperAsync();
                         _ = RequestScrollRemapSettingsFromHelperAsync();
-                        ApplyBrightnessGestureSettingsToHelper();
+                        _ = RequestBrightnessGestureSettingsFromHelperAsync();
                     });
                 }
             });
@@ -107,37 +99,44 @@ namespace XboxGamingBar
 
         private bool _brightnessGestureLoaded = false;
 
-        private void LoadBrightnessGestureSettings()
+        private async Task RequestBrightnessGestureSettingsFromHelperAsync()
         {
+            if (!App.IsConnected) return;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-                bool enabled = settings.Values.TryGetValue("LegionR_BrightnessGesture", out var enabledVal) && enabledVal is bool b && b;
-                int trigger = settings.Values.TryGetValue("BrightnessGesture_Trigger", out var triggerVal) && triggerVal is int ti ? ti : 0;
-                int axis = settings.Values.TryGetValue("BrightnessGesture_Axis", out var axisVal) && axisVal is int ai ? ai : 0;
-
-                if (BrightnessGestureEnabledToggle != null)
-                    BrightnessGestureEnabledToggle.IsOn = enabled;
-                if (BrightnessGestureTriggerComboBox != null && trigger >= 0 && trigger < BrightnessGestureTriggerComboBox.Items.Count)
-                    BrightnessGestureTriggerComboBox.SelectedIndex = trigger;
-                if (BrightnessGestureAxisComboBox != null && axis >= 0 && axis < BrightnessGestureAxisComboBox.Items.Count)
-                    BrightnessGestureAxisComboBox.SelectedIndex = axis;
-                if (BrightnessGestureOptionsPanel != null)
-                    BrightnessGestureOptionsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
-
-                Logger.Info($"Brightness gesture settings loaded: Enabled={enabled}, Trigger={trigger}, Axis={axis}");
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Command.Get },
+                    { "Function", (int)Function.Labs_LegionRBrightnessGesture },
+                });
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyBrightnessGestureSnapshot(content.ToString());
             }
             catch (Exception ex)
             {
-                Logger.Error($"Failed to load brightness gesture settings: {ex.Message}");
+                Logger.Error($"Failed to get brightness gesture settings from helper: {ex.Message}");
             }
-            finally
+        }
+
+        private void ApplyBrightnessGestureSnapshot(string configJson)
+        {
+            try
             {
-                // Only after the controls have been set (which may have already fired
-                // their change events once, ignored below) do user interactions actually
-                // save/send.
-                _brightnessGestureLoaded = true;
+                _brightnessGestureLoaded = false;
+                var config = JsonObject.Parse(configJson);
+                bool enabled = config.TryGetValue("Enabled", out var enabledValue) && enabledValue.GetBoolean();
+                int trigger = config.TryGetValue("Trigger", out var triggerValue) ? (int)triggerValue.GetNumber() : 0;
+                int axis = config.TryGetValue("Axis", out var axisValue) ? (int)axisValue.GetNumber() : 0;
+                if (BrightnessGestureEnabledToggle != null) BrightnessGestureEnabledToggle.IsOn = enabled;
+                if (BrightnessGestureTriggerComboBox != null && trigger >= 0 && trigger < BrightnessGestureTriggerComboBox.Items.Count) BrightnessGestureTriggerComboBox.SelectedIndex = trigger;
+                if (BrightnessGestureAxisComboBox != null && axis >= 0 && axis < BrightnessGestureAxisComboBox.Items.Count) BrightnessGestureAxisComboBox.SelectedIndex = axis;
+                if (BrightnessGestureOptionsPanel != null) BrightnessGestureOptionsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
             }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to render helper brightness gesture snapshot: {ex.Message}");
+            }
+            finally { _brightnessGestureLoaded = true; }
         }
 
         private async void BrightnessGestureEnabledToggle_Toggled(object sender, RoutedEventArgs e)
@@ -176,29 +175,7 @@ namespace XboxGamingBar
             if (trigger < 0) trigger = 0;
             if (axis < 0) axis = 0;
 
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values["LegionR_BrightnessGesture"] = enabled;
-                settings.Values["BrightnessGesture_Trigger"] = trigger;
-                settings.Values["BrightnessGesture_Axis"] = axis;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to save brightness gesture settings: {ex.Message}");
-            }
-
             await SendBrightnessGestureSettingsToHelper(enabled, trigger, axis);
-        }
-
-        private void ApplyBrightnessGestureSettingsToHelper()
-        {
-            bool enabled = BrightnessGestureEnabledToggle?.IsOn ?? false;
-            int trigger = BrightnessGestureTriggerComboBox?.SelectedIndex ?? 0;
-            int axis = BrightnessGestureAxisComboBox?.SelectedIndex ?? 0;
-            if (trigger < 0) trigger = 0;
-            if (axis < 0) axis = 0;
-            _ = SendBrightnessGestureSettingsToHelper(enabled, trigger, axis);
         }
 
         private async Task SendBrightnessGestureSettingsToHelper(bool enabled, int trigger, int axis)
@@ -218,6 +195,8 @@ namespace XboxGamingBar
                 {
                     Logger.Info($"Brightness Gesture: Enabled={enabled}, Trigger={trigger}, Axis={axis}, Success={Convert.ToBoolean(successObj)}");
                 }
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyBrightnessGestureSnapshot(content.ToString());
             }
             catch (Exception ex)
             {
@@ -507,9 +486,6 @@ namespace XboxGamingBar
             if (LegionLCommandGrid != null)
                 LegionLCommandGrid.Visibility = isCommand ? Visibility.Visible : Visibility.Collapsed;
 
-            // Always save settings immediately when selection changes
-            SaveLegionRemapSettings();
-
             // Apply immediately for Disabled, Xbox Guide, or Focus GoTweaks
             if (selection != 2 && selection != 3)
                 ApplyLegionButtonConfig(true);
@@ -537,7 +513,6 @@ namespace XboxGamingBar
 
         private void LegionLCommandApplyButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveLegionRemapSettings();
             ApplyLegionButtonConfig(true);
             UpdateLegionRemapDescription();
         }
@@ -556,9 +531,6 @@ namespace XboxGamingBar
             if (LegionRCommandGrid != null)
                 LegionRCommandGrid.Visibility = isCommand ? Visibility.Visible : Visibility.Collapsed;
 
-            // Always save settings immediately when selection changes
-            SaveLegionRemapSettings();
-
             // Apply immediately for Disabled, Xbox Guide, or Focus GoTweaks
             if (selection != 2 && selection != 3)
                 ApplyLegionButtonConfig(false);
@@ -568,7 +540,6 @@ namespace XboxGamingBar
 
         private void LegionRCommandApplyButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveLegionRemapSettings();
             ApplyLegionButtonConfig(false);
             UpdateLegionRemapDescription();
         }
@@ -720,123 +691,53 @@ namespace XboxGamingBar
             catch { /* best-effort per target */ }
         }
 
-        private void SaveLegionRemapSettings()
+        private async Task RequestLegionRemapSettingsFromHelperAsync()
         {
+            if (!App.IsConnected) return;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-                int lAction = LegionLActionComboBox?.SelectedIndex ?? 0;
-                string lShortcut = GetKeysAsString("LegionL");
-                string lCommand = LegionLCommandTextBox?.Text ?? "";
-                int rAction = LegionRActionComboBox?.SelectedIndex ?? 0;
-                string rShortcut = GetKeysAsString("LegionR");
-                string rCommand = LegionRCommandTextBox?.Text ?? "";
-
-                settings.Values["LegionL_Action"] = lAction;
-                settings.Values["LegionL_Shortcut"] = lShortcut;
-                settings.Values["LegionL_Command"] = lCommand;
-                settings.Values["LegionR_Action"] = rAction;
-                settings.Values["LegionR_Shortcut"] = rShortcut;
-                settings.Values["LegionR_Command"] = rCommand;
-
-                // Also save to JSON fallback file for elevated helper
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "LegionL_Action", lAction },
-                    { "LegionL_Shortcut", lShortcut },
-                    { "LegionL_Command", lCommand },
-                    { "LegionR_Action", rAction },
-                    { "LegionR_Shortcut", rShortcut },
-                    { "LegionR_Command", rCommand }
+                    { "Command", (int)Command.Get },
+                    { "Function", (int)Function.Labs_LegionButtonRemap },
                 });
-
-                Logger.Info("Legion remap settings saved");
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyLegionRemapSnapshot(content.ToString());
             }
             catch (Exception ex)
             {
-                Logger.Error($"Failed to save Legion remap settings: {ex.Message}");
+                Logger.Error($"Failed to get Legion remap settings from helper: {ex.Message}");
             }
         }
 
-        private void LoadLegionRemapSettings()
+        private void ApplyLegionRemapSnapshot(string configJson)
         {
+            bool wasInitialized = labsSectionInitialized;
+            labsSectionInitialized = false;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                // Load Legion L settings
-                if (settings.Values.TryGetValue("LegionL_Action", out var lAction) && lAction is int lActionInt)
-                {
-                    if (LegionLActionComboBox != null && lActionInt >= 0 && lActionInt <= 4)
-                        LegionLActionComboBox.SelectedIndex = lActionInt;
-                }
-                if (settings.Values.TryGetValue("LegionL_Shortcut", out var lShortcut) && lShortcut is string lShortcutStr)
-                {
-                    LoadKeysFromString("LegionL", lShortcutStr, LegionLKeyTags);
-                }
-                if (settings.Values.TryGetValue("LegionL_Command", out var lCommand) && lCommand is string lCommandStr)
-                {
-                    if (LegionLCommandTextBox != null)
-                        LegionLCommandTextBox.Text = lCommandStr;
-                }
-
-                // Load Legion R settings
-                if (settings.Values.TryGetValue("LegionR_Action", out var rAction) && rAction is int rActionInt)
-                {
-                    if (LegionRActionComboBox != null && rActionInt >= 0 && rActionInt <= 4)
-                        LegionRActionComboBox.SelectedIndex = rActionInt;
-                }
-                if (settings.Values.TryGetValue("LegionR_Shortcut", out var rShortcut) && rShortcut is string rShortcutStr)
-                {
-                    LoadKeysFromString("LegionR", rShortcutStr, LegionRKeyTags);
-                }
-                if (settings.Values.TryGetValue("LegionR_Command", out var rCommand) && rCommand is string rCommandStr)
-                {
-                    if (LegionRCommandTextBox != null)
-                        LegionRCommandTextBox.Text = rCommandStr;
-                }
-
-                // Update description and show/hide input grids based on loaded settings
-                UpdateLegionRemapDescription();
-                int lSelectionLoaded = LegionLActionComboBox?.SelectedIndex ?? 0;
-                int rSelectionLoaded = LegionRActionComboBox?.SelectedIndex ?? 0;
-                if (LegionLShortcutPanel != null)
-                    LegionLShortcutPanel.Visibility = (lSelectionLoaded == 2) ? Visibility.Visible : Visibility.Collapsed;
-                if (LegionLCommandGrid != null)
-                    LegionLCommandGrid.Visibility = (lSelectionLoaded == 3) ? Visibility.Visible : Visibility.Collapsed;
-                if (LegionRShortcutPanel != null)
-                    LegionRShortcutPanel.Visibility = (rSelectionLoaded == 2) ? Visibility.Visible : Visibility.Collapsed;
-                if (LegionRCommandGrid != null)
-                    LegionRCommandGrid.Visibility = (rSelectionLoaded == 3) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Also sync to JSON fallback file for elevated helper
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
-                {
-                    { "LegionL_Action", LegionLActionComboBox?.SelectedIndex ?? 0 },
-                    { "LegionL_Shortcut", GetKeysAsString("LegionL") },
-                    { "LegionL_Command", LegionLCommandTextBox?.Text ?? "" },
-                    { "LegionR_Action", LegionRActionComboBox?.SelectedIndex ?? 0 },
-                    { "LegionR_Shortcut", GetKeysAsString("LegionR") },
-                    { "LegionR_Command", LegionRCommandTextBox?.Text ?? "" }
-                });
-
-                Logger.Info("Legion remap settings loaded");
+                var config = JsonObject.Parse(configJson);
+                int GetAction(string key) => config.TryGetValue(key, out var value) ? (int)value.GetNumber() : 0;
+                string GetText(string key) => config.TryGetValue(key, out var value) ? value.GetString() ?? "" : "";
+                if (LegionLActionComboBox != null) LegionLActionComboBox.SelectedIndex = GetAction("LegionL_Action");
+                LoadKeysFromString("LegionL", GetText("LegionL_Shortcut"), LegionLKeyTags);
+                if (LegionLCommandTextBox != null) LegionLCommandTextBox.Text = GetText("LegionL_Command");
+                if (LegionRActionComboBox != null) LegionRActionComboBox.SelectedIndex = GetAction("LegionR_Action");
+                LoadKeysFromString("LegionR", GetText("LegionR_Shortcut"), LegionRKeyTags);
+                if (LegionRCommandTextBox != null) LegionRCommandTextBox.Text = GetText("LegionR_Command");
+                int l = LegionLActionComboBox?.SelectedIndex ?? 0;
+                int r = LegionRActionComboBox?.SelectedIndex ?? 0;
+                if (LegionLShortcutPanel != null) LegionLShortcutPanel.Visibility = l == 2 ? Visibility.Visible : Visibility.Collapsed;
+                if (LegionLCommandGrid != null) LegionLCommandGrid.Visibility = l == 3 ? Visibility.Visible : Visibility.Collapsed;
+                if (LegionRShortcutPanel != null) LegionRShortcutPanel.Visibility = r == 2 ? Visibility.Visible : Visibility.Collapsed;
+                if (LegionRCommandGrid != null) LegionRCommandGrid.Visibility = r == 3 ? Visibility.Visible : Visibility.Collapsed;
             }
-            catch (Exception ex)
+            catch (Exception ex) { Logger.Error($"Failed to render helper Legion remap snapshot: {ex.Message}"); }
+            finally
             {
-                Logger.Error($"Failed to load Legion remap settings: {ex.Message}");
+                labsSectionInitialized = wasInitialized;
+                UpdateViiperLegionLDisabledHint();
             }
-        }
-
-        private async void ApplyLegionRemapSettingsToHelper()
-        {
-            // Always send L/R config to helper (including disabled state) to clear any stale monitor config
-            ApplyLegionButtonConfig(true);
-
-            // Small delay between requests
-            await Task.Delay(100);
-
-            ApplyLegionButtonConfig(false);
         }
 
         private async void ApplyLegionButtonConfig(bool isLegionL)
@@ -918,9 +819,8 @@ namespace XboxGamingBar
                             }
                         }
 
-                        // Save settings on success
-                        if (success || !enabled)
-                            SaveLegionRemapSettings();
+                        if (response.TryGetValue("Content", out object content) && content != null)
+                            ApplyLegionRemapSnapshot(content.ToString());
 
                         Logger.Info($"Legion Button Remap: {buttonName}, Enabled={enabled}, Action={actionType}, Value={shortcutOrCommand}, Success={success}");
                     }

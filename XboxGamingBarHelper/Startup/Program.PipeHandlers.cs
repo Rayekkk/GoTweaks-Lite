@@ -1398,6 +1398,16 @@ namespace XboxGamingBarHelper
         // Labs: Legion Button Remap
         private static global::Windows.Foundation.Collections.ValueSet HandleLabsLegionButtonRemap(Shared.IPC.PipeMessage request)
         {
+            if (request.Command == Command.Get)
+            {
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { nameof(Function), (int)Function.Labs_LegionButtonRemap },
+                    { "Content", GetLegionButtonRemapSnapshot() },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                };
+            }
+
             global::Windows.Foundation.Collections.ValueSet response = null;
             string button = "L";
             bool enabled = false;
@@ -1414,8 +1424,13 @@ namespace XboxGamingBarHelper
                 shortcut = shortcutObj?.ToString() ?? "";
 
             bool success = ConfigureLegionButtonRemap(button, enabled, actionType, shortcut);
+            if (success || !enabled)
+                PersistLegionButtonRemap(button, enabled, actionType, shortcut);
             response = new global::Windows.Foundation.Collections.ValueSet();
+            response.Add(nameof(Function), (int)Function.Labs_LegionButtonRemap);
             response.Add("Success", success);
+            response.Add("Content", GetLegionButtonRemapSnapshot());
+            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
             Logger.Info($"Pipe: Legion {button} Remap - Enabled: {enabled}, Success: {success}");
             return response;
         }
@@ -1423,6 +1438,16 @@ namespace XboxGamingBarHelper
         // Labs: Brightness Gesture (enabled + trigger button + axis)
         private static global::Windows.Foundation.Collections.ValueSet HandleLabsLegionRBrightnessGesture(Shared.IPC.PipeMessage request)
         {
+            if (request.Command == Command.Get)
+            {
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { nameof(Function), (int)Function.Labs_LegionRBrightnessGesture },
+                    { "Content", GetLegionBrightnessGestureSnapshot() },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                };
+            }
+
             bool enabled = false;
             if (request.Extra.TryGetValue("Enabled", out object enabledObj))
                 enabled = Convert.ToBoolean(enabledObj);
@@ -1437,21 +1462,57 @@ namespace XboxGamingBarHelper
 
             bool success = ConfigureLegionBrightnessGesture(enabled, triggerType, axisType);
 
-            try
+            if (success || !enabled)
             {
                 Settings.LocalSettingsHelper.SetValue("LegionR_BrightnessGesture", enabled);
                 Settings.LocalSettingsHelper.SetValue("BrightnessGesture_Trigger", triggerType);
                 Settings.LocalSettingsHelper.SetValue("BrightnessGesture_Axis", axisType);
             }
-            catch (Exception ex)
-            {
-                Logger.Error($"Pipe: Failed to persist brightness gesture settings: {ex.Message}");
-            }
 
             var response = new global::Windows.Foundation.Collections.ValueSet();
+            response.Add(nameof(Function), (int)Function.Labs_LegionRBrightnessGesture);
             response.Add("Success", success);
+            response.Add("Content", GetLegionBrightnessGestureSnapshot());
+            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
             Logger.Info($"Pipe: Brightness Gesture - Enabled: {enabled}, Trigger: {triggerType}, Axis: {axisType}, Success: {success}");
             return response;
+        }
+
+        private static void PersistLegionButtonRemap(string button, bool enabled, int actionType, string shortcutOrCommand)
+        {
+            string prefix = string.Equals(button, "R", StringComparison.OrdinalIgnoreCase) ? "LegionR_" : "LegionL_";
+            int action = enabled ? actionType + 1 : 0;
+            LocalSettingsHelper.SetValue(prefix + "Action", action);
+            LocalSettingsHelper.SetValue(prefix + "Shortcut", enabled && actionType == 1 ? shortcutOrCommand ?? "" : "");
+            LocalSettingsHelper.SetValue(prefix + "Command", enabled && actionType == 2 ? shortcutOrCommand ?? "" : "");
+        }
+
+        private static string GetLegionButtonRemapSnapshot()
+        {
+            int GetAction(string key) => LocalSettingsHelper.TryGetValue<int>(key, out var value) ? value : 0;
+            string GetText(string key) => LocalSettingsHelper.TryGetValue<string>(key, out var value) ? value ?? "" : "";
+            return System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["LegionL_Action"] = GetAction("LegionL_Action"),
+                ["LegionL_Shortcut"] = GetText("LegionL_Shortcut"),
+                ["LegionL_Command"] = GetText("LegionL_Command"),
+                ["LegionR_Action"] = GetAction("LegionR_Action"),
+                ["LegionR_Shortcut"] = GetText("LegionR_Shortcut"),
+                ["LegionR_Command"] = GetText("LegionR_Command"),
+            });
+        }
+
+        private static string GetLegionBrightnessGestureSnapshot()
+        {
+            bool enabled = LocalSettingsHelper.TryGetValue<bool>("LegionR_BrightnessGesture", out var enabledValue) && enabledValue;
+            int trigger = LocalSettingsHelper.TryGetValue<int>("BrightnessGesture_Trigger", out var triggerValue) ? triggerValue : 0;
+            int axis = LocalSettingsHelper.TryGetValue<int>("BrightnessGesture_Axis", out var axisValue) ? axisValue : 0;
+            return System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["Enabled"] = enabled,
+                ["Trigger"] = trigger,
+                ["Axis"] = axis,
+            });
         }
 
         // Labs: Scroll Wheel Remap
@@ -1695,31 +1756,41 @@ namespace XboxGamingBarHelper
         // Quick Metrics: Enable/disable metrics push timer
         private static global::Windows.Foundation.Collections.ValueSet HandleQuickMetricsEnabled(Shared.IPC.PipeMessage request)
         {
-            global::Windows.Foundation.Collections.ValueSet response = null;
+            const string settingsKey = "QuickMetricsEnabled";
+            if (request.Command == Command.Get)
+            {
+                bool enabled = LocalSettingsHelper.TryGetValue<bool>(settingsKey, out var saved) && saved;
+                if (performanceManager != null) performanceManager.QuickMetricsEnabled = enabled;
+                return new global::Windows.Foundation.Collections.ValueSet { { "Content", enabled } };
+            }
             if (request.Content != null && performanceManager != null)
             {
-                bool enabled = false;
-                if (bool.TryParse(request.Content.ToString(), out enabled) || request.Content.ToString() == "True" || request.Content.ToString() == "true")
-                {
-                    enabled = request.Content.ToString().ToLower() == "true" || request.Content.ToString() == "True";
-                }
+                bool enabled = request.Content.ToString().ToLowerInvariant() == "true";
                 performanceManager.QuickMetricsEnabled = enabled;
+                LocalSettingsHelper.SetValue(settingsKey, enabled);
                 Logger.Info($"Pipe: Quick Metrics enabled set to: {enabled}");
             }
-            return response;
+            return new global::Windows.Foundation.Collections.ValueSet { { "Content", performanceManager?.QuickMetricsEnabled ?? false } };
         }
 
         // Screen Saver: Enable/disable idle-triggered screen saver
         private static global::Windows.Foundation.Collections.ValueSet HandleScreenSaverEnabled(Shared.IPC.PipeMessage request)
         {
-            global::Windows.Foundation.Collections.ValueSet response = null;
+            const string settingsKey = "ScreenSaverEnabled";
+            if (request.Command == Command.Get)
+            {
+                bool enabled = LocalSettingsHelper.TryGetValue<bool>(settingsKey, out var saved) && saved;
+                SetScreenSaverEnabled(enabled);
+                return new global::Windows.Foundation.Collections.ValueSet { { "Content", enabled } };
+            }
             if (request.Content != null)
             {
                 bool enabled = request.Content.ToString().ToLower() == "true";
                 SetScreenSaverEnabled(enabled);
+                LocalSettingsHelper.SetValue(settingsKey, enabled);
                 Logger.Info($"Pipe: Screen Saver enabled set to: {enabled}");
             }
-            return response;
+            return new global::Windows.Foundation.Collections.ValueSet { { "Content", screenSaverEnabled } };
         }
 
         // Software gyro bias capture or reset (Steam-style one-shot calibration). Samples

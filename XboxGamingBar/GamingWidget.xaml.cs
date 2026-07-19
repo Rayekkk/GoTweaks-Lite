@@ -3358,10 +3358,10 @@ namespace XboxGamingBar
                     UpdateControllerEmulationPrereqGate();
                 });
 
-                // Send Quick Metrics and Screen Saver enabled states to helper (fire-and-forget)
-                Logger.Info("[PIPE] Sending Quick Metrics and Screen Saver enabled states to helper...");
-                SendQuickMetricsEnabledToHelper();
-                SendScreenSaverEnabledToHelper();
+                // The helper owns these functional settings. Render its confirmed state;
+                // never seed it from a widget-local startup cache.
+                await RequestQuickMetricsEnabledFromHelperAsync();
+                await RequestScreenSaverEnabledFromHelperAsync();
                 await RequestProfileSaveFlagsFromHelperAsync();
                 // 2.0 invariant: never let the widget's persisted LocalSettings profiles
                 // seed the helper on connect.  The helper owns the durable profile and sends a

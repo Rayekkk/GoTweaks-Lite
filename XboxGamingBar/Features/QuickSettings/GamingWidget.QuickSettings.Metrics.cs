@@ -99,10 +99,6 @@ namespace XboxGamingBar
             {
                 quickMetricsEnabled = QuickMetricsToggle.IsOn;
 
-                // Save setting to local storage
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values[QuickMetricsEnabledKey] = quickMetricsEnabled;
-
                 // Update visibility of metrics row and selection panel
                 if (QuickMetricsRow != null)
                     QuickMetricsRow.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -124,7 +120,14 @@ namespace XboxGamingBar
                         { "Function", (int)Shared.Enums.Function.QuickMetricsEnabled },
                         { "Content", quickMetricsEnabled }
                     };
-                    await App.SendMessageAsync(request);
+                    var response = await App.SendMessageAsync(request);
+                    if (response != null && response.TryGetValue("Content", out object content))
+                    {
+                        quickMetricsEnabled = Convert.ToBoolean(content);
+                        QuickMetricsToggle.IsOn = quickMetricsEnabled;
+                        if (QuickMetricsRow != null) QuickMetricsRow.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
+                        if (MetricsSelectionPanel != null) MetricsSelectionPanel.Visibility = quickMetricsEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    }
                     Logger.Info($"Quick Metrics toggle set to: {quickMetricsEnabled}");
                 }
             }
