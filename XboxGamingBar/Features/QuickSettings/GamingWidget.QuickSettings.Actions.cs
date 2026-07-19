@@ -777,7 +777,7 @@ namespace XboxGamingBar
             int nextIndex = (currentIndex + 1) % fpsValues.Length;
             int nextLimit = fpsValues[nextIndex];
 
-            fpsLimit.SetValue(nextLimit);
+            _ = SendProfileFieldIntentAsync("FPSLimit", nextLimit);
             Logger.Info($"FPS Limit cycled from {currentLimit} to {nextLimit} (max refresh: {maxRefresh})");
 
             // Sync the Performance tab FPS Limit controls
@@ -802,14 +802,6 @@ namespace XboxGamingBar
                 isApplyingHelperUpdate = false;
             }
 
-            // Save to profile if FPS Limit saving is enabled
-            if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
-            {
-                SaveCurrentSettingsToProfile(currentProfileName);
-                // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's comment
-                // below - same missing-resync gap, found in an independent audit 2026-07-19.
-                SendPowerSourceProfileValuesToHelper("FPSLimit");
-            }
         }
 
         /// <summary>
@@ -833,15 +825,20 @@ namespace XboxGamingBar
                 {
                     maxRefresh = refreshRates.Value.Max();
                 }
-                FPSLimitSlider.Maximum = maxRefresh;
 
                 // If slider is at minimum (15) or below, set to max refresh as default
                 int limit = (int)FPSLimitSlider.Value;
-                if (limit <= 15)
+                isApplyingHelperUpdate = true;
+                try
                 {
-                    limit = maxRefresh;
-                    FPSLimitSlider.Value = limit;
+                    FPSLimitSlider.Maximum = maxRefresh;
+                    if (limit <= 15)
+                    {
+                        limit = maxRefresh;
+                        FPSLimitSlider.Value = limit;
+                    }
                 }
+                finally { isApplyingHelperUpdate = false; }
 
                 // Update display text with the final value
                 if (FPSLimitValue != null)
@@ -849,29 +846,16 @@ namespace XboxGamingBar
                     FPSLimitValue.Text = $"{limit} FPS";
                 }
 
-                fpsLimit.SetValue(limit);
+                _ = SendProfileFieldIntentAsync("FPSLimit", limit);
                 Logger.Info($"FPS Limit enabled: {limit}");
             }
             else
             {
                 // Disable FPS limit (0 = unlimited)
-                fpsLimit.SetValue(0);
+                _ = SendProfileFieldIntentAsync("FPSLimit", 0);
                 Logger.Info("FPS Limit disabled");
             }
 
-            // Save to profile if FPS Limit saving is enabled
-            if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
-            {
-                SaveCurrentSettingsToProfile(currentProfileName);
-                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
-                // 2026-07-19: like the Custom TDP sliders before their own fix, FPS Limit's 3
-                // custom-wired handlers (this one, the debounced slider tick, and the Quick
-                // Settings tile cycle above) saved only to the widget-local profile and never
-                // resynced to the helper's persisted AC/DC GameProfile - so a live FPS Limit
-                // edit could be silently reverted by a stale profile value on the next AC/DC
-                // transition or helper restart, same failure shape as the TDP bug (d2f9db0).
-                SendPowerSourceProfileValuesToHelper("FPSLimit");
-            }
         }
 
         /// <summary>
@@ -1023,17 +1007,8 @@ namespace XboxGamingBar
 
             if (fpsLimit != null && FPSLimitToggle.IsOn)
             {
-                fpsLimit.SetValue(fpsLimitPendingValue);
+                _ = SendProfileFieldIntentAsync("FPSLimit", fpsLimitPendingValue);
                 Logger.Info($"FPS Limit changed (debounced): {fpsLimitPendingValue}");
-
-                // Save to profile if FPS Limit saving is enabled
-                if (SaveFPSLimit && !isLoadingProfile && !isSwitchingProfile)
-                {
-                    SaveCurrentSettingsToProfile(currentProfileName);
-                    // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's
-                    // comment above - same missing-resync gap.
-            SendPowerSourceProfileValuesToHelper("RefreshRate");
-                }
             }
         }
 

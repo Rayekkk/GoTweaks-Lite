@@ -334,6 +334,19 @@ namespace XboxGamingBarHelper
                 if (dc) profile.CPUBoost_DC = enabled;
                 else profile.CPUBoost = enabled;
             }
+            else if (field == "FPSLimit" && value.TryGetInt32(out int fpsLimit))
+            {
+                // RTSS accepts 0 as disabled. 360 leaves room for high-refresh external panels
+                // while still rejecting malformed pipe payloads.
+                if (fpsLimit < 0 || fpsLimit > 360)
+                {
+                    reason = "FPS limit outside 0-360";
+                    Logger.Warn($"Rejected SetProfileField(FPSLimit): {fpsLimit}");
+                    return false;
+                }
+                if (dc) profile.FPSLimit_DC = fpsLimit;
+                else profile.FPSLimit = fpsLimit;
+            }
             else if (field == "CPUState"
                 && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
                 && cfg.TryGetValue("MaxValue", out var maxElement) && maxElement.TryGetInt32(out int maxState))

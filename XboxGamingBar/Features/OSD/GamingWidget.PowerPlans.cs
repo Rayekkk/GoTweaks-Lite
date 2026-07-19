@@ -124,6 +124,11 @@ namespace XboxGamingBar
                 if (MinCPUStateComboBox != null) MinCPUStateComboBox.IsEnabled = false;
                 if (MaxCPUStateComboBox != null) MaxCPUStateComboBox.IsEnabled = false;
             }
+            else if (field == "FPSLimit")
+            {
+                if (FPSLimitToggle != null) FPSLimitToggle.IsEnabled = false;
+                if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = false;
+            }
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -181,6 +186,11 @@ namespace XboxGamingBar
                     if (MinCPUStateComboBox != null) MinCPUStateComboBox.IsEnabled = true;
                     if (MaxCPUStateComboBox != null) MaxCPUStateComboBox.IsEnabled = true;
                 }
+                else if (field == "FPSLimit")
+                {
+                    if (FPSLimitToggle != null) FPSLimitToggle.IsEnabled = rtssInstalled?.Value == true;
+                    if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = rtssInstalled?.Value == true;
+                }
             }
         }
 
@@ -220,6 +230,22 @@ namespace XboxGamingBar
                         minCPUState.SuppressRemoteSync = false;
                         maxCPUState.SuppressRemoteSync = false;
                     }
+                }
+                else if (field == "FPSLimit" && values.ContainsKey(prefix + "FpsLimit"))
+                {
+                    int confirmed = (int)values.GetNamedNumber(prefix + "FpsLimit");
+                    fpsLimit.SuppressRemoteSync = true;
+                    try { fpsLimit.ForceSetValue(confirmed); }
+                    finally { fpsLimit.SuppressRemoteSync = false; }
+
+                    isApplyingHelperUpdate = true;
+                    try
+                    {
+                        if (FPSLimitToggle != null) FPSLimitToggle.IsOn = confirmed > 0;
+                        if (FPSLimitSlider != null && confirmed > 0) FPSLimitSlider.Value = confirmed;
+                        if (FPSLimitValue != null) FPSLimitValue.Text = confirmed > 0 ? $"{confirmed} FPS" : "Off";
+                    }
+                    finally { isApplyingHelperUpdate = false; }
                 }
             }
             catch (Exception ex)
