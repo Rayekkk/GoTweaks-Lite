@@ -543,6 +543,13 @@ namespace XboxGamingBarHelper
                 antiLag = false;
                 boost = false;
             }
+            // AFMF requires Anti-Lag - apply-time only, never persisted (see
+            // TryApplyAmdProfileField's FluidMotionFrames branch). Takes precedence over the
+            // Chill exclusion above: a real AMD driver requirement isn't optional the way the
+            // Chill/Anti-Lag/Boost preference conflict is. When FluidMotionFrames is false again,
+            // this resolves back to the profile's own untouched Anti-Lag preference.
+            if (fluidMotionFrames == true)
+                antiLag = true;
             if (antiLag.HasValue)
                 amdManager.AMDRadeonAntiLagEnabled.SetValue(antiLag.Value);
             if (boost.HasValue)

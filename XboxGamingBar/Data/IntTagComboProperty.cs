@@ -55,13 +55,25 @@ namespace XboxGamingBar.Data
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (suppressAutoSend) return;
-
             var selectedItem = UI.SelectedItem as ComboBoxItem;
             if (selectedItem?.Tag is string tagString && int.TryParse(tagString, out int newValue))
             {
                 if (newValue != Value)
                 {
+                    if (suppressAutoSend)
+                    {
+                        // Don't send here - an explicit SetProfileField intent elsewhere already
+                        // owns the send for this Function (see the field's doc comment). But this
+                        // property's cached Value is what that intent's handler reads
+                        // (TryGetAmdProfileFieldIntent reads amdRadeonBoostResolution.Value, not
+                        // the ComboBox directly) - without updating it here, the intent would keep
+                        // sending the value from BEFORE this selection change, so the combobox
+                        // would appear to do nothing.
+                        Logger.Info($"{Function} combo box updated to {newValue} (send owned by SetProfileField intent).");
+                        SetValueSilent(newValue, DateTime.Now.Ticks);
+                        return;
+                    }
+
                     Logger.Info($"{Function} combo box updated to {newValue}.");
                     // Bug fix: omitting the timestamp defaults SetValue's updatedTime to 0.
                     // PropertyUpdateArbiter (issue #79) rejects a 0-timestamped edit as stale once

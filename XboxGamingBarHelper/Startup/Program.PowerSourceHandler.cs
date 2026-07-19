@@ -582,8 +582,17 @@ namespace XboxGamingBarHelper
 
             if (field == "FluidMotionFrames" && IsBoolean(out bool fmf))
             {
-                if (dc) { profile.FluidMotionFrames_DC = fmf; if (fmf) profile.RadeonAntiLag_DC = true; }
-                else { profile.FluidMotionFrames = fmf; if (fmf) profile.RadeonAntiLag = true; }
+                // AFMF forcing Anti-Lag on is a hardware-apply-time requirement, not a persisted
+                // preference - it must NOT overwrite profile.RadeonAntiLag here. That used to
+                // permanently clobber the user's real Anti-Lag preference to true the moment AFMF
+                // was turned on, with no corresponding restore when AFMF was turned back off
+                // (this branch never had an "else" to undo it) - so disabling AFMF left Anti-Lag
+                // stuck on forever after. ApplyAMDFeaturesFromProfile now computes the *effective*
+                // Anti-Lag value (profile preference OR FluidMotionFrames) at apply time instead,
+                // matching AMDRadeonAntiLagEnabled_PropertyChanged's own live-edit guard which
+                // already skips persisting a save while it's forced on by AFMF.
+                if (dc) profile.FluidMotionFrames_DC = fmf;
+                else profile.FluidMotionFrames = fmf;
             }
             else if (field == "RadeonSuperResolution" && IsBoolean(out bool rsr))
             {
