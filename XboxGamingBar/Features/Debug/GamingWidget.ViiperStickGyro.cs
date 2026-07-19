@@ -56,75 +56,75 @@ namespace XboxGamingBar
             MirrorToggle(ControllerEmulationStickInvertYToggle, ViiperStickGyroInvertYToggle);
             MirrorSliderValue(StickSensitivityV2Slider, ViiperStickGyroSensitivitySlider, ViiperStickGyroSensitivityValueText, FormatSensitivity);
 
-            // Restore anti-deadzone slider values from LocalSettings (set by
-            // a prior session / set on the helper side). No matching legacy
-            // slider to mirror — these settings live only in the Viiper UI for now.
+            // Render safe defaults until the helper-owned advanced snapshot arrives.
+            // These settings have no matching legacy controls to mirror.
+            isMirroringStickGyro = true;
             try
             {
-                var s = Windows.Storage.ApplicationData.Current.LocalSettings;
+                var s = new System.Collections.Generic.Dictionary<string, object>();
                 if (ViiperStickGyroAntiDeadzoneSlider != null)
                 {
-                    int adz = s.Values.TryGetValue("ControllerEmulationStickGyroAntiDeadzone", out object adzObj) && adzObj is int ai ? ai : 10;
+                    int adz = s.TryGetValue("ControllerEmulationStickGyroAntiDeadzone", out object adzObj) && adzObj is int ai ? ai : 10;
                     ViiperStickGyroAntiDeadzoneSlider.Value = Math.Max(0, Math.Min(30, adz));
                     if (ViiperStickGyroAntiDeadzoneValueText != null)
                         ViiperStickGyroAntiDeadzoneValueText.Text = $"{(int)ViiperStickGyroAntiDeadzoneSlider.Value}%";
                 }
                 if (ViiperStickGyroAntiDeadzoneThresholdSlider != null)
                 {
-                    int thr = s.Values.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out object thrObj) && thrObj is int ti ? ti : 3;
+                    int thr = s.TryGetValue("ControllerEmulationStickGyroAntiDeadzoneThreshold", out object thrObj) && thrObj is int ti ? ti : 3;
                     ViiperStickGyroAntiDeadzoneThresholdSlider.Value = Math.Max(0, Math.Min(50, thr));
                     if (ViiperStickGyroAntiDeadzoneThresholdValueText != null)
                         ViiperStickGyroAntiDeadzoneThresholdValueText.Text = $"{(ViiperStickGyroAntiDeadzoneThresholdSlider.Value / 10.0):F1}°/s";
                 }
                 if (ViiperStickGyroSmoothingSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroSmoothing", out object o) && o is int vi ? vi : 30;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroSmoothing", out object o) && o is int vi ? vi : 30;
                     ViiperStickGyroSmoothingSlider.Value = Math.Max(0, Math.Min(90, v));
                     if (ViiperStickGyroSmoothingValueText != null)
                         ViiperStickGyroSmoothingValueText.Text = v == 0 ? "off" : $"{v}%";
                 }
                 if (ViiperStickGyroVerticalRatioSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroVerticalRatio", out object o) && o is int vi ? vi : 100;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroVerticalRatio", out object o) && o is int vi ? vi : 100;
                     ViiperStickGyroVerticalRatioSlider.Value = Math.Max(10, Math.Min(200, v));
                     if (ViiperStickGyroVerticalRatioValueText != null)
                         ViiperStickGyroVerticalRatioValueText.Text = $"{(int)ViiperStickGyroVerticalRatioSlider.Value}%";
                 }
                 if (ViiperStickGyroCurvePresetComboBox != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroCurvePreset", out object o) && o is int vi ? vi : 0;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroCurvePreset", out object o) && o is int vi ? vi : 0;
                     int idx = Math.Max(0, Math.Min(2, v));
                     ViiperStickGyroCurvePresetComboBox.SelectedIndex = idx;
                 }
                 if (ViiperStickGyroTightenThresholdSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTightenThreshold", out object o) && o is int vi ? vi : 0;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroTightenThreshold", out object o) && o is int vi ? vi : 0;
                     ViiperStickGyroTightenThresholdSlider.Value = Math.Max(0, Math.Min(500, v));
                     if (ViiperStickGyroTightenThresholdValueText != null)
                         ViiperStickGyroTightenThresholdValueText.Text = v == 0 ? "off" : $"{v}°/s";
                 }
                 if (ViiperStickGyroTightenGainSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTightenGain", out object o) && o is int vi ? vi : 100;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroTightenGain", out object o) && o is int vi ? vi : 100;
                     ViiperStickGyroTightenGainSlider.Value = Math.Max(100, Math.Min(300, v));
                     if (ViiperStickGyroTightenGainValueText != null)
                         ViiperStickGyroTightenGainValueText.Text = $"{(ViiperStickGyroTightenGainSlider.Value / 100.0):F2}×";
                 }
                 if (ViiperStickGyroTouchDeactivateToggle != null)
                 {
-                    bool v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", out object o) && o is bool vb && vb;
+                    bool v = s.TryGetValue("ControllerEmulationStickGyroTouchDeactivateEnabled", out object o) && o is bool vb && vb;
                     ViiperStickGyroTouchDeactivateToggle.IsOn = v;
                 }
                 if (ViiperStickGyroTouchThresholdSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", out object o) && o is int vi ? vi : 15;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", out object o) && o is int vi ? vi : 15;
                     ViiperStickGyroTouchThresholdSlider.Value = Math.Max(0, Math.Min(50, v));
                     if (ViiperStickGyroTouchThresholdValueText != null)
                         ViiperStickGyroTouchThresholdValueText.Text = $"{(int)ViiperStickGyroTouchThresholdSlider.Value}%";
                 }
                 if (ViiperStickGyroTouchHoldoffSlider != null)
                 {
-                    int v = s.Values.TryGetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", out object o) && o is int vi ? vi : 250;
+                    int v = s.TryGetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", out object o) && o is int vi ? vi : 250;
                     ViiperStickGyroTouchHoldoffSlider.Value = Math.Max(0, Math.Min(1000, v));
                     if (ViiperStickGyroTouchHoldoffValueText != null)
                         ViiperStickGyroTouchHoldoffValueText.Text = $"{(int)ViiperStickGyroTouchHoldoffSlider.Value} ms";
@@ -134,6 +134,8 @@ namespace XboxGamingBar
             {
                 Logger.Warn($"Failed to restore anti-deadzone slider values: {ex.Message}");
             }
+            finally { isMirroringStickGyro = false; }
+            _ = RequestStickGyroAdvancedSettingsFromHelperAsync();
 
             // Master-enable toggle drives the badge + cascading enable state. The
             // toggle itself is bound to a real WidgetProperty so its value pushes
@@ -306,8 +308,7 @@ namespace XboxGamingBar
             {
                 ViiperStickGyroAntiDeadzoneValueText.Text = $"{value}%";
             }
-            SaveAntiDeadzoneSettings(value, null);
-            SendStickGyroAntiDeadzoneToHelper(value, null);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzone, value);
         }
 
         private void ViiperStickGyroAntiDeadzoneThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -317,24 +318,21 @@ namespace XboxGamingBar
             {
                 ViiperStickGyroAntiDeadzoneThresholdValueText.Text = $"{(value / 10.0):F1}°/s";
             }
-            SaveAntiDeadzoneSettings(null, value);
-            SendStickGyroAntiDeadzoneToHelper(null, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzoneThreshold, value);
         }
 
         private void ViiperStickGyroSmoothingSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroSmoothingValueText != null) ViiperStickGyroSmoothingValueText.Text = value == 0 ? "off" : $"{value}%";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroSmoothing", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroSmoothing, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroSmoothing, value);
         }
 
         private void ViiperStickGyroVerticalRatioSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroVerticalRatioValueText != null) ViiperStickGyroVerticalRatioValueText.Text = $"{value}%";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroVerticalRatio", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroVerticalRatio, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroVerticalRatio, value);
         }
 
         private void ViiperStickGyroCurvePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -342,8 +340,7 @@ namespace XboxGamingBar
             if (ViiperStickGyroCurvePresetComboBox?.SelectedItem is ComboBoxItem item &&
                 item.Tag is string tagStr && int.TryParse(tagStr, out int preset))
             {
-                SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroCurvePreset", preset);
-                SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroCurvePreset, preset);
+                if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroCurvePreset, preset);
             }
         }
 
@@ -352,8 +349,7 @@ namespace XboxGamingBar
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroTightenThresholdValueText != null)
                 ViiperStickGyroTightenThresholdValueText.Text = value == 0 ? "off" : $"{value}°/s";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTightenThreshold", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTightenThreshold, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroTightenThreshold, value);
         }
 
         private void ViiperStickGyroTightenGainSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -361,70 +357,108 @@ namespace XboxGamingBar
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroTightenGainValueText != null)
                 ViiperStickGyroTightenGainValueText.Text = $"{(value / 100.0):F2}×";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTightenGain", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTightenGain, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroTightenGain, value);
         }
 
         private void ViiperStickGyroTouchDeactivateToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (ViiperStickGyroTouchDeactivateToggle == null) return;
             bool on = ViiperStickGyroTouchDeactivateToggle.IsOn;
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateEnabled", on);
-            SendStickGyroBoolToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled, on);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled, on);
         }
 
         private void ViiperStickGyroTouchThresholdSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroTouchThresholdValueText != null) ViiperStickGyroTouchThresholdValueText.Text = $"{value}%";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateThreshold", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateThreshold, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateThreshold, value);
         }
 
         private void ViiperStickGyroTouchHoldoffSlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
             int value = (int)Math.Round(e.NewValue);
             if (ViiperStickGyroTouchHoldoffValueText != null) ViiperStickGyroTouchHoldoffValueText.Text = $"{value} ms";
-            SaveStickGyroAdvancedSetting("ControllerEmulationStickGyroTouchDeactivateHoldoff", value);
-            SendStickGyroIntToHelper(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, value);
+            if (!isMirroringStickGyro) _ = SetStickGyroSettingAsync(Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, value);
         }
 
-        private static void SaveStickGyroAdvancedSetting(string key, object value)
+        private static readonly Shared.Enums.Function[] StickGyroAdvancedFunctions =
         {
-            try { Windows.Storage.ApplicationData.Current.LocalSettings.Values[key] = value; }
-            catch (Exception ex) { Logger.Warn($"SaveStickGyroAdvancedSetting {key} failed: {ex.Message}"); }
+            Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzone,
+            Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzoneThreshold,
+            Shared.Enums.Function.ControllerEmulationStickGyroSmoothing,
+            Shared.Enums.Function.ControllerEmulationStickGyroVerticalRatio,
+            Shared.Enums.Function.ControllerEmulationStickGyroCurvePreset,
+            Shared.Enums.Function.ControllerEmulationStickGyroTightenThreshold,
+            Shared.Enums.Function.ControllerEmulationStickGyroTightenGain,
+            Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled,
+            Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateThreshold,
+            Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateHoldoff,
+        };
+
+        private async System.Threading.Tasks.Task RequestStickGyroAdvancedSettingsFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            foreach (var fn in StickGyroAdvancedFunctions)
+                await RequestStickGyroSettingFromHelperAsync(fn);
         }
 
-        private static void SendStickGyroIntToHelper(Shared.Enums.Function fn, int value)
+        private async System.Threading.Tasks.Task SetStickGyroSettingAsync(Shared.Enums.Function fn, object requestedValue)
         {
+            if (!App.IsConnected) return;
             try
             {
-                if (!App.IsConnected) return;
-                var msg = new Windows.Foundation.Collections.ValueSet
+                await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
                     { "Command", (int)Shared.Enums.Command.Set },
                     { "Function", (int)fn },
-                    { "Content", value }
-                };
-                App.PipeClient?.SendValueSet(msg);
+                    { "Content", requestedValue },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                });
+                await RequestStickGyroSettingFromHelperAsync(fn);
             }
-            catch (Exception ex) { Logger.Warn($"SendStickGyroIntToHelper {fn} failed: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Helper rejected or failed to confirm {fn}: {ex.Message}");
+                await RequestStickGyroSettingFromHelperAsync(fn);
+            }
         }
 
-        private static void SendStickGyroBoolToHelper(Shared.Enums.Function fn, bool value)
+        private async System.Threading.Tasks.Task RequestStickGyroSettingFromHelperAsync(Shared.Enums.Function fn)
         {
             try
             {
-                if (!App.IsConnected) return;
-                var msg = new Windows.Foundation.Collections.ValueSet
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Command", (int)Shared.Enums.Command.Get },
                     { "Function", (int)fn },
-                    { "Content", value }
-                };
-                App.PipeClient?.SendValueSet(msg);
+                });
+                if (response != null && response.TryGetValue("Content", out object content))
+                    ApplyStickGyroConfirmedValue(fn, content);
             }
-            catch (Exception ex) { Logger.Warn($"SendStickGyroBoolToHelper {fn} failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Warn($"Failed to get helper-confirmed {fn}: {ex.Message}"); }
+        }
+
+        private void ApplyStickGyroConfirmedValue(Shared.Enums.Function fn, object content)
+        {
+            isMirroringStickGyro = true;
+            try
+            {
+                int value = fn == Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled ? 0 : Convert.ToInt32(content);
+                switch (fn)
+                {
+                    case Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzone: if (ViiperStickGyroAntiDeadzoneSlider != null) ViiperStickGyroAntiDeadzoneSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzoneThreshold: if (ViiperStickGyroAntiDeadzoneThresholdSlider != null) ViiperStickGyroAntiDeadzoneThresholdSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroSmoothing: if (ViiperStickGyroSmoothingSlider != null) ViiperStickGyroSmoothingSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroVerticalRatio: if (ViiperStickGyroVerticalRatioSlider != null) ViiperStickGyroVerticalRatioSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroCurvePreset: if (ViiperStickGyroCurvePresetComboBox != null) ViiperStickGyroCurvePresetComboBox.SelectedIndex = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroTightenThreshold: if (ViiperStickGyroTightenThresholdSlider != null) ViiperStickGyroTightenThresholdSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroTightenGain: if (ViiperStickGyroTightenGainSlider != null) ViiperStickGyroTightenGainSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateEnabled: if (ViiperStickGyroTouchDeactivateToggle != null) ViiperStickGyroTouchDeactivateToggle.IsOn = Convert.ToBoolean(content); break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateThreshold: if (ViiperStickGyroTouchThresholdSlider != null) ViiperStickGyroTouchThresholdSlider.Value = value; break;
+                    case Shared.Enums.Function.ControllerEmulationStickGyroTouchDeactivateHoldoff: if (ViiperStickGyroTouchHoldoffSlider != null) ViiperStickGyroTouchHoldoffSlider.Value = value; break;
+                }
+            }
+            finally { isMirroringStickGyro = false; }
         }
 
         /// <summary>
@@ -478,58 +512,6 @@ namespace XboxGamingBar
             int.TryParse(parts.Length > 0 ? parts[0] : "0", System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int a);
             int.TryParse(parts.Length > 1 ? parts[1] : "0", System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int b);
             return (a, b);
-        }
-
-        private static void SaveAntiDeadzoneSettings(int? adz, int? threshold)
-        {
-            try
-            {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                if (adz.HasValue)
-                {
-                    settings.Values["ControllerEmulationStickGyroAntiDeadzone"] = adz.Value;
-                }
-                if (threshold.HasValue)
-                {
-                    settings.Values["ControllerEmulationStickGyroAntiDeadzoneThreshold"] = threshold.Value;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"SaveAntiDeadzoneSettings failed: {ex.Message}");
-            }
-        }
-
-        private static void SendStickGyroAntiDeadzoneToHelper(int? adz, int? threshold)
-        {
-            try
-            {
-                if (!App.IsConnected) return;
-                if (adz.HasValue)
-                {
-                    var msg = new Windows.Foundation.Collections.ValueSet
-                    {
-                        { "Command", (int)Shared.Enums.Command.Set },
-                        { "Function", (int)Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzone },
-                        { "Content", adz.Value }
-                    };
-                    App.PipeClient?.SendValueSet(msg);
-                }
-                if (threshold.HasValue)
-                {
-                    var msg = new Windows.Foundation.Collections.ValueSet
-                    {
-                        { "Command", (int)Shared.Enums.Command.Set },
-                        { "Function", (int)Shared.Enums.Function.ControllerEmulationStickGyroAntiDeadzoneThreshold },
-                        { "Content", threshold.Value }
-                    };
-                    App.PipeClient?.SendValueSet(msg);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"SendStickGyroAntiDeadzoneToHelper failed: {ex.Message}");
-            }
         }
 
         /// <summary>

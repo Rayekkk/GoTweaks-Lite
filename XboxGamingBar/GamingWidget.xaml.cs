@@ -3338,6 +3338,7 @@ namespace XboxGamingBar
                 // never seed it from a widget-local startup cache.
                 await RequestQuickMetricsEnabledFromHelperAsync();
                 await RequestScreenSaverEnabledFromHelperAsync();
+                await RequestStickGyroAdvancedSettingsFromHelperAsync();
                 await RequestProfileSaveFlagsFromHelperAsync();
                 // 2.0 invariant: never let the widget's persisted LocalSettings profiles
                 // seed the helper on connect.  The helper owns the durable profile and sends a

@@ -195,6 +195,9 @@ namespace XboxGamingBarHelper.ControllerEmulation
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(30, System.Convert.ToInt32(newValue))), updatedTime);
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -211,6 +214,9 @@ namespace XboxGamingBarHelper.ControllerEmulation
             : base(initialValue, null, Function.ControllerEmulationStickGyroAntiDeadzoneThreshold, manager)
         {
         }
+
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime);
 
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
@@ -238,6 +244,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroVerticalRatioProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroVerticalRatio, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(10, System.Math.Min(200, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -251,6 +259,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroCurvePresetProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroCurvePreset, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(2, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -264,6 +274,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroTightenThresholdProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTightenThreshold, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(500, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -277,6 +289,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroTightenGainProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTightenGain, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(100, System.Math.Min(300, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -303,6 +317,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroTouchDeactivateThresholdProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateThreshold, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(50, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -316,6 +332,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroTouchDeactivateHoldoffProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroTouchDeactivateHoldoff, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(1000, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -329,6 +347,8 @@ namespace XboxGamingBarHelper.ControllerEmulation
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public ControllerEmulationStickGyroSmoothingProperty(int initialValue, ControllerEmulationManager manager)
             : base(initialValue, null, Function.ControllerEmulationStickGyroSmoothing, manager) { }
+        public override bool SetValue(object newValue, long updatedTime = 0)
+            => base.SetValue(System.Math.Max(0, System.Math.Min(90, System.Convert.ToInt32(newValue))), updatedTime);
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
