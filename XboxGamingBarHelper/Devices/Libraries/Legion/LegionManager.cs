@@ -1869,25 +1869,28 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// <summary>
         /// Apply individual Slow TDP (SPL) value
         /// </summary>
-        public void ApplyCustomTDPSlow(int slow)
+        public bool ApplyCustomTDPSlow(int slow, out string failureReason)
         {
-            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            failureReason = null;
+            // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
+            // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)
             {
                 Logger.Debug($"Skipping ApplyCustomTDPSlow({slow}W) - not in Custom mode (mode={performanceMode})");
-                return;
+                return true;
             }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
                 Logger.Info($"Skipping ApplyCustomTDPSlow({slow}W) - still in startup grace period");
-                return;
+                return true;
             }
 
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set custom TDP Slow: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -1898,40 +1901,46 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     customTDPSlow = slow;
                     Logger.Info($"Slow TDP (SPL) set to {slow}W");
                     CustomTDPApplied?.Invoke();
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set Slow TDP: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set Slow TDP: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting Slow TDP: {ex.Message}");
+                return false;
             }
         }
 
         /// <summary>
         /// Apply individual Fast TDP (SPPL) value
         /// </summary>
-        public void ApplyCustomTDPFast(int fast)
+        public bool ApplyCustomTDPFast(int fast, out string failureReason)
         {
-            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            failureReason = null;
+            // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
+            // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)
             {
                 Logger.Debug($"Skipping ApplyCustomTDPFast({fast}W) - not in Custom mode (mode={performanceMode})");
-                return;
+                return true;
             }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
                 Logger.Info($"Skipping ApplyCustomTDPFast({fast}W) - still in startup grace period");
-                return;
+                return true;
             }
 
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set custom TDP Fast: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -1942,40 +1951,46 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     customTDPFast = fast;
                     Logger.Info($"Fast TDP (SPPL) set to {fast}W");
                     CustomTDPApplied?.Invoke();
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set Fast TDP: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set Fast TDP: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting Fast TDP: {ex.Message}");
+                return false;
             }
         }
 
         /// <summary>
         /// Apply individual Peak TDP (FPPT) value
         /// </summary>
-        public void ApplyCustomTDPPeak(int peak)
+        public bool ApplyCustomTDPPeak(int peak, out string failureReason)
         {
-            // Only meaningful in Custom mode; preset modes are firmware-managed.
+            failureReason = null;
+            // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
+            // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)
             {
                 Logger.Debug($"Skipping ApplyCustomTDPPeak({peak}W) - not in Custom mode (mode={performanceMode})");
-                return;
+                return true;
             }
             // Skip during startup grace period to prevent widget sync from overriding main TDP slider
             if ((DateTime.Now - startupTime).TotalMilliseconds < STARTUP_GRACE_PERIOD_MS)
             {
                 Logger.Info($"Skipping ApplyCustomTDPPeak({peak}W) - still in startup grace period");
-                return;
+                return true;
             }
 
             if (wmiService == null)
             {
+                failureReason = "WMI service not available";
                 Logger.Warn("Cannot set custom TDP Peak: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -1986,15 +2001,18 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     customTDPPeak = peak;
                     Logger.Info($"Peak TDP (FPPT) set to {peak}W");
                     CustomTDPApplied?.Invoke();
+                    return true;
                 }
-                else
-                {
-                    Logger.Error($"Failed to set Peak TDP: {result.Message}");
-                }
+
+                failureReason = result.Message;
+                Logger.Error($"Failed to set Peak TDP: {result.Message}");
+                return false;
             }
             catch (Exception ex)
             {
+                failureReason = ex.Message;
                 Logger.Error($"Error setting Peak TDP: {ex.Message}");
+                return false;
             }
         }
 

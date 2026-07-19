@@ -420,9 +420,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
     }
 
     // Custom TDP Slow (SPL) in watts
-    internal class LegionCustomTDPSlowProperty : HelperProperty<int, LegionManager>
+    internal class LegionCustomTDPSlowProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionCustomTDPSlowProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionCustomTDPSlow, inManager)
         {
@@ -432,14 +435,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionCustomTDPSlow changed to {Value}W");
-            Manager?.ApplyCustomTDPSlow(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.ApplyCustomTDPSlow(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "TDP (SPL) could not be applied.");
         }
     }
 
     // Custom TDP Fast (SPPL) in watts
-    internal class LegionCustomTDPFastProperty : HelperProperty<int, LegionManager>
+    internal class LegionCustomTDPFastProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionCustomTDPFastProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionCustomTDPFast, inManager)
         {
@@ -449,14 +457,19 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionCustomTDPFast changed to {Value}W");
-            Manager?.ApplyCustomTDPFast(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.ApplyCustomTDPFast(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "TDP (SPPT) could not be applied.");
         }
     }
 
     // Custom TDP Peak (FPPT) in watts
-    internal class LegionCustomTDPPeakProperty : HelperProperty<int, LegionManager>
+    internal class LegionCustomTDPPeakProperty : HelperProperty<int, LegionManager>, IHardwareApplyResult
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
 
         public LegionCustomTDPPeakProperty(int initialValue, LegionManager inManager) : base(initialValue, null, Function.LegionCustomTDPPeak, inManager)
         {
@@ -466,7 +479,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionCustomTDPPeak changed to {Value}W");
-            Manager?.ApplyCustomTDPPeak(Value);
+            string reason = "Legion manager is not available.";
+            LastApplySucceeded = Manager != null && Manager.ApplyCustomTDPPeak(Value, out reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "TDP (FPPT) could not be applied.");
         }
     }
 
