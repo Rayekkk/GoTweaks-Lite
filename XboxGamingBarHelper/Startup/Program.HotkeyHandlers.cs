@@ -76,22 +76,8 @@ namespace XboxGamingBarHelper
 
         private static bool SetCustomQuickSetting(string id, string name, string icon, string shortcut, bool delete, out string reason)
         {
-            reason = null;
-            if (string.IsNullOrWhiteSpace(id) || id.Length > 128)
-            {
-                reason = "Invalid custom tile identifier.";
+            if (!Shared.Data.CustomQuickSettingValidator.Validate(id, name, shortcut, delete, out reason))
                 return false;
-            }
-            if (!delete && (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(shortcut)))
-            {
-                reason = "A name and keyboard shortcut are required.";
-                return false;
-            }
-            if (!delete && (name.Length > 80 || shortcut.Length > 256))
-            {
-                reason = "The custom tile name or shortcut is too long.";
-                return false;
-            }
 
             string trimmedName = delete ? null : name.Trim();
             string trimmedShortcut = delete ? null : shortcut.Trim();
