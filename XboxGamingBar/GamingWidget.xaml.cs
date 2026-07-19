@@ -884,7 +884,7 @@ namespace XboxGamingBar
         private PerformanceProfile gameProfile = new PerformanceProfile();
         private PerformanceProfile gameACProfile = new PerformanceProfile();
         private PerformanceProfile gameDCProfile = new PerformanceProfile();
-        private string currentProfileName = ""; // Empty so first SwitchProfile() loads settings
+        private string currentProfileName = ""; // Helper-derived display label; never an intent target
         private string currentGameName = "";
         private string currentGameExePath = "";
         private bool hasHelperGlobalPowerSourceSplit;
@@ -892,6 +892,14 @@ namespace XboxGamingBar
         private string helperGamePowerSourceSplitGameName = "";
         private bool hasHelperGamePowerSourceSplit;
         private bool helperGamePowerSourceSplit;
+        // Functional scope is owned by the helper. This is only a hydrated display and
+        // intent-routing cache; widget events must not derive a different active profile.
+        private bool hasHelperActiveProfileScope;
+        private bool helperActiveProfileIsPerGame;
+        private string helperActiveProfileGameName = "";
+        private string helperActiveProfileGamePath = "";
+        private bool helperActiveProfileIsOnAC = true;
+        private bool helperActiveProfilePowerSourceSplit;
         private string currentGameIconPath = ""; // Cache icon path to preserve it across foreground changes
         private bool isLoadingProfile = false;
         private bool isSwitchingProfile = false;

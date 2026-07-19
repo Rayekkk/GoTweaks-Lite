@@ -46,6 +46,10 @@ namespace XboxGamingBar
 
         private void SwitchProfile()
         {
+            // 2.0: helper owns selection, persistence and application of the active
+            // profile. This legacy UI hook must not load or save a local profile.
+            _ = SyncPowerSourceProfilesFromHelperAsync();
+#if false // Legacy LocalSettings profile switching is intentionally disabled in 2.0.
             string targetProfile = GetTargetProfileName();
 
             if (targetProfile != currentProfileName)
@@ -82,6 +86,7 @@ namespace XboxGamingBar
                     isSwitchingProfile = false;
                 }
             }
+ #endif
         }
 
         private string GetTargetProfileName()

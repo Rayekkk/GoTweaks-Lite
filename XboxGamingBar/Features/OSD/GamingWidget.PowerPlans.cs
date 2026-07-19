@@ -100,6 +100,12 @@ namespace XboxGamingBar
                 var dc = Read("Dc");
                 bool isGlobal = Bool("IsGlobal", true);
                 bool splitEnabled = Bool("PowerSourceSplitEnabled", false);
+                hasHelperActiveProfileScope = true;
+                helperActiveProfileIsPerGame = Text("HelperActiveScope", "Global") == "PerGame";
+                helperActiveProfileGameName = Text("HelperActiveGameName", "");
+                helperActiveProfileGamePath = Text("HelperActiveGamePath", "");
+                helperActiveProfileIsOnAC = Bool("HelperIsOnAC", true);
+                helperActiveProfilePowerSourceSplit = Bool("HelperActivePowerSourceSplitEnabled", false);
                 if (isGlobal)
                 {
                     hasHelperGlobalPowerSourceSplit = true;
@@ -117,6 +123,7 @@ namespace XboxGamingBar
                     gameACProfile = ac;
                     gameDCProfile = dc;
                 }
+                UpdateDisplayProfileNameFromHelperScope();
                 Logger.Info("Hydrated AC/DC profile cache from helper");
             }
             catch (Exception ex)
@@ -156,8 +163,14 @@ namespace XboxGamingBar
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
-                bool dc = currentProfileName != null && currentProfileName.EndsWith("_DC");
-                bool perGame = currentProfileName != null && currentProfileName.StartsWith("Game_");
+                // Scope and AC/DC are helper-confirmed runtime state, not the widget's
+                // local profile name. The fallback is used only before the first snapshot.
+                bool perGame = hasHelperActiveProfileScope
+                    ? helperActiveProfileIsPerGame
+                    : perGameProfile?.Value == true && HasValidGame(currentGameName);
+                bool dc = hasHelperActiveProfileScope
+                    ? !helperActiveProfileIsOnAC
+                    : currentProfileName != null && currentProfileName.EndsWith("_DC");
                 var json = new Windows.Data.Json.JsonObject
                 {
                     ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetProfileField"),
@@ -167,8 +180,8 @@ namespace XboxGamingBar
                 };
                 if (perGame)
                 {
-                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameName ?? "");
-                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameExePath ?? "");
+                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(hasHelperActiveProfileScope ? helperActiveProfileGameName : currentGameName ?? "");
+                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(hasHelperActiveProfileScope ? helperActiveProfileGamePath : currentGameExePath ?? "");
                 }
                 if (field == "CPUState" && value is int[] cpuState && cpuState.Length == 2)
                 {
@@ -240,6 +253,8 @@ namespace XboxGamingBar
             if (!App.IsConnected) return;
             try
             {
+                if (hasHelperActiveProfileScope)
+                    perGame = helperActiveProfileIsPerGame;
                 var json = new Windows.Data.Json.JsonObject
                 {
                     ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetPowerSourceSplit"),
@@ -248,8 +263,8 @@ namespace XboxGamingBar
                 };
                 if (perGame)
                 {
-                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameName ?? "");
-                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameExePath ?? "");
+                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(hasHelperActiveProfileScope ? helperActiveProfileGameName : currentGameName ?? "");
+                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(hasHelperActiveProfileScope ? helperActiveProfileGamePath : currentGameExePath ?? "");
                 }
                 var response = await App.PipeClient.SendRequestAsync(new Windows.Foundation.Collections.ValueSet
                 {
@@ -275,6 +290,23 @@ namespace XboxGamingBar
             {
                 Logger.Warn($"Power-source split intent failed: {ex.Message}");
                 await SyncPowerSourceProfilesFromHelperAsync();
+            }
+        }
+
+        private void UpdateDisplayProfileNameFromHelperScope()
+        {
+            if (!hasHelperActiveProfileScope) return;
+
+            if (helperActiveProfileIsPerGame)
+            {
+                string gameName = helperActiveProfileGameName ?? "";
+                currentProfileName = helperActiveProfilePowerSourceSplit
+                    ? $"Game_{gameName}_{(helperActiveProfileIsOnAC ? "AC" : "DC")}" : $"Game_{gameName}";
+            }
+            else
+            {
+                currentProfileName = helperActiveProfilePowerSourceSplit
+                    ? (helperActiveProfileIsOnAC ? "AC" : "DC") : "Global";
             }
         }
 

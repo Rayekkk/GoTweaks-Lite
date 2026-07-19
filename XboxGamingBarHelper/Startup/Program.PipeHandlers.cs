@@ -1554,6 +1554,10 @@ namespace XboxGamingBarHelper
                 return "{}";
 
             var selected = profile.Value;
+            // The requested profile can be inactive (for example, an AC edit while
+            // the device is on DC). Publish the live helper-owned scope separately
+            // so the widget never derives an intent target from its local cache.
+            Shared.Data.GameProfile active = profileManager.CurrentProfile.Value;
 
             int DcInt(int? value, int ac) => value ?? ac;
             bool DcBool(bool? value, bool ac) => value ?? ac;
@@ -1564,6 +1568,12 @@ namespace XboxGamingBarHelper
             {
                 { "IsGlobal", selected.IsGlobalProfile },
                 { "PowerSourceSplitEnabled", selected.PowerSourceProfileEnabled },
+                { "HelperActiveScope", active.IsGlobalProfile ? "Global" : "PerGame" },
+                { "HelperActiveGameName", active.IsGlobalProfile ? "" : active.GameId.Name ?? "" },
+                { "HelperActiveGamePath", active.IsGlobalProfile ? "" : active.GameId.Path ?? "" },
+                { "HelperIsOnAC", IsCurrentlyOnAC },
+                { "HelperPerGameEnabled", !active.IsGlobalProfile },
+                { "HelperActivePowerSourceSplitEnabled", active.PowerSourceProfileEnabled },
                 { "AcLegionPerformanceMode", selected.LegionPerformanceMode ?? 2 },
                 { "DcLegionPerformanceMode", DcInt(selected.LegionPerformanceMode_DC, selected.LegionPerformanceMode ?? 2) },
                 { "AcTdp", selected.TDP }, { "DcTdp", DcInt(selected.TDP_DC, selected.TDP) },

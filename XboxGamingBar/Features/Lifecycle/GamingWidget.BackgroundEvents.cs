@@ -129,12 +129,14 @@ namespace XboxGamingBar
                 // Register Chill FPS handlers after sync to prevent crash
                 RegisterChillFPSHandlers();
 
-                // Re-evaluate which profile should be active and reload its settings
-                // This is needed because the game may have closed while widget was in background
-                // and the UI may still show stale game profile values
-                // Must run on UI thread since GetTargetProfileName and LoadProfileSettings access UI controls
+                // The helper has kept the functional profile state current while this UI was
+                // backgrounded. Refresh only the helper-confirmed display cache on return.
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                 {
+                    // Active scope is helper-owned; never recompute it from widget
+                    // controls, power events or LocalSettings after backgrounding.
+                    _ = SyncPowerSourceProfilesFromHelperAsync();
+#if false // Legacy local profile reload could apply stale widget-owned settings.
                     try
                     {
                         string expectedProfile = GetTargetProfileName();
@@ -157,6 +159,7 @@ namespace XboxGamingBar
                     {
                         Logger.Error($"Error reloading profile after returning from background: {ex.Message}");
                     }
+#endif
                 });
             }
             else
