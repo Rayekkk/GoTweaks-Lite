@@ -119,6 +119,11 @@ namespace XboxGamingBar
             Windows.UI.Xaml.Controls.Control pendingControl = null;
             if (field == "CPUBoost") pendingControl = CPUBoostToggle;
             else if (field == "CPUEPP") pendingControl = CPUEPPSlider;
+            else if (field == "CPUState")
+            {
+                if (MinCPUStateComboBox != null) MinCPUStateComboBox.IsEnabled = false;
+                if (MaxCPUStateComboBox != null) MaxCPUStateComboBox.IsEnabled = false;
+            }
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -131,7 +136,17 @@ namespace XboxGamingBar
                     ["Scope"] = Windows.Data.Json.JsonValue.CreateStringValue(perGame ? "PerGame" : "Global"),
                     ["Power"] = Windows.Data.Json.JsonValue.CreateStringValue(dc ? "DC" : "AC")
                 };
-                if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);
+                if (perGame)
+                {
+                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameName ?? "");
+                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameExePath ?? "");
+                }
+                if (field == "CPUState" && value is int[] cpuState && cpuState.Length == 2)
+                {
+                    json["MinValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(cpuState[0]);
+                    json["MaxValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(cpuState[1]);
+                }
+                else if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);
                 else json["Value"] = Windows.Data.Json.JsonValue.CreateNumberValue(Convert.ToDouble(value));
 
                 var response = await App.PipeClient.SendRequestAsync(new Windows.Foundation.Collections.ValueSet
@@ -161,6 +176,11 @@ namespace XboxGamingBar
             finally
             {
                 if (pendingControl != null) pendingControl.IsEnabled = true;
+                if (field == "CPUState")
+                {
+                    if (MinCPUStateComboBox != null) MinCPUStateComboBox.IsEnabled = true;
+                    if (MaxCPUStateComboBox != null) MaxCPUStateComboBox.IsEnabled = true;
+                }
             }
         }
 
@@ -185,6 +205,21 @@ namespace XboxGamingBar
                     cpuEPP.SuppressRemoteSync = true;
                     try { cpuEPP.ForceSetValue((int)values.GetNamedNumber(prefix + "CpuEpp")); }
                     finally { cpuEPP.SuppressRemoteSync = false; }
+                }
+                else if (field == "CPUState" && values.ContainsKey(prefix + "MinCpuState") && values.ContainsKey(prefix + "MaxCpuState"))
+                {
+                    minCPUState.SuppressRemoteSync = true;
+                    maxCPUState.SuppressRemoteSync = true;
+                    try
+                    {
+                        minCPUState.ForceSetValue((int)values.GetNamedNumber(prefix + "MinCpuState"));
+                        maxCPUState.ForceSetValue((int)values.GetNamedNumber(prefix + "MaxCpuState"));
+                    }
+                    finally
+                    {
+                        minCPUState.SuppressRemoteSync = false;
+                        maxCPUState.SuppressRemoteSync = false;
+                    }
                 }
             }
             catch (Exception ex)

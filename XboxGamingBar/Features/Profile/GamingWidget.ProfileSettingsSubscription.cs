@@ -192,6 +192,15 @@ namespace XboxGamingBar
                 _ = SendProfileFieldIntentAsync("CPUEPP", (int)(CPUEPPSlider?.Value ?? 80));
                 return;
             }
+            if (group == "CPUState")
+            {
+                _ = SendProfileFieldIntentAsync("CPUState", new[]
+                {
+                    GetSelectedCPUStateValue(MinCPUStateComboBox),
+                    GetSelectedCPUStateValue(MaxCPUStateComboBox)
+                });
+                return;
+            }
 
             // Legacy local cache path for groups not yet migrated to SetProfileField.
             SaveCurrentSettingsToProfile(currentProfileName);

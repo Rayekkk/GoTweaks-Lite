@@ -1524,14 +1524,14 @@ namespace XboxGamingBarHelper
                     && intent.ValueKind == System.Text.Json.JsonValueKind.String
                     && intent.GetString() == "SetProfileField")
                 {
-                    bool applied = ApplyProfileFieldIntent(cfg, out string reason);
+                    bool applied = ApplyProfileFieldIntent(cfg, out string reason, out Shared.Data.GameProfile confirmedProfile);
                     return new global::Windows.Foundation.Collections.ValueSet
                     {
                         { "Content", System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
                             {
                                 { "Outcome", applied ? "Applied" : "Rejected" },
                                 { "Reason", reason ?? "" },
-                                { "Snapshot", GetPowerSourceProfileValuesSnapshot() }
+                                { "Snapshot", GetPowerSourceProfileValuesSnapshot(confirmedProfile) }
                             }) }
                     };
                 }
@@ -1540,11 +1540,15 @@ namespace XboxGamingBarHelper
             return response;
         }
 
-        private static string GetPowerSourceProfileValuesSnapshot()
+        private static string GetPowerSourceProfileValuesSnapshot(Shared.Data.GameProfile? requestedProfile = null)
         {
-            var profile = profileManager?.CurrentProfile;
-            if (profile == null)
+            Shared.Data.GameProfile? profile = requestedProfile;
+            if (!profile.HasValue && profileManager != null)
+                profile = profileManager.CurrentProfile.Value;
+            if (!profile.HasValue)
                 return "{}";
+
+            var selected = profile.Value;
 
             int DcInt(int? value, int ac) => value ?? ac;
             bool DcBool(bool? value, bool ac) => value ?? ac;
@@ -1552,31 +1556,31 @@ namespace XboxGamingBarHelper
 
             var values = new Dictionary<string, object>
             {
-                { "IsGlobal", profile.IsGlobalProfile },
-                { "AcLegionPerformanceMode", profile.LegionPerformanceMode ?? 2 },
-                { "DcLegionPerformanceMode", DcInt(profile.LegionPerformanceMode_DC, profile.LegionPerformanceMode ?? 2) },
-                { "AcTdp", profile.TDP }, { "DcTdp", DcInt(profile.TDP_DC, profile.TDP) },
-                { "AcTdpFast", profile.TDPFast }, { "DcTdpFast", DcInt(profile.TDPFast_DC, profile.TDPFast) },
-                { "AcTdpPeak", profile.TDPPeak }, { "DcTdpPeak", DcInt(profile.TDPPeak_DC, profile.TDPPeak) },
-                { "AcCpuBoost", profile.CPUBoost }, { "DcCpuBoost", DcBool(profile.CPUBoost_DC, profile.CPUBoost) },
-                { "AcCpuEpp", profile.CPUEPP }, { "DcCpuEpp", DcInt(profile.CPUEPP_DC, profile.CPUEPP) },
-                { "AcMaxCpuState", profile.MaxCPUState }, { "DcMaxCpuState", DcInt(profile.MaxCPUState_DC, profile.MaxCPUState) },
-                { "AcMinCpuState", profile.MinCPUState }, { "DcMinCpuState", DcInt(profile.MinCPUState_DC, profile.MinCPUState) },
-                { "AcFpsLimit", profile.FPSLimit ?? 0 }, { "DcFpsLimit", DcInt(profile.FPSLimit_DC, profile.FPSLimit ?? 0) },
-                { "AcHdrEnabled", profile.HDREnabled ?? false }, { "DcHdrEnabled", DcBool(profile.HDREnabled_DC, profile.HDREnabled ?? false) },
-                { "AcResolution", profile.Resolution ?? "" }, { "DcResolution", DcString(profile.Resolution_DC, profile.Resolution) },
-                { "AcRefreshRate", profile.RefreshRate ?? 0 }, { "DcRefreshRate", DcInt(profile.RefreshRate_DC, profile.RefreshRate ?? 0) },
-                { "AcFluidMotionFrames", profile.FluidMotionFrames ?? false }, { "DcFluidMotionFrames", DcBool(profile.FluidMotionFrames_DC, profile.FluidMotionFrames ?? false) },
-                { "AcRadeonSuperResolution", profile.RadeonSuperResolution ?? false }, { "DcRadeonSuperResolution", DcBool(profile.RadeonSuperResolution_DC, profile.RadeonSuperResolution ?? false) },
-                { "AcRadeonSuperResolutionSharpness", profile.RadeonSuperResolutionSharpness ?? 80 }, { "DcRadeonSuperResolutionSharpness", DcInt(profile.RadeonSuperResolutionSharpness_DC, profile.RadeonSuperResolutionSharpness ?? 80) },
-                { "AcImageSharpening", profile.ImageSharpening ?? false }, { "DcImageSharpening", DcBool(profile.ImageSharpening_DC, profile.ImageSharpening ?? false) },
-                { "AcImageSharpeningSharpness", profile.ImageSharpeningSharpness ?? 80 }, { "DcImageSharpeningSharpness", DcInt(profile.ImageSharpeningSharpness_DC, profile.ImageSharpeningSharpness ?? 80) },
-                { "AcRadeonAntiLag", profile.RadeonAntiLag ?? false }, { "DcRadeonAntiLag", DcBool(profile.RadeonAntiLag_DC, profile.RadeonAntiLag ?? false) },
-                { "AcRadeonBoost", profile.RadeonBoost ?? false }, { "DcRadeonBoost", DcBool(profile.RadeonBoost_DC, profile.RadeonBoost ?? false) },
-                { "AcRadeonBoostResolution", profile.RadeonBoostResolution ?? 0 }, { "DcRadeonBoostResolution", DcInt(profile.RadeonBoostResolution_DC, profile.RadeonBoostResolution ?? 0) },
-                { "AcRadeonChill", profile.RadeonChill ?? false }, { "DcRadeonChill", DcBool(profile.RadeonChill_DC, profile.RadeonChill ?? false) },
-                { "AcRadeonChillMinFPS", profile.RadeonChillMinFPS ?? 30 }, { "DcRadeonChillMinFPS", DcInt(profile.RadeonChillMinFPS_DC, profile.RadeonChillMinFPS ?? 30) },
-                { "AcRadeonChillMaxFPS", profile.RadeonChillMaxFPS ?? 60 }, { "DcRadeonChillMaxFPS", DcInt(profile.RadeonChillMaxFPS_DC, profile.RadeonChillMaxFPS ?? 60) }
+                { "IsGlobal", selected.IsGlobalProfile },
+                { "AcLegionPerformanceMode", selected.LegionPerformanceMode ?? 2 },
+                { "DcLegionPerformanceMode", DcInt(selected.LegionPerformanceMode_DC, selected.LegionPerformanceMode ?? 2) },
+                { "AcTdp", selected.TDP }, { "DcTdp", DcInt(selected.TDP_DC, selected.TDP) },
+                { "AcTdpFast", selected.TDPFast }, { "DcTdpFast", DcInt(selected.TDPFast_DC, selected.TDPFast) },
+                { "AcTdpPeak", selected.TDPPeak }, { "DcTdpPeak", DcInt(selected.TDPPeak_DC, selected.TDPPeak) },
+                { "AcCpuBoost", selected.CPUBoost }, { "DcCpuBoost", DcBool(selected.CPUBoost_DC, selected.CPUBoost) },
+                { "AcCpuEpp", selected.CPUEPP }, { "DcCpuEpp", DcInt(selected.CPUEPP_DC, selected.CPUEPP) },
+                { "AcMaxCpuState", selected.MaxCPUState }, { "DcMaxCpuState", DcInt(selected.MaxCPUState_DC, selected.MaxCPUState) },
+                { "AcMinCpuState", selected.MinCPUState }, { "DcMinCpuState", DcInt(selected.MinCPUState_DC, selected.MinCPUState) },
+                { "AcFpsLimit", selected.FPSLimit ?? 0 }, { "DcFpsLimit", DcInt(selected.FPSLimit_DC, selected.FPSLimit ?? 0) },
+                { "AcHdrEnabled", selected.HDREnabled ?? false }, { "DcHdrEnabled", DcBool(selected.HDREnabled_DC, selected.HDREnabled ?? false) },
+                { "AcResolution", selected.Resolution ?? "" }, { "DcResolution", DcString(selected.Resolution_DC, selected.Resolution) },
+                { "AcRefreshRate", selected.RefreshRate ?? 0 }, { "DcRefreshRate", DcInt(selected.RefreshRate_DC, selected.RefreshRate ?? 0) },
+                { "AcFluidMotionFrames", selected.FluidMotionFrames ?? false }, { "DcFluidMotionFrames", DcBool(selected.FluidMotionFrames_DC, selected.FluidMotionFrames ?? false) },
+                { "AcRadeonSuperResolution", selected.RadeonSuperResolution ?? false }, { "DcRadeonSuperResolution", DcBool(selected.RadeonSuperResolution_DC, selected.RadeonSuperResolution ?? false) },
+                { "AcRadeonSuperResolutionSharpness", selected.RadeonSuperResolutionSharpness ?? 80 }, { "DcRadeonSuperResolutionSharpness", DcInt(selected.RadeonSuperResolutionSharpness_DC, selected.RadeonSuperResolutionSharpness ?? 80) },
+                { "AcImageSharpening", selected.ImageSharpening ?? false }, { "DcImageSharpening", DcBool(selected.ImageSharpening_DC, selected.ImageSharpening ?? false) },
+                { "AcImageSharpeningSharpness", selected.ImageSharpeningSharpness ?? 80 }, { "DcImageSharpeningSharpness", DcInt(selected.ImageSharpeningSharpness_DC, selected.ImageSharpeningSharpness ?? 80) },
+                { "AcRadeonAntiLag", selected.RadeonAntiLag ?? false }, { "DcRadeonAntiLag", DcBool(selected.RadeonAntiLag_DC, selected.RadeonAntiLag ?? false) },
+                { "AcRadeonBoost", selected.RadeonBoost ?? false }, { "DcRadeonBoost", DcBool(selected.RadeonBoost_DC, selected.RadeonBoost ?? false) },
+                { "AcRadeonBoostResolution", selected.RadeonBoostResolution ?? 0 }, { "DcRadeonBoostResolution", DcInt(selected.RadeonBoostResolution_DC, selected.RadeonBoostResolution ?? 0) },
+                { "AcRadeonChill", selected.RadeonChill ?? false }, { "DcRadeonChill", DcBool(selected.RadeonChill_DC, selected.RadeonChill ?? false) },
+                { "AcRadeonChillMinFPS", selected.RadeonChillMinFPS ?? 30 }, { "DcRadeonChillMinFPS", DcInt(selected.RadeonChillMinFPS_DC, selected.RadeonChillMinFPS ?? 30) },
+                { "AcRadeonChillMaxFPS", selected.RadeonChillMaxFPS ?? 60 }, { "DcRadeonChillMaxFPS", DcInt(selected.RadeonChillMaxFPS_DC, selected.RadeonChillMaxFPS ?? 60) }
             };
 
             return System.Text.Json.JsonSerializer.Serialize(values);

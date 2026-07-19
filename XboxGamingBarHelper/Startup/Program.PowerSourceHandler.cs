@@ -77,7 +77,7 @@ namespace XboxGamingBarHelper
                     && intent.ValueKind == System.Text.Json.JsonValueKind.String
                     && intent.GetString() == "SetProfileField")
                 {
-                    ApplyProfileFieldIntent(cfg, out _);
+                    ApplyProfileFieldIntent(cfg, out _, out _);
                     return;
                 }
 
@@ -288,30 +288,24 @@ namespace XboxGamingBarHelper
             }
         }
 
-        private static bool ApplyProfileFieldIntent(Dictionary<string, System.Text.Json.JsonElement> cfg, out string reason)
+        private static bool ApplyProfileFieldIntent(Dictionary<string, System.Text.Json.JsonElement> cfg, out string reason, out Shared.Data.GameProfile confirmedProfile)
         {
             reason = null;
+            confirmedProfile = default;
             string field = cfg.TryGetValue("Field", out var fieldElement) ? fieldElement.GetString() : null;
             string scope = cfg.TryGetValue("Scope", out var scopeElement) ? scopeElement.GetString() : null;
             string power = cfg.TryGetValue("Power", out var powerElement) ? powerElement.GetString() : null;
+            bool hasValue = cfg.TryGetValue("Value", out var value);
             if (string.IsNullOrEmpty(field) || (scope != "Global" && scope != "PerGame") || (power != "AC" && power != "DC")
-                || !cfg.TryGetValue("Value", out var value))
+                || (field != "CPUState" && !hasValue))
             {
                 reason = "missing or invalid Field, Power, or Value";
                 Logger.Warn("Rejected SetProfileField: " + reason);
                 return false;
             }
 
-            var profile = profileManager?.CurrentProfile;
-            if (profile == null)
+            if (!TryResolveProfileIntentTarget(scope, cfg, out var profile, out bool targetIsActive, out reason))
             {
-                reason = "profile manager not ready";
-                Logger.Warn($"Rejected SetProfileField({field}): {reason}");
-                return false;
-            }
-            if ((scope == "Global") != profile.IsGlobalProfile)
-            {
-                reason = "requested scope does not match helper's active profile";
                 Logger.Warn($"Rejected SetProfileField({field}): {reason}");
                 return false;
             }
@@ -340,6 +334,27 @@ namespace XboxGamingBarHelper
                 if (dc) profile.CPUBoost_DC = enabled;
                 else profile.CPUBoost = enabled;
             }
+            else if (field == "CPUState"
+                && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
+                && cfg.TryGetValue("MaxValue", out var maxElement) && maxElement.TryGetInt32(out int maxState))
+            {
+                if (minState < 5 || maxState > 100 || minState > maxState || minState % 5 != 0 || maxState % 5 != 0)
+                {
+                    reason = "CPU state must be 5-100% in 5% steps with Min <= Max";
+                    Logger.Warn($"Rejected SetProfileField(CPUState): min={minState}, max={maxState}");
+                    return false;
+                }
+                if (dc) { profile.MinCPUState_DC = minState; profile.MaxCPUState_DC = maxState; }
+                else { profile.MinCPUState = minState; profile.MaxCPUState = maxState; }
+
+                // Windows cannot boost above a max CPU state below 100%. Keep this invariant in
+                // the helper-owned profile rather than letting the widget derive and push it.
+                if (maxState < 100)
+                {
+                    if (dc) profile.CPUBoost_DC = false;
+                    else profile.CPUBoost = false;
+                }
+            }
             else
             {
                 reason = "unsupported field or value type";
@@ -351,7 +366,7 @@ namespace XboxGamingBarHelper
             // the helper's power-source handler applies it on the next real transition.
             // isApplyingProfile prevents the regular property handlers from treating this
             // helper-owned apply as a second user edit.
-            if (dc != IsCurrentlyOnAC)
+            if (targetIsActive && dc != IsCurrentlyOnAC)
             {
                 lock (profileApplicationLock)
                 {
@@ -370,7 +385,41 @@ namespace XboxGamingBarHelper
                 }
             }
 
+            confirmedProfile = profile;
             Logger.Info($"Applied SetProfileField intent: {field} ({power}) to {profile.GameId.Name}");
+            return true;
+        }
+
+        private static bool TryResolveProfileIntentTarget(string scope, Dictionary<string, System.Text.Json.JsonElement> cfg,
+            out Shared.Data.GameProfile profile, out bool targetIsActive, out string reason)
+        {
+            profile = default;
+            targetIsActive = false;
+            reason = null;
+            if (profileManager == null)
+            {
+                reason = "profile manager not ready";
+                return false;
+            }
+
+            if (scope == "Global")
+            {
+                profileManager.RefreshGlobalProfile();
+                profile = profileManager.GlobalProfile;
+            }
+            else
+            {
+                string targetName = cfg.TryGetValue("TargetGameName", out var nameElement) ? nameElement.GetString() : null;
+                string targetPath = cfg.TryGetValue("TargetGamePath", out var pathElement) ? pathElement.GetString() : null;
+                if (string.IsNullOrWhiteSpace(targetName) || string.IsNullOrWhiteSpace(targetPath)
+                    || !profileManager.TryGetProfile(new Shared.Data.GameId(targetName, targetPath), out profile))
+                {
+                    reason = "target per-game profile was not found";
+                    return false;
+                }
+            }
+
+            targetIsActive = profileManager.CurrentProfile != null && profileManager.CurrentProfile.Value.GameId == profile.GameId;
             return true;
         }
 

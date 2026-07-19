@@ -153,11 +153,10 @@ namespace XboxGamingBar
             // Ensure min doesn't exceed max
             if (minValue > maxValue)
             {
-                SetCPUStateComboBoxValue(MaxCPUStateComboBox, minValue);
+                isApplyingCPUStateFromHelper = true;
+                try { SetCPUStateComboBoxValue(MaxCPUStateComboBox, minValue); }
+                finally { isApplyingCPUStateFromHelper = false; }
             }
-
-            // Send to helper
-            minCPUState?.SetValue(minValue);
 
             Logger.Info($"Min CPU State changed to {minValue}%");
         }
@@ -180,11 +179,10 @@ namespace XboxGamingBar
             // Ensure max doesn't go below min
             if (maxValue < minValue)
             {
-                SetCPUStateComboBoxValue(MinCPUStateComboBox, maxValue);
+                isApplyingCPUStateFromHelper = true;
+                try { SetCPUStateComboBoxValue(MinCPUStateComboBox, maxValue); }
+                finally { isApplyingCPUStateFromHelper = false; }
             }
-
-            // Send to helper
-            maxCPUState?.SetValue(maxValue);
 
             // Update CPU Boost toggle enabled state
             UpdateCPUBoostEnabledState();
@@ -213,14 +211,9 @@ namespace XboxGamingBar
 
             CPUBoostToggle.IsEnabled = canBoost;
 
-            // If boost is now disabled and was on, turn it off and notify helper.
-            // Skipped during profile load so a transient/stale combo value can't stomp the profile.
-            if (allowAutoDisable && !canBoost && CPUBoostToggle.IsOn)
-            {
-                CPUBoostToggle.IsOn = false;
-                cpuBoost?.SetValue(false);
-                Logger.Info("CPU Boost disabled automatically - Max CPU State is below 100%");
-            }
+            // CPU Boost is helper-owned. A Max CPU State intent below 100% is validated as an
+            // atomic profile change by the helper, which clears Boost there and pushes the
+            // confirmed value back. The widget must not independently rewrite it.
         }
 
         /// <summary>
