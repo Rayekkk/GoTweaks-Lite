@@ -69,7 +69,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 Logger.Warn("AMDFluidMotionFrameSettingV1.SetAlgorithm: adlxSetting is null (AFMF 2.x not supported on this driver)");
                 return false;
             }
-            return adlxSetting.SetAlgorithm(value) == ADLX_RESULT.ADLX_OK;
+            var result = adlxSetting.SetAlgorithm(value);
+            if (result != ADLX_RESULT.ADLX_OK)
+                Logger.Error($"AMDFluidMotionFrameSettingV1.SetAlgorithm({value}) returned {result}.");
+            return result == ADLX_RESULT.ADLX_OK;
         }
 
         public ADLX_AFMF_SEARCH_MODE_TYPE GetSearchMode()
@@ -97,7 +100,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 Logger.Warn("AMDFluidMotionFrameSettingV1.SetSearchMode: adlxSetting is null");
                 return false;
             }
-            return adlxSetting.SetSearchMode(value) == ADLX_RESULT.ADLX_OK;
+            var result = adlxSetting.SetSearchMode(value);
+            if (result != ADLX_RESULT.ADLX_OK)
+                Logger.Error($"AMDFluidMotionFrameSettingV1.SetSearchMode({value}) returned {result}.");
+            return result == ADLX_RESULT.ADLX_OK;
         }
 
         public ADLX_AFMF_PERFORMANCE_MODE_TYPE GetPerformanceMode()
@@ -125,7 +131,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 Logger.Warn("AMDFluidMotionFrameSettingV1.SetPerformanceMode: adlxSetting is null");
                 return false;
             }
-            return adlxSetting.SetPerformanceMode(value) == ADLX_RESULT.ADLX_OK;
+            var result = adlxSetting.SetPerformanceMode(value);
+            if (result != ADLX_RESULT.ADLX_OK)
+                Logger.Error($"AMDFluidMotionFrameSettingV1.SetPerformanceMode({value}) returned {result}.");
+            return result == ADLX_RESULT.ADLX_OK;
         }
 
         public ADLX_AFMF_FAST_MOTION_RESP GetFastMotionResponse()
@@ -153,7 +162,10 @@ namespace XboxGamingBarHelper.AMD.Settings
                 Logger.Warn("AMDFluidMotionFrameSettingV1.SetFastMotionResponse: adlxSetting is null");
                 return false;
             }
-            return adlxSetting.SetFastMotionResponse(value) == ADLX_RESULT.ADLX_OK;
+            var result = adlxSetting.SetFastMotionResponse(value);
+            if (result != ADLX_RESULT.ADLX_OK)
+                Logger.Error($"AMDFluidMotionFrameSettingV1.SetFastMotionResponse({value}) returned {result}.");
+            return result == ADLX_RESULT.ADLX_OK;
         }
     }
 }
