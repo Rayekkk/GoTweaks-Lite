@@ -370,7 +370,7 @@ namespace XboxGamingBar
             return fallback;
         }
 
-        private void SetAutoSdrCurveStatus(string text)
+        internal void SetAutoSdrCurveStatus(string text)
         {
             if (AutoSdrCurveStatusText == null) return;
             AutoSdrCurveStatusText.Text = text;

@@ -223,6 +223,14 @@ namespace XboxGamingBarHelper.Systems
             return true;
         }
 
+        internal static bool TryNormalizeCurveJson(string json, out string normalized, out string error)
+        {
+            normalized = null;
+            if (!TryParseCurveJson(json, out var points, out error)) return false;
+            normalized = SerializeCurveJson(points);
+            return true;
+        }
+
         /// <summary>
         /// Enable/disable the feature. When turning on while HDR is already active, applies
         /// immediately and starts watching brightness; when turning off, stops watching.

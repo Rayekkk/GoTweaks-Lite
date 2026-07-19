@@ -51,7 +51,7 @@ namespace XboxGamingBar
             {
                 if (SettingFailureBanner == null || SettingFailureText == null) return;
                 string detail = string.IsNullOrWhiteSpace(reason) ? "The helper rejected the request." : reason;
-                SettingFailureText.Text = $"{function}: {detail}";
+                SettingFailureText.Text = function == Function.None ? detail : $"{function}: {detail}";
                 SettingFailureBanner.Visibility = Visibility.Visible;
 
                 if (settingFailureBannerTimer == null)

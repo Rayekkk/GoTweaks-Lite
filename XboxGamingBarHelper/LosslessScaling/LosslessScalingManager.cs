@@ -585,7 +585,7 @@ namespace XboxGamingBarHelper.LosslessScaling
         /// <summary>
         /// Brings Lossless Scaling window to the foreground.
         /// </summary>
-        public void BringToForeground()
+        public bool BringToForeground()
         {
             Process[] processes = null;
             try
@@ -594,7 +594,7 @@ namespace XboxGamingBarHelper.LosslessScaling
                 if (processes.Length == 0)
                 {
                     Logger.Warn("Cannot bring to foreground: Lossless Scaling is not running");
-                    return;
+                    return false;
                 }
 
                 var processIds = new HashSet<int>(processes.Select(p => p.Id));
@@ -626,14 +626,16 @@ namespace XboxGamingBarHelper.LosslessScaling
                     }
                     SetForegroundWindow(hWnd);
                     Logger.Info("Lossless Scaling brought to foreground");
-                    return;
+                    return true;
                 }
 
                 Logger.Warn("Could not find Lossless Scaling window handle");
+                return false;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error bringing Lossless Scaling to foreground: {ex.Message}");
+                return false;
             }
             finally
             {
@@ -1072,14 +1074,14 @@ namespace XboxGamingBarHelper.LosslessScaling
             return settings;
         }
 
-        private void WriteSettingsToProfile(string profileName)
+        private bool WriteSettingsToProfile(string profileName)
         {
             try
             {
                 if (!File.Exists(SETTINGS_PATH))
                 {
                     Logger.Warn("Settings.xml not found, cannot write settings");
-                    return;
+                    return false;
                 }
 
                 var doc = XDocument.Load(SETTINGS_PATH);
@@ -1089,7 +1091,7 @@ namespace XboxGamingBarHelper.LosslessScaling
                 if (profile == null)
                 {
                     Logger.Warn($"Profile '{profileName}' not found");
-                    return;
+                    return false;
                 }
 
                 // Update values from current properties
@@ -1126,28 +1128,30 @@ namespace XboxGamingBarHelper.LosslessScaling
 
                 doc.Save(SETTINGS_PATH);
                 Logger.Info($"Settings written to profile '{profileName}'");
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Failed to write Settings.xml: {ex.Message}");
+                return false;
             }
         }
 
-        private void CreateProfile(string gameName, string exePath)
+        private bool CreateProfile(string gameName, string exePath)
         {
             try
             {
                 if (!File.Exists(SETTINGS_PATH))
                 {
                     Logger.Warn("Settings.xml not found, cannot create profile");
-                    return;
+                    return false;
                 }
 
                 // Check if profile already exists
                 if (!string.IsNullOrEmpty(FindProfileByExePath(exePath)))
                 {
                     Logger.Warn($"Profile for '{exePath}' already exists");
-                    return;
+                    return false;
                 }
 
                 var doc = XDocument.Load(SETTINGS_PATH);
@@ -1158,7 +1162,7 @@ namespace XboxGamingBarHelper.LosslessScaling
                 if (profilesElement == null || defaultProfile == null)
                 {
                     Logger.Error("Cannot find GameProfiles or Default profile");
-                    return;
+                    return false;
                 }
 
                 // Clone Default profile
@@ -1184,10 +1188,12 @@ namespace XboxGamingBarHelper.LosslessScaling
                 // Update current profile
                 lock (stateLock) { currentProfileName = gameName; }
                 losslessScalingCurrentProfile.SetValue(gameName, DateTime.Now.Ticks);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Failed to create profile: {ex.Message}");
+                return false;
             }
         }
 
@@ -1235,6 +1241,79 @@ namespace XboxGamingBarHelper.LosslessScaling
             losslessScalingLS1Type.SetValue(settings.LS1Type, now);
             losslessScalingMaxFrameLatency.SetValue(settings.MaxFrameLatency, now);
             losslessScalingLS1Sharpness.SetValue(settings.LS1Sharpness, now);
+        }
+
+        /// <summary>
+        /// Executes an explicit widget action and returns null on success or a user-facing
+        /// error on failure. Actions are not represented as mutable boolean properties: one
+        /// request maps to exactly one helper-side execution and one correlated result.
+        /// </summary>
+        public async Task<string> ExecuteActionAsync(string action, string payload = null)
+        {
+            try
+            {
+                switch (action ?? string.Empty)
+                {
+                    case "Launch":
+                        if (!IsInstalled()) return "Lossless Scaling is not installed.";
+                        return await LaunchLosslessScalingAsync()
+                            ? null
+                            : "Lossless Scaling could not be launched.";
+
+                    case "BringToForeground":
+                        return BringToForeground()
+                            ? null
+                            : "Lossless Scaling is not running or its window could not be found.";
+
+                    case "SaveAndRestart":
+                    {
+                        string profileToWrite;
+                        lock (stateLock) { profileToWrite = currentProfileName; }
+                        if (!WriteSettingsToProfile(profileToWrite))
+                            return $"Lossless Scaling profile '{profileToWrite}' could not be saved.";
+
+                        var processes = Process.GetProcessesByName(PROCESS_NAME);
+                        foreach (var process in processes)
+                        {
+                            try
+                            {
+                                process.Kill();
+                                process.WaitForExit(5000);
+                            }
+                            finally
+                            {
+                                process.Dispose();
+                            }
+                        }
+                        await Task.Delay(1000);
+                        return await LaunchLosslessScalingAsync()
+                            ? null
+                            : "Settings were saved, but Lossless Scaling could not be restarted.";
+                    }
+
+                    case "CreateProfile":
+                    {
+                        var parts = (payload ?? string.Empty).Split(new[] { "<||>" }, StringSplitOptions.None);
+                        if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+                            return "A game name and executable/window filter are required.";
+                        return CreateProfile(parts[0], parts[1])
+                            ? null
+                            : "The Lossless Scaling profile could not be created (it may already exist).";
+                    }
+
+                    case "ResetProfile":
+                        UpdatePropertiesFromSettings(new LosslessScalingSettings());
+                        return null;
+
+                    default:
+                        return $"Unknown Lossless Scaling action: {action}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Lossless Scaling action '{action}' failed: {ex}");
+                return ex.Message;
+            }
         }
 
         #endregion

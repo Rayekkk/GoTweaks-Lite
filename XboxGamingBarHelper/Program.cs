@@ -1582,6 +1582,7 @@ namespace XboxGamingBarHelper
             systemManager.RefreshRate.PropertyChanged += RefreshRate_PropertyChanged;
             // [2.0 rebuild - Faza C2]
             amdManager.AMDFluidMotionFrameEnabled.PropertyChanged += AMDFluidMotionFrameEnabled_PropertyChanged;
+            losslessScalingManager.LosslessScalingFrameGenType.PropertyChanged += LosslessScalingFrameGenType_PropertyChanged;
             amdManager.AMDRadeonSuperResolutionEnabled.PropertyChanged += AMDRadeonSuperResolutionEnabled_PropertyChanged;
             amdManager.AMDRadeonSuperResolutionSharpness.PropertyChanged += AMDRadeonSuperResolutionSharpness_PropertyChanged;
             amdManager.AMDImageSharpeningEnabled.PropertyChanged += AMDImageSharpeningEnabled_PropertyChanged;

@@ -16,6 +16,21 @@ namespace XboxGamingBarHelper.Systems
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            if (!(newValue is string curveJson))
+            {
+                Logger.Warn("Auto SDR curve rejected before state update: not a string");
+                return false;
+            }
+            if (!AutoSdrManager.TryNormalizeCurveJson(curveJson, out string normalized, out string error))
+            {
+                Logger.Warn($"Auto SDR curve rejected before state update: {error}");
+                return false;
+            }
+            return base.SetValue(normalized, updatedTime);
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);

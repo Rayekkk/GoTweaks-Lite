@@ -1007,11 +1007,31 @@ namespace XboxGamingBarHelper
 
         private static void AMDFluidMotionFrameEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // AFMF and LS frame generation are mutually exclusive. The helper owns this
+            // decision so it is enforced even when the widget is suspended or a hotkey,
+            // profile, or another client changes AFMF.
+            if (amdManager.AMDFluidMotionFrameEnabled.Value
+                && !string.Equals(losslessScalingManager?.LosslessScalingFrameGenType?.Value, "Off", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Info("AFMF enabled - helper disabling Lossless Scaling frame generation.");
+                losslessScalingManager.LosslessScalingFrameGenType.SetValue("Off", DateTime.Now.Ticks);
+            }
+
             if (isApplyingProfile || IsInProfileSwitchCooldown()) return;
             bool isOnAC = IsCurrentlyOnAC;
             RouteProfileSave(ProfileSaveFlagsState.AMDFeatures, "FluidMotionFrames",
                 cur => { if (isOnAC) cur.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value; else cur.FluidMotionFrames_DC = amdManager.AMDFluidMotionFrameEnabled.Value; },
                 glo => { if (isOnAC) glo.FluidMotionFrames = amdManager.AMDFluidMotionFrameEnabled.Value; else glo.FluidMotionFrames_DC = amdManager.AMDFluidMotionFrameEnabled.Value; });
+        }
+
+        private static void LosslessScalingFrameGenType_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (!string.Equals(losslessScalingManager.LosslessScalingFrameGenType.Value, "Off", StringComparison.OrdinalIgnoreCase)
+                && amdManager.AMDFluidMotionFrameEnabled.Value)
+            {
+                Logger.Info("Lossless Scaling frame generation enabled - helper disabling AFMF.");
+                amdManager.AMDFluidMotionFrameEnabled.SetValue(false, DateTime.Now.Ticks);
+            }
         }
 
         private static void AMDRadeonSuperResolutionEnabled_PropertyChanged(object sender, PropertyChangedEventArgs e)

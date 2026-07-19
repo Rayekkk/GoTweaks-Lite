@@ -354,6 +354,46 @@ namespace XboxGamingBar
             }
         }
 
+        private async Task<bool> ExecuteLosslessScalingActionAsync(string action, string payload = null)
+        {
+            if (!App.IsConnected)
+            {
+                await ShowSettingApplyFailureAsync(Function.None, "Lossless Scaling: helper disconnected.");
+                return false;
+            }
+
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "ExecuteLosslessScalingAction", action }
+                };
+                if (!string.IsNullOrEmpty(payload)) request.Add("Payload", payload);
+
+                var response = await App.SendMessageAsync(request);
+                bool success = response != null
+                    && response.TryGetValue("Success", out object successValue)
+                    && successValue is bool applied
+                    && applied;
+                if (!success)
+                {
+                    string reason = response != null
+                        && response.TryGetValue("Error", out object errorValue)
+                        ? errorValue as string
+                        : null;
+                    await ShowSettingApplyFailureAsync(Function.None,
+                        $"Lossless Scaling: {reason ?? "the helper rejected the action."}");
+                }
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Lossless Scaling action '{action}' failed: {ex.Message}");
+                await ShowSettingApplyFailureAsync(Function.None, $"Lossless Scaling: {ex.Message}");
+                return false;
+            }
+        }
+
         private async void LaunchLosslessScalingButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -362,14 +402,7 @@ namespace XboxGamingBar
                 LaunchLosslessScalingButton.Content = "Launching...";
                 LaunchLosslessScalingButton.IsEnabled = false;
 
-                // Trigger launch via the helper service (which has permissions to launch exe directly)
-                // Reset to false first, then set to true to ensure the change is detected
-                losslessScalingLaunch.SetValue(false);
-                losslessScalingLaunch.SetValue(true);
-                Logger.Info("Sent launch request to helper");
-
-                // Wait a bit and update status
-                await Task.Delay(3000);
+                await ExecuteLosslessScalingActionAsync("Launch");
                 UpdateLosslessScalingStatus();
                 LaunchLosslessScalingButton.Content = "Launch";
                 LaunchLosslessScalingButton.IsEnabled = true;
@@ -382,15 +415,12 @@ namespace XboxGamingBar
             }
         }
 
-        private void ShowLosslessScalingWindowButton_Click(object sender, RoutedEventArgs e)
+        private async void ShowLosslessScalingWindowButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 Logger.Info("Show Lossless Scaling Window button clicked");
-                // Reset to false first, then set to true to ensure the change is detected
-                losslessScalingBringToForeground.SetValue(false);
-                losslessScalingBringToForeground.SetValue(true);
-                Logger.Info("Sent bring to foreground request to helper");
+                await ExecuteLosslessScalingActionAsync("BringToForeground");
             }
             catch (Exception ex)
             {
@@ -463,15 +493,11 @@ namespace XboxGamingBar
             }
         }
 
-        // Conflict resolution: Lossless Scaling Frame Gen vs AMD Fluid Motion Frames
-        private bool isHandlingConflict = false; // Prevents infinite loop
-
         private void LosslessScalingFrameGenTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
             {
                 string selectedType = LosslessScalingFrameGenTypeComboBox.SelectedItem as string ?? "Off";
-                bool isFrameGenEnabled = selectedType != "Off";
                 bool showLSFG3 = selectedType == "LSFG3";
                 bool showLSFG2 = selectedType == "LSFG2";
 
@@ -504,31 +530,7 @@ namespace XboxGamingBar
                     LosslessScalingFrameGenTypeComboBox.XYFocusDown = null;
                 }
 
-                // Handle conflict with AMD Fluid Motion Frames
-                if (isHandlingConflict) return;
-
-                if (isFrameGenEnabled && AMDFluidMotionFrameToggle.IsOn)
-                {
-                    Logger.Info("Lossless Scaling Frame Gen enabled - auto-disabling AMD Fluid Motion Frames");
-                    isHandlingConflict = true;
-                    AMDFluidMotionFrameToggle.IsOn = false;
-                    isHandlingConflict = false;
-
-                    // Show conflict warning
-                    if (LSConflictWarningBorder != null && LSConflictWarningText != null)
-                    {
-                        LSConflictWarningBorder.Visibility = Visibility.Visible;
-                        LSConflictWarningText.Text = "AMD Fluid Motion Frames has been automatically disabled because it conflicts with Lossless Scaling Frame Generation.";
-                    }
-                }
-                else if (!isFrameGenEnabled)
-                {
-                    // Hide warning when LS Frame Gen is disabled
-                    if (LSConflictWarningBorder != null)
-                    {
-                        LSConflictWarningBorder.Visibility = Visibility.Collapsed;
-                    }
-                }
+                UpdateLosslessScalingConflictWarning();
             }
             catch (Exception ex)
             {
@@ -699,38 +701,22 @@ namespace XboxGamingBar
         {
             try
             {
-                if (isHandlingConflict) return;
-
-                string selectedType = LosslessScalingFrameGenTypeComboBox.SelectedItem as string ?? "Off";
-                bool isLSFrameGenEnabled = selectedType != "Off";
-
-                if (AMDFluidMotionFrameToggle.IsOn && isLSFrameGenEnabled)
-                {
-                    Logger.Info("AMD Fluid Motion Frames enabled - auto-disabling Lossless Scaling Frame Gen");
-                    isHandlingConflict = true;
-                    LosslessScalingFrameGenTypeComboBox.SelectedIndex = 0; // Set to "Off"
-                    isHandlingConflict = false;
-
-                    // Show conflict warning
-                    if (LSConflictWarningBorder != null && LSConflictWarningText != null)
-                    {
-                        LSConflictWarningBorder.Visibility = Visibility.Visible;
-                        LSConflictWarningText.Text = "Lossless Scaling Frame Generation has been automatically disabled because it conflicts with AMD Fluid Motion Frames.";
-                    }
-                }
-                else if (!AMDFluidMotionFrameToggle.IsOn)
-                {
-                    // Hide warning if both are now off
-                    if (LSConflictWarningBorder != null && !isLSFrameGenEnabled)
-                    {
-                        LSConflictWarningBorder.Visibility = Visibility.Collapsed;
-                    }
-                }
+                UpdateLosslessScalingConflictWarning();
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error in AMDFluidMotionFrameToggle_Toggled: {ex.Message}");
             }
+        }
+
+        private void UpdateLosslessScalingConflictWarning()
+        {
+            if (LSConflictWarningBorder == null || LSConflictWarningText == null) return;
+            string selectedType = LosslessScalingFrameGenTypeComboBox?.SelectedItem as string ?? "Off";
+            bool conflictVisible = selectedType != "Off" && (AMDFluidMotionFrameToggle?.IsOn ?? false);
+            LSConflictWarningBorder.Visibility = conflictVisible ? Visibility.Visible : Visibility.Collapsed;
+            if (conflictVisible)
+                LSConflictWarningText.Text = "Resolving the conflict between Lossless Scaling Frame Generation and AMD Fluid Motion Frames...";
         }
 
         private void LosslessScalingCurrentProfile_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -755,7 +741,7 @@ namespace XboxGamingBar
             }
         }
 
-        private void LosslessScalingCreateProfileButton_Click(object sender, RoutedEventArgs e)
+        private async void LosslessScalingCreateProfileButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -763,8 +749,8 @@ namespace XboxGamingBar
                 {
                     // Format: "GameName<||>WindowFilter" - use game name as window title filter for Lossless Scaling profile matching
                     string profileData = $"{currentGameName}<||>{currentGameName}";
-                    losslessScalingCreateProfile.SetValue(profileData);
-                    Logger.Info($"Creating Lossless Scaling profile for: {currentGameName}");
+                    if (await ExecuteLosslessScalingActionAsync("CreateProfile", profileData))
+                        Logger.Info($"Created Lossless Scaling profile for: {currentGameName}");
                 }
                 else
                 {
@@ -777,17 +763,15 @@ namespace XboxGamingBar
             }
         }
 
-        private void LosslessScalingSaveSettingsButton_Click(object sender, RoutedEventArgs e)
+        private async void LosslessScalingSaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Trigger save and restart
-                losslessScalingSaveAndRestart.SetValue(true);
-                Logger.Info("Saving Lossless Scaling settings and restarting");
-
-                // Optimistic: the values just sent are exactly what's about to be written to
-                // Settings.xml, so they ARE the new baseline as of this click.
-                RecaptureLosslessScalingBaseline();
+                if (await ExecuteLosslessScalingActionAsync("SaveAndRestart"))
+                {
+                    Logger.Info("Saved Lossless Scaling settings and restarted");
+                    RecaptureLosslessScalingBaseline();
+                }
             }
             catch (Exception ex)
             {
@@ -803,7 +787,7 @@ namespace XboxGamingBar
         {
             try
             {
-                losslessScalingResetProfile.SetValue(true);
+                if (!await ExecuteLosslessScalingActionAsync("ResetProfile")) return;
                 Logger.Info("Reset Lossless Scaling profile to defaults");
 
                 // The helper pushes the new (default) values back via the normal per-property
@@ -813,7 +797,7 @@ namespace XboxGamingBar
                 // correctly re-enables Scale instead of leaving it stuck disabled - the helper
                 // only updates its in-memory state here, Settings.xml isn't touched until
                 // Apply-and-Restart.
-                await Task.Delay(400);
+                await Task.Delay(100);
                 RecomputeLosslessScalingDirtyState();
             }
             catch (Exception ex)

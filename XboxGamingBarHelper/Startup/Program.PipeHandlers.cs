@@ -68,6 +68,12 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                if (pipeMsg.Extra.TryGetValue("ExecuteLosslessScalingAction", out object losslessActionValue) && losslessActionValue is string)
+                {
+                    await HandleExecuteLosslessScalingAction(pipeMsg, (string)losslessActionValue);
+                    return;
+                }
+
                 // Handle keyboard shortcut request
                 if (pipeMsg.Extra.TryGetValue("SendKeyboardShortcut", out object shortcutValue) && shortcutValue is string)
                 {
@@ -334,6 +340,27 @@ namespace XboxGamingBarHelper
         // unchanged — the dispatcher applies the exact same match condition that
         // used to guard each block.
         // ====================================================================
+
+        private static async Task HandleExecuteLosslessScalingAction(Shared.IPC.PipeMessage pipeMsg, string action)
+        {
+            string payload = pipeMsg.Extra.TryGetValue("Payload", out object payloadValue)
+                ? payloadValue as string
+                : null;
+            string error = losslessScalingManager == null
+                ? "Lossless Scaling manager is not ready."
+                : await losslessScalingManager.ExecuteActionAsync(action, payload);
+
+            var response = new global::Windows.Foundation.Collections.ValueSet
+            {
+                { "Success", string.IsNullOrEmpty(error) }
+            };
+            if (!string.IsNullOrEmpty(error))
+                response.Add("Error", error);
+
+            var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+            responseMsg.RequestId = pipeMsg.RequestId;
+            SendPipeMessage(responseMsg);
+        }
 
         // SendKeyboardShortcut: inject a keyboard shortcut via InputInjector.
         private static void HandleSendKeyboardShortcut(Shared.IPC.PipeMessage pipeMsg)

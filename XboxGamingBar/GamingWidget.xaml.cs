@@ -649,10 +649,6 @@ namespace XboxGamingBar
         private readonly LosslessScalingSizeProperty losslessScalingSize;
         private readonly LosslessScalingAutoScaleProperty losslessScalingAutoScale;
         private readonly LosslessScalingAutoScaleDelayProperty losslessScalingAutoScaleDelay;
-        private readonly LosslessScalingSaveAndRestartProperty losslessScalingSaveAndRestart;
-        private readonly LosslessScalingCreateProfileProperty losslessScalingCreateProfile;
-        private readonly LosslessScalingBringToForegroundProperty losslessScalingBringToForeground;
-        private readonly LosslessScalingLaunchProperty losslessScalingLaunch;
 
         // Additional Settings.xml-backed LS properties (added 2026-05-01)
         private readonly LosslessScalingSyncModeProperty losslessScalingSyncMode;
@@ -663,7 +659,6 @@ namespace XboxGamingBar
         private readonly LosslessScalingResizeBeforeScalingProperty losslessScalingResizeBeforeScaling;
         private readonly LosslessScalingLS1TypeProperty losslessScalingLS1Type;
         private readonly LosslessScalingMaxFrameLatencyProperty losslessScalingMaxFrameLatency;
-        private readonly LosslessScalingResetProfileProperty losslessScalingResetProfile;
         private readonly LosslessScalingLS1SharpnessProperty losslessScalingLS1Sharpness;
 
         // Legion Go properties
@@ -1234,10 +1229,6 @@ namespace XboxGamingBar
             losslessScalingSize = new LosslessScalingSizeProperty(LosslessScalingSizeToggle, this);
             losslessScalingAutoScale = new LosslessScalingAutoScaleProperty(LosslessScalingAutoScaleToggle, this);
             losslessScalingAutoScaleDelay = new LosslessScalingAutoScaleDelayProperty(0, LosslessScalingAutoScaleDelaySlider, this);
-            losslessScalingSaveAndRestart = new LosslessScalingSaveAndRestartProperty();
-            losslessScalingCreateProfile = new LosslessScalingCreateProfileProperty();
-            losslessScalingBringToForeground = new LosslessScalingBringToForegroundProperty();
-            losslessScalingLaunch = new LosslessScalingLaunchProperty();
 
             // Additional Settings.xml-backed LS properties (added 2026-05-01)
             losslessScalingSyncMode = new LosslessScalingSyncModeProperty(LosslessScalingSyncModeComboBox, this);
@@ -1248,7 +1239,6 @@ namespace XboxGamingBar
             losslessScalingResizeBeforeScaling = new LosslessScalingResizeBeforeScalingProperty(LosslessScalingResizeBeforeToggle, this);
             losslessScalingLS1Type = new LosslessScalingLS1TypeProperty(LosslessScalingLS1TypeComboBox, this);
             losslessScalingMaxFrameLatency = new LosslessScalingMaxFrameLatencyProperty(1, LosslessScalingMaxFrameLatencySlider, this);
-            losslessScalingResetProfile = new LosslessScalingResetProfileProperty();
             losslessScalingLS1Sharpness = new LosslessScalingLS1SharpnessProperty(1, LosslessScalingLS1SharpnessSlider, this);
 
             // Legion Go properties
@@ -1603,8 +1593,6 @@ namespace XboxGamingBar
                 losslessScalingSize,
                 losslessScalingAutoScale,
                 losslessScalingAutoScaleDelay,
-                losslessScalingSaveAndRestart,
-                losslessScalingCreateProfile,
                 // Additional Settings.xml-backed LS properties (added 2026-05-01)
                 losslessScalingSyncMode,
                 losslessScalingCaptureApi,
@@ -1614,7 +1602,6 @@ namespace XboxGamingBar
                 losslessScalingResizeBeforeScaling,
                 losslessScalingLS1Type,
                 losslessScalingMaxFrameLatency,
-                losslessScalingResetProfile,
                 losslessScalingLS1Sharpness,
                 currentTdp,
                 legionGoDetected,

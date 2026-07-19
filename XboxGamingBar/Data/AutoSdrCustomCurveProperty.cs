@@ -1,4 +1,5 @@
 using Shared.Enums;
+using System;
 using System.Threading.Tasks;
 using Windows.UI.Core;
 
@@ -27,6 +28,19 @@ namespace XboxGamingBar.Data
         {
             Apply();
             return Task.CompletedTask;
+        }
+
+        protected override async Task OnSetRequestPendingChanged(bool pending)
+        {
+            if (owner != null)
+                await owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                    () => owner.SetAutoSdrCurveStatus(pending ? "Applying..." : string.Empty));
+        }
+
+        protected override async Task OnSetRequestFailed(string reason)
+        {
+            if (owner != null)
+                await owner.ShowSettingApplyFailureAsync(Function.AutoSdrCustomCurve, reason);
         }
 
         private void Apply()

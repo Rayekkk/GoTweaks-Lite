@@ -14,6 +14,20 @@ namespace XboxGamingBarHelper.Systems
         {
         }
 
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            int preset;
+            if (newValue is int intValue) preset = intValue;
+            else if (!int.TryParse(newValue?.ToString(), out preset)) return false;
+            if (preset != (int)AutoSdrManager.CurvePreset.LegionGo2
+                && preset != (int)AutoSdrManager.CurvePreset.Custom)
+            {
+                Logger.Warn($"Auto SDR preset rejected: {preset}");
+                return false;
+            }
+            return base.SetValue(preset, updatedTime);
+        }
+
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
