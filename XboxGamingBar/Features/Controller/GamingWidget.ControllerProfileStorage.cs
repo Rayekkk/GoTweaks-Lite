@@ -61,7 +61,7 @@ namespace XboxGamingBar
             }
             if (mouseCombo != null)
             {
-                mouseCombo.SelectionChanged += ControllerSettingChanged;
+                mouseCombo.SelectionChanged += (s, e) => SendButtonMappingForName(buttonName);
             }
             if (keyCombo != null)
             {
@@ -92,7 +92,7 @@ namespace XboxGamingBar
             // Update the profile and send command
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(typeCombo, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -297,7 +297,7 @@ namespace XboxGamingBar
 
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(null, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -341,7 +341,7 @@ namespace XboxGamingBar
             UpdateButtonGamepadComboControls(buttonName);
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(modeCombo, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -372,7 +372,7 @@ namespace XboxGamingBar
 
                 if (!isLoadingControllerProfile)
                 {
-                    ControllerSettingChanged(addCombo, null);
+                    SendButtonMappingForName(buttonName);
                 }
             }
 
@@ -394,7 +394,7 @@ namespace XboxGamingBar
             SetStoredButtonTurbo(buttonName, turboCheck.IsChecked == true);
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(turboCheck, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -407,7 +407,7 @@ namespace XboxGamingBar
 
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(null, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -559,7 +559,7 @@ namespace XboxGamingBar
                 // Trigger profile save and command send
                 if (!isLoadingControllerProfile)
                 {
-                    ControllerSettingChanged(keyCombo, null);
+                    SendButtonMappingForName(buttonName);
                 }
             }
 
@@ -632,7 +632,7 @@ namespace XboxGamingBar
             // Trigger profile save and command send
             if (!isLoadingControllerProfile)
             {
-                ControllerSettingChanged(null, null);
+                SendButtonMappingForName(buttonName);
             }
         }
 
@@ -1096,21 +1096,30 @@ namespace XboxGamingBar
                 || WidgetSliderProperty.HelperSyncCount > 0)
                 return;
 
-            // This is a transient payload for the direct user edit below, never a
-            // durable widget profile. Persistence and scope resolution happen in helper.
-            ControllerProfile profile = GetCurrentControllerProfileFromUI();
+            // Every regular controller control is already paired with its own WidgetProperty.
+            // Its direct value is the complete user intent; do not rebuild and resend an entire
+            // controller/lighting snapshot in reaction to an unrelated control event.
+        }
 
-            // Send button mappings to helper
-            SendButtonMappingsToHelper(profile);
-
-            // Send lighting settings to helper (so they get saved to helper's profile XML)
-            // Skip if only the power light changed - it's already sent directly by the property
-            // and resending all lighting would overwrite stick colors with UI color picker value
-            bool isPowerLightToggleOnly = sender == LegionPowerLightToggle;
-            if (!isPowerLightToggleOnly)
+        private void SendButtonMappingForName(string buttonName)
+        {
+            if (isLoadingControllerProfile || isUnloading || isApplyingHelperUpdate
+                || WidgetSliderProperty.HelperSyncCount > 0) return;
+            var profile = GetCurrentControllerProfileFromUI();
+            ButtonMapping mapping = null;
+            LegionButtonMappingProperty property = null;
+            switch (buttonName)
             {
-                SendLightingToHelper(profile);
+                case "Y1": mapping = profile.ButtonY1; property = legionButtonY1; break;
+                case "Y2": mapping = profile.ButtonY2; property = legionButtonY2; break;
+                case "Y3": mapping = profile.ButtonY3; property = legionButtonY3; break;
+                case "M1": mapping = profile.ButtonM1; property = legionButtonM1; break;
+                case "M2": mapping = profile.ButtonM2; property = legionButtonM2; break;
+                case "M3": mapping = profile.ButtonM3; property = legionButtonM3; break;
+                case "Desktop": mapping = profile.ButtonDesktop; property = legionButtonDesktop; break;
+                case "Page": mapping = profile.ButtonPage; property = legionButtonPage; break;
             }
+            if (mapping != null && property != null) property.SendMapping(mapping.ToJson());
         }
 
         /// <summary>

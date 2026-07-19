@@ -1355,8 +1355,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         {
             base.NotifyPropertyChanged(propertyName);
             Logger.Info($"LegionDesktopControls changed to {Value}");
-            // Note: Actual application happens through JoystickAsMouseMode and GamepadButtonMapping
-            // properties, so this property mainly serves as state tracking for the UI toggle
+            Manager?.ApplyDesktopControlsPreset(Value);
         }
     }
 

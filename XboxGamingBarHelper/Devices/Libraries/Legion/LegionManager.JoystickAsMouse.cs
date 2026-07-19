@@ -186,5 +186,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             }
         }
 
+        public void ApplyDesktopControlsPreset(bool enabled)
+        {
+            const string enabledMappings = "{\"DPadUp\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[82],\"MouseButton\":0},\"DPadDown\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[81],\"MouseButton\":0},\"DPadLeft\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[80],\"MouseButton\":0},\"DPadRight\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[79],\"MouseButton\":0},\"LSUp\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[82],\"MouseButton\":0},\"LSDown\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[81],\"MouseButton\":0},\"LSClick\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[227],\"MouseButton\":0},\"A\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[40],\"MouseButton\":0},\"B\":{\"Type\":1,\"GamepadAction\":0,\"KeyboardKeys\":[41],\"MouseButton\":0},\"LB\":{\"Type\":2,\"GamepadAction\":0,\"KeyboardKeys\":[],\"MouseButton\":0},\"LT\":{\"Type\":2,\"GamepadAction\":0,\"KeyboardKeys\":[],\"MouseButton\":1}}";
+            const string disabledMappings = "{\"DPadUp\":{\"Type\":0,\"GamepadAction\":0},\"DPadDown\":{\"Type\":0,\"GamepadAction\":0},\"DPadLeft\":{\"Type\":0,\"GamepadAction\":0},\"DPadRight\":{\"Type\":0,\"GamepadAction\":0},\"LSUp\":{\"Type\":0,\"GamepadAction\":0},\"LSDown\":{\"Type\":0,\"GamepadAction\":0},\"LSClick\":{\"Type\":0,\"GamepadAction\":0},\"A\":{\"Type\":0,\"GamepadAction\":0},\"B\":{\"Type\":0,\"GamepadAction\":0},\"LB\":{\"Type\":0,\"GamepadAction\":0},\"LT\":{\"Type\":0,\"GamepadAction\":0}}";
+
+            LegionJoystickAsMouseMode.SetValue(enabled ? 2 : 0);
+            LegionGamepadMapping.SetValue(enabled ? enabledMappings : disabledMappings);
+        }
+
     }
 }

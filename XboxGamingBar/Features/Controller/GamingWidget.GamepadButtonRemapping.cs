@@ -98,8 +98,9 @@ namespace XboxGamingBar
             // Build an ephemeral payload from the UI; helper owns persistence and scope.
             ControllerProfile currentProfile = GetCurrentControllerProfileFromUI();
 
-            // Send to helper
-            SendButtonMappingsToHelper(currentProfile);
+            // The remap dictionary is one functional field. Do not resend the eight unrelated
+            // Y1/Page mappings when a face-button or preset entry changes.
+            SendGamepadButtonMappingsToHelper(currentProfile);
         }
 
         private string GetGamepadActionName(int action)
