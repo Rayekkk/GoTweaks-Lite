@@ -43,33 +43,47 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        private void GPDFanCurveToggle_Toggled(object sender, RoutedEventArgs e)
+        private async void GPDFanCurveToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (GPDFanCurveToggle == null) return;
+            if (GPDFanCurveToggle == null || isApplyingGPDFanCurveHelperState) return;
 
             bool enabled = GPDFanCurveToggle.IsOn;
             Logger.Info($"GPD fan curve toggled: {enabled}");
 
-            // Send enabled state to helper
-            gpdFanCurveEnabled?.SetEnabled(enabled);
+            GPDFanCurveToggle.IsEnabled = false;
+            bool confirmed = gpdFanCurveEnabled != null
+                && await gpdFanCurveEnabled.RequestEnabledAsync(enabled);
+            if (!confirmed)
+                ApplyConfirmedGPDFanCurveEnabled(gpdFanCurveEnabled?.Value == true);
+            ShowGPDFanCurveRequestResult(confirmed);
+            GPDFanCurveToggle.IsEnabled = true;
+        }
 
-            // Toggle visibility of manual vs curve content
-            if (GPDManualFanContent != null)
-            {
-                GPDManualFanContent.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
-            }
-            if (GPDFanCurveContent != null)
-            {
-                GPDFanCurveContent.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            // Save enabled state
+        private void ApplyConfirmedGPDFanCurveEnabled(bool enabled)
+        {
+            isApplyingGPDFanCurveHelperState = true;
             try
             {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                settings.Values["GPDFanCurveEnabled"] = enabled;
+                if (GPDFanCurveToggle != null)
+                    GPDFanCurveToggle.IsOn = enabled;
+                if (GPDManualFanContent != null)
+                    GPDManualFanContent.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+                if (GPDFanCurveContent != null)
+                    GPDFanCurveContent.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+                if (GPDFanCurveStatusText != null)
+                    GPDFanCurveStatusText.Visibility = Visibility.Collapsed;
             }
-            catch { }
+            finally
+            {
+                isApplyingGPDFanCurveHelperState = false;
+            }
+        }
+
+        private void ShowGPDFanCurveRequestResult(bool confirmed)
+        {
+            if (GPDFanCurveStatusText == null) return;
+            GPDFanCurveStatusText.Text = confirmed ? "" : "The helper did not confirm the fan curve change.";
+            GPDFanCurveStatusText.Visibility = confirmed ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void GPDFanCurveExpandToggle_Click(object sender, RoutedEventArgs e)
@@ -122,8 +136,9 @@ namespace XboxGamingBar
 
             gpdFanCurveGraphInitialized = true;
 
-            // Load saved preset selection
-            LoadGPDFanCurvePresetSetting();
+            // Preset is only a presentation of the helper-confirmed curve, not separately
+            // persisted functional state.
+            UpdateGPDFanCurvePresetFromValues(currentGPDFanCurveValues);
 
             // Draw the graph
             DrawGPDGridLines();
@@ -241,6 +256,7 @@ namespace XboxGamingBar
             if (values == null || values.Length != 10) return;
 
             currentGPDFanCurveValues = values;
+            UpdateGPDFanCurvePresetFromValues(values);
             UpdateGPDFanCurveGraph();
         }
 
@@ -374,8 +390,6 @@ namespace XboxGamingBar
                     // Send to helper
                     gpdFanCurveGraph?.SetCurveValuesDebounced(currentGPDFanCurveValues);
 
-                    // Save preset selection
-                    SaveGPDFanCurvePresetSetting(presetName);
                 }
             }
         }
@@ -388,8 +402,28 @@ namespace XboxGamingBar
                 isGPDFanCurvePresetLoading = true;
                 GPDSelectPresetInComboBox("Custom");
                 isGPDFanCurvePresetLoading = false;
-                SaveGPDFanCurvePresetSetting("Custom");
             }
+        }
+
+        private void UpdateGPDFanCurvePresetFromValues(int[] values)
+        {
+            string matchingPreset = "Custom";
+            if (values != null)
+            {
+                foreach (var preset in GPDFanCurvePresets)
+                {
+                    if (values.SequenceEqual(preset.Value))
+                    {
+                        matchingPreset = preset.Key;
+                        break;
+                    }
+                }
+            }
+
+            currentGPDFanCurvePreset = matchingPreset;
+            isGPDFanCurvePresetLoading = true;
+            try { GPDSelectPresetInComboBox(matchingPreset); }
+            finally { isGPDFanCurvePresetLoading = false; }
         }
 
         private void GPDSelectPresetInComboBox(string presetName)
@@ -403,32 +437,6 @@ namespace XboxGamingBar
                     break;
                 }
             }
-        }
-
-        private void SaveGPDFanCurvePresetSetting(string presetName)
-        {
-            try
-            {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                settings.Values["GPDFanCurvePreset"] = presetName;
-            }
-            catch { }
-        }
-
-        private void LoadGPDFanCurvePresetSetting()
-        {
-            try
-            {
-                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                if (settings.Values.TryGetValue("GPDFanCurvePreset", out object saved) && saved is string presetName)
-                {
-                    currentGPDFanCurvePreset = presetName;
-                    isGPDFanCurvePresetLoading = true;
-                    GPDSelectPresetInComboBox(presetName);
-                    isGPDFanCurvePresetLoading = false;
-                }
-            }
-            catch { }
         }
 
     }

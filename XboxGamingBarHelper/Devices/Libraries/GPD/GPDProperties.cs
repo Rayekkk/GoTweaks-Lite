@@ -1,5 +1,6 @@
 using NLog;
 using Shared.Enums;
+using System;
 using XboxGamingBarHelper.Core;
 
 namespace XboxGamingBarHelper.Devices.Libraries.GPD
@@ -567,8 +568,8 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public GPDFanCurveEnabledProperty(GPDManager inManager)
-            : base(false, null, Function.GPDFanCurveEnabled, inManager)
+        public GPDFanCurveEnabledProperty(bool initialValue, GPDManager inManager)
+            : base(initialValue, null, Function.GPDFanCurveEnabled, inManager)
         {
             Logger.Debug("[GPDFan] GPDFanCurveEnabledProperty created");
         }
@@ -588,10 +589,36 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public GPDFanCurveDataProperty(GPDManager inManager)
-            : base("0,30,35,45,55,65,75,85,95,100", null, Function.GPDFanCurveData, inManager)
+        public GPDFanCurveDataProperty(string initialValue, GPDManager inManager)
+            : base(initialValue, null, Function.GPDFanCurveData, inManager)
         {
             Logger.Debug("[GPDFan] GPDFanCurveDataProperty created");
+        }
+
+        public override bool SetValue(object newValue, long updatedTime = 0)
+        {
+            if (!(newValue is string raw) || !TryNormalize(raw, out string normalized))
+            {
+                Logger.Warn($"[GPDFan] Rejected invalid fan curve data: {newValue}");
+                return false;
+            }
+
+            return base.SetValue(normalized, updatedTime);
+        }
+
+        private static bool TryNormalize(string raw, out string normalized)
+        {
+            normalized = null;
+            var parts = raw?.Split(',');
+            if (parts == null || parts.Length != 10) return false;
+            var values = new int[10];
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!int.TryParse(parts[i].Trim(), out int value)) return false;
+                values[i] = Math.Max(0, Math.Min(100, value));
+            }
+            normalized = string.Join(",", values);
+            return true;
         }
 
         protected override void NotifyPropertyChanged(string propertyName = "")

@@ -90,31 +90,10 @@ namespace XboxGamingBar
                 Logger.Info($"GPD fan control section visibility set to: {supported}");
             }
 
-            // Restore fan curve enabled state from LocalSettings
+            // The helper owns and persists the enabled state. Render the last confirmed value;
+            // never resurrect a stale widget LocalSettings value when the section becomes visible.
             if (supported)
-            {
-                try
-                {
-                    var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                    if (settings.Values.TryGetValue("GPDFanCurveEnabled", out object saved) && saved is bool enabled && enabled)
-                    {
-                        if (GPDFanCurveToggle != null)
-                        {
-                            GPDFanCurveToggle.Toggled -= GPDFanCurveToggle_Toggled;
-                            GPDFanCurveToggle.IsOn = true;
-                            GPDFanCurveToggle.Toggled += GPDFanCurveToggle_Toggled;
-                        }
-                        if (GPDManualFanContent != null)
-                            GPDManualFanContent.Visibility = Visibility.Collapsed;
-                        if (GPDFanCurveContent != null)
-                            GPDFanCurveContent.Visibility = Visibility.Visible;
-
-                        // Send enabled state to helper
-                        gpdFanCurveEnabled?.SetEnabled(true);
-                    }
-                }
-                catch { }
-            }
+                ApplyConfirmedGPDFanCurveEnabled(gpdFanCurveEnabled?.Value == true);
         }
 
         /// <summary>

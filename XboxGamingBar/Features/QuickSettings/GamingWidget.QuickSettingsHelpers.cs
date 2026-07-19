@@ -79,6 +79,7 @@ namespace XboxGamingBar
         };
         private string currentGPDFanCurvePreset = "Custom";
         private bool isGPDFanCurvePresetLoading = false;
+        private bool isApplyingGPDFanCurveHelperState = false;
 
         private void ToggleLegionFanFullSpeed()
         {

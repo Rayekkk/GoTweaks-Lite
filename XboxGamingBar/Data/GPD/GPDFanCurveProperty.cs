@@ -2,6 +2,8 @@ using Shared.Enums;
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using Windows.Foundation.Collections;
 using Windows.UI.Xaml.Controls;
 
 namespace XboxGamingBar.Data
@@ -15,7 +17,9 @@ namespace XboxGamingBar.Data
     {
         private readonly Page _owner;
         private Action<int[]> _graphUpdateCallback;
+        private Action<bool> _requestResultCallback;
         private Timer _debounceTimer;
+        private readonly SemaphoreSlim _requestGate = new SemaphoreSlim(1, 1);
         private string _pendingValue;
         private readonly object _debounceLock = new object();
         private const int DEBOUNCE_MS = 500;
@@ -40,6 +44,11 @@ namespace XboxGamingBar.Data
             _graphUpdateCallback = callback;
         }
 
+        public void SetRequestResultCallback(Action<bool> callback)
+        {
+            _requestResultCallback = callback;
+        }
+
         /// <summary>
         /// Converts the string value to an array of integers
         /// </summary>
@@ -59,11 +68,9 @@ namespace XboxGamingBar.Data
                 return;
             }
 
-            var newValue = FormatCurveData(values);
-
             lock (_debounceLock)
             {
-                _pendingValue = newValue;
+                _pendingValue = FormatCurveData(values);
 
                 if (_debounceTimer == null)
                 {
@@ -79,19 +86,18 @@ namespace XboxGamingBar.Data
         /// <summary>
         /// Sets curve values immediately without debouncing (for initialization/presets)
         /// </summary>
-        public void SetCurveValuesImmediate(int[] values)
+        public async Task<bool> SetCurveValuesImmediateAsync(int[] values)
         {
             if (values == null || values.Length != 10)
             {
                 Logger.Warn("Invalid GPD curve values array");
-                return;
+                return false;
             }
 
-            var newValue = FormatCurveData(values);
-            SetValue(newValue);
+            return await RequestAndSyncConfirmedValueAsync(FormatCurveData(values));
         }
 
-        private void DebounceCallback(object state)
+        private async void DebounceCallback(object state)
         {
             string valueToSend;
             lock (_debounceLock)
@@ -104,7 +110,59 @@ namespace XboxGamingBar.Data
             if (!string.IsNullOrEmpty(valueToSend))
             {
                 Logger.Info($"Sending debounced GPD fan curve: {valueToSend}");
-                SetValue(valueToSend);
+                bool confirmed = await RequestAndSyncConfirmedValueAsync(valueToSend);
+                if (!confirmed)
+                    Logger.Warn("GPD fan curve request was not confirmed by helper");
+                if (_requestResultCallback != null && _owner != null)
+                {
+                    await _owner.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                    {
+                        _requestResultCallback(confirmed);
+                    });
+                }
+            }
+        }
+
+        private async Task<bool> RequestAndSyncConfirmedValueAsync(string requestedValue)
+        {
+            if (!App.IsConnected) return false;
+            await _requestGate.WaitAsync();
+            try
+            {
+                var response = await App.SendMessageAsync(new ValueSet
+                {
+                    { nameof(Command), (int)Command.Set },
+                    { nameof(Function), (int)Function.GPDFanCurveData },
+                    { nameof(Content), requestedValue }
+                });
+                if (response == null || response.ContainsKey("Error")) return false;
+
+                response = await App.SendMessageAsync(new ValueSet
+                {
+                    { nameof(Command), (int)Command.Get },
+                    { nameof(Function), (int)Function.GPDFanCurveData }
+                });
+                if (response == null || !response.TryGetValue(nameof(Content), out object confirmed))
+                    return false;
+
+                long updatedTime = response.TryGetValue(nameof(UpdatedTime), out object rawTime)
+                    ? Convert.ToInt64(rawTime) : DateTime.Now.Ticks;
+                SuppressRemoteSync = true;
+                try
+                {
+                    bool synchronized = SetValue(confirmed, updatedTime);
+                    return synchronized && string.Equals(Value, requestedValue, StringComparison.Ordinal);
+                }
+                finally { SuppressRemoteSync = false; }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to confirm GPD fan curve: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                _requestGate.Release();
             }
         }
 
@@ -217,22 +275,64 @@ namespace XboxGamingBar.Data
     }
 
     /// <summary>
-    /// Toggle property for enabling/disabling the GPD software fan curve.
-    /// Persists enabled state to LocalSettings.
+    /// Toggle property for enabling/disabling the GPD software fan curve. Persistence and
+    /// ownership live in the helper; the callback only renders helper-confirmed state.
     /// </summary>
     internal class GPDFanCurveEnabledProperty : WidgetProperty<bool>
     {
-        private readonly Page _owner;
+        private Action<bool> _stateUpdateCallback;
 
-        public GPDFanCurveEnabledProperty(Page owner)
+        public GPDFanCurveEnabledProperty()
             : base(false, null, Function.GPDFanCurveEnabled)
         {
-            _owner = owner;
         }
 
-        public void SetEnabled(bool enabled)
+        public void SetStateUpdateCallback(Action<bool> callback)
         {
-            SetValue(enabled);
+            _stateUpdateCallback = callback;
+        }
+
+        public async Task<bool> RequestEnabledAsync(bool enabled)
+        {
+            if (!App.IsConnected) return false;
+            try
+            {
+                var response = await App.SendMessageAsync(new ValueSet
+                {
+                    { nameof(Command), (int)Command.Set },
+                    { nameof(Function), (int)Function.GPDFanCurveEnabled },
+                    { nameof(Content), enabled }
+                });
+                if (response == null || response.ContainsKey("Error")) return false;
+
+                response = await App.SendMessageAsync(new ValueSet
+                {
+                    { nameof(Command), (int)Command.Get },
+                    { nameof(Function), (int)Function.GPDFanCurveEnabled }
+                });
+                if (response == null || !response.TryGetValue(nameof(Content), out object confirmed))
+                    return false;
+
+                long updatedTime = response.TryGetValue(nameof(UpdatedTime), out object rawTime)
+                    ? Convert.ToInt64(rawTime) : DateTime.Now.Ticks;
+                SuppressRemoteSync = true;
+                try
+                {
+                    bool synchronized = SetValue(confirmed, updatedTime);
+                    return synchronized && Value == enabled;
+                }
+                finally { SuppressRemoteSync = false; }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to confirm GPD fan curve enabled state: {ex.Message}");
+                return false;
+            }
+        }
+
+        protected override void OnValueSyncedFromHelper()
+        {
+            _stateUpdateCallback?.Invoke(Value);
         }
     }
 }

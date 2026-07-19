@@ -220,9 +220,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
             FanRPM = new GPDFanRPMProperty(this);
             FanMode = new GPDFanModeProperty(this);
 
-            // Create software fan curve properties
-            FanCurveEnabled = new GPDFanCurveEnabledProperty(this);
-            FanCurveData = new GPDFanCurveDataProperty(this);
+            // Load helper-owned fan state before constructing the synced properties. Otherwise
+            // BatchGet exposes their hard-coded defaults even though the manager uses the saved
+            // values internally, leaving the widget and the active curve out of sync.
+            LoadFanCurveSettings();
+            FanCurveEnabled = new GPDFanCurveEnabledProperty(fanCurveEnabled, this);
+            FanCurveData = new GPDFanCurveDataProperty(string.Join(",", fanCurveValues), this);
             FanCurveVisibleProp = new GPDFanCurveVisibleProperty(this);
             CPUTemp = new GPDCPUTempProperty(this);
 
@@ -236,9 +239,6 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
             {
                 _win5Mappings[i] = defaults[i];
             }
-
-            // Load saved fan curve data from LocalSettings
-            LoadFanCurveSettings();
 
             if (isGPDDetected)
             {
@@ -699,10 +699,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.GPD
                     var parts = savedData?.Split(',');
                     if (parts != null && parts.Length == 10)
                     {
+                        var loadedValues = new int[10];
                         for (int i = 0; i < 10; i++)
                         {
-                            fanCurveValues[i] = Math.Max(0, Math.Min(100, int.Parse(parts[i].Trim())));
+                            if (!int.TryParse(parts[i].Trim(), out int value))
+                                throw new FormatException($"Invalid fan curve value at index {i}");
+                            loadedValues[i] = Math.Max(0, Math.Min(100, value));
                         }
+                        fanCurveValues = loadedValues;
                         Logger.Info($"[GPDFan] Loaded saved fan curve data: {savedData}");
                     }
                 }

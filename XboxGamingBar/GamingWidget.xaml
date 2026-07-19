@@ -8871,6 +8871,13 @@
                                                       Toggled="GPDFanCurveToggle_Toggled"
                                                       XYFocusUp="{x:Bind GPDNavItem}"/>
                                     </Grid>
+                                    <TextBlock x:Name="GPDFanCurveStatusText"
+                                               Margin="0,6,0,0"
+                                               Text=""
+                                               FontSize="12"
+                                               Foreground="#FFFF6464"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed"/>
 
                                     <!-- Manual Fan Controls (visible when curve OFF) -->
                                     <StackPanel x:Name="GPDManualFanContent">

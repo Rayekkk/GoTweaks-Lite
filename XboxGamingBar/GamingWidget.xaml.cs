@@ -1406,10 +1406,12 @@ namespace XboxGamingBar
             controllerEmulationStickConversion = new ControllerEmulationStickConversionProperty(StickConversionComboBox, this);
             gpdFanCurveGraph = new GPDFanCurveGraphProperty(this);
             gpdFanCurveGraph.SetGraphUpdateCallback(OnGPDFanCurveUpdated);
+            gpdFanCurveGraph.SetRequestResultCallback(ShowGPDFanCurveRequestResult);
             gpdCPUTemp = new GPDCPUTempProperty(this);
             gpdCPUTemp.SetTempUpdateCallback(OnGPDCPUTempUpdated);
             gpdFanCurveVisible = new GPDFanCurveVisibleProperty();
-            gpdFanCurveEnabled = new GPDFanCurveEnabledProperty(this);
+            gpdFanCurveEnabled = new GPDFanCurveEnabledProperty();
+            gpdFanCurveEnabled.SetStateUpdateCallback(ApplyConfirmedGPDFanCurveEnabled);
 
             // Settings properties
             tdpMethod = new TdpMethodProperty(TdpMethodComboBox, this);
