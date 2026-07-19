@@ -378,7 +378,7 @@ namespace XboxGamingBarHelper
         /// <summary>
         /// Toggles OSD visibility by cycling through OSD levels (0=Off, 1, 2, 3)
         /// </summary>
-        private static void ToggleOSD()
+        private static async void ToggleOSD()
         {
             try
             {
@@ -388,12 +388,25 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
-                // Cycle through levels: 0 -> 1 -> 2 -> 3 -> 0
-                int currentLevel = onScreenDisplay.Value;
-                int newLevel = (currentLevel + 1) % 4;  // 0, 1, 2, 3, then back to 0
-
-                onScreenDisplay.SetValue(newLevel);
-                Logger.Info($"ToggleOSD: OSD level changed from {currentLevel} to {newLevel}");
+                if (GetSavedOSDProvider() == 1 && amdManager != null)
+                {
+                    int currentLevel = amdManager.GetAMDOverlayLevel();
+                    if (currentLevel < 0)
+                        throw new InvalidOperationException("AMD overlay state is unavailable");
+                    int newLevel = (currentLevel + 1) % 5;
+                    int confirmed = await amdManager.ApplyAMDOverlayLevelAsync(newLevel);
+                    if (confirmed != newLevel)
+                        throw new InvalidOperationException($"AMD overlay confirmed {confirmed}, expected {newLevel}");
+                    onScreenDisplay.ForceSetValue(confirmed);
+                    Logger.Info($"ToggleOSD: AMD level changed from {currentLevel} to {confirmed}");
+                }
+                else
+                {
+                    int currentLevel = Math.Min(onScreenDisplay.Value, 3);
+                    int newLevel = (currentLevel + 1) % 4;
+                    onScreenDisplay.SetValue(newLevel);
+                    Logger.Info($"ToggleOSD: RTSS level changed from {currentLevel} to {newLevel}");
+                }
             }
             catch (Exception ex)
             {

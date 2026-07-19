@@ -10,6 +10,7 @@ using XboxGamingBarHelper.OnScreenDisplay;
 using Windows.UI.Input.Preview.Injection;
 using Windows.System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace XboxGamingBarHelper.AMD
@@ -288,6 +289,7 @@ namespace XboxGamingBarHelper.AMD
         private InjectedInputKeyboardInfo[] changeAMDOverlayLevelKeyboardCombo;
         private List<Tuple<int, int>> amdOverlayLevelList;
         private Dictionary<int, int> amdOverlayLevelMap;
+        private readonly SemaphoreSlim amdOverlayApplyGate = new SemaphoreSlim(1, 1);
 
         private long lastUpdate;
 
@@ -1190,23 +1192,59 @@ namespace XboxGamingBarHelper.AMD
 
             if (IsInUsed)
             {
-                SetAMDValues();
+                ApplyAMDOverlayLevelInBackground(onScreenDisplayLevel);
             }
         }
 
         public override void SetLevel(int level)
         {
             base.SetLevel(level);
-
-            // SetAMDValues();
+            ApplyAMDOverlayLevelInBackground(level);
         }
 
-        private async void SetAMDValues()
+        private async void ApplyAMDOverlayLevelInBackground(int level)
         {
             try
             {
-                var (currentlyOn, currentLevel) = ReadCurrentMetricsProfile();
-                if (onScreenDisplayLevel == 0)
+                int confirmed = await ApplyAMDOverlayLevelAsync(level);
+                if (confirmed != level)
+                    Logger.Warn($"AMD overlay requested level {level}, confirmed {confirmed}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"AMD overlay background apply failed: {ex.Message}");
+            }
+        }
+
+        public int GetAMDOverlayLevel()
+        {
+            if (!TryReadCurrentMetricsProfile(out int currentlyOn, out int currentProfile))
+                return -1;
+            if (currentlyOn == 0)
+                return 0;
+
+            foreach (var level in amdOverlayLevelList)
+            {
+                if (level.Item2 == currentProfile)
+                    return level.Item1;
+            }
+            return -1;
+        }
+
+        public async Task<int> ApplyAMDOverlayLevelAsync(int targetLevel)
+        {
+            if (targetLevel < 0 || targetLevel > 4)
+                throw new ArgumentOutOfRangeException(nameof(targetLevel));
+
+            await amdOverlayApplyGate.WaitAsync();
+            try
+            {
+                if (inputInjector == null)
+                    throw new InvalidOperationException("AMD overlay input injector is unavailable");
+                if (!TryReadCurrentMetricsProfile(out int currentlyOn, out int currentProfile))
+                    throw new InvalidOperationException("AMD metrics overlay registry state is unavailable");
+
+                if (targetLevel == 0)
                 {
                     if (currentlyOn == 1)
                     {
@@ -1224,48 +1262,73 @@ namespace XboxGamingBarHelper.AMD
                     {
                         Logger.Info("Turning ON AMD On-Screen Display.");
                         inputInjector.InjectKeyboardInput(turnAMDOverlayOnOffKeyboardCombo);
-                        await Task.Delay(100);
+                        await Task.Delay(200);
+                        TryReadCurrentMetricsProfile(out currentlyOn, out currentProfile);
                     }
 
-                    var targetLevel = amdOverlayLevelMap[onScreenDisplayLevel];
-                    if (currentLevel != targetLevel)
+                    int targetProfile = amdOverlayLevelMap[targetLevel];
+                    if (currentProfile != targetProfile)
                     {
-                        var currentLevelIndex = 0;
-                        var targetLevelIndex = 0;
+                        int currentLevelIndex = -1;
+                        int targetLevelIndex = -1;
                         for (var i = 0; i < amdOverlayLevelList.Count; i++)
                         {
-                            if (amdOverlayLevelList[i].Item2 == currentLevel)
+                            if (amdOverlayLevelList[i].Item2 == currentProfile)
                             {
                                 currentLevelIndex = i;
                             }
-                            if (amdOverlayLevelList[i].Item2 == targetLevel)
+                            if (amdOverlayLevelList[i].Item2 == targetProfile)
                             {
                                 targetLevelIndex = i;
                             }
                         }
 
-                        var numberOfKeyPresses = Math.Abs(targetLevelIndex - currentLevelIndex);
-                        Logger.Info($"Current AMD On-Screen Display level is {currentLevel} at index {currentLevelIndex}, need to change to {targetLevel} at index {targetLevelIndex}, need to press {numberOfKeyPresses} times.");
+                        if (currentLevelIndex < 0 || targetLevelIndex < 0)
+                            throw new InvalidOperationException($"Unknown AMD metrics profile {currentProfile}");
+
+                        // Ctrl+Shift+X only cycles forward and wraps. Absolute distance is
+                        // wrong for transitions such as level 4 -> level 1 (one press, not three).
+                        int numberOfKeyPresses = (targetLevelIndex - currentLevelIndex + amdOverlayLevelList.Count)
+                                                       % amdOverlayLevelList.Count;
+                        Logger.Info($"AMD overlay profile {currentProfile} -> {targetProfile}; cycling {numberOfKeyPresses} time(s).");
                         for (var i = 0; i < numberOfKeyPresses; i++)
                         {
                             inputInjector.InjectKeyboardInput(changeAMDOverlayLevelKeyboardCombo);
-                            await Task.Delay(100);
+                            await Task.Delay(150);
                         }
                     }
                     else
                     {
-                        Logger.Info($"Current AMD On-Screen Display level is {currentLevel} already matches {targetLevel}.");
+                        Logger.Info($"AMD On-Screen Display already matches level {targetLevel}.");
                     }
                 }
+
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    await Task.Delay(150);
+                    int confirmed = GetAMDOverlayLevel();
+                    if (confirmed == targetLevel)
+                    {
+                        base.SetLevel(targetLevel);
+                        return confirmed;
+                    }
+                }
+
+                int finalLevel = GetAMDOverlayLevel();
+                if (finalLevel == targetLevel)
+                    base.SetLevel(targetLevel);
+                return finalLevel;
             }
-            catch (Exception ex)
+            finally
             {
-                Logger.Error($"Error in SetAMDValues: {ex.Message}");
+                amdOverlayApplyGate.Release();
             }
         }
 
-        private static Tuple<int, int> ReadCurrentMetricsProfile()
+        private static bool TryReadCurrentMetricsProfile(out int stateValue, out int profileValue)
         {
+            stateValue = 0;
+            profileValue = 0;
             try
             {
                 using (RegistryKey subKey = AMD_PERFORMANCE_KEY_ROOT.OpenSubKey(AMD_PERFORMANCE_KEY_PATH))
@@ -1277,10 +1340,10 @@ namespace XboxGamingBarHelper.AMD
                         if (stateObject != null)
                         {
                             Logger.Debug($"Value of '{AMD_PERFORMANCE_STATE_KEY_NAME}' at '{AMD_PERFORMANCE_KEY_PATH}': {stateObject} of type {stateObject.GetType().Name}");
-                            var stateValue = (int)stateObject;
+                            stateValue = Convert.ToInt32(stateObject);
                             if (stateValue == 0)
                             {
-                                return new Tuple<int, int>(0, 0);
+                                return true;
                             }
                             else
                             {
@@ -1288,32 +1351,32 @@ namespace XboxGamingBarHelper.AMD
                                 if (profileObject != null)
                                 {
                                     Logger.Debug($"Value of {AMD_PERFORMANCE_PROFILE_KEY_NAME} is {profileObject} of type {profileObject.GetType().Name}");
-                                    var profileValue = (int)profileObject;
-                                    return new Tuple<int, int>(stateValue, profileValue);
+                                    profileValue = Convert.ToInt32(profileObject);
+                                    return true;
                                 }
                                 else
                                 {
-                                    return new Tuple<int, int>(stateValue, 0);
+                                    return true;
                                 }
                             }
                         }
                         else
                         {
                             Logger.Warn($"Value '{AMD_PERFORMANCE_STATE_KEY_NAME}' not found in '{AMD_PERFORMANCE_KEY_PATH}'.");
-                            return new Tuple<int, int>(0, 0);
+                            return false;
                         }
                     }
                     else
                     {
                         Logger.Warn($"Registry key '{AMD_PERFORMANCE_KEY_PATH}' not found.");
-                        return new Tuple<int, int>(0, 0);
+                        return false;
                     }
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error($"An error occurred: {ex.Message}");
-                return new Tuple<int, int>(0, 0);
+                return false;
             }
         }
 

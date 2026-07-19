@@ -44,7 +44,7 @@ namespace XboxGamingBar
     public sealed partial class GamingWidget
     {
 
-        private void PerformanceOverlayComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void PerformanceOverlayComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PerformanceOverlayComboBox != null && PerformanceOverlaySlider != null)
             {
@@ -52,36 +52,14 @@ namespace XboxGamingBar
                 int index = PerformanceOverlayComboBox.SelectedIndex;
                 if (index >= 0)
                 {
-                    // [2.0 rebuild - code review fix] osdProvider==1 (AMD) branch must not run
-                    // during a programmatic/helper-driven ComboBox update - since slice 1 made OSD
-                    // level helper-authoritative, PerformanceOverlaySlider_ValueChanged now also
-                    // fires from a helper push (BatchGet on connect, a hotkey toggle, etc.), setting
-                    // isLoadingPerformanceOverlaySetting=true around the ComboBox.SelectedIndex
-                    // assignment that triggers this handler. Without this guard, that helper-pushed
-                    // RTSS-style numeric OSD level got misread as "the user wants to toggle the AMD
-                    // overlay", injecting a real Ctrl+Shift+O keystroke via SendAMDOverlayToggle()
-                    // on every connect/sync when the AMD provider is selected.
+                    // Helper-driven rendering must never be reinterpreted as a user intent.
+                    // The helper owns provider selection, absolute AMD level application and
+                    // confirmation against Radeon Software's registry state.
                     if (osdProvider == 1 && !isLoadingPerformanceOverlaySetting) // AMD
                     {
-                        // For AMD: index 0 = Off, index 1-3 maps to AMD levels
-                        if (index == 0 && amdOverlayLevel > 0)
-                        {
-                            // Turn off AMD overlay
-                            SendAMDOverlayToggle();
-                            amdOverlayLevel = 0;
-                            SaveAMDOverlayLevel();
-                            Logger.Info("AMD Overlay toggled OFF via ComboBox");
-                        }
-                        else if (index > 0 && amdOverlayLevel == 0)
-                        {
-                            // Turn on AMD overlay (starts at level 1)
-                            SendAMDOverlayToggle();
-                            amdOverlayLevel = 1;
-                            SaveAMDOverlayLevel();
-                            Logger.Info("AMD Overlay toggled ON via ComboBox");
-                        }
-                        // Note: We can't set specific AMD levels directly, only cycle
-                        UpdateQuickSettingsTileStates();
+                        PerformanceOverlayComboBox.IsEnabled = false;
+                        await SendAMDOverlayLevelIntentAsync(index);
+                        PerformanceOverlayComboBox.IsEnabled = true;
                     }
                     else if (osdProvider != 1) // RTSS
                     {
@@ -117,19 +95,6 @@ namespace XboxGamingBar
         private void SavePerformanceOverlaySetting()
         {
             // Intentionally does nothing: OSD level is persisted by the helper (slice 1).
-        }
-
-        private void SaveAMDOverlayLevel()
-        {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values["AMD_OverlayLevel"] = amdOverlayLevel;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving AMD overlay level: {ex.Message}");
-            }
         }
 
         private void PerformanceOverlaySlider_ValueChanged(object sender, Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)

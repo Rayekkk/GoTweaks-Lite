@@ -1272,6 +1272,7 @@ namespace XboxGamingBarHelper
 
             Logger.Info("Initialize properties.");
             onScreenDisplay = new OnScreenDisplayProperty(0, null, rtssManager);
+            InitializeOSDProviderFromSettings();
 
             // Build properties list
             var propertyList = new List<FunctionalProperty>

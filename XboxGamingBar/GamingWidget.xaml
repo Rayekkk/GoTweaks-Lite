@@ -1150,13 +1150,14 @@
                                         <ComboBoxItem Content="Basic" Tag="1"/>
                                         <ComboBoxItem Content="Detailed" Tag="2"/>
                                         <ComboBoxItem Content="Full" Tag="3"/>
+                                        <ComboBoxItem x:Name="PerformanceOverlayCustomItem" Content="Custom" Tag="4" Visibility="Collapsed"/>
                                     </ComboBox>
                                 </Grid>
 
                                 <!-- Hidden slider for property system compatibility -->
                                 <Slider x:Name="PerformanceOverlaySlider"
                                         Visibility="Collapsed"
-                                        Minimum="0" Maximum="3"
+                                        Minimum="0" Maximum="4"
                                         Value="0"
                                         ValueChanged="PerformanceOverlaySlider_ValueChanged"/>
                             </StackPanel>
@@ -3294,6 +3295,12 @@
                                             <ComboBoxItem Content="AMD" Tag="1"/>
                                         </ComboBox>
                                     </Grid>
+                                    <TextBlock x:Name="OSDProviderStatusText"
+                                               Visibility="Collapsed"
+                                               Foreground="#FF8A80"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10"/>
 
                                     <!-- RTSS-specific options (hidden when AMD provider is selected) -->
                                     <StackPanel x:Name="RTSSOptionsPanel">
@@ -3625,7 +3632,7 @@
                                         <TextBlock Text="AMD Adrenaline Overlay"
                                                    FontSize="13" FontWeight="SemiBold" Foreground="#B9C0CC"
                                                    Margin="0,0,0,8"/>
-                                        <TextBlock Text="The AMD overlay is controlled through Adrenaline software. Use Ctrl+Shift+O to toggle and Ctrl+Shift+X to cycle overlay levels."
+                                        <TextBlock Text="GoTweaks applies and verifies the selected AMD overlay level through Radeon Software."
                                                    Foreground="#B9C0CC"
                                                    FontSize="12"
                                                    TextWrapping="Wrap"/>

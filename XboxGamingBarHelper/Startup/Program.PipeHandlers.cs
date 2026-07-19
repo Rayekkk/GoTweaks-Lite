@@ -190,6 +190,24 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                if (pipeMsg.Extra.ContainsKey("GetOSDProviderState"))
+                {
+                    HandleGetOSDProviderState(pipeMsg);
+                    return;
+                }
+
+                if (pipeMsg.Extra.ContainsKey("SetOSDProvider"))
+                {
+                    await HandleSetOSDProvider(pipeMsg);
+                    return;
+                }
+
+                if (pipeMsg.Extra.ContainsKey("SetAMDOverlayLevel"))
+                {
+                    await HandleSetAMDOverlayLevel(pipeMsg);
+                    return;
+                }
+
                 // Persists the user's "Check for driver updates on start"
                 // preference on the helper side. Widget writes here whenever
                 // the checkbox flips; helper re-reads at next launch before
@@ -890,6 +908,135 @@ namespace XboxGamingBarHelper
                 var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
                 responseMsg.RequestId = pipeMsg.RequestId;
                 pipeServer.SendMessage(responseMsg.ToJson());
+            }
+        }
+
+        private static int GetSavedOSDProvider()
+        {
+            if (Settings.LocalSettingsHelper.TryGetValue<int>("OSDProvider", out var provider)
+                && (provider == 0 || provider == 1))
+                return provider;
+            return 0;
+        }
+
+        private static void InitializeOSDProviderFromSettings()
+        {
+            int provider = GetSavedOSDProvider();
+            if (provider == 1 && amdManager != null && onScreenDisplay != null)
+                onScreenDisplay.ChangeManager(amdManager);
+            else if (provider == 1)
+            {
+                Logger.Warn("Saved AMD OSD provider is unavailable; falling back to RTSS");
+                Settings.LocalSettingsHelper.SetValue("OSDProvider", 0);
+            }
+            else if (provider == 0 && onScreenDisplay?.Value > 3)
+            {
+                onScreenDisplay.ForceSetValue(0);
+            }
+        }
+
+        private static void SendOSDProviderState(int requestId, bool success, string error = null)
+        {
+            var response = new global::Windows.Foundation.Collections.ValueSet
+            {
+                { "Success", success },
+                { "OSDProvider", GetSavedOSDProvider() },
+                { "AMDOverlayLevel", amdManager?.GetAMDOverlayLevel() ?? -1 },
+                { "OSDLevel", onScreenDisplay?.Value ?? 0 },
+            };
+            if (!string.IsNullOrWhiteSpace(error)) response.Add("Error", error);
+            if (pipeServer != null && pipeServer.IsConnected)
+            {
+                var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+                responseMsg.RequestId = requestId;
+                pipeServer.SendMessage(responseMsg.ToJson());
+            }
+        }
+
+        private static void HandleGetOSDProviderState(Shared.IPC.PipeMessage pipeMsg)
+        {
+            bool amdStateAvailable = GetSavedOSDProvider() != 1
+                                     || (amdManager != null && amdManager.GetAMDOverlayLevel() >= 0);
+            SendOSDProviderState(
+                pipeMsg.RequestId,
+                amdStateAvailable,
+                amdStateAvailable ? null : "Radeon Software metrics state is unavailable");
+        }
+
+        private static async Task HandleSetOSDProvider(Shared.IPC.PipeMessage pipeMsg)
+        {
+            int previousProvider = GetSavedOSDProvider();
+            try
+            {
+                if (!pipeMsg.Extra.TryGetValue("SetOSDProvider", out var value)
+                    || !int.TryParse(value?.ToString(), out int provider)
+                    || (provider != 0 && provider != 1))
+                    throw new FormatException("OSD provider must be 0 (RTSS) or 1 (AMD)");
+
+                if (onScreenDisplay == null || rtssManager == null)
+                    throw new InvalidOperationException("OSD managers are not ready");
+                if (provider == 1 && amdManager == null)
+                    throw new InvalidOperationException("AMD manager is unavailable");
+
+                if (provider == 1)
+                {
+                    onScreenDisplay.ChangeManager(amdManager);
+                    int confirmed = await amdManager.ApplyAMDOverlayLevelAsync(onScreenDisplay.Value);
+                    if (confirmed != onScreenDisplay.Value)
+                        throw new InvalidOperationException($"AMD overlay confirmed level {confirmed}, expected {onScreenDisplay.Value}");
+                }
+                else
+                {
+                    if (amdManager != null)
+                    {
+                        int confirmed = await amdManager.ApplyAMDOverlayLevelAsync(0);
+                        if (confirmed != 0)
+                            throw new InvalidOperationException($"AMD overlay remained at level {confirmed}");
+                    }
+                    onScreenDisplay.ForceSetValue(0);
+                    onScreenDisplay.ChangeManager(rtssManager);
+                }
+
+                Settings.LocalSettingsHelper.SetValue("OSDProvider", provider);
+                SendOSDProviderState(pipeMsg.RequestId, true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Pipe: SetOSDProvider failed: {ex.Message}");
+                if (onScreenDisplay != null)
+                {
+                    if (previousProvider == 1 && amdManager != null)
+                        onScreenDisplay.ChangeManager(amdManager);
+                    else if (rtssManager != null)
+                        onScreenDisplay.ChangeManager(rtssManager);
+                }
+                SendOSDProviderState(pipeMsg.RequestId, false, ex.Message);
+            }
+        }
+
+        private static async Task HandleSetAMDOverlayLevel(Shared.IPC.PipeMessage pipeMsg)
+        {
+            try
+            {
+                if (GetSavedOSDProvider() != 1)
+                    throw new InvalidOperationException("AMD is not the selected OSD provider");
+                if (amdManager == null)
+                    throw new InvalidOperationException("AMD manager is unavailable");
+                if (!pipeMsg.Extra.TryGetValue("SetAMDOverlayLevel", out var value)
+                    || !int.TryParse(value?.ToString(), out int target)
+                    || target < 0 || target > 4)
+                    throw new FormatException("AMD overlay level must be in range 0..4");
+
+                int confirmed = await amdManager.ApplyAMDOverlayLevelAsync(target);
+                if (confirmed != target)
+                    throw new InvalidOperationException($"AMD overlay confirmed level {confirmed}, expected {target}");
+                onScreenDisplay.ForceSetValue(target);
+                SendOSDProviderState(pipeMsg.RequestId, true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Pipe: SetAMDOverlayLevel failed: {ex.Message}");
+                SendOSDProviderState(pipeMsg.RequestId, false, ex.Message);
             }
         }
 

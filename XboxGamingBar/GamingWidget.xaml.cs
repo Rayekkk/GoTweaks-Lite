@@ -3170,6 +3170,7 @@ namespace XboxGamingBar
 
                 await RequestOSDConfigFromHelperAsync();
                 await RequestDisplayOSDConfigFromHelperAsync();
+                await SyncOSDProviderStateFromHelperAsync();
 
                 // Don't apply profile TDP mode to helper - the helper is the source of truth
                 // It already has the correct mode from its own profile (global.xml)

@@ -116,8 +116,8 @@ namespace XboxGamingBar
         private int osdTextSize = 100;    // Percentage: 50=Small, 100=Medium, 150=Large, 200=X-Large, 250=XX-Large, 300=XXX-Large
         private string osdTextColor = "DYNAMIC";  // DYNAMIC = value-based colors, or hex color code
         private string osdLabelColor = "DEFAULT";  // DEFAULT = use item-specific colors, or hex color code
-        private int osdProvider = 0;  // 0=RTSS, 1=AMD
-        private int amdOverlayLevel = 0;  // Track AMD overlay level: 0=Off, 1-4=Level 1-4 (can't query from AMD)
+        private int osdProvider = 0;  // Helper-confirmed display cache: 0=RTSS, 1=AMD
+        private int amdOverlayLevel = 0;  // Helper-confirmed Radeon registry state: 0=Off, 1-4
         private bool isOSDCustomizeExpanded = false;
         private bool isProfileDetectionExpanded = false;
         private bool isProfileSettingsExpanded = false;
@@ -189,7 +189,7 @@ namespace XboxGamingBar
             }
         }
 
-        private void OSDProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void OSDProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (isLoadingOSDConfig) return;
 
@@ -197,40 +197,9 @@ namespace XboxGamingBar
             {
                 if (int.TryParse(tagStr, out int provider))
                 {
-                    int previousProvider = osdProvider;
-                    osdProvider = provider;
-
-                    // Update UI visibility
-                    UpdateOSDProviderUI();
-
-                    // When switching providers, disable the other one
-                    if (provider == 0) // RTSS
-                    {
-                        // Disable AMD overlay if it was enabled (send Ctrl+Shift+O to toggle off)
-                        if (previousProvider == 1 && amdOverlayLevel > 0)
-                        {
-                            SendAMDOverlayToggle();
-                            amdOverlayLevel = 0;
-                            SaveAMDOverlayLevel();
-                        }
-                        // Enable RTSS OSD by sending config
-                        SendOSDConfigToHelper();
-                    }
-                    else if (provider == 1) // AMD
-                    {
-                        // Disable RTSS OSD by setting level to 0
-                        if (osd != null)
-                        {
-                            osd.SetValue(0);
-                        }
-                        // Don't auto-toggle AMD overlay - we can't know its actual state
-                        // User should manually enable via Quick Settings tile if needed
-                    }
-
-                    // Update Quick Settings tiles
-                    UpdateQuickSettingsTileStates();
-
-                    Logger.Info($"OSD Provider changed to: {(provider == 0 ? "RTSS" : "AMD")}");
+                    OSDProviderComboBox.IsEnabled = false;
+                    await SendOSDProviderIntentAsync(provider);
+                    OSDProviderComboBox.IsEnabled = true;
                 }
             }
         }
@@ -245,54 +214,121 @@ namespace XboxGamingBar
             {
                 AMDOptionsPanel.Visibility = osdProvider == 1 ? Visibility.Visible : Visibility.Collapsed;
             }
-        }
-
-        private async void SendAMDOverlayToggle()
-        {
-            // Send Ctrl+Shift+O to toggle AMD Adrenaline's metrics overlay on/off
-            // Use helper's InputInjector since UWP widget can't use SendInput directly
-            try
+            if (PerformanceOverlayCustomItem != null)
             {
-                if (App.IsConnected)
-                {
-                    var request = new Windows.Foundation.Collections.ValueSet();
-                    request.Add("SendKeyboardShortcut", "Ctrl+Shift+O");
-                    await App.SendMessageAsync(request);
-                    Logger.Info("Sent AMD overlay toggle hotkey (Ctrl+Shift+O) via helper");
-                }
-                else
-                {
-                    Logger.Warn("Cannot send AMD overlay toggle - not connected to helper");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error sending AMD overlay toggle: {ex.Message}");
+                PerformanceOverlayCustomItem.Visibility = osdProvider == 1 ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
-        private async void CycleAMDOverlayLevel()
+        private async Task SendOSDProviderIntentAsync(int provider)
         {
-            // Send Ctrl+Shift+X to cycle AMD Adrenaline's metrics overlay levels
-            // Use helper's InputInjector since UWP widget can't use SendInput directly
             try
             {
-                if (App.IsConnected)
+                if (!App.IsConnected) throw new InvalidOperationException("Helper is disconnected");
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    var request = new Windows.Foundation.Collections.ValueSet();
-                    request.Add("SendKeyboardShortcut", "Ctrl+Shift+X");
-                    await App.SendMessageAsync(request);
-                    Logger.Info("Sent AMD overlay cycle hotkey (Ctrl+Shift+X) via helper");
-                }
-                else
-                {
-                    Logger.Warn("Cannot cycle AMD overlay level - not connected to helper");
-                }
+                    { "SetOSDProvider", provider },
+                });
+                ApplyOSDProviderState(response);
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error cycling AMD overlay level: {ex.Message}");
+                Logger.Warn($"OSD provider request failed: {ex.Message}");
+                await SyncOSDProviderStateFromHelperAsync();
+                ShowOSDProviderFailure(ex.Message);
             }
+        }
+
+        private async Task SendAMDOverlayLevelIntentAsync(int level)
+        {
+            try
+            {
+                if (!App.IsConnected) throw new InvalidOperationException("Helper is disconnected");
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "SetAMDOverlayLevel", level },
+                });
+                ApplyOSDProviderState(response);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"AMD overlay level request failed: {ex.Message}");
+                await SyncOSDProviderStateFromHelperAsync();
+                ShowOSDProviderFailure(ex.Message);
+            }
+        }
+
+        private async Task SyncOSDProviderStateFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "GetOSDProviderState", true },
+                });
+                ApplyOSDProviderState(response);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"OSD provider state sync failed: {ex.Message}");
+            }
+        }
+
+        private void ApplyOSDProviderState(Windows.Foundation.Collections.ValueSet response)
+        {
+            if (response == null) return;
+            int confirmedOSDLevel = osd?.Value ?? 0;
+            bool success = response.TryGetValue("Success", out object successValue)
+                           && successValue is bool successFlag && successFlag;
+            string error = response.TryGetValue("Error", out object errorValue)
+                ? errorValue?.ToString()
+                : null;
+            if (response.TryGetValue("OSDProvider", out object providerValue)
+                && int.TryParse(providerValue?.ToString(), out int provider)
+                && (provider == 0 || provider == 1))
+                osdProvider = provider;
+            if (response.TryGetValue("AMDOverlayLevel", out object levelValue)
+                && int.TryParse(levelValue?.ToString(), out int level)
+                && level >= 0 && level <= 4)
+                amdOverlayLevel = level;
+            if (response.TryGetValue("OSDLevel", out object osdLevelValue)
+                && int.TryParse(osdLevelValue?.ToString(), out int parsedOSDLevel)
+                && parsedOSDLevel >= 0 && parsedOSDLevel <= 3)
+                confirmedOSDLevel = parsedOSDLevel;
+
+            isLoadingOSDConfig = true;
+            isLoadingPerformanceOverlaySetting = true;
+            try
+            {
+                UpdateOSDLayoutUI();
+                if (PerformanceOverlayComboBox != null)
+                {
+                    int visibleLevel = osdProvider == 1 ? amdOverlayLevel : confirmedOSDLevel;
+                    if (visibleLevel >= 0 && visibleLevel < PerformanceOverlayComboBox.Items.Count)
+                        PerformanceOverlayComboBox.SelectedIndex = visibleLevel;
+                }
+                UpdateQuickSettingsTileStates();
+                if (OSDProviderStatusText != null)
+                {
+                    OSDProviderStatusText.Text = success ? "" : (error ?? "The helper could not apply the requested OSD state.");
+                    OSDProviderStatusText.Visibility = success ? Visibility.Collapsed : Visibility.Visible;
+                }
+            }
+            finally
+            {
+                isLoadingPerformanceOverlaySetting = false;
+                isLoadingOSDConfig = false;
+            }
+        }
+
+        private void ShowOSDProviderFailure(string message)
+        {
+            if (OSDProviderStatusText == null) return;
+            OSDProviderStatusText.Text = string.IsNullOrWhiteSpace(message)
+                ? "The helper could not apply the requested OSD state."
+                : message;
+            OSDProviderStatusText.Visibility = Visibility.Visible;
         }
 
         private void LoadOSDOptionsForLevel(int level)
