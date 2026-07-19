@@ -875,6 +875,7 @@ namespace XboxGamingBar
         // Debounces SettingChanged for slider drags (CPU EPP, AMD sharpness/resolution/FPS
         // sliders) so a drag writes the profile once when it settles instead of on every tick.
         private DispatcherTimer settingsSaveDebounceTimer;
+        private object settingsSaveDebouncePendingSender;
         private const int SETTINGS_SAVE_DEBOUNCE_MS = 300;
 
         // Profile management

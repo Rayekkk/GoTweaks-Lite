@@ -409,11 +409,54 @@ namespace XboxGamingBar
                     lastTDPModeIndex = confirmedIndex;
                     UpdateTDPSliderEnabledState();
                 }
+                else if (IsAmdProfileField(field))
+                {
+                    ApplyConfirmedAmdProfileFields(values, prefix);
+                }
             }
             catch (Exception ex)
             {
                 Logger.Warn($"Failed to render confirmed {field} value: {ex.Message}");
             }
+        }
+
+        private static bool IsAmdProfileField(string field)
+        {
+            return field == "FluidMotionFrames" || field == "RadeonSuperResolution" || field == "RadeonSuperResolutionSharpness"
+                || field == "ImageSharpening" || field == "ImageSharpeningSharpness" || field == "RadeonAntiLag"
+                || field == "RadeonBoost" || field == "RadeonBoostResolution" || field == "RadeonChill"
+                || field == "RadeonChillMinFPS" || field == "RadeonChillMaxFPS";
+        }
+
+        private void ApplyConfirmedAmdProfileFields(Windows.Data.Json.JsonObject values, string prefix)
+        {
+            void Bool(string key, XboxGamingBar.Data.WidgetProperty<bool> property)
+            {
+                if (!values.ContainsKey(prefix + key)) return;
+                property.SuppressRemoteSync = true;
+                try { property.ForceSetValue(values.GetNamedBoolean(prefix + key)); }
+                finally { property.SuppressRemoteSync = false; }
+            }
+            void Int(string key, XboxGamingBar.Data.WidgetProperty<int> property)
+            {
+                if (!values.ContainsKey(prefix + key)) return;
+                property.SuppressRemoteSync = true;
+                try { property.ForceSetValue((int)values.GetNamedNumber(prefix + key)); }
+                finally { property.SuppressRemoteSync = false; }
+            }
+
+            Bool("FluidMotionFrames", amdFluidMotionFrameEnabled);
+            Bool("RadeonSuperResolution", amdRadeonSuperResolutionEnabled);
+            Int("RadeonSuperResolutionSharpness", amdRadeonSuperResolutionSharpness);
+            Bool("ImageSharpening", amdImageSharpeningEnabled);
+            Int("ImageSharpeningSharpness", amdImageSharpeningSharpness);
+            Bool("RadeonAntiLag", amdRadeonAntiLagEnabled);
+            Bool("RadeonBoost", amdRadeonBoostEnabled);
+            Int("RadeonBoostResolution", amdRadeonBoostResolution);
+            Bool("RadeonChill", amdRadeonChillEnabled);
+            Int("RadeonChillMinFPS", amdRadeonChillMinFPSProperty);
+            Int("RadeonChillMaxFPS", amdRadeonChillMaxFPSProperty);
+            UpdateAntiLagLockState();
         }
 
         /// <summary>

@@ -452,6 +452,16 @@ namespace XboxGamingBarHelper
                 if (dc) { profile.TDP_DC = slow; profile.TDPFast_DC = fast; profile.TDPPeak_DC = peak; }
                 else { profile.TDP = slow; profile.TDPFast = fast; profile.TDPPeak = peak; }
             }
+            else if (TryApplyAmdProfileField(field, value, dc, ref profile, out bool amdField, out reason))
+            {
+                // The helper has persisted the requested AMD field and any resulting
+                // mutual-exclusion correction. Hardware application below is authoritative.
+            }
+            else if (amdField)
+            {
+                Logger.Warn($"Rejected SetProfileField({field}): {reason}");
+                return false;
+            }
             else
             {
                 reason = "unsupported field or value type";
@@ -497,8 +507,114 @@ namespace XboxGamingBarHelper
                 }
             }
 
+            // AMD controls may be delayed, dropped, or rejected by ADLX. Reapply the
+            // helper-owned effective profile for an edit to the currently-active power side,
+            // then return the persisted snapshot as the widget's sole confirmed state.
+            if (targetIsActive && dc == IsCurrentlyOnAC && IsAmdProfileField(field))
+            {
+                lock (profileApplicationLock)
+                {
+                    if (!isApplyingProfile)
+                    {
+                        try { isApplyingProfile = true; ApplyAMDFeaturesFromProfile(profile, IsCurrentlyOnAC); }
+                        finally { isApplyingProfile = false; }
+                    }
+                }
+            }
+
             confirmedProfile = profile;
             Logger.Info($"Applied SetProfileField intent: {field} ({power}) to {profile.GameId.Name}");
+            return true;
+        }
+
+        private static bool IsAmdProfileField(string field)
+        {
+            switch (field)
+            {
+                case "FluidMotionFrames": case "RadeonSuperResolution": case "RadeonSuperResolutionSharpness":
+                case "ImageSharpening": case "ImageSharpeningSharpness": case "RadeonAntiLag":
+                case "RadeonBoost": case "RadeonBoostResolution": case "RadeonChill":
+                case "RadeonChillMinFPS": case "RadeonChillMaxFPS": return true;
+                default: return false;
+            }
+        }
+
+        private static bool TryApplyAmdProfileField(string field, System.Text.Json.JsonElement value, bool dc,
+            ref Shared.Data.GameProfile profile, out bool recognized, out string reason)
+        {
+            recognized = IsAmdProfileField(field);
+            reason = null;
+            if (!recognized) return false;
+            string validationReason = null;
+
+            bool IsBoolean(out bool result)
+            {
+                result = false;
+                if (value.ValueKind != System.Text.Json.JsonValueKind.True && value.ValueKind != System.Text.Json.JsonValueKind.False)
+                { validationReason = "AMD toggle requires a boolean value"; return false; }
+                result = value.GetBoolean(); return true;
+            }
+            bool IsInt(int minimum, int maximum, out int result)
+            {
+                result = 0;
+                if (!value.TryGetInt32(out result) || result < minimum || result > maximum)
+                { validationReason = $"AMD value must be between {minimum} and {maximum}"; return false; }
+                return true;
+            }
+
+            if (field == "FluidMotionFrames" && IsBoolean(out bool fmf))
+            {
+                if (dc) { profile.FluidMotionFrames_DC = fmf; if (fmf) profile.RadeonAntiLag_DC = true; }
+                else { profile.FluidMotionFrames = fmf; if (fmf) profile.RadeonAntiLag = true; }
+            }
+            else if (field == "RadeonSuperResolution" && IsBoolean(out bool rsr))
+            {
+                if (dc) { profile.RadeonSuperResolution_DC = rsr; if (rsr) profile.ImageSharpening_DC = false; }
+                else { profile.RadeonSuperResolution = rsr; if (rsr) profile.ImageSharpening = false; }
+            }
+            else if (field == "ImageSharpening" && IsBoolean(out bool ris))
+            {
+                if (dc) { profile.ImageSharpening_DC = ris; if (ris) profile.RadeonSuperResolution_DC = false; }
+                else { profile.ImageSharpening = ris; if (ris) profile.RadeonSuperResolution = false; }
+            }
+            else if (field == "RadeonAntiLag" && IsBoolean(out bool antiLag))
+            {
+                if (dc) { profile.RadeonAntiLag_DC = antiLag; if (antiLag) profile.RadeonChill_DC = false; }
+                else { profile.RadeonAntiLag = antiLag; if (antiLag) profile.RadeonChill = false; }
+            }
+            else if (field == "RadeonBoost" && IsBoolean(out bool boost))
+            {
+                if (dc) { profile.RadeonBoost_DC = boost; if (boost) profile.RadeonChill_DC = false; }
+                else { profile.RadeonBoost = boost; if (boost) profile.RadeonChill = false; }
+            }
+            else if (field == "RadeonChill" && IsBoolean(out bool chill))
+            {
+                if (dc) { profile.RadeonChill_DC = chill; if (chill) { profile.RadeonAntiLag_DC = false; profile.RadeonBoost_DC = false; } }
+                else { profile.RadeonChill = chill; if (chill) { profile.RadeonAntiLag = false; profile.RadeonBoost = false; } }
+            }
+            else if (field == "RadeonSuperResolutionSharpness" && IsInt(0, 100, out int rsrSharp)) { if (dc) profile.RadeonSuperResolutionSharpness_DC = rsrSharp; else profile.RadeonSuperResolutionSharpness = rsrSharp; }
+            else if (field == "ImageSharpeningSharpness" && IsInt(0, 100, out int risSharp)) { if (dc) profile.ImageSharpeningSharpness_DC = risSharp; else profile.ImageSharpeningSharpness = risSharp; }
+            else if (field == "RadeonBoostResolution" && IsInt(0, 1, out int boostResolution)) { if (dc) profile.RadeonBoostResolution_DC = boostResolution; else profile.RadeonBoostResolution = boostResolution; }
+            else if (field == "RadeonChillMinFPS" && IsInt(30, 300, out int chillMin)) { if (dc) profile.RadeonChillMinFPS_DC = chillMin; else profile.RadeonChillMinFPS = chillMin; }
+            else if (field == "RadeonChillMaxFPS" && IsInt(30, 300, out int chillMax)) { if (dc) profile.RadeonChillMaxFPS_DC = chillMax; else profile.RadeonChillMaxFPS = chillMax; }
+            else { reason = validationReason; return false; }
+
+            int min = dc ? (profile.RadeonChillMinFPS_DC ?? profile.RadeonChillMinFPS ?? 30) : (profile.RadeonChillMinFPS ?? 30);
+            int max = dc ? (profile.RadeonChillMaxFPS_DC ?? profile.RadeonChillMaxFPS ?? 60) : (profile.RadeonChillMaxFPS ?? 60);
+            // Keep the pair valid in the helper-owned profile. Moving either endpoint past
+            // the other moves its counterpart; the widget receives both effective values in
+            // the confirmation snapshot.
+            if (min > max)
+            {
+                if (field == "RadeonChillMinFPS")
+                {
+                    if (dc) profile.RadeonChillMaxFPS_DC = min; else profile.RadeonChillMaxFPS = min;
+                }
+                else
+                {
+                    if (dc) profile.RadeonChillMinFPS_DC = max; else profile.RadeonChillMinFPS = max;
+                }
+            }
             return true;
         }
 

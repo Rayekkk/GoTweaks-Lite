@@ -219,6 +219,11 @@ namespace XboxGamingBar
                     _ = SendProfileFieldIntentAsync("Resolution", selectedResolution);
                 return;
             }
+            if (TryGetAmdProfileFieldIntent(sender, out string amdField, out object amdValue))
+            {
+                _ = SendProfileFieldIntentAsync(amdField, amdValue);
+                return;
+            }
 
             // Legacy local cache path for groups not yet migrated to SetProfileField.
             SaveCurrentSettingsToProfile(currentProfileName);
@@ -240,6 +245,24 @@ namespace XboxGamingBar
                 sender == AMDRadeonChillToggle || sender == AMDRadeonChillMinFPSSlider || sender == AMDRadeonChillMaxFPSSlider)
                 return "AMD";
             return null;
+        }
+
+        private bool TryGetAmdProfileFieldIntent(object sender, out string field, out object value)
+        {
+            field = null;
+            value = null;
+            if (sender == AMDFluidMotionFrameToggle) { field = "FluidMotionFrames"; value = AMDFluidMotionFrameToggle.IsOn; }
+            else if (sender == AMDRadeonSuperResolutionToggle) { field = "RadeonSuperResolution"; value = AMDRadeonSuperResolutionToggle.IsOn; }
+            else if (sender == AMDRadeonSuperResolutionSharpnessSlider) { field = "RadeonSuperResolutionSharpness"; value = (int)AMDRadeonSuperResolutionSharpnessSlider.Value; }
+            else if (sender == AMDImageSharpeningToggle) { field = "ImageSharpening"; value = AMDImageSharpeningToggle.IsOn; }
+            else if (sender == AMDImageSharpeningSlider) { field = "ImageSharpeningSharpness"; value = (int)AMDImageSharpeningSlider.Value; }
+            else if (sender == AMDRadeonAntiLagToggle) { field = "RadeonAntiLag"; value = AMDRadeonAntiLagToggle.IsOn; }
+            else if (sender == AMDRadeonBoostToggle) { field = "RadeonBoost"; value = AMDRadeonBoostToggle.IsOn; }
+            else if (sender == AMDRadeonBoostResolutionComboBox && amdRadeonBoostResolution != null) { field = "RadeonBoostResolution"; value = amdRadeonBoostResolution.Value; }
+            else if (sender == AMDRadeonChillToggle) { field = "RadeonChill"; value = AMDRadeonChillToggle.IsOn; }
+            else if (sender == AMDRadeonChillMinFPSSlider) { field = "RadeonChillMinFPS"; value = (int)AMDRadeonChillMinFPSSlider.Value; }
+            else if (sender == AMDRadeonChillMaxFPSSlider) { field = "RadeonChillMaxFPS"; value = (int)AMDRadeonChillMaxFPSSlider.Value; }
+            return field != null;
         }
 
         /// <summary>
@@ -266,6 +289,7 @@ namespace XboxGamingBar
             }
 
             settingsSaveDebounceTimer.Stop();
+            settingsSaveDebouncePendingSender = sender;
             settingsSaveDebounceTimer.Start();
         }
 
@@ -273,7 +297,8 @@ namespace XboxGamingBar
         {
             settingsSaveDebounceTimer?.Stop();
             // Re-checks the same guards - state may have changed during the debounce wait.
-            SettingChanged(sender, e);
+            SettingChanged(settingsSaveDebouncePendingSender, e);
+            settingsSaveDebouncePendingSender = null;
         }
 
     }

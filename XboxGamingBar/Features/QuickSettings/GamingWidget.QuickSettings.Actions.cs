@@ -833,6 +833,12 @@ namespace XboxGamingBar
         /// </summary>
         private void AMDRadeonSuperResolutionToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (App.IsConnected)
+            {
+                // Mutual exclusion is resolved and confirmed by the helper profile intent.
+                SettingChanged(sender, e);
+                return;
+            }
             // RSR and RIS are mutually exclusive - enabling one disables the other
             if (AMDRadeonSuperResolutionToggle.IsOn && AMDImageSharpeningToggle.IsOn && !isLoadingProfile && !isSwitchingProfile && !isApplyingHelperUpdate)
             {
@@ -849,6 +855,11 @@ namespace XboxGamingBar
         /// </summary>
         private void AMDImageSharpeningToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (App.IsConnected)
+            {
+                SettingChanged(sender, e);
+                return;
+            }
             // RSR and RIS are mutually exclusive - enabling one disables the other
             if (AMDImageSharpeningToggle.IsOn && AMDRadeonSuperResolutionToggle.IsOn && !isLoadingProfile && !isSwitchingProfile && !isApplyingHelperUpdate)
             {
@@ -885,6 +896,11 @@ namespace XboxGamingBar
         /// </summary>
         private void AMDRadeonAntiLagToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (App.IsConnected)
+            {
+                SettingChanged(sender, e);
+                return;
+            }
             // Anti-Lag and Chill are mutually exclusive
             if (AMDRadeonAntiLagToggle.IsOn && AMDRadeonChillToggle.IsOn && !isLoadingProfile && !isSwitchingProfile && !isApplyingHelperUpdate)
             {
@@ -901,6 +917,11 @@ namespace XboxGamingBar
         /// </summary>
         private void AMDRadeonBoostToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (App.IsConnected)
+            {
+                SettingChanged(sender, e);
+                return;
+            }
             // Boost and Chill are mutually exclusive
             if (AMDRadeonBoostToggle.IsOn && AMDRadeonChillToggle.IsOn && !isLoadingProfile && !isSwitchingProfile && !isApplyingHelperUpdate)
             {
@@ -917,6 +938,11 @@ namespace XboxGamingBar
         /// </summary>
         private void AMDRadeonChillToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (App.IsConnected)
+            {
+                SettingChanged(sender, e);
+                return;
+            }
             // Chill is mutually exclusive with Anti-Lag and Boost
             if (AMDRadeonChillToggle.IsOn && !isLoadingProfile && !isSwitchingProfile && !isApplyingHelperUpdate)
             {
