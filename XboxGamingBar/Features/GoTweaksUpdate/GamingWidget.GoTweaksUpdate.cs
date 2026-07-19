@@ -9,12 +9,12 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        // Historical key name retained — meaning flipped from "Install on
-        // start" (auto-install the downloaded msixbundle) to "Check on
-        // start" (allow the helper's startup probe to run at all) so the
-        // stored preference carries over without a migration.
-        private const string GoTweaksCheckOnStartKey = "GoTweaksUpdate_UpdateOnStart";
+        // Banner visibility is purely presentational and remains widget-local.
         private const string GoTweaksHideBannerKey   = "GoTweaksUpdate_HideBanner";
+
+        // Helper-confirmed functional preferences. This widget copy is display cache only.
+        private bool _helperGoTweaksCheckOnStart = true;
+        private bool _helperDriverCheckOnStart = true;
 
         // Cached latest update payload so the banner can drive an install
         // without re-asking the helper (helper caches too, but this saves
@@ -23,23 +23,17 @@ namespace XboxGamingBar
         private string _goTweaksDownloadUrl;
         private string _goTweaksReleasePageUrl;
 
-        // Set while SyncUpdatePreferenceCheckboxesFromLocalSettings programmatically
+        // Set while SyncUpdatePreferenceCheckboxes programmatically
         // assigns IsChecked on the five update-preference checkboxes (GoTweaks +
         // Lenovo driver updates). Their Checked/Unchecked handlers early-return
-        // when this is true so the init-time restore doesn't write back to
-        // LocalSettings or pipe a redundant Set*OnStart message to the helper.
+        // so rendering confirmed state cannot emit a new user intent.
         private bool _isLoadingUpdatePreferenceCheckboxes;
 
         /// <summary>
-        /// Restores the five update-preference checkboxes (two GoTweaks self-update
-        /// + three Lenovo driver-update) from LocalSettings during widget init.
-        /// The push-driven sync paths (HandleGoTweaksUpdatePush, UpdateDriverUpdatesTile,
-        /// RenderDriverUpdateResult) only run when the helper actually delivers a
-        /// result, so without this call the XAML defaults win on every cold start
-        /// where no update is available — making toggles look unsaved even though
-        /// LocalSettings holds the correct value.
+        /// Renders helper-confirmed functional startup policy and widget-local
+        /// presentation preferences without firing user-intent handlers.
         /// </summary>
-        private void SyncUpdatePreferenceCheckboxesFromLocalSettings()
+        private void SyncUpdatePreferenceCheckboxes()
         {
             _isLoadingUpdatePreferenceCheckboxes = true;
             try
@@ -63,10 +57,7 @@ namespace XboxGamingBar
 
         private bool GoTweaksCheckOnStart
         {
-            // Default true: users who haven't opted out expect the banner
-            // to appear on launch when an update exists.
-            get => GetBoolSetting(GoTweaksCheckOnStartKey, true);
-            set => SetBoolSetting(GoTweaksCheckOnStartKey, value);
+            get => _helperGoTweaksCheckOnStart;
         }
         private bool GoTweaksHideBanner
         {
@@ -79,21 +70,58 @@ namespace XboxGamingBar
             if (_isLoadingUpdatePreferenceCheckboxes) return;
             if (GoTweaksUpdateOnStartCheckbox == null) return;
             bool on = GoTweaksUpdateOnStartCheckbox.IsOn;
-            GoTweaksCheckOnStart = on;
+            GoTweaksUpdateOnStartCheckbox.IsEnabled = false;
             // Forward to helper so its next startup honours the toggle. Mirrors
             // the DriverCheckOnStart path; helper persists it via
             // LocalSettingsHelper and reads synchronously before scheduling
             // its GitHub probe.
             try
             {
-                if (App.IsConnected)
-                {
-                    var req = new ValueSet();
-                    req.Add("SetGoTweaksCheckOnStart", on);
-                    await App.SendMessageAsync(req);
-                }
+                if (!App.IsConnected) throw new InvalidOperationException("Helper is disconnected");
+                var req = new ValueSet { { "SetGoTweaksCheckOnStart", on } };
+                var response = await App.SendMessageAsync(req);
+                if (!IsSuccessfulPipeAck(response))
+                    throw new InvalidOperationException("Helper rejected the preference");
             }
-            catch (Exception ex) { Logger.Warn($"SetGoTweaksCheckOnStart forward failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Warn($"SetGoTweaksCheckOnStart failed: {ex.Message}"); }
+            await SyncUpdateCheckPreferencesFromHelperAsync();
+            GoTweaksUpdateOnStartCheckbox.IsEnabled = true;
+        }
+
+        private static bool IsSuccessfulPipeAck(ValueSet response)
+        {
+            return response != null && response.TryGetValue("Success", out object value)
+                   && value is bool success && success;
+        }
+
+        private async Task SyncUpdateCheckPreferencesFromHelperAsync()
+        {
+            if (!App.IsConnected)
+            {
+                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncUpdatePreferenceCheckboxes);
+                return;
+            }
+
+            try
+            {
+                var response = await App.SendMessageAsync(new ValueSet
+                {
+                    { "GetUpdateCheckPreferences", true },
+                });
+                if (response == null)
+                    throw new InvalidOperationException("Helper returned no preference snapshot");
+
+                if (response.TryGetValue("DriverCheckOnStart", out object driverValue) && driverValue is bool driver)
+                    _helperDriverCheckOnStart = driver;
+                if (response.TryGetValue("GoTweaksCheckOnStart", out object appValue) && appValue is bool app)
+                    _helperGoTweaksCheckOnStart = app;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to sync helper update preferences: {ex.Message}");
+            }
+
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncUpdatePreferenceCheckboxes);
         }
 
         private void GoTweaksHideBannerCheckbox_Changed(object sender, RoutedEventArgs e)
@@ -131,13 +159,8 @@ namespace XboxGamingBar
                 _goTweaksReleasePageUrl = pageUrl;
 
                 bool hideBanner = GoTweaksHideBanner;
-                bool checkOnStart = GoTweaksCheckOnStart;
-
                 await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    if (GoTweaksUpdateOnStartCheckbox != null &&
-                        GoTweaksUpdateOnStartCheckbox.IsOn != checkOnStart)
-                        GoTweaksUpdateOnStartCheckbox.IsOn = checkOnStart;
                     if (GoTweaksHideBannerCheckbox != null &&
                         GoTweaksHideBannerCheckbox.IsOn != hideBanner)
                         GoTweaksHideBannerCheckbox.IsOn = hideBanner;

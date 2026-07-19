@@ -524,12 +524,7 @@ namespace XboxGamingBar
             };
 
         private const string DriverUpdatesShowUtilitiesKey = "DriverUpdates_ShowUtilities";
-        // Kept for back-compat — same storage key, new meaning: "CheckOnStart".
-        // Historically this was "UpdateOnStart" (auto-install). Changed after
-        // users asked for a way to skip the Lenovo check entirely — the name
-        // stays so existing LocalSettings values carry over. Default true so
-        // first-install users still see the banner after startup probe.
-        private const string DriverUpdatesUpdateOnStartKey = "DriverUpdates_UpdateOnStart";
+        // Banner/filter choices are presentation-only and remain widget-local.
         private const string DriverUpdatesHideBannerKey    = "DriverUpdates_HideBanner";
 
         private static bool GetBoolSetting(string key, bool defaultValue)
@@ -551,10 +546,7 @@ namespace XboxGamingBar
 
         private bool DriverUpdatesCheckOnStart
         {
-            // Default true: users who haven't explicitly opted out expect the
-            // helper's startup probe to populate the banner automatically.
-            get => GetBoolSetting(DriverUpdatesUpdateOnStartKey, true);
-            set => SetBoolSetting(DriverUpdatesUpdateOnStartKey, value);
+            get => _helperDriverCheckOnStart;
         }
         private bool DriverUpdatesHideBanner
         {
@@ -567,7 +559,7 @@ namespace XboxGamingBar
             if (_isLoadingUpdatePreferenceCheckboxes) return;
             if (DriverUpdatesUpdateOnStartCheckbox == null) return;
             bool on = DriverUpdatesUpdateOnStartCheckbox.IsChecked == true;
-            DriverUpdatesCheckOnStart = on;
+            DriverUpdatesUpdateOnStartCheckbox.IsEnabled = false;
             // Forward to helper so its next startup honours the toggle.
             // Helper persists via its own LocalSettingsHelper (separate store
             // from widget LocalSettings) and reads the value before running
@@ -575,14 +567,15 @@ namespace XboxGamingBar
             // the box is unchecked.
             try
             {
-                if (App.IsConnected)
-                {
-                    var req = new Windows.Foundation.Collections.ValueSet();
-                    req.Add("SetDriverCheckOnStart", on);
-                    await App.SendMessageAsync(req);
-                }
+                if (!App.IsConnected) throw new InvalidOperationException("Helper is disconnected");
+                var req = new Windows.Foundation.Collections.ValueSet { { "SetDriverCheckOnStart", on } };
+                var response = await App.SendMessageAsync(req);
+                if (!IsSuccessfulPipeAck(response))
+                    throw new InvalidOperationException("Helper rejected the preference");
             }
-            catch (Exception ex) { Logger.Warn($"SetDriverCheckOnStart forward failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Warn($"SetDriverCheckOnStart failed: {ex.Message}"); }
+            await SyncUpdateCheckPreferencesFromHelperAsync();
+            DriverUpdatesUpdateOnStartCheckbox.IsEnabled = true;
         }
 
         private void DriverUpdatesHideBannerCheckbox_Changed(object sender, Windows.UI.Xaml.RoutedEventArgs e)
@@ -630,8 +623,6 @@ namespace XboxGamingBar
             try
             {
                 bool hideBanner = DriverUpdatesHideBanner;
-                bool checkOnStart = DriverUpdatesCheckOnStart;
-
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                 {
                     if (QuickDriverUpdatesTile == null) return;
@@ -644,8 +635,6 @@ namespace XboxGamingBar
                     _isLoadingUpdatePreferenceCheckboxes = true;
                     try
                     {
-                        if (DriverUpdatesUpdateOnStartCheckbox != null && DriverUpdatesUpdateOnStartCheckbox.IsChecked != checkOnStart)
-                            DriverUpdatesUpdateOnStartCheckbox.IsChecked = checkOnStart;
                         if (DriverUpdatesHideBannerCheckbox != null && DriverUpdatesHideBannerCheckbox.IsChecked != hideBanner)
                             DriverUpdatesHideBannerCheckbox.IsChecked = hideBanner;
                     }

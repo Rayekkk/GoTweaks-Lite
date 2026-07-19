@@ -183,6 +183,13 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                // Return helper-owned functional startup policy.
+                if (pipeMsg.Extra.ContainsKey("GetUpdateCheckPreferences"))
+                {
+                    HandleGetUpdateCheckPreferences(pipeMsg);
+                    return;
+                }
+
                 // Persists the user's "Check for driver updates on start"
                 // preference on the helper side. Widget writes here whenever
                 // the checkbox flips; helper re-reads at next launch before
@@ -864,6 +871,28 @@ namespace XboxGamingBarHelper
             }
         }
 
+        private static void HandleGetUpdateCheckPreferences(Shared.IPC.PipeMessage pipeMsg)
+        {
+            bool driverCheckOnStart = true;
+            bool goTweaksCheckOnStart = true;
+            if (Settings.LocalSettingsHelper.TryGetValue<bool>("DriverCheckOnStart", out var persistedDriver))
+                driverCheckOnStart = persistedDriver;
+            if (Settings.LocalSettingsHelper.TryGetValue<bool>("GoTweaksCheckOnStart", out var persistedApp))
+                goTweaksCheckOnStart = persistedApp;
+
+            var response = new global::Windows.Foundation.Collections.ValueSet
+            {
+                { "DriverCheckOnStart", driverCheckOnStart },
+                { "GoTweaksCheckOnStart", goTweaksCheckOnStart },
+            };
+            if (pipeServer != null && pipeServer.IsConnected)
+            {
+                var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+                responseMsg.RequestId = pipeMsg.RequestId;
+                pipeServer.SendMessage(responseMsg.ToJson());
+            }
+        }
+
         // SetDriverCheckOnStart: persist the "check for driver updates on start" pref.
         private static void HandleSetDriverCheckOnStart(Shared.IPC.PipeMessage pipeMsg)
         {
@@ -873,16 +902,18 @@ namespace XboxGamingBarHelper
                 if (pipeMsg.Extra.TryGetValue("SetDriverCheckOnStart", out var v))
                 {
                     if (v is bool b) val = b;
-                    else if (v is string s) bool.TryParse(s, out val);
+                    else if (v is string s && bool.TryParse(s, out var parsed)) val = parsed;
+                    else throw new FormatException("SetDriverCheckOnStart must be boolean");
                 }
                 Settings.LocalSettingsHelper.SetValue("DriverCheckOnStart", val);
                 Logger.Info($"Pipe: SetDriverCheckOnStart = {val}");
+                SendPipeAck(pipeMsg.RequestId);
             }
             catch (Exception ex)
             {
                 Logger.Warn($"Pipe: SetDriverCheckOnStart threw: {ex.Message}");
+                SendPipeAck(pipeMsg.RequestId, false);
             }
-            SendPipeAck(pipeMsg.RequestId);
         }
 
         // SetGoTweaksCheckOnStart: persist the "check for app updates on start" pref.
@@ -894,16 +925,18 @@ namespace XboxGamingBarHelper
                 if (pipeMsg.Extra.TryGetValue("SetGoTweaksCheckOnStart", out var v))
                 {
                     if (v is bool b) val = b;
-                    else if (v is string s) bool.TryParse(s, out val);
+                    else if (v is string s && bool.TryParse(s, out var parsed)) val = parsed;
+                    else throw new FormatException("SetGoTweaksCheckOnStart must be boolean");
                 }
                 Settings.LocalSettingsHelper.SetValue("GoTweaksCheckOnStart", val);
                 Logger.Info($"Pipe: SetGoTweaksCheckOnStart = {val}");
+                SendPipeAck(pipeMsg.RequestId);
             }
             catch (Exception ex)
             {
                 Logger.Warn($"Pipe: SetGoTweaksCheckOnStart threw: {ex.Message}");
+                SendPipeAck(pipeMsg.RequestId, false);
             }
-            SendPipeAck(pipeMsg.RequestId);
         }
 
         // CheckGoTweaksUpdate: serve the cached self-update probe unless ForceRefresh.

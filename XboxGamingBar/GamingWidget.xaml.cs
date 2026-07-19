@@ -1106,12 +1106,9 @@ namespace XboxGamingBar
             xamlTimer.Stop();
             Logger.Info($"[TIMING] InitializeComponent: {xamlTimer.ElapsedMilliseconds}ms");
 
-            // Restore the GoTweaks self-update + Lenovo driver-update checkboxes from
-            // LocalSettings now, independent of any helper push. The push-driven sync
-            // paths only fire when the helper actually returns a result (update available,
-            // driver list parsed) — without this call, the XAML defaults stay visible on
-            // every cold start where no push arrives, making toggles look unsaved.
-            SyncUpdatePreferenceCheckboxesFromLocalSettings();
+            // Initialize helper-confirmed update policy with safe defaults and restore
+            // presentation-only banner/filter choices. Pipe sync replaces the defaults.
+            SyncUpdatePreferenceCheckboxes();
 
             // Register for lifecycle events
             this.Loaded += GamingWidget_Loaded;
@@ -3217,6 +3214,7 @@ namespace XboxGamingBar
                 await RequestScreenSaverEnabledFromHelperAsync();
                 await RequestStickGyroAdvancedSettingsFromHelperAsync();
                 await RequestProfileSaveFlagsFromHelperAsync();
+                await SyncUpdateCheckPreferencesFromHelperAsync();
                 // 2.0 invariant: never let the widget's persisted LocalSettings profiles
                 // seed the helper on connect.  The helper owns the durable profile and sends a
                 // snapshot back for this display/edit cache instead.
