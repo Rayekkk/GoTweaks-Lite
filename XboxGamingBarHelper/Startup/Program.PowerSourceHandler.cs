@@ -515,7 +515,7 @@ namespace XboxGamingBarHelper
                         try
                         {
                             isApplyingProfile = true;
-                            ApplyPowerSourceChangeInternal(IsCurrentlyOnAC);
+                            ApplyPowerSourceChangeInternal(IsCurrentlyOnAC, profile);
                         }
                         finally
                         {
@@ -657,7 +657,7 @@ namespace XboxGamingBarHelper
                 {
                     if (!isApplyingProfile)
                     {
-                        try { isApplyingProfile = true; ApplyPowerSourceChangeInternal(IsCurrentlyOnAC); }
+                        try { isApplyingProfile = true; ApplyPowerSourceChangeInternal(IsCurrentlyOnAC, profile); }
                         finally { isApplyingProfile = false; }
                     }
                 }
@@ -789,7 +789,17 @@ namespace XboxGamingBarHelper
             }
         }
 
-        private static void ApplyPowerSourceChangeInternal(bool isOnAC)
+        // freshProfile lets a caller that just mutated a local GameProfile struct copy (e.g.
+        // ApplyProfileFieldIntent, right after setting a field) pass that copy straight through
+        // instead of falling back to profileManager.CurrentProfile.Value below. That fallback is
+        // a SEPARATE store (a GameProfileProperty cache) that a field mutation's Save() never
+        // touches - Save() only updates the static per-GameId cache dictionary and debounce-queues
+        // the disk write. Without this, a same-request immediate-apply would silently read the
+        // OLD value and see "no difference", never touching hardware - found on-device: the TDP
+        // Mode/OS Power Mode comboboxes appeared to accept a change (Applied) but nothing happened,
+        // while the Quick Settings tile worked because it sets the live property directly, with no
+        // GameProfile round-trip at all.
+        private static void ApplyPowerSourceChangeInternal(bool isOnAC, Shared.Data.GameProfile? freshProfile = null)
         {
             try
             {
@@ -797,7 +807,7 @@ namespace XboxGamingBarHelper
                 // from freely (getters have no side effect), but must never assign into this
                 // copy (GameProfile's setters call Save(), which would debounce-write a bogus
                 // in-between value from a throwaway copy).
-                Shared.Data.GameProfile profile = profileManager.CurrentProfile.Value;
+                Shared.Data.GameProfile profile = freshProfile ?? profileManager.CurrentProfile.Value;
                 string state = isOnAC ? "AC" : "DC";
                 // A profile with the split disabled intentionally resolves to its base values
                 // even on battery. This is scope policy, not a widget-side decision.
