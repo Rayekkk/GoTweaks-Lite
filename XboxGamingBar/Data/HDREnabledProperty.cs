@@ -7,6 +7,7 @@ namespace XboxGamingBar.Data
 {
     internal class HDREnabledProperty : WidgetControlProperty<bool, ToggleSwitch>
     {
+        public bool IsUpdatingUI { get; private set; }
         public HDREnabledProperty(ToggleSwitch inUI, Page inOwner) : base(false, Function.HDREnabled, inUI, inOwner)
         {
             if (UI != null)
@@ -19,8 +20,7 @@ namespace XboxGamingBar.Data
         {
             if (UI != null && UI.IsOn != Value)
             {
-                Logger.Info($"{Function} toggle updated to {UI.IsOn}.");
-                SetValue(UI.IsOn);
+                Logger.Info($"{Function} toggle requested {UI.IsOn}.");
             }
         }
 
@@ -33,7 +33,9 @@ namespace XboxGamingBar.Data
                 Logger.Info($"Update {Function} toggle value {Value}.");
                 await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    UI.IsOn = Value;
+                    IsUpdatingUI = true;
+                    try { UI.IsOn = Value; }
+                    finally { IsUpdatingUI = false; }
                 });
             }
         }

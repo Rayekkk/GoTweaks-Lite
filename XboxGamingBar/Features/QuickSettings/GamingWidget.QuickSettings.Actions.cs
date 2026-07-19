@@ -462,8 +462,8 @@ namespace XboxGamingBar
 
                 int nextIndex = (currentIndex + 1) % quickResolutions.Count;
                 string nextRes = quickResolutions[nextIndex];
-                resolution.SetValue(nextRes);
-                Logger.Info($"Resolution cycled from {currentRes} to {nextRes}");
+                _ = SendProfileFieldIntentAsync("Resolution", nextRes);
+                Logger.Info($"Requested resolution cycle from {currentRes} to {nextRes}");
             }
         }
 
@@ -489,11 +489,8 @@ namespace XboxGamingBar
             if (hdrEnabled != null && (hdrSupported?.Value ?? false))
             {
                 bool newValue = !hdrEnabled.Value;
-                hdrEnabled.SetValue(newValue);
-                // Update the toggle so SettingChanged fires and saves to profile
-                if (HDRToggle != null)
-                    HDRToggle.IsOn = newValue;
-                Logger.Info($"HDR toggled to {newValue}");
+                _ = SendProfileFieldIntentAsync("HDR", newValue);
+                Logger.Info($"Requested HDR={newValue}");
             }
         }
 

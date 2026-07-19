@@ -136,6 +136,8 @@ namespace XboxGamingBar
             }
             else if (field == "OSPowerMode") pendingControl = OSPowerModeComboBox;
             else if (field == "RefreshRate") pendingControl = RefreshRatesComboBox;
+            else if (field == "HDR") pendingControl = HDRToggle;
+            else if (field == "Resolution") pendingControl = ResolutionComboBox;
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -165,6 +167,7 @@ namespace XboxGamingBar
                     json["PeakValue"] = Windows.Data.Json.JsonValue.CreateNumberValue(customTdp[2]);
                 }
                 else if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);
+                else if (value is string text) json["Value"] = Windows.Data.Json.JsonValue.CreateStringValue(text);
                 else json["Value"] = Windows.Data.Json.JsonValue.CreateNumberValue(Convert.ToDouble(value));
 
                 var response = await App.PipeClient.SendRequestAsync(new Windows.Foundation.Collections.ValueSet
@@ -287,6 +290,18 @@ namespace XboxGamingBar
                         try { refreshRate.ForceSetValue(confirmed); }
                         finally { refreshRate.SuppressRemoteSync = false; }
                     }
+                }
+                else if (field == "HDR" && values.ContainsKey(prefix + "HdrEnabled"))
+                {
+                    hdrEnabled.SuppressRemoteSync = true;
+                    try { hdrEnabled.ForceSetValue(values.GetNamedBoolean(prefix + "HdrEnabled")); }
+                    finally { hdrEnabled.SuppressRemoteSync = false; }
+                }
+                else if (field == "Resolution" && values.ContainsKey(prefix + "Resolution"))
+                {
+                    resolution.SuppressRemoteSync = true;
+                    try { resolution.ForceSetValue(values.GetNamedString(prefix + "Resolution")); }
+                    finally { resolution.SuppressRemoteSync = false; }
                 }
             }
             catch (Exception ex)

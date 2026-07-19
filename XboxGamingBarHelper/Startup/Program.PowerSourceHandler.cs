@@ -373,6 +373,31 @@ namespace XboxGamingBarHelper
                 if (dc) profile.RefreshRate_DC = refreshRate;
                 else profile.RefreshRate = refreshRate;
             }
+            else if (field == "HDR" && (value.ValueKind == System.Text.Json.JsonValueKind.True || value.ValueKind == System.Text.Json.JsonValueKind.False))
+            {
+                bool hdrEnabled = value.GetBoolean();
+                if (hdrEnabled && systemManager?.HDRSupported?.Value != true)
+                {
+                    reason = "HDR is not supported by the active display";
+                    Logger.Warn("Rejected SetProfileField(HDR): unsupported display");
+                    return false;
+                }
+                if (dc) profile.HDREnabled_DC = hdrEnabled;
+                else profile.HDREnabled = hdrEnabled;
+            }
+            else if (field == "Resolution" && value.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                string resolution = value.GetString();
+                var supportedResolutions = systemManager?.Resolutions?.Value;
+                if (string.IsNullOrWhiteSpace(resolution) || supportedResolutions == null || !supportedResolutions.Contains(resolution))
+                {
+                    reason = "resolution is not supported by the active display";
+                    Logger.Warn($"Rejected SetProfileField(Resolution): {resolution ?? "<null>"}");
+                    return false;
+                }
+                if (dc) profile.Resolution_DC = resolution;
+                else profile.Resolution = resolution;
+            }
             else if (field == "CPUState"
                 && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
                 && cfg.TryGetValue("MaxValue", out var maxElement) && maxElement.TryGetInt32(out int maxState))
