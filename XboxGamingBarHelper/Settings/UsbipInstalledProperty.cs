@@ -14,6 +14,7 @@ namespace XboxGamingBarHelper.Settings
     /// </summary>
     internal class UsbipInstalledProperty : HelperProperty<bool, SettingsManager>
     {
+        private bool confirmedInstalledThisProcess;
         // Service names installed ONLY by usbip-win2. Every entry must be specific to
         // usbip-win2 — see the false-positive note below.
         private static readonly string[] ServiceKeyNames = new[]
@@ -38,6 +39,7 @@ namespace XboxGamingBarHelper.Settings
         public UsbipInstalledProperty(SettingsManager inManager)
             : base(Detect(), null, Function.Viiper_UsbipInstalled, inManager)
         {
+            confirmedInstalledThisProcess = Value;
             Logger.Info($"usbip-win2 installed: {Value}");
         }
 
@@ -47,6 +49,13 @@ namespace XboxGamingBarHelper.Settings
         public void Refresh()
         {
             var detected = Detect();
+            if (detected)
+                confirmedInstalledThisProcess = true;
+            else if (confirmedInstalledThisProcess)
+            {
+                Logger.Debug("usbip-win2 transient negative ignored after process-local confirmation");
+                detected = true;
+            }
             if (detected != Value)
             {
                 SetValue(detected);

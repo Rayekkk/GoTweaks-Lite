@@ -1455,9 +1455,6 @@ namespace XboxGamingBar
             UpdateControllerEmulationPrereqGate();
         }
 
-        private const string UsbipEverConfirmedInstalledKey = "UsbipEverConfirmedInstalled";
-        private const string HidHideEverConfirmedInstalledKey = "HidHideEverConfirmedInstalled";
-
         /// <summary>
         /// Gates the whole Controller Emulation card behind usbip-win2 + HidHide being installed:
         /// while either is missing, the expand button is disabled (card can't be opened) and the
@@ -1465,34 +1462,14 @@ namespace XboxGamingBar
         /// Install button per missing component, so the fix is one click away instead of sending
         /// the user hunting through the System tab's Prerequisites card.
         ///
-        /// The "confirmed installed" flags are persisted in LocalSettings, not just an in-memory
-        /// field, and once true are NEVER re-checked against the live property again. Two reasons:
-        /// (1) the helper's install-status check (registry/CLI-path lookup for HidHide, driver-list
-        /// lookup for usbip-win2) is a pull-based re-check fired on every request rather than a
-        /// stable cached value, and has been observed to blip "not installed" for a couple of
-        /// seconds even when genuinely installed (2026-07-11, confirmed via widget + helper logs:
-        /// HidHide flapped False -> True -> False -> True within ~2s of a fresh helper start, then
-        /// stayed True for the rest of that session). (2) Game Bar can silently recreate this whole
-        /// GamingWidget instance (documented elsewhere in this codebase - see the Quick Metrics and
-        /// desktop-app-close fixes), which would reset a plain in-memory latch back to false on
-        /// every close/reopen, right back into the same blip window - which is exactly what made
-        /// the in-memory-only version of this fix look like clicking "Install" was doing something
-        /// (it wasn't; the real status just happened to arrive around the same time).
+        /// The helper owns the process-local anti-flap latch for both prerequisites. This keeps
+        /// widget recreation from relocking the card after a transient detection miss, while a
+        /// helper restart performs a fresh real installation check and recognizes uninstallations.
         /// </summary>
         private void UpdateControllerEmulationPrereqGate()
         {
-            bool usbipOk = GetBoolSetting(UsbipEverConfirmedInstalledKey, false);
-            if (!usbipOk && usbipInstalled?.Value == true)
-            {
-                usbipOk = true;
-                SetBoolSetting(UsbipEverConfirmedInstalledKey, true);
-            }
-            bool hidHideOk = GetBoolSetting(HidHideEverConfirmedInstalledKey, false);
-            if (!hidHideOk && hidHideInstalled?.Value == true)
-            {
-                hidHideOk = true;
-                SetBoolSetting(HidHideEverConfirmedInstalledKey, true);
-            }
+            bool usbipOk = usbipInstalled?.Value == true;
+            bool hidHideOk = hidHideInstalled?.Value == true;
             bool prereqsMet = usbipOk && hidHideOk;
 
             if (ControllerEmulationEnableRow != null)

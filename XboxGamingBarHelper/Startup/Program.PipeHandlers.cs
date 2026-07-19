@@ -38,6 +38,7 @@ namespace XboxGamingBarHelper
     internal partial class Program
     {
         private static long profileIntentRevision;
+        private static bool hidHideConfirmedInstalledThisProcess;
 
         // NOTE: Connection_RequestReceived (AppService handler) was removed - using Named Pipes only
         // See PipeServer_MessageReceived below for the pipe-based message handler
@@ -2074,6 +2075,13 @@ namespace XboxGamingBarHelper
             global::Windows.Foundation.Collections.ValueSet response = null;
             int functionValue = (int)request.Function;
             bool installed = XboxGamingBarHelper.Labs.HidHideHelper.IsInstalled();
+            if (installed)
+                hidHideConfirmedInstalledThisProcess = true;
+            else if (hidHideConfirmedInstalledThisProcess)
+            {
+                Logger.Debug("Pipe: transient HidHide negative ignored after process-local confirmation");
+                installed = true;
+            }
             response = new global::Windows.Foundation.Collections.ValueSet();
             response.Add(nameof(Function), functionValue);
             response.Add("Content", installed);
@@ -2099,6 +2107,7 @@ namespace XboxGamingBarHelper
             {
                 bool success = XboxGamingBarHelper.Labs.HidHideHelper.Install();
                 bool installed = XboxGamingBarHelper.Labs.HidHideHelper.IsInstalled();
+                if (installed) hidHideConfirmedInstalledThisProcess = true;
                 var updateMsg = new Shared.IPC.PipeMessage
                 {
                     Command = Shared.Enums.Command.Set,
