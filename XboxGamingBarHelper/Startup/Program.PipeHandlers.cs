@@ -68,6 +68,18 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                if (pipeMsg.Extra.ContainsKey("GetCustomQuickSettings"))
+                {
+                    HandleGetCustomQuickSettings(pipeMsg);
+                    return;
+                }
+
+                if (pipeMsg.Extra.ContainsKey("SetCustomQuickSetting"))
+                {
+                    HandleSetCustomQuickSetting(pipeMsg);
+                    return;
+                }
+
                 if (pipeMsg.Extra.TryGetValue("ExecuteLosslessScalingAction", out object losslessActionValue) && losslessActionValue is string)
                 {
                     await HandleExecuteLosslessScalingAction(pipeMsg, (string)losslessActionValue);

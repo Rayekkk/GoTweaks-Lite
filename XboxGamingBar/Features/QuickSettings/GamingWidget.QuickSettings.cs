@@ -36,7 +36,6 @@ using Windows.UI;
 using XboxGamingBar.Data;
 using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
-using XboxGamingBar.QuickSettings;
 using Shared.Enums;
 
 namespace XboxGamingBar
@@ -310,9 +309,6 @@ namespace XboxGamingBar
             AddTileDefinition("LegionFanFullSpeed", "Fan Max", "\uE9CA", order: order++);
             AddTileDefinition("Battery", "Battery", "\uE83F", order: order++); // Battery10
 
-            // Load custom shortcut tiles from storage
-            LoadCustomShortcutTiles();
-
             // Row 8 - Quick Actions (high order numbers to keep at bottom)
             int actionOrder = 1000;
             AddTileDefinition("ActionTaskManager", "Task Mgr", "\uE7EF", isAction: true, order: actionOrder++);
@@ -328,157 +324,121 @@ namespace XboxGamingBar
             qsTileMap[id] = def;
         }
 
-        /// <summary>
-        /// Load custom shortcut tiles from storage using QuickSettingsConfig
-        /// </summary>
-        private void LoadCustomShortcutTiles()
+        private void ApplyCustomQuickSettingsSnapshot(string json)
         {
             try
             {
-                // Load from QuickSettingsConfig (the new unified storage)
-                var config = QuickSettings.QuickSettingsConfig.Instance;
-                var customTiles = config.Tiles.Where(t => t.Type == QuickSettings.TileType.CustomShortcut).ToList();
-
-                // Calculate starting order (after built-in tiles)
-                int startingOrder = qsTileDefinitions.Count > 0 ? qsTileDefinitions.Max(t => t.Order) + 1 : 100;
-
-                int index = 0;
-                foreach (var tile in customTiles)
+                foreach (var existing in qsCustomShortcuts.ToList())
                 {
-                    if (!string.IsNullOrEmpty(tile.CustomShortcut))
-                    {
-                        // Use the stable GUID from QuickSettingsConfig instead of index-based ID
-                        // This prevents tile ID mismatch when widget is reloaded
-                        string tileId = tile.Id;
-                        var def = new TileDefinition
-                        {
-                            Id = tileId,
-                            Name = tile.Name,
-                            Glyph = tile.Icon ?? "\uE768",
-                            IsVisible = tile.IsVisible,
-                            IsTrigger = true,
-                            CustomShortcut = tile.CustomShortcut,
-                            Order = startingOrder + index  // Order will be overridden by LoadQuickSettingsConfig if saved
-                        };
-                        qsTileDefinitions.Add(def);
-                        qsTileMap[tileId] = def;
-                        qsCustomShortcuts.Add(def);
-                        index++;
-                    }
+                    qsTileDefinitions.Remove(existing);
+                    qsTileMap.Remove(existing.Id);
                 }
-                Logger.Info($"Loaded {index} custom shortcut tiles from QuickSettingsConfig (using stable GUIDs)");
+                qsCustomShortcuts.Clear();
 
-                // Migration: If old storage has shortcuts that aren't in the new system, migrate them
-                MigrateOldCustomShortcuts();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading custom shortcut tiles: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Migrate old custom shortcuts from the legacy storage format to QuickSettingsConfig
-        /// </summary>
-        private void MigrateOldCustomShortcuts()
-        {
-            try
-            {
+                int defaultOrder = qsTileDefinitions.Where(tile => !tile.IsAction).Select(tile => tile.Order).DefaultIfEmpty(0).Max() + 1;
                 var settings = ApplicationData.Current.LocalSettings;
-                if (settings.Values.TryGetValue("QS_CustomShortcuts", out object val) && val is string data && !string.IsNullOrEmpty(data))
+                var definitions = string.IsNullOrWhiteSpace(json) ? new JsonArray() : JsonArray.Parse(json);
+                foreach (var item in definitions)
                 {
-                    var config = QuickSettings.QuickSettingsConfig.Instance;
-                    var existingShortcuts = config.Tiles
-                        .Where(t => t.Type == QuickSettings.TileType.CustomShortcut)
-                        .Select(t => t.CustomShortcut)
-                        .ToHashSet();
+                    var obj = item.GetObject();
+                    string id = obj.GetNamedString("Id", "");
+                    string shortcut = obj.GetNamedString("Shortcut", "");
+                    if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(shortcut)) continue;
 
-                    var shortcuts = data.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    int migratedCount = 0;
+                    bool visible = true;
+                    int order = defaultOrder++;
+                    if (settings.Values.TryGetValue($"QS_{id}_Visible", out object visibleValue) && visibleValue is bool savedVisible)
+                        visible = savedVisible;
+                    if (settings.Values.TryGetValue($"QS_{id}_Order", out object orderValue) && orderValue is int savedOrder)
+                        order = savedOrder;
 
-                    foreach (var shortcut in shortcuts)
+                    var definition = new TileDefinition
                     {
-                        var parts = shortcut.Split('|');
-                        if (parts.Length == 2 && !existingShortcuts.Contains(parts[1]))
-                        {
-                            // Add to QuickSettingsConfig if not already present
-                            config.AddCustomTile(parts[0], "\uE768", parts[1]);
-                            migratedCount++;
-                        }
-                    }
-
-                    if (migratedCount > 0)
-                    {
-                        Logger.Info($"Migrated {migratedCount} custom shortcuts from legacy storage");
-                        // Clear old storage after migration
-                        settings.Values.Remove("QS_CustomShortcuts");
-                    }
+                        Id = id,
+                        Name = obj.GetNamedString("Name", "Shortcut"),
+                        Glyph = obj.GetNamedString("Icon", "\uE768"),
+                        IsVisible = visible,
+                        IsTrigger = true,
+                        CustomShortcut = shortcut,
+                        Order = order
+                    };
+                    qsTileDefinitions.Add(definition);
+                    qsTileMap[id] = definition;
+                    qsCustomShortcuts.Add(definition);
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error migrating old custom shortcuts: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Save custom shortcut tiles to QuickSettingsConfig
-        /// Note: This is now handled automatically by QuickSettingsConfig.AddCustomTile
-        /// This method is kept for compatibility but delegates to QuickSettingsConfig
-        /// </summary>
-        private void SaveCustomShortcutTiles()
-        {
-            try
-            {
-                // QuickSettingsConfig.Save() is called automatically by AddCustomTile
-                // This method now just triggers a save to ensure consistency
-                QuickSettings.QuickSettingsConfig.Instance.Save();
-                Logger.Info($"Custom shortcut tiles saved to QuickSettingsConfig");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving custom shortcut tiles: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Add a new custom shortcut tile using QuickSettingsConfig
-        /// </summary>
-        private void AddCustomShortcutTile(string name, string shortcut)
-        {
-            try
-            {
-                // Add to QuickSettingsConfig (saves automatically) - returns tile with GUID
-                var config = QuickSettings.QuickSettingsConfig.Instance;
-                var configTile = config.AddCustomTile(name, "\uE768", shortcut);
-
-                // Calculate new order (place at end)
-                int maxOrder = qsTileDefinitions.Count > 0 ? qsTileDefinitions.Max(t => t.Order) : 0;
-
-                // Use the GUID from QuickSettingsConfig for stable tile identification
-                string tileId = configTile.Id;
-                var def = new TileDefinition
-                {
-                    Id = tileId,
-                    Name = name,
-                    Glyph = "\uE768",
-                    IsVisible = true,
-                    IsTrigger = true,
-                    CustomShortcut = shortcut,
-                    Order = maxOrder + 1
-                };
-                qsTileDefinitions.Add(def);
-                qsTileMap[tileId] = def;
-                qsCustomShortcuts.Add(def);
 
                 RebuildQuickSettingsTiles();
                 BuildSortableGrid();
-
-                Logger.Info($"Added custom shortcut tile: {name} -> {shortcut} (id: {tileId})");
+                Logger.Info($"Rendered {qsCustomShortcuts.Count} helper-owned custom shortcut tile(s)");
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error adding custom shortcut tile: {ex.Message}");
+                Logger.Error($"Error applying custom quick settings: {ex.Message}");
+            }
+        }
+
+        private async Task SyncCustomQuickSettingsFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "GetCustomQuickSettings", true }
+                });
+                if (response != null && response.TryGetValue("Content", out object content) && content is string json)
+                {
+                    await Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                        () => ApplyCustomQuickSettingsSnapshot(json));
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Could not sync custom quick settings: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> SetCustomQuickSettingAsync(string id, string name, string shortcut, bool delete)
+        {
+            if (!App.IsConnected)
+            {
+                await ShowSettingApplyFailureAsync(Function.None, "Custom shortcut: helper disconnected.");
+                return false;
+            }
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "SetCustomQuickSetting", true },
+                    { "TileId", id },
+                    { "Delete", delete }
+                };
+                if (!delete)
+                {
+                    request.Add("Name", name);
+                    request.Add("Icon", "\uE768");
+                    request.Add("Shortcut", shortcut);
+                }
+                var response = await App.SendMessageAsync(request);
+                bool success = response != null && response.TryGetValue("Success", out object result)
+                    && result is bool applied && applied;
+                if (!success)
+                {
+                    string reason = response != null && response.TryGetValue("Reason", out object reasonValue)
+                        ? reasonValue?.ToString() : "the helper rejected the custom shortcut";
+                    await ShowSettingApplyFailureAsync(Function.None, $"Custom shortcut: {reason}");
+                    return false;
+                }
+                if (response.TryGetValue("Content", out object content) && content is string json)
+                    await Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                        () => ApplyCustomQuickSettingsSnapshot(json));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Custom quick setting request failed: {ex.Message}");
+                await ShowSettingApplyFailureAsync(Function.None, $"Custom shortcut: {ex.Message}");
+                return false;
             }
         }
 
@@ -726,8 +686,6 @@ namespace XboxGamingBar
                 ["name"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.Name ?? ""),
                 ["mask"] = Windows.Data.Json.JsonValue.CreateNumberValue(mask)
             };
-            if (!string.IsNullOrWhiteSpace(tile.CustomShortcut))
-                intent["shortcut"] = Windows.Data.Json.JsonValue.CreateStringValue(tile.CustomShortcut);
             await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
             {
                 { "Command", (int)Shared.Enums.Command.Set },

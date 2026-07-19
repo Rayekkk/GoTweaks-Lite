@@ -36,7 +36,6 @@ using Windows.UI;
 using XboxGamingBar.Data;
 using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
-using XboxGamingBar.QuickSettings;
 using Shared.Enums;
 
 namespace XboxGamingBar
@@ -349,36 +348,22 @@ namespace XboxGamingBar
         /// <summary>
         /// Handle delete button click in the selected tile indicator
         /// </summary>
-        private void DeleteSelectedTile_Click(object sender, RoutedEventArgs e)
+        private async void DeleteSelectedTile_Click(object sender, RoutedEventArgs e)
         {
             if (qsSelectedTileForMove != null && !string.IsNullOrEmpty(qsSelectedTileForMove.CustomShortcut))
             {
-                DeleteCustomShortcutTile(qsSelectedTileForMove);
+                await DeleteCustomShortcutTileAsync(qsSelectedTileForMove);
             }
         }
 
         /// <summary>
         /// Delete a custom shortcut tile
         /// </summary>
-        private void DeleteCustomShortcutTile(TileDefinition tile)
+        private async Task DeleteCustomShortcutTileAsync(TileDefinition tile)
         {
             try
             {
-                // Remove from QuickSettingsConfig persistent storage first
-                // Need to find the matching config tile by custom shortcut path
-                var config = QuickSettings.QuickSettingsConfig.Instance;
-                var configTile = config.Tiles.FirstOrDefault(t =>
-                    t.Type == QuickSettings.TileType.CustomShortcut &&
-                    t.CustomShortcut == tile.CustomShortcut);
-                if (configTile != null)
-                {
-                    config.RemoveTile(configTile.Id);
-                }
-
-                // Remove from local lists
-                qsTileDefinitions.Remove(tile);
-                qsTileMap.Remove(tile.Id);
-                qsCustomShortcuts.Remove(tile);
+                if (!await SetCustomQuickSettingAsync(tile.Id, null, null, delete: true)) return;
 
                 // Clear selection if we deleted the selected tile
                 if (qsSelectedTileForMove?.Id == tile.Id)

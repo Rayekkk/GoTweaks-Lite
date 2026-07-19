@@ -36,7 +36,6 @@ using Windows.UI;
 using XboxGamingBar.Data;
 using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
-using XboxGamingBar.QuickSettings;
 using Shared.Enums;
 
 namespace XboxGamingBar
@@ -56,14 +55,6 @@ namespace XboxGamingBar
 
         private async Task SendQuickSettingActionAsync(string tileId)
         {
-            string customShortcut = null;
-            if (qsTileMap.TryGetValue(tileId, out var mappedTile))
-                customShortcut = mappedTile.CustomShortcut;
-            if (string.IsNullOrWhiteSpace(customShortcut)
-                && QuickSettings.QuickSettingsConfig.Instance.GetTile(tileId) is QuickSettings.QuickSettingsTile configTile
-                && configTile.Type == QuickSettings.TileType.CustomShortcut)
-                customShortcut = configTile.CustomShortcut;
-
             if (!App.IsConnected)
             {
                 await ShowSettingApplyFailureAsync(Function.None, $"Quick setting {tileId}: helper disconnected.");
@@ -73,7 +64,6 @@ namespace XboxGamingBar
             try
             {
                 var request = new Windows.Foundation.Collections.ValueSet { { "ExecuteQuickSetting", tileId } };
-                if (!string.IsNullOrWhiteSpace(customShortcut)) request["CustomShortcut"] = customShortcut;
                 var response = await App.SendMessageAsync(request) as Windows.Foundation.Collections.ValueSet;
                 bool success = response != null && response.TryGetValue("Success", out object result)
                     && Convert.ToBoolean(result);
@@ -1214,7 +1204,7 @@ namespace XboxGamingBar
         /// <summary>
         /// Add a custom shortcut tile
         /// </summary>
-        private void AddCustomShortcut_Click(object sender, RoutedEventArgs e)
+        private async void AddCustomShortcut_Click(object sender, RoutedEventArgs e)
         {
             string name = CustomShortcutNameBox?.Text?.Trim();
             string shortcut = GetCustomShortcutKeysString();
@@ -1225,7 +1215,8 @@ namespace XboxGamingBar
                 return;
             }
 
-            AddCustomShortcutTile(name, shortcut);
+            string id = Guid.NewGuid().ToString("N");
+            if (!await SetCustomQuickSettingAsync(id, name, shortcut, delete: false)) return;
 
             // Clear inputs
             if (CustomShortcutNameBox != null) CustomShortcutNameBox.Text = "";

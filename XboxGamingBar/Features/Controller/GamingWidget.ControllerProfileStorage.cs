@@ -35,7 +35,6 @@ using Windows.UI;
 using XboxGamingBar.Data;
 using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
-using XboxGamingBar.QuickSettings;
 using Shared.Enums;
 
 namespace XboxGamingBar

@@ -36,7 +36,6 @@ using Windows.UI;
 using XboxGamingBar.Data;
 using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
-using XboxGamingBar.QuickSettings;
 using Shared.Enums;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
@@ -3204,6 +3203,9 @@ namespace XboxGamingBar
                 // helper monitor is the sole executor, including while the widget is
                 // suspended in full-screen exclusive mode.
                 LoadHotkeySettings();
+                // Custom shortcut definitions and their executable key combinations are
+                // helper-owned. Only tile order/visibility remains widget-local presentation.
+                await SyncCustomQuickSettingsFromHelperAsync();
                 // Same reasoning applies to quick-tile controller combos: without this a
                 // helper restart forgets every tile combo binding until the user re-opens
                 // Customize Tiles and hits Save again.

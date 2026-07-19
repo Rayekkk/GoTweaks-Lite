@@ -39,6 +39,87 @@ namespace XboxGamingBarHelper
     {
         private const string ControllerHotkeyConfigSettingsKey = "ControllerHotkeyConfig";
         private const string TileHotkeyConfigSettingsKey = "TileHotkeyConfig";
+        private const string CustomQuickSettingsKey = "CustomQuickSettings";
+        private static readonly object CustomQuickSettingsLock = new object();
+
+        private sealed class CustomQuickSettingDefinition
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string Icon { get; set; }
+            public string Shortcut { get; set; }
+        }
+
+        private static List<CustomQuickSettingDefinition> LoadCustomQuickSettings()
+        {
+            lock (CustomQuickSettingsLock)
+            {
+                if (!LocalSettingsHelper.TryGetValue<string>(CustomQuickSettingsKey, out string json)
+                    || string.IsNullOrWhiteSpace(json)) return new List<CustomQuickSettingDefinition>();
+                try
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<CustomQuickSettingDefinition>>(json)
+                        ?? new List<CustomQuickSettingDefinition>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Discarding invalid custom quick-setting registry: {ex.Message}");
+                    return new List<CustomQuickSettingDefinition>();
+                }
+            }
+        }
+
+        private static string GetCustomQuickSettingsSnapshot()
+        {
+            return System.Text.Json.JsonSerializer.Serialize(LoadCustomQuickSettings());
+        }
+
+        private static bool SetCustomQuickSetting(string id, string name, string icon, string shortcut, bool delete, out string reason)
+        {
+            reason = null;
+            if (string.IsNullOrWhiteSpace(id) || id.Length > 128)
+            {
+                reason = "Invalid custom tile identifier.";
+                return false;
+            }
+            if (!delete && (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(shortcut)))
+            {
+                reason = "A name and keyboard shortcut are required.";
+                return false;
+            }
+            if (!delete && (name.Length > 80 || shortcut.Length > 256))
+            {
+                reason = "The custom tile name or shortcut is too long.";
+                return false;
+            }
+
+            lock (CustomQuickSettingsLock)
+            {
+                var definitions = LoadCustomQuickSettings();
+                definitions.RemoveAll(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+                if (!delete)
+                {
+                    definitions.Add(new CustomQuickSettingDefinition
+                    {
+                        Id = id,
+                        Name = name.Trim(),
+                        Icon = string.IsNullOrWhiteSpace(icon) ? "\uE768" : icon,
+                        Shortcut = shortcut.Trim()
+                    });
+                }
+                LocalSettingsHelper.SetValue(CustomQuickSettingsKey,
+                    System.Text.Json.JsonSerializer.Serialize(definitions));
+            }
+            return true;
+        }
+
+        private static bool TryGetCustomQuickSettingShortcut(string id, out string shortcut)
+        {
+            shortcut = LoadCustomQuickSettings()
+                .FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase))
+                ?.Shortcut;
+            return !string.IsNullOrWhiteSpace(shortcut);
+        }
 
         /// <summary>
         /// Initializes the hotkey manager and registers global hotkeys
@@ -179,7 +260,6 @@ namespace XboxGamingBarHelper
                             {
                                 string id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
                                 string name = el.TryGetProperty("name", out var nEl) ? nEl.GetString() : "";
-                                string shortcut = el.TryGetProperty("shortcut", out var shortcutEl) ? shortcutEl.GetString() : null;
                                 uint mask = 0;
                                 // mask can exceed int range (Legion paddle high bits) - read as long.
                                 if (el.TryGetProperty("mask", out var mEl) && mEl.TryGetInt64(out var m)) mask = (uint)m;
@@ -187,9 +267,8 @@ namespace XboxGamingBarHelper
 
                                 string capturedId = id;
                                 string capturedName = name;
-                                string capturedShortcut = shortcut;
                                 controllerHotkeyMonitor.RegisterTileHotkey(mask,
-                                    () => ExecuteQuickSettingAction(capturedId, capturedShortcut, out _), name);
+                                    () => ExecuteQuickSettingAction(capturedId, out _), name);
                                 Logger.Info($"ControllerHotkey: registered tile combo '{name}' id={id} mask=0x{mask:X}");
                                 count++;
                             }
@@ -210,9 +289,7 @@ namespace XboxGamingBarHelper
         {
             string tileId = pipeMsg.Extra.TryGetValue("ExecuteQuickSetting", out object idValue)
                 ? idValue?.ToString() : null;
-            string shortcut = pipeMsg.Extra.TryGetValue("CustomShortcut", out object shortcutValue)
-                ? shortcutValue?.ToString() : null;
-            bool success = ExecuteQuickSettingAction(tileId, shortcut, out string reason);
+            bool success = ExecuteQuickSettingAction(tileId, out string reason);
             try
             {
                 if (pipeServer != null && pipeServer.IsConnected && pipeMsg.RequestId > 0)
@@ -231,6 +308,39 @@ namespace XboxGamingBarHelper
             {
                 Logger.Error($"Quick setting response failed: {ex.Message}");
             }
+        }
+
+        private static void HandleGetCustomQuickSettings(Shared.IPC.PipeMessage pipeMsg)
+        {
+            var response = new global::Windows.Foundation.Collections.ValueSet
+            {
+                { "Success", true },
+                { "Content", GetCustomQuickSettingsSnapshot() }
+            };
+            var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+            responseMsg.RequestId = pipeMsg.RequestId;
+            SendPipeMessage(responseMsg);
+        }
+
+        private static void HandleSetCustomQuickSetting(Shared.IPC.PipeMessage pipeMsg)
+        {
+            string id = pipeMsg.Extra.TryGetValue("TileId", out object idValue) ? idValue?.ToString() : null;
+            string name = pipeMsg.Extra.TryGetValue("Name", out object nameValue) ? nameValue?.ToString() : null;
+            string icon = pipeMsg.Extra.TryGetValue("Icon", out object iconValue) ? iconValue?.ToString() : null;
+            string shortcut = pipeMsg.Extra.TryGetValue("Shortcut", out object shortcutValue) ? shortcutValue?.ToString() : null;
+            bool delete = pipeMsg.Extra.TryGetValue("Delete", out object deleteValue)
+                && bool.TryParse(deleteValue?.ToString(), out bool parsedDelete) && parsedDelete;
+            bool success = SetCustomQuickSetting(id, name, icon, shortcut, delete, out string reason);
+
+            var response = new global::Windows.Foundation.Collections.ValueSet
+            {
+                { "Success", success },
+                { "Content", GetCustomQuickSettingsSnapshot() }
+            };
+            if (!success) response.Add("Reason", reason ?? "The custom shortcut was rejected.");
+            var responseMsg = Shared.IPC.PipeMessage.FromValueSet(response);
+            responseMsg.RequestId = pipeMsg.RequestId;
+            SendPipeMessage(responseMsg);
         }
 
         private static void ApplyTileHotkeyConfigIntent(string json)
@@ -254,7 +364,6 @@ namespace XboxGamingBarHelper
                     string id = idElement.GetString();
                     if (string.IsNullOrWhiteSpace(id)) return;
                     string name = root.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : "";
-                    string shortcut = root.TryGetProperty("shortcut", out var shortcutElement) ? shortcutElement.GetString() : null;
                     long mask = root.TryGetProperty("mask", out var maskElement) && maskElement.TryGetInt64(out long parsedMask)
                         ? parsedMask : 0;
 
@@ -277,7 +386,6 @@ namespace XboxGamingBarHelper
                         {
                             { "id", id }, { "name", name ?? "" }, { "mask", mask }
                         };
-                        if (!string.IsNullOrWhiteSpace(shortcut)) entry["shortcut"] = shortcut;
                         entries.Add(entry);
                     }
                     ApplyTileHotkeys(System.Text.Json.JsonSerializer.Serialize(entries));
@@ -289,14 +397,14 @@ namespace XboxGamingBarHelper
             }
         }
 
-        private static bool ExecuteQuickSettingAction(string tileId, string customShortcut, out string reason)
+        private static bool ExecuteQuickSettingAction(string tileId, out string reason)
         {
             reason = null;
             if (!_managersReady) { reason = "helper managers are not ready"; return false; }
             if (string.IsNullOrWhiteSpace(tileId)) { reason = "missing tile identifier"; return false; }
             try
             {
-                if (!string.IsNullOrWhiteSpace(customShortcut))
+                if (TryGetCustomQuickSettingShortcut(tileId, out string customShortcut))
                 {
                     SendKeyboardShortcutViaInputInjector(customShortcut);
                     return true;
