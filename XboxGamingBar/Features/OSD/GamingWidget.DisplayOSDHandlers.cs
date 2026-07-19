@@ -83,16 +83,7 @@ namespace XboxGamingBar
 
         private void SaveDisplayOSDSettingsToStorage()
         {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values["OLED_AdaptiveBrightness"] = adaptiveBrightnessEnabled;
-                settings.Values["OLED_PositionShift"] = osdPositionShiftEnabled;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving display/OSD settings: {ex.Message}");
-            }
+            // Persisted by helper after it accepts OLEDConfig.
         }
 
         private void LoadDisplayOSDSettingsFromStorage()
@@ -100,15 +91,6 @@ namespace XboxGamingBar
             isLoadingOLEDSettings = true;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                if (settings.Values.TryGetValue("OLED_AdaptiveBrightness", out object adaptiveBrightness) && adaptiveBrightness is bool ab)
-                    adaptiveBrightnessEnabled = ab;
-                if (settings.Values.TryGetValue("OLED_PositionShift", out object posShift) && posShift is bool ps)
-                    osdPositionShiftEnabled = ps;
-                if (settings.Values.TryGetValue("OSD_Opacity", out object opacity) && opacity is int op)
-                    osdOpacity = op;
-
                 // Update UI
                 if (AdaptiveBrightnessToggle != null) AdaptiveBrightnessToggle.IsOn = adaptiveBrightnessEnabled;
                 if (OSDPositionShiftToggle != null) OSDPositionShiftToggle.IsOn = osdPositionShiftEnabled;
@@ -149,6 +131,28 @@ namespace XboxGamingBar
             {
                 Logger.Error($"Error sending display/OSD config to helper: {ex.Message}");
             }
+        }
+
+        private async Task RequestDisplayOSDConfigFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet { { "Command", (int)Shared.Enums.Command.Get }, { "Function", (int)Shared.Enums.Function.OLEDConfig } });
+                if (response == null || !response.TryGetValue("Content", out object content) || string.IsNullOrWhiteSpace(content?.ToString())) return;
+                isLoadingOLEDSettings = true;
+                foreach (var part in content.ToString().Split(';'))
+                {
+                    var pair = part.Split(':');
+                    if (pair.Length != 2) continue;
+                    if (pair[0] == "AdaptiveBrightness") adaptiveBrightnessEnabled = pair[1] == "1";
+                    if (pair[0] == "PositionShift") osdPositionShiftEnabled = pair[1] == "1";
+                }
+                if (AdaptiveBrightnessToggle != null) AdaptiveBrightnessToggle.IsOn = adaptiveBrightnessEnabled;
+                if (OSDPositionShiftToggle != null) OSDPositionShiftToggle.IsOn = osdPositionShiftEnabled;
+            }
+            catch (Exception ex) { Logger.Error($"Failed to render helper display OSD configuration: {ex.Message}"); }
+            finally { isLoadingOLEDSettings = false; }
         }
 
     }

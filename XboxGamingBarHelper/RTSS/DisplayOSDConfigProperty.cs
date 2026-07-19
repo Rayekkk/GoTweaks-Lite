@@ -1,6 +1,7 @@
 using System;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
+using XboxGamingBarHelper.Settings;
 
 namespace XboxGamingBarHelper.RTSS
 {
@@ -10,12 +11,18 @@ namespace XboxGamingBarHelper.RTSS
     /// </summary>
     internal class DisplayOSDConfigProperty : HelperProperty<string, RTSSManager>
     {
+        private const string SettingsKey = "DisplayOSDConfig";
         private readonly Action<bool> setAdaptiveBrightness;
 
         public DisplayOSDConfigProperty(RTSSManager inManager, Action<bool> adaptiveBrightnessCallback)
             : base("", null, Function.OLEDConfig, inManager)
         {
             setAdaptiveBrightness = adaptiveBrightnessCallback;
+            if (LocalSettingsHelper.TryGetValue<string>(SettingsKey, out var saved) && !string.IsNullOrWhiteSpace(saved))
+            {
+                SetValueSilent(saved);
+                manager.ParseDisplayOSDConfig(saved, setAdaptiveBrightness);
+            }
         }
 
         public override bool SetValue(object newValue, long updatedTime = 0)
@@ -24,6 +31,7 @@ namespace XboxGamingBarHelper.RTSS
             if (result && manager != null && newValue is string configString)
             {
                 manager.ParseDisplayOSDConfig(configString, setAdaptiveBrightness);
+                LocalSettingsHelper.SetValue(SettingsKey, configString);
             }
             return result;
         }

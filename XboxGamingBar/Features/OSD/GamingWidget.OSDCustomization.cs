@@ -170,9 +170,10 @@ namespace XboxGamingBar
         private bool isFanCurvePresetLoading = false;
         private bool isCPUExtrasExpanded = false;
         private bool isDebugExpanded = false;
+        // Legacy values retained only while the reserved wire channel remains; no startup
+        // load or active UI path reads or writes them.
         private int deviceTDPMin = 4;
         private int deviceTDPMax = 35;
-
 
         private bool isLoadingOSDConfig = false;
 
@@ -201,16 +202,6 @@ namespace XboxGamingBar
                 {
                     int previousProvider = osdProvider;
                     osdProvider = provider;
-
-                    // Save to storage
-                    try
-                    {
-                        ApplicationData.Current.LocalSettings.Values["OSD_Provider"] = osdProvider;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error($"Error saving OSD provider: {ex.Message}");
-                    }
 
                     // Update UI visibility
                     UpdateOSDProviderUI();
@@ -463,57 +454,16 @@ namespace XboxGamingBar
 
         private void SaveOSDConfigToStorage()
         {
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                foreach (var level in osdLevelConfig.Keys)
-                {
-                    var config = osdLevelConfig[level];
-                    foreach (var item in config)
-                    {
-                        settings.Values[$"OSD_L{level}_{item.Key}"] = item.Value;
-                    }
-                    settings.Values[$"OSD_L{level}_CustomTags"] = osdCustomTags.GetValueOrDefault(level, "");
-                    settings.Values[$"OSD_L{level}_Columns"] = osdLevelColumns.GetValueOrDefault(level, 3);
-
-                    // Save item order
-                    if (osdLevelOrder.ContainsKey(level))
-                    {
-                        settings.Values[$"OSD_L{level}_Order"] = string.Join(",", osdLevelOrder[level]);
-                    }
-
-                    // Save item label colors
-                    if (osdItemLabelColors.ContainsKey(level))
-                    {
-                        foreach (var colorItem in osdItemLabelColors[level])
-                        {
-                            settings.Values[$"OSD_L{level}_{colorItem.Key}_Color"] = colorItem.Value;
-                        }
-                    }
-                }
-
-                // Save global layout settings (text size is per-resolution)
-                string currentRes = resolution?.Value ?? "default";
-                settings.Values[$"OSD_TextSize_{currentRes}"] = osdTextSize;
-                settings.Values["OSD_TextColor"] = osdTextColor;
-                settings.Values["OSD_LabelColor"] = osdLabelColor;
-                settings.Values["OSD_Opacity"] = osdOpacity;
-                settings.Values["OSD_FrametimeGraphPinned"] = frametimeGraphPinned;
-
-                Logger.Info($"OSD configuration saved to storage (resolution: {currentRes}, text size: {osdTextSize}, opacity: {osdOpacity})");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error saving OSD config: {ex.Message}");
-            }
+            // HelperProperty<OSDConfig> persists the accepted configuration. The widget
+            // deliberately keeps only a display/edit cache.
         }
 
         private void LoadOSDConfigFromStorage()
         {
+            // Defaults are only a temporary display while the helper snapshot arrives.
+            // They must never be sent back as a startup write.
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
                 var itemKeys = new[] { "AppName", "Time", "Time12H", "FPS", "Battery", "ControllerBattery", "Memory", "VRAM", "CPU", "CPUClock", "GPU", "GPUClock", "FrameBudget", "Fan", "TDPLimits", "FrametimeGraph" };
 
                 foreach (var level in new[] { 1, 2, 3 })
@@ -525,92 +475,18 @@ namespace XboxGamingBar
 
                     foreach (var key in itemKeys)
                     {
-                        string settingKey = $"OSD_L{level}_{key}";
-                        if (settings.Values.TryGetValue(settingKey, out object val) && val is bool enabled)
-                        {
-                            osdLevelConfig[level][key] = enabled;
-                        }
+                        osdLevelConfig[level][key] = false;
                     }
 
-                    string customTagsKey = $"OSD_L{level}_CustomTags";
-                    if (settings.Values.TryGetValue(customTagsKey, out object tagsVal) && tagsVal is string tags)
-                    {
-                        osdCustomTags[level] = tags;
-                    }
+                    osdCustomTags[level] = "";
 
-                    // Load per-level columns
-                    string columnsKey = $"OSD_L{level}_Columns";
-                    if (settings.Values.TryGetValue(columnsKey, out object colsVal) && colsVal is int levelCols)
-                    {
-                        osdLevelColumns[level] = levelCols;
-                    }
-
-                    // Load per-level order
-                    string orderKey = $"OSD_L{level}_Order";
-                    if (settings.Values.TryGetValue(orderKey, out object orderVal) && orderVal is string orderStr)
-                    {
-                        var orderList = orderStr.Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-                        if (orderList.Count == itemKeys.Length)
-                        {
-                            osdLevelOrder[level] = orderList;
-                        }
-                    }
-
-                    // Load per-level item label colors
                     if (!osdItemLabelColors.ContainsKey(level))
                     {
                         osdItemLabelColors[level] = new Dictionary<string, string>();
                     }
-                    foreach (var key in itemKeys)
-                    {
-                        string colorKey = $"OSD_L{level}_{key}_Color";
-                        if (settings.Values.TryGetValue(colorKey, out object colorVal) && colorVal is string color)
-                        {
-                            osdItemLabelColors[level][key] = color;
-                        }
-                    }
                 }
 
-                // Load global layout settings (text size is per-resolution)
-                string currentRes = resolution?.Value ?? "default";
-                string textSizeKey = $"OSD_TextSize_{currentRes}";
-                if (settings.Values.TryGetValue(textSizeKey, out object sizeVal) && sizeVal is int size)
-                {
-                    osdTextSize = size;
-                    Logger.Info($"Loaded OSD text size {osdTextSize} for resolution {currentRes}");
-                }
-                else
-                {
-                    // Default to 100 if no per-resolution setting exists
-                    osdTextSize = 100;
-                    Logger.Info($"No OSD text size saved for resolution {currentRes}, using default 100");
-                }
-                if (settings.Values.TryGetValue("OSD_TextColor", out object textColorVal) && textColorVal is string textColor)
-                {
-                    osdTextColor = textColor;
-                }
-                if (settings.Values.TryGetValue("OSD_LabelColor", out object labelColorVal) && labelColorVal is string labelColor)
-                {
-                    osdLabelColor = labelColor;
-                }
-                if (settings.Values.TryGetValue("OSD_Opacity", out object opacityVal) && opacityVal is int opacity)
-                {
-                    osdOpacity = opacity;
-                }
-                if (settings.Values.TryGetValue("OSD_FrametimeGraphPinned", out object pinnedVal) && pinnedVal is bool pinned)
-                {
-                    frametimeGraphPinned = pinned;
-                    if (FrametimeGraphPinnedToggle != null)
-                        FrametimeGraphPinnedToggle.IsOn = frametimeGraphPinned;
-                }
-                if (settings.Values.TryGetValue("OSD_Provider", out object providerVal) && providerVal is int provider)
-                {
-                    osdProvider = provider;
-                }
-                if (settings.Values.TryGetValue("AMD_OverlayLevel", out object amdLevelVal) && amdLevelVal is int amdLevel)
-                {
-                    amdOverlayLevel = amdLevel;
-                }
+                osdTextSize = 100;
 
                 // Update layout UI
                 UpdateOSDLayoutUI();
@@ -697,6 +573,42 @@ namespace XboxGamingBar
             {
                 Logger.Error($"Error sending OSD config to helper: {ex.Message}");
             }
+        }
+
+        private async Task RequestOSDConfigFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Get },
+                    { "Function", (int)Shared.Enums.Function.OSDConfig },
+                });
+                if (response == null || !response.TryGetValue("Content", out object content) || string.IsNullOrWhiteSpace(content?.ToString())) return;
+                isLoadingOSDConfig = true;
+                foreach (var part in content.ToString().Split(';'))
+                {
+                    int separator = part.IndexOf(':');
+                    if (separator < 0) continue;
+                    string key = part.Substring(0, separator);
+                    string value = part.Substring(separator + 1);
+                    if (key == "TextSize" && int.TryParse(value, out int size)) osdTextSize = size;
+                    else if (key == "TextColor") osdTextColor = value;
+                    else if (key == "LabelColor") osdLabelColor = value;
+                    else if (key == "Opacity" && int.TryParse(value, out int opacity)) osdOpacity = opacity;
+                    else if (key == "FrametimeGraphPinned") frametimeGraphPinned = value == "1";
+                    else if (key.Length == 2 && key[0] == 'L' && int.TryParse(key.Substring(1), out int level) && osdLevelConfig.ContainsKey(level))
+                    {
+                        foreach (var item in osdLevelConfig[level].Keys.ToList()) osdLevelConfig[level][item] = false;
+                        foreach (var item in value.Split(',')) if (osdLevelConfig[level].ContainsKey(item)) osdLevelConfig[level][item] = true;
+                    }
+                }
+                UpdateOSDLayoutUI();
+                LoadOSDOptionsForLevel(osdCustomizeLevel);
+            }
+            catch (Exception ex) { Logger.Error($"Failed to render helper OSD configuration: {ex.Message}"); }
+            finally { isLoadingOSDConfig = false; }
         }
 
         private void OSDCustomizeExpandButton_Click(object sender, RoutedEventArgs e)

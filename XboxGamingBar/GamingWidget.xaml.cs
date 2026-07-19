@@ -1958,9 +1958,6 @@ namespace XboxGamingBar
             UpdateProfileDisplay();
             UpdateGameProfileCardVisibility();
 
-            // Load Device TDP limits
-            LoadTDPLimitsFromStorage();
-
             // Subscribe to property changes that affect Quick Settings tiles
             SubscribeToQuickSettingsPropertyChanges();
 
@@ -1977,9 +1974,6 @@ namespace XboxGamingBar
             // Load Performance Overlay setting
             LoadPerformanceOverlaySetting();
 
-            // Send OSD config to helper on startup
-            SendOSDConfigToHelper();
-            _ = SendDisplayOSDConfigToHelper();
 
             // Initialize Labs section (DAService status polling)
             InitializeLabsSection();
@@ -2385,7 +2379,6 @@ namespace XboxGamingBar
             {
                 Logger.Info($"Resolution changed to {resolution?.Value}, reloading OSD config");
                 LoadOSDConfigFromStorage();
-                SendOSDConfigToHelper();
             });
         }
 
@@ -3306,8 +3299,8 @@ namespace XboxGamingBar
                     properties.StopPendingUpdates();
                 });
 
-                Logger.Info("[PIPE] Sending OSD config to helper...");
-                SendOSDConfigToHelper();
+                await RequestOSDConfigFromHelperAsync();
+                await RequestDisplayOSDConfigFromHelperAsync();
 
                 // Don't apply profile TDP mode to helper - the helper is the source of truth
                 // It already has the correct mode from its own profile (global.xml)
