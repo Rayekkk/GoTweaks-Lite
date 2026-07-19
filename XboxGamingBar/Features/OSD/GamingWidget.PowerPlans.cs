@@ -134,7 +134,12 @@ namespace XboxGamingBar
 
         private async Task SendProfileFieldIntentAsync(string field, object value)
         {
-            if (!App.IsConnected) return;
+            if (!App.IsConnected)
+            {
+                await ShowSettingApplyFailureAsync(Function.PowerSourceProfileValues,
+                    $"{field}: helper disconnected; the requested value was not applied.");
+                return;
+            }
             long intentRevision;
             lock (latestProfileIntentRevisions)
             {
@@ -160,6 +165,12 @@ namespace XboxGamingBar
             else if (field == "HDR") pendingControl = HDRToggle;
             else if (field == "Resolution") pendingControl = ResolutionComboBox;
             else if (field == "LegionPerformanceMode") pendingControl = TDPModeComboBox;
+            else if (field == "CustomTDP")
+            {
+                if (CustomTDPSlowSlider != null) CustomTDPSlowSlider.IsEnabled = false;
+                if (CustomTDPFastSlider != null) CustomTDPFastSlider.IsEnabled = false;
+                if (CustomTDPPeakSlider != null) CustomTDPPeakSlider.IsEnabled = false;
+            }
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -208,6 +219,8 @@ namespace XboxGamingBar
                 {
                     Logger.Warn($"Profile intent {field} was not confirmed by helper");
                     await SyncPowerSourceProfilesFromHelperAsync();
+                    await ShowSettingApplyFailureAsync(Function.PowerSourceProfileValues,
+                        $"{field}: helper did not confirm the requested value.");
                     return;
                 }
                 var result = Windows.Data.Json.JsonObject.Parse(content);
@@ -222,7 +235,12 @@ namespace XboxGamingBar
                     return;
                 }
                 string outcome = result.GetNamedString("Outcome", "Rejected");
-                if (outcome != "Applied") Logger.Warn($"Profile intent {field} rejected: {result.GetNamedString("Reason", "unknown reason")}");
+                if (outcome != "Applied")
+                {
+                    string reason = result.GetNamedString("Reason", "unknown reason");
+                    Logger.Warn($"Profile intent {field} rejected: {reason}");
+                    await ShowSettingApplyFailureAsync(Function.PowerSourceProfileValues, $"{field}: {reason}");
+                }
                 string snapshot = result.GetNamedString("Snapshot", "");
                 await SyncPowerSourceProfilesFromHelperAsync(snapshot);
                 ApplyConfirmedProfileFieldFromSnapshot(field, dc, snapshot);
@@ -231,6 +249,7 @@ namespace XboxGamingBar
             {
                 Logger.Warn($"Profile intent {field} failed: {ex.Message}");
                 await SyncPowerSourceProfilesFromHelperAsync();
+                await ShowSettingApplyFailureAsync(Function.PowerSourceProfileValues, $"{field}: {ex.Message}");
             }
             finally
             {
@@ -244,6 +263,13 @@ namespace XboxGamingBar
                 {
                     if (FPSLimitToggle != null) FPSLimitToggle.IsEnabled = rtssInstalled?.Value == true;
                     if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = rtssInstalled?.Value == true;
+                }
+                else if (field == "CustomTDP")
+                {
+                    bool enabled = legionGoDetected?.Value == true && IsCustomTdpModeSelected();
+                    if (CustomTDPSlowSlider != null) CustomTDPSlowSlider.IsEnabled = enabled;
+                    if (CustomTDPFastSlider != null) CustomTDPFastSlider.IsEnabled = enabled;
+                    if (CustomTDPPeakSlider != null) CustomTDPPeakSlider.IsEnabled = enabled;
                 }
             }
         }

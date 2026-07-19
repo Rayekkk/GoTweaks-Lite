@@ -1646,6 +1646,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
 
         public bool SetCustomTDP(int slow, int fast, int peak)
         {
+            if (slow < 5 || peak > 50 || slow > fast || fast > peak)
+            {
+                Logger.Warn($"Cannot set invalid Custom TDP limits: SPL={slow}W, SPPT={fast}W, FPPT={peak}W");
+                return false;
+            }
+
             if (wmiService == null)
             {
                 Logger.Warn("Cannot set custom TDP: WMI service not available");
@@ -1724,11 +1730,9 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 // Apply TDP values
                 if (!ApplyTDPValues(slow, fast, peak)) return false;
 
-                // Keep the helper's internal cache (customTDPSlow/Fast/Peak via these properties) in
-                // sync with the applied values, but do NOT SyncToRemote: the widget owns the Custom
-                // limits (it drives them live from the TDP / SPPT Boost / FPPT Boost sliders), so the
-                // helper never needs to push them back. The cache feeds ReassertCustomTDP, the OSD
-                // current-TDP readout and GetCurrentTDPValues.
+                // Keep the helper-owned confirmed cache in sync with the applied values. The
+                // correlated intent response publishes the full effective profile snapshot; these
+                // legacy properties remain display hydration/backward-compatibility channels.
                 LegionCustomTDPSlow.SetValueSilent(slow);
                 LegionCustomTDPFast.SetValueSilent(fast);
                 LegionCustomTDPPeak.SetValueSilent(peak);
