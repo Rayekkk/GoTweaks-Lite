@@ -887,6 +887,11 @@ namespace XboxGamingBar
         private string currentProfileName = ""; // Empty so first SwitchProfile() loads settings
         private string currentGameName = "";
         private string currentGameExePath = "";
+        private bool hasHelperGlobalPowerSourceSplit;
+        private bool helperGlobalPowerSourceSplit;
+        private string helperGamePowerSourceSplitGameName = "";
+        private bool hasHelperGamePowerSourceSplit;
+        private bool helperGamePowerSourceSplit;
         private string currentGameIconPath = ""; // Cache icon path to preserve it across foreground changes
         private bool isLoadingProfile = false;
         private bool isSwitchingProfile = false;
@@ -968,6 +973,7 @@ namespace XboxGamingBar
 
         private bool GetGlobalPowerSourceProfileEnabled()
         {
+            if (hasHelperGlobalPowerSourceSplit) return helperGlobalPowerSourceSplit;
             var settings = ApplicationData.Current.LocalSettings;
             if (settings.Values.TryGetValue(GlobalPowerSourceProfileSettingKey, out object val) && val is bool enabled)
             {
@@ -979,6 +985,8 @@ namespace XboxGamingBar
 
         private bool GetPerGamePowerSourceProfileEnabled(string gameName)
         {
+            if (hasHelperGamePowerSourceSplit && helperGamePowerSourceSplitGameName == gameName)
+                return helperGamePowerSourceSplit;
             if (!HasValidGame(gameName))
             {
                 return GetGlobalPowerSourceProfileEnabled();

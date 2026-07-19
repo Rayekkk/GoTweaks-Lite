@@ -54,6 +54,24 @@ namespace Shared.Data
             }
         }
 
+        // 2.0 profile-scope ownership: the helper, not the widget's LocalSettings, owns
+        // whether this profile resolves its *_DC fields when the device is on battery.
+        // Missing in old XML deserializes to false, which is the safe "use base values" default.
+        [XmlElement("PowerSourceProfileEnabled")]
+        private bool powerSourceProfileEnabled;
+        public bool PowerSourceProfileEnabled
+        {
+            get { return powerSourceProfileEnabled; }
+            set
+            {
+                if (powerSourceProfileEnabled != value)
+                {
+                    powerSourceProfileEnabled = value;
+                    Save();
+                }
+            }
+        }
+
         [XmlElement("TDP")]
         private int tdp;
         public int TDP
@@ -1444,6 +1462,7 @@ namespace Shared.Data
         {
             GameId = new GameId(gameName, gamePath);
             use = inUse;
+            powerSourceProfileEnabled = false;
             // AC values (main settings)
             tdp = inTDP;
             cpuBoost = inCPUBoost;

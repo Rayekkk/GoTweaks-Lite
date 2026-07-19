@@ -1523,9 +1523,11 @@ namespace XboxGamingBarHelper
                 var cfg = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(content);
                 if (cfg != null && cfg.TryGetValue("Intent", out var intent)
                     && intent.ValueKind == System.Text.Json.JsonValueKind.String
-                    && intent.GetString() == "SetProfileField")
+                    && (intent.GetString() == "SetProfileField" || intent.GetString() == "SetPowerSourceSplit"))
                 {
-                    bool applied = ApplyProfileFieldIntent(cfg, out string reason, out Shared.Data.GameProfile confirmedProfile);
+                    bool applied = intent.GetString() == "SetProfileField"
+                        ? ApplyProfileFieldIntent(cfg, out string reason, out Shared.Data.GameProfile confirmedProfile)
+                        : ApplyPowerSourceSplitIntent(cfg, out reason, out confirmedProfile);
                     long revision = System.Threading.Interlocked.Increment(ref profileIntentRevision);
                     return new global::Windows.Foundation.Collections.ValueSet
                     {
@@ -1561,6 +1563,7 @@ namespace XboxGamingBarHelper
             var values = new Dictionary<string, object>
             {
                 { "IsGlobal", selected.IsGlobalProfile },
+                { "PowerSourceSplitEnabled", selected.PowerSourceProfileEnabled },
                 { "AcLegionPerformanceMode", selected.LegionPerformanceMode ?? 2 },
                 { "DcLegionPerformanceMode", DcInt(selected.LegionPerformanceMode_DC, selected.LegionPerformanceMode ?? 2) },
                 { "AcTdp", selected.TDP }, { "DcTdp", DcInt(selected.TDP_DC, selected.TDP) },

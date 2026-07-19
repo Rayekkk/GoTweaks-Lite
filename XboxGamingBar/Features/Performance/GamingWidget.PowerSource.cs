@@ -63,26 +63,12 @@ namespace XboxGamingBar
 
             if (perGameContext)
             {
-                SavePerGamePowerSourceProfileSetting(currentGameName, enabled);
-                Logger.Info($"PowerSourceProfileToggle toggled for game '{currentGameName}' to: {enabled}");
-                LoadOrCreateGameProfiles();
+                _ = SendPowerSourceSplitIntentAsync(enabled, perGame: true);
             }
             else
             {
-                Logger.Info($"PowerSourceProfileToggle toggled globally to: {enabled}");
-                SavePowerSourceProfileSetting(enabled);
-                // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
-                // 2026-07-19: this branch used to stop at persisting the flag, unlike its
-                // per-game sibling (which calls LoadOrCreateGameProfiles) - see that method's
-                // global counterpart, LoadOrCreateGlobalPowerSourceProfiles, for the full
-                // rationale (missing seeding left acProfile/dcProfile at hardcoded defaults).
-                LoadOrCreateGlobalPowerSourceProfiles();
+                _ = SendPowerSourceSplitIntentAsync(enabled, perGame: false);
             }
-
-            UpdateGlobalProfileDisplayMode();
-            UpdateGameProfileCardVisibility();
-            UpdateActiveProfileIndicator();
-            UpdateProfileDisplay();
         }
 
         private void LoadPowerSourceProfileSetting()

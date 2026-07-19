@@ -98,14 +98,21 @@ namespace XboxGamingBar
 
                 var ac = Read("Ac");
                 var dc = Read("Dc");
-                if (Bool("IsGlobal", true))
+                bool isGlobal = Bool("IsGlobal", true);
+                bool splitEnabled = Bool("PowerSourceSplitEnabled", false);
+                if (isGlobal)
                 {
+                    hasHelperGlobalPowerSourceSplit = true;
+                    helperGlobalPowerSourceSplit = splitEnabled;
                     globalProfile = ac.Clone();
                     acProfile = ac;
                     dcProfile = dc;
                 }
                 else
                 {
+                    hasHelperGamePowerSourceSplit = true;
+                    helperGamePowerSourceSplitGameName = currentGameName ?? "";
+                    helperGamePowerSourceSplit = splitEnabled;
                     gameProfile = ac.Clone();
                     gameACProfile = ac;
                     gameDCProfile = dc;
@@ -225,6 +232,49 @@ namespace XboxGamingBar
                     if (FPSLimitToggle != null) FPSLimitToggle.IsEnabled = rtssInstalled?.Value == true;
                     if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = rtssInstalled?.Value == true;
                 }
+            }
+        }
+
+        private async Task SendPowerSourceSplitIntentAsync(bool enabled, bool perGame)
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var json = new Windows.Data.Json.JsonObject
+                {
+                    ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetPowerSourceSplit"),
+                    ["Scope"] = Windows.Data.Json.JsonValue.CreateStringValue(perGame ? "PerGame" : "Global"),
+                    ["Enabled"] = Windows.Data.Json.JsonValue.CreateBooleanValue(enabled)
+                };
+                if (perGame)
+                {
+                    json["TargetGameName"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameName ?? "");
+                    json["TargetGamePath"] = Windows.Data.Json.JsonValue.CreateStringValue(currentGameExePath ?? "");
+                }
+                var response = await App.PipeClient.SendRequestAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues },
+                    { "Content", json.Stringify() }
+                });
+                if (response == null || !response.TryGetValue("Content", out object raw) || !(raw is string content))
+                {
+                    Logger.Warn("Power-source split was not confirmed by helper");
+                    await SyncPowerSourceProfilesFromHelperAsync();
+                    return;
+                }
+                var result = Windows.Data.Json.JsonObject.Parse(content);
+                if (result.GetNamedString("Outcome", "Rejected") != "Applied")
+                    Logger.Warn($"Power-source split rejected: {result.GetNamedString("Reason", "unknown reason")}");
+                await SyncPowerSourceProfilesFromHelperAsync(result.GetNamedString("Snapshot", ""));
+                SyncPowerSourceProfileToggleForCurrentContext();
+                UpdateActiveProfileIndicator();
+                UpdateProfileDisplay();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Power-source split intent failed: {ex.Message}");
+                await SyncPowerSourceProfilesFromHelperAsync();
             }
         }
 

@@ -87,6 +87,14 @@ namespace XboxGamingBarHelper
                     return;
                 }
 
+                if (cfg.TryGetValue("Intent", out intent)
+                    && intent.ValueKind == System.Text.Json.JsonValueKind.String
+                    && intent.GetString() == "SetPowerSourceSplit")
+                {
+                    ApplyPowerSourceSplitIntent(cfg, out _, out _);
+                    return;
+                }
+
                 int? ParseInt(string key)
                 {
                     if (!cfg.TryGetValue(key, out var el)) return null;
@@ -494,6 +502,37 @@ namespace XboxGamingBarHelper
             return true;
         }
 
+        private static bool ApplyPowerSourceSplitIntent(Dictionary<string, System.Text.Json.JsonElement> cfg, out string reason, out Shared.Data.GameProfile confirmedProfile)
+        {
+            reason = null;
+            confirmedProfile = default;
+            string scope = cfg.TryGetValue("Scope", out var scopeElement) ? scopeElement.GetString() : null;
+            if (!cfg.TryGetValue("Enabled", out var enabledElement)
+                || (enabledElement.ValueKind != System.Text.Json.JsonValueKind.True && enabledElement.ValueKind != System.Text.Json.JsonValueKind.False))
+            {
+                reason = "missing split enabled value";
+                return false;
+            }
+            if (!TryResolveProfileIntentTarget(scope, cfg, out var profile, out bool targetIsActive, out reason))
+                return false;
+
+            profile.PowerSourceProfileEnabled = enabledElement.GetBoolean();
+            if (targetIsActive)
+            {
+                lock (profileApplicationLock)
+                {
+                    if (!isApplyingProfile)
+                    {
+                        try { isApplyingProfile = true; ApplyPowerSourceChangeInternal(IsCurrentlyOnAC); }
+                        finally { isApplyingProfile = false; }
+                    }
+                }
+            }
+            confirmedProfile = profile;
+            Logger.Info($"Applied SetPowerSourceSplit intent: enabled={profile.PowerSourceProfileEnabled} to {profile.GameId.Name}");
+            return true;
+        }
+
         private static bool TryResolveProfileIntentTarget(string scope, Dictionary<string, System.Text.Json.JsonElement> cfg,
             out Shared.Data.GameProfile profile, out bool targetIsActive, out string reason)
         {
@@ -626,6 +665,9 @@ namespace XboxGamingBarHelper
                 // in-between value from a throwaway copy).
                 Shared.Data.GameProfile profile = profileManager.CurrentProfile.Value;
                 string state = isOnAC ? "AC" : "DC";
+                // A profile with the split disabled intentionally resolves to its base values
+                // even on battery. This is scope policy, not a widget-side decision.
+                bool resolveAcValues = isOnAC || !profile.PowerSourceProfileEnabled;
 
                 // [2.0 rebuild - AC/DC persistence follow-up] LegionPerformanceMode (TDP Mode)
                 // itself now switches on a real AC/DC transition too, same as every other
@@ -634,7 +676,7 @@ namespace XboxGamingBarHelper
                 // "don't change on profile switch") - only switch when a real value is set.
                 if (legionManager != null)
                 {
-                    int? targetMode = isOnAC ? profile.LegionPerformanceMode : (profile.LegionPerformanceMode_DC ?? profile.LegionPerformanceMode);
+                    int? targetMode = resolveAcValues ? profile.LegionPerformanceMode : (profile.LegionPerformanceMode_DC ?? profile.LegionPerformanceMode);
                     if (targetMode.HasValue && targetMode.Value != legionManager.LegionPerformanceMode.Value)
                     {
                         Logger.Info($"Helper-side AC/DC handler: switching LegionPerformanceMode to {targetMode.Value} from persisted {state} profile");
@@ -659,13 +701,13 @@ namespace XboxGamingBarHelper
                     // version of this method rather than removed.
                     var (cachedSlow, cachedFast, cachedPeak) = legionManager.GetCurrentTDPValues();
 
-                    int targetTdp = isOnAC ? profile.TDP : (profile.TDP_DC ?? profile.TDP);
+                    int targetTdp = resolveAcValues ? profile.TDP : (profile.TDP_DC ?? profile.TDP);
                     if (targetTdp <= 0) targetTdp = cachedSlow ?? performanceManager.TDP.Value;
 
-                    int targetTdpFast = isOnAC ? profile.TDPFast : (profile.TDPFast_DC ?? profile.TDPFast);
+                    int targetTdpFast = resolveAcValues ? profile.TDPFast : (profile.TDPFast_DC ?? profile.TDPFast);
                     if (targetTdpFast <= 0) targetTdpFast = cachedFast ?? targetTdp;
 
-                    int targetTdpPeak = isOnAC ? profile.TDPPeak : (profile.TDPPeak_DC ?? profile.TDPPeak);
+                    int targetTdpPeak = resolveAcValues ? profile.TDPPeak : (profile.TDPPeak_DC ?? profile.TDPPeak);
                     if (targetTdpPeak <= 0) targetTdpPeak = cachedPeak ?? targetTdp;
 
                     if (targetTdp > 0)
@@ -708,67 +750,67 @@ namespace XboxGamingBarHelper
                 // 2b) Extended fields: CPUBoost / CPUEPP / CPUState (Min+Max) / FPSLimit. Apply
                 // unconditionally — these settings aren't managed by Legion preset modes, so
                 // they're safe to reapply anytime the resolved value differs from current.
-                bool targetCpuBoost = isOnAC ? profile.CPUBoost : (profile.CPUBoost_DC ?? profile.CPUBoost);
+                bool targetCpuBoost = resolveAcValues ? profile.CPUBoost : (profile.CPUBoost_DC ?? profile.CPUBoost);
                 if (powerManager?.CPUBoost != null && targetCpuBoost != powerManager.CPUBoost.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying CPUBoost={targetCpuBoost} from persisted {state} profile");
                     powerManager.CPUBoost.SetValue(targetCpuBoost);
                 }
 
-                int targetCpuEpp = isOnAC ? profile.CPUEPP : (profile.CPUEPP_DC ?? profile.CPUEPP);
+                int targetCpuEpp = resolveAcValues ? profile.CPUEPP : (profile.CPUEPP_DC ?? profile.CPUEPP);
                 if (powerManager?.CPUEPP != null && targetCpuEpp != powerManager.CPUEPP.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying CPUEPP={targetCpuEpp} from persisted {state} profile");
                     powerManager.CPUEPP.SetValue(targetCpuEpp);
                 }
 
-                int targetMaxCpuState = isOnAC ? profile.MaxCPUState : (profile.MaxCPUState_DC ?? profile.MaxCPUState);
+                int targetMaxCpuState = resolveAcValues ? profile.MaxCPUState : (profile.MaxCPUState_DC ?? profile.MaxCPUState);
                 if (powerManager?.MaxCPUState != null && targetMaxCpuState != powerManager.MaxCPUState.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying MaxCPUState={targetMaxCpuState}% from persisted {state} profile");
                     powerManager.MaxCPUState.SetValue(targetMaxCpuState);
                 }
 
-                int targetMinCpuState = isOnAC ? profile.MinCPUState : (profile.MinCPUState_DC ?? profile.MinCPUState);
+                int targetMinCpuState = resolveAcValues ? profile.MinCPUState : (profile.MinCPUState_DC ?? profile.MinCPUState);
                 if (powerManager?.MinCPUState != null && targetMinCpuState != powerManager.MinCPUState.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying MinCPUState={targetMinCpuState}% from persisted {state} profile");
                     powerManager.MinCPUState.SetValue(targetMinCpuState);
                 }
 
-                int? targetFpsLimit = isOnAC ? profile.FPSLimit : (profile.FPSLimit_DC ?? profile.FPSLimit);
+                int? targetFpsLimit = resolveAcValues ? profile.FPSLimit : (profile.FPSLimit_DC ?? profile.FPSLimit);
                 if (targetFpsLimit.HasValue && rtssManager?.FPSLimit != null && targetFpsLimit.Value != rtssManager.FPSLimit.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying FPSLimit={targetFpsLimit.Value} from persisted {state} profile");
                     rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
                 }
 
-                ApplyOSPowerModeFromProfile(profile, isOnAC, "Helper-side AC/DC handler");
+                ApplyOSPowerModeFromProfile(profile, resolveAcValues, "Helper-side AC/DC handler");
 
                 // 2c) AMD Radeon features (11 fields) — reuses ApplyAMDFeaturesFromProfile's
                 // existing mutual-exclusion correction (RSR/RIS, Chill/AntiLag/Boost), now AC/DC-aware.
                 if (amdManager != null)
                 {
-                    ApplyAMDFeaturesFromProfile(profile, isOnAC);
+                    ApplyAMDFeaturesFromProfile(profile, resolveAcValues);
                 }
 
                 // 2d) HDR / Resolution / RefreshRate — same HasValue/IsNullOrEmpty-gated shape
                 // RunningGame_PropertyChanged's own profile-switch block already uses.
-                bool? targetHdr = isOnAC ? profile.HDREnabled : (profile.HDREnabled_DC ?? profile.HDREnabled);
+                bool? targetHdr = resolveAcValues ? profile.HDREnabled : (profile.HDREnabled_DC ?? profile.HDREnabled);
                 if (targetHdr.HasValue && systemManager?.HDREnabled != null && targetHdr.Value != systemManager.HDREnabled.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying HDREnabled={targetHdr.Value} from persisted {state} profile");
                     systemManager.HDREnabled.SetValue(targetHdr.Value);
                 }
 
-                string targetResolution = isOnAC ? profile.Resolution : (profile.Resolution_DC ?? profile.Resolution);
+                string targetResolution = resolveAcValues ? profile.Resolution : (profile.Resolution_DC ?? profile.Resolution);
                 if (!string.IsNullOrEmpty(targetResolution) && systemManager?.Resolution != null && targetResolution != systemManager.Resolution.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying Resolution={targetResolution} from persisted {state} profile");
                     systemManager.Resolution.SetValue(targetResolution);
                 }
 
-                int? targetRefreshRate = isOnAC ? profile.RefreshRate : (profile.RefreshRate_DC ?? profile.RefreshRate);
+                int? targetRefreshRate = resolveAcValues ? profile.RefreshRate : (profile.RefreshRate_DC ?? profile.RefreshRate);
                 if (targetRefreshRate.HasValue && systemManager?.RefreshRate != null && targetRefreshRate.Value != systemManager.RefreshRate.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying RefreshRate={targetRefreshRate.Value} from persisted {state} profile");
