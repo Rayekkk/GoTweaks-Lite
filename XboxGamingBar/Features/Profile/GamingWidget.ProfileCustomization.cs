@@ -46,55 +46,37 @@ namespace XboxGamingBar
 
         private void LoadProfileCustomizationSettings()
         {
+            // Functional save flags are helper-owned. Until its confirmed snapshot arrives,
+            // render the documented defaults without consulting widget LocalSettings.
+            ApplyProfileSaveFlagsSnapshot(null);
+        }
+
+        private void ApplyProfileSaveFlagsSnapshot(string configJson)
+        {
             isLoadingProfileSettings = true;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
+                var flags = string.IsNullOrEmpty(configJson) ? null : Windows.Data.Json.JsonObject.Parse(configJson);
+                bool GetFlag(string key, bool fallback) => flags != null && flags.TryGetValue(key, out var value)
+                    ? value.GetBoolean() : fallback;
 
-                // Load values from settings
-                _saveTDP = settings.Values.ContainsKey("ProfileSaveTDP") ? (bool)settings.Values["ProfileSaveTDP"] : true;
-                _saveCPUBoost = settings.Values.ContainsKey("ProfileSaveCPUBoost") ? (bool)settings.Values["ProfileSaveCPUBoost"] : true;
-                _saveCPUEPP = settings.Values.ContainsKey("ProfileSaveCPUEPP") ? (bool)settings.Values["ProfileSaveCPUEPP"] : true;
-                _saveCPUState = settings.Values.ContainsKey("ProfileSaveCPUState") ? (bool)settings.Values["ProfileSaveCPUState"] : true;
-                _saveAMDFeatures = settings.Values.ContainsKey("ProfileSaveAMDFeatures") ? (bool)settings.Values["ProfileSaveAMDFeatures"] : false;
-                _saveFPSLimit = settings.Values.ContainsKey("ProfileSaveFPSLimit") ? (bool)settings.Values["ProfileSaveFPSLimit"] : true;
-                _saveOSPowerMode = settings.Values.ContainsKey("ProfileSaveOSPowerMode") ? (bool)settings.Values["ProfileSaveOSPowerMode"] : true;
-                // HDR and Resolution - check for new separate settings first, fall back to combined setting for migration
-                if (settings.Values.ContainsKey("ProfileSaveHDR"))
-                {
-                    _saveHDR = (bool)settings.Values["ProfileSaveHDR"];
-                }
-                else if (settings.Values.ContainsKey("ProfileSaveHDRResolution"))
-                {
-                    _saveHDR = (bool)settings.Values["ProfileSaveHDRResolution"]; // Migrate from combined setting
-                }
-                else
-                {
-                    _saveHDR = false;
-                }
+                _saveTDP = GetFlag("TDP", true);
+                _saveCPUBoost = GetFlag("CPUBoost", true);
+                _saveCPUEPP = GetFlag("CPUEPP", true);
+                _saveCPUState = GetFlag("CPUState", true);
+                _saveAMDFeatures = GetFlag("AMDFeatures", false);
+                _saveFPSLimit = GetFlag("FPSLimit", true);
+                _saveOSPowerMode = GetFlag("OSPowerMode", true);
+                _saveHDR = GetFlag("HDR", false);
+                _saveResolution = GetFlag("Resolution", false);
+                _saveRefreshRate = GetFlag("RefreshRate", false);
+                _saveOverlayLevel = GetFlag("OverlayLevel", false);
+                _saveNintendoLayout = GetFlag("NintendoLayout", false);
+                _saveVibration = GetFlag("Vibration", false);
+                _saveLighting = GetFlag("Lighting", false);
+                _saveButtonMappings = GetFlag("ButtonMappings", false);
+                _saveGyroSettings = GetFlag("GyroSettings", false);
 
-                if (settings.Values.ContainsKey("ProfileSaveResolution"))
-                {
-                    _saveResolution = (bool)settings.Values["ProfileSaveResolution"];
-                }
-                else if (settings.Values.ContainsKey("ProfileSaveHDRResolution"))
-                {
-                    _saveResolution = (bool)settings.Values["ProfileSaveHDRResolution"]; // Migrate from combined setting
-                }
-                else
-                {
-                    _saveResolution = false;
-                }
-
-                _saveRefreshRate = settings.Values.ContainsKey("ProfileSaveRefreshRate") ? (bool)settings.Values["ProfileSaveRefreshRate"] : false;
-                _saveOverlayLevel = settings.Values.ContainsKey("ProfileSaveOverlayLevel") ? (bool)settings.Values["ProfileSaveOverlayLevel"] : false;
-                _saveNintendoLayout = settings.Values.ContainsKey("ProfileSaveNintendoLayout") ? (bool)settings.Values["ProfileSaveNintendoLayout"] : false;
-                _saveVibration = settings.Values.ContainsKey("ProfileSaveVibration") ? (bool)settings.Values["ProfileSaveVibration"] : false;
-                _saveLighting = settings.Values.ContainsKey("ProfileSaveLighting") ? (bool)settings.Values["ProfileSaveLighting"] : false;
-                _saveButtonMappings = settings.Values.ContainsKey("ProfileSaveButtonMappings") ? (bool)settings.Values["ProfileSaveButtonMappings"] : false;
-                _saveGyroSettings = settings.Values.ContainsKey("ProfileSaveGyroSettings") ? (bool)settings.Values["ProfileSaveGyroSettings"] : false;
-
-                // Update UI checkboxes
                 if (ProfileSaveTDPCheckBox != null) ProfileSaveTDPCheckBox.IsChecked = _saveTDP;
                 if (ProfileSaveCPUBoostCheckBox != null) ProfileSaveCPUBoostCheckBox.IsChecked = _saveCPUBoost;
                 if (ProfileSaveCPUEPPCheckBox != null) ProfileSaveCPUEPPCheckBox.IsChecked = _saveCPUEPP;
@@ -112,42 +94,21 @@ namespace XboxGamingBar
                 if (ProfileSaveButtonMappingsCheckBox != null) ProfileSaveButtonMappingsCheckBox.IsChecked = _saveButtonMappings;
                 if (ProfileSaveGyroSettingsCheckBox != null) ProfileSaveGyroSettingsCheckBox.IsChecked = _saveGyroSettings;
             }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to render helper ProfileSaveFlags snapshot: {ex.Message}");
+            }
             finally
             {
                 isLoadingProfileSettings = false;
             }
         }
-
-        private void SaveProfileCustomizationSettings()
-        {
-            if (isLoadingProfileSettings) return;
-
-            var settings = ApplicationData.Current.LocalSettings;
-            settings.Values["ProfileSaveTDP"] = ProfileSaveTDPCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveCPUBoost"] = ProfileSaveCPUBoostCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveCPUEPP"] = ProfileSaveCPUEPPCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveCPUState"] = ProfileSaveCPUStateCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveAMDFeatures"] = ProfileSaveAMDFeaturesCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveFPSLimit"] = ProfileSaveFPSLimitCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveOSPowerMode"] = ProfileSaveOSPowerModeCheckBox?.IsChecked ?? true;
-            settings.Values["ProfileSaveHDR"] = ProfileSaveHDRCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveResolution"] = ProfileSaveResolutionCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveRefreshRate"] = ProfileSaveRefreshRateCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveOverlayLevel"] = ProfileSaveOverlayLevelCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveNintendoLayout"] = ProfileSaveNintendoLayoutCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveVibration"] = ProfileSaveVibrationCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveLighting"] = ProfileSaveLightingCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveButtonMappings"] = ProfileSaveButtonMappingsCheckBox?.IsChecked ?? false;
-            settings.Values["ProfileSaveGyroSettings"] = ProfileSaveGyroSettingsCheckBox?.IsChecked ?? false;
-        }
-
         private void ProfileSettingsCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             if (isLoadingProfileSettings) return;
 
             // Update backing fields from UI checkboxes
             SyncProfileSettingsBackingFields();
-            SaveProfileCustomizationSettings();
             SendProfileSaveFlagsToHelper();
             // Re-render the profile tables immediately so the row visibility (which
             // categories are shown/hidden) reflects the new Save* selection without
@@ -162,43 +123,67 @@ namespace XboxGamingBar
         /// GlobalProfile regardless of the active profile. Sent on startup and on any checkbox
         /// change. Helper stores a snapshot and consults it from AutoTDP / Legion save handlers.
         /// </summary>
-        internal void SendProfileSaveFlagsToHelper()
+        internal async void SendProfileSaveFlagsToHelper()
         {
             try
             {
                 if (!App.IsConnected) return;
-
-                var jsonObj = new Windows.Data.Json.JsonObject();
-                jsonObj["TDP"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveTDP);
-                jsonObj["CPUBoost"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUBoost);
-                jsonObj["CPUEPP"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUEPP);
-                jsonObj["CPUState"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUState);
-                jsonObj["AMDFeatures"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveAMDFeatures);
-                jsonObj["FPSLimit"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveFPSLimit);
-                jsonObj["OSPowerMode"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveOSPowerMode);
-                jsonObj["HDR"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveHDR);
-                jsonObj["Resolution"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveResolution);
-                jsonObj["RefreshRate"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveRefreshRate);
-                jsonObj["OverlayLevel"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveOverlayLevel);
-                jsonObj["NintendoLayout"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveNintendoLayout);
-                jsonObj["Vibration"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveVibration);
-                jsonObj["Lighting"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveLighting);
-                jsonObj["ButtonMappings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveButtonMappings);
-                jsonObj["GyroSettings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveGyroSettings);
-
                 var request = new Windows.Foundation.Collections.ValueSet
                 {
                     { "Command", (int)Shared.Enums.Command.Set },
                     { "Function", (int)Shared.Enums.Function.ProfileSaveFlags },
-                    { "Content", jsonObj.Stringify() },
+                    { "Content", BuildProfileSaveFlagsJson() },
                 };
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info("Sent ProfileSaveFlags to helper");
+                var response = await App.SendMessageAsync(request);
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyProfileSaveFlagsSnapshot(content.ToString());
+                Logger.Info("ProfileSaveFlags confirmed by helper");
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error sending ProfileSaveFlags: {ex.Message}");
             }
+        }
+
+        internal async Task RequestProfileSaveFlagsFromHelperAsync()
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Get },
+                    { "Function", (int)Shared.Enums.Function.ProfileSaveFlags },
+                });
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyProfileSaveFlagsSnapshot(content.ToString());
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to get ProfileSaveFlags from helper: {ex.Message}");
+            }
+        }
+
+        private string BuildProfileSaveFlagsJson()
+        {
+            var flags = new Windows.Data.Json.JsonObject();
+            flags["TDP"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveTDP);
+            flags["CPUBoost"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUBoost);
+            flags["CPUEPP"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUEPP);
+            flags["CPUState"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveCPUState);
+            flags["AMDFeatures"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveAMDFeatures);
+            flags["FPSLimit"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveFPSLimit);
+            flags["OSPowerMode"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveOSPowerMode);
+            flags["HDR"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveHDR);
+            flags["Resolution"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveResolution);
+            flags["RefreshRate"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveRefreshRate);
+            flags["OverlayLevel"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveOverlayLevel);
+            flags["NintendoLayout"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveNintendoLayout);
+            flags["Vibration"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveVibration);
+            flags["Lighting"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveLighting);
+            flags["ButtonMappings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveButtonMappings);
+            flags["GyroSettings"] = Windows.Data.Json.JsonValue.CreateBooleanValue(_saveGyroSettings);
+            return flags.Stringify();
         }
 
         /// <summary>

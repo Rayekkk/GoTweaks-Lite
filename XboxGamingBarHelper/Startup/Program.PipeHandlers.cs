@@ -1457,7 +1457,16 @@ namespace XboxGamingBarHelper
         // Labs: Scroll Wheel Remap
         private static global::Windows.Foundation.Collections.ValueSet HandleLabsLegionScrollRemap(Shared.IPC.PipeMessage request)
         {
-            global::Windows.Foundation.Collections.ValueSet response = null;
+            if (request.Command == Command.Get)
+            {
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { nameof(Function), (int)Function.Labs_LegionScrollRemap },
+                    { "Content", GetLegionScrollRemapSnapshot() },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                };
+            }
+
             string direction = "Up";
             bool enabled = false;
             int actionType = 0;
@@ -1473,34 +1482,87 @@ namespace XboxGamingBarHelper
                 shortcut = shortcutObj?.ToString() ?? "";
 
             bool success = ConfigureLegionScrollRemap(direction, enabled, actionType, shortcut);
-            response = new global::Windows.Foundation.Collections.ValueSet();
+            bool accepted = success || !enabled;
+            if (accepted)
+                PersistLegionScrollRemap(direction, enabled, actionType, shortcut);
+
+            var response = new global::Windows.Foundation.Collections.ValueSet();
+            response.Add(nameof(Function), (int)Function.Labs_LegionScrollRemap);
             response.Add("Success", success);
+            response.Add("Content", GetLegionScrollRemapSnapshot());
+            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
             Logger.Info($"Pipe: Scroll {direction} Remap - Enabled: {enabled}, Success: {success}");
             return response;
+        }
+
+        private static void PersistLegionScrollRemap(string direction, bool enabled, int actionType, string shortcutOrCommand)
+        {
+            bool isClick = string.Equals(direction, "Click", StringComparison.OrdinalIgnoreCase);
+            string prefix = isClick ? "ScrollClick_" : "Scroll_";
+            int action = enabled ? actionType + 1 : 0;
+            LocalSettingsHelper.SetValue(prefix + "Action", action);
+            LocalSettingsHelper.SetValue(prefix + "Shortcut", actionType == 1 && enabled ? shortcutOrCommand ?? "" : "");
+            LocalSettingsHelper.SetValue(prefix + "Command", actionType == 2 && enabled ? shortcutOrCommand ?? "" : "");
+        }
+
+        private static string GetLegionScrollRemapSnapshot()
+        {
+            int GetAction(string key) => LocalSettingsHelper.TryGetValue<int>(key, out var value) ? value : 0;
+            string GetText(string key) => LocalSettingsHelper.TryGetValue<string>(key, out var value) ? value ?? "" : "";
+            return System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["Scroll_Action"] = GetAction("Scroll_Action"),
+                ["Scroll_Shortcut"] = GetText("Scroll_Shortcut"),
+                ["Scroll_Command"] = GetText("Scroll_Command"),
+                ["ScrollClick_Action"] = GetAction("ScrollClick_Action"),
+                ["ScrollClick_Shortcut"] = GetText("ScrollClick_Shortcut"),
+                ["ScrollClick_Command"] = GetText("ScrollClick_Command"),
+            });
         }
 
         // Controller Hotkey Config: Receive hotkey settings from widget for XInput monitoring
         private static global::Windows.Foundation.Collections.ValueSet HandleControllerHotkeyConfig(Shared.IPC.PipeMessage request)
         {
-            global::Windows.Foundation.Collections.ValueSet response = null;
-            if (request.Content != null)
+            if (request.Command == Command.Get)
             {
-                string configJson = request.Content.ToString();
-                ApplyControllerHotkeyConfig(configJson);
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { nameof(Function), (int)Function.ControllerHotkeyConfig },
+                    { "Content", GetControllerHotkeyConfigSnapshot() },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                };
             }
-            return response;
+            if (request.Content != null)
+                ApplyControllerHotkeyConfig(request.Content.ToString());
+            return new global::Windows.Foundation.Collections.ValueSet
+            {
+                { nameof(Function), (int)Function.ControllerHotkeyConfig },
+                { "Content", GetControllerHotkeyConfigSnapshot() },
+                { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+            };
         }
 
         // Profile Save Flags: which settings the widget wants captured per-game vs.
         // left as device-wide globals.
         private static global::Windows.Foundation.Collections.ValueSet HandleProfileSaveFlags(Shared.IPC.PipeMessage request)
         {
-            global::Windows.Foundation.Collections.ValueSet response = null;
-            if (request.Content != null)
+            if (request.Command == Command.Get)
             {
-                ApplyProfileSaveFlags(request.Content.ToString());
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { nameof(Function), (int)Function.ProfileSaveFlags },
+                    { "Content", GetProfileSaveFlagsSnapshot() },
+                    { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+                };
             }
-            return response;
+            if (request.Content != null)
+                ApplyProfileSaveFlags(request.Content.ToString());
+            return new global::Windows.Foundation.Collections.ValueSet
+            {
+                { nameof(Function), (int)Function.ProfileSaveFlags },
+                { "Content", GetProfileSaveFlagsSnapshot() },
+                { "UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds() },
+            };
         }
 
         // Per-state TDP / TDPBoost values from the widget.

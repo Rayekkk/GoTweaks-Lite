@@ -37,6 +37,8 @@ namespace XboxGamingBarHelper
 {
     internal partial class Program
     {
+        private const string ProfileSaveFlagsSettingsKey = "ProfileSaveFlags";
+
         // Snapshot of the widget's Profiles-tab save checkboxes. Defaults match the widget's
         // initial-field defaults so any handler that runs before the widget has pushed flags
         // falls back to the same behavior the UI shows to the user.
@@ -61,9 +63,21 @@ namespace XboxGamingBarHelper
             public static bool Lighting = false;
             public static bool ButtonMappings = false;
             public static bool GyroSettings = false;
+
+            static ProfileSaveFlagsState()
+            {
+                if (LocalSettingsHelper.TryGetValue<string>(ProfileSaveFlagsSettingsKey, out var saved)
+                    && !string.IsNullOrWhiteSpace(saved))
+                    ApplyProfileSaveFlags(saved, persist: false);
+            }
         }
 
         internal static void ApplyProfileSaveFlags(string configJson)
+        {
+            ApplyProfileSaveFlags(configJson, persist: true);
+        }
+
+        private static void ApplyProfileSaveFlags(string configJson, bool persist)
         {
             try
             {
@@ -85,6 +99,8 @@ namespace XboxGamingBarHelper
                 if (cfg.TryGetValue("Lighting", out var v17)) ProfileSaveFlagsState.Lighting = v17;
                 if (cfg.TryGetValue("ButtonMappings", out var v18)) ProfileSaveFlagsState.ButtonMappings = v18;
                 if (cfg.TryGetValue("GyroSettings", out var v19)) ProfileSaveFlagsState.GyroSettings = v19;
+                if (persist)
+                    LocalSettingsHelper.SetValue(ProfileSaveFlagsSettingsKey, GetProfileSaveFlagsSnapshot());
                 Logger.Info("Applied ProfileSaveFlags from widget "
                     + $"(TDP={ProfileSaveFlagsState.TDP}, CPUBoost={ProfileSaveFlagsState.CPUBoost}, "
                     + $"CPUEPP={ProfileSaveFlagsState.CPUEPP}, CPUState={ProfileSaveFlagsState.CPUState}, "
@@ -96,6 +112,31 @@ namespace XboxGamingBarHelper
             {
                 Logger.Error($"ApplyProfileSaveFlags: {ex.Message}");
             }
+        }
+
+        internal static string GetProfileSaveFlagsSnapshot()
+        {
+            // Reading any field triggers ProfileSaveFlagsState's static initializer, which loads
+            // the helper-owned persisted snapshot before it is exposed to a widget.
+            return System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, bool>
+            {
+                ["TDP"] = ProfileSaveFlagsState.TDP,
+                ["CPUBoost"] = ProfileSaveFlagsState.CPUBoost,
+                ["CPUEPP"] = ProfileSaveFlagsState.CPUEPP,
+                ["CPUState"] = ProfileSaveFlagsState.CPUState,
+                ["AMDFeatures"] = ProfileSaveFlagsState.AMDFeatures,
+                ["FPSLimit"] = ProfileSaveFlagsState.FPSLimit,
+                ["OSPowerMode"] = ProfileSaveFlagsState.OSPowerMode,
+                ["HDR"] = ProfileSaveFlagsState.HDR,
+                ["Resolution"] = ProfileSaveFlagsState.Resolution,
+                ["RefreshRate"] = ProfileSaveFlagsState.RefreshRate,
+                ["OverlayLevel"] = ProfileSaveFlagsState.OverlayLevel,
+                ["NintendoLayout"] = ProfileSaveFlagsState.NintendoLayout,
+                ["Vibration"] = ProfileSaveFlagsState.Vibration,
+                ["Lighting"] = ProfileSaveFlagsState.Lighting,
+                ["ButtonMappings"] = ProfileSaveFlagsState.ButtonMappings,
+                ["GyroSettings"] = ProfileSaveFlagsState.GyroSettings,
+            });
         }
 
         // Routes a setting save to CurrentProfile (per-game capture) when saveToProfile is true,

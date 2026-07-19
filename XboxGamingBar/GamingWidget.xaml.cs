@@ -920,8 +920,6 @@ namespace XboxGamingBar
 
         // Controller profile state
         private bool isLoadingControllerProfile = false;
-        private bool isSwitchingControllerProfile = false;
-        private DateTime lastProfileApplyTime = DateTime.MinValue; // Prevents duplicate sends from queued UI events
 
         // Debounces the controller-profile save/send for slider drags (gyro sensitivity/
         // deadzone, stick deadzones, trigger travel, joystick-mouse sens, light brightness/
@@ -3364,7 +3362,7 @@ namespace XboxGamingBar
                 Logger.Info("[PIPE] Sending Quick Metrics and Screen Saver enabled states to helper...");
                 SendQuickMetricsEnabledToHelper();
                 SendScreenSaverEnabledToHelper();
-                SendProfileSaveFlagsToHelper();
+                await RequestProfileSaveFlagsFromHelperAsync();
                 // 2.0 invariant: never let the widget's persisted LocalSettings profiles
                 // seed the helper on connect.  The helper owns the durable profile and sends a
                 // snapshot back for this display/edit cache instead.
@@ -3375,7 +3373,7 @@ namespace XboxGamingBar
                 // state — which is fine in desktop mode (the widget's own watcher
                 // fires) but breaks every hotkey in FSE where the widget is suspended
                 // and only the helper is polling XInput. Issue #79 (kingvall).
-                SendControllerHotkeyConfigToHelper();
+                LoadHotkeySettings();
                 // Same reasoning applies to quick-tile controller combos: without this a
                 // helper restart forgets every tile combo binding until the user re-opens
                 // Customize Tiles and hits Save again.

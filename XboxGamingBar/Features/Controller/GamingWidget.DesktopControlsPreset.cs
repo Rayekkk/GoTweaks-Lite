@@ -45,15 +45,8 @@ namespace XboxGamingBar
     {
         private void LegionDesktopControls_Toggled(object sender, RoutedEventArgs e)
         {
-            if (isLoadingControllerProfile || isSwitchingControllerProfile)
+            if (isLoadingControllerProfile)
                 return;
-
-            // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
-            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
-            {
-                Logger.Info("Desktop Controls toggled event skipped - profile was just applied");
-                return;
-            }
 
             bool enabled = LegionDesktopControlsToggle?.IsOn ?? false;
 

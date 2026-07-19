@@ -45,7 +45,7 @@ namespace XboxGamingBar
     {
         private void LegionNintendoLayout_Toggled(object sender, RoutedEventArgs e)
         {
-            if (isLoadingControllerProfile || isSwitchingControllerProfile)
+            if (isLoadingControllerProfile)
                 return;
 
             // [audit fix - Section 1] Was missing entirely, unlike every sibling toggle handler
@@ -63,13 +63,6 @@ namespace XboxGamingBar
             if (isApplyingHelperUpdate)
             {
                 Logger.Info("Nintendo Layout reflected from helper - not recomputing/resending mappings");
-                return;
-            }
-
-            // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
-            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
-            {
-                Logger.Info("Nintendo Layout toggled event skipped - profile was just applied");
                 return;
             }
 

@@ -71,8 +71,8 @@ namespace XboxGamingBar.Data
             // brightness+speed sliders / power-light toggle; every save handler
             // (ControllerSettingChanged / ControllerSliderSettingChanged) is already guarded by
             // isApplyingHelperUpdate, and the view updates (preview, visibility) correctly follow.
-            // Widget no longer seeds lighting (ApplyControllerProfile + the seed-path
-            // SendLightingToHelper calls); user edits still send via ApplyControllerSettingChange.
+            // Widget no longer seeds lighting from a local profile; user edits still send via
+            // ApplyControllerSettingChange.
             // [2.0 rebuild - slice 4] Vibration REMOVED: helper-authoritative. The old comment here
             // ("helper does NOT persist across restarts") is STALE - since §29 the helper persists
             // LegionVibration/Mode into its profile via RouteProfileSave (per-game if the Vibration
@@ -96,7 +96,7 @@ namespace XboxGamingBar.Data
             // (ApplyLegionControllerSettingsFromProfile). The widget reflects the pushed JSON by
             // rebuilding the composite per-button UI in ApplyButtonMappingFromHelper
             // (LegionButtonMappingProperty.OnValueSyncedFromHelper). User edits still send via
-            // SendButtonMappingsToHelper; the widget no longer seeds them in ApplyControllerProfile.
+            // SendButtonMappingsToHelper; the widget no longer seeds them from a local profile.
             // [2.0 rebuild - slice 8] LegionGamepadButtonMapping (the arbitrary face/D-pad/stick-click
             // remap dict, written only by the Nintendo-layout and Desktop-Controls presets - no
             // dedicated UI exists for it since §29 removed the standalone "Gamepad Buttons" section)
@@ -114,10 +114,8 @@ namespace XboxGamingBar.Data
             // was simply missing an isApplyingHelperUpdate guard (fixed in
             // GamingWidget.NintendoLayoutPreset.cs - now reflects without recomputing/resending on a
             // helper push, same as every other toggle handler). The widget no longer seeds either
-            // from ApplyControllerProfile, and the seed-path resend of gamepadButtonMappings
-            // (SendGamepadButtonMappingsToHelper) is removed from ApplyControllerProfile /
-            // ResendActiveControllerProfileToHelper - only the live-edit path (Nintendo/Desktop toggle
-            // handlers via SaveAndSendGamepadMappings) still sends it.
+            // from local profile loading. Only the live-edit path (Nintendo/Desktop toggle handlers
+            // via SaveAndSendGamepadMappings) sends it.
             // [2.0 rebuild - slice 5] Gyro REMOVED: helper-authoritative. The helper persists all
             // gyro fields via RouteProfileSave (GyroSettings save-flag, §29; global-persistence bug
             // fixed) and applies+pushes them at startup (now before BatchGet) / game switch. All gyro
@@ -129,8 +127,7 @@ namespace XboxGamingBar.Data
             // gated, §29) and applies+pushes them at startup / game switch
             // (ApplyLegionControllerSettingsFromProfile). The widget now REFLECTS the helper's
             // pushed value (bound sliders + UpdateControllerSliderDisplays text), and no longer
-            // seeds them from its own LocalSettings ControllerProfile (removed from
-            // ApplyControllerProfile + SendControllerSettingsToHelper).
+            // seeds them from its own LocalSettings ControllerProfile.
             // [2.0 rebuild - slice 3] Trigger travel (Left/Right Start/End) + HairTriggers REMOVED:
             // helper-authoritative (same as deadzones - persisted §29, applied+pushed by
             // ApplyLegionControllerSettingsFromProfile). The 4 travel sliders reflect via the

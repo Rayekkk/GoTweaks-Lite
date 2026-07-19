@@ -74,9 +74,6 @@ namespace XboxGamingBar
             // Load saved Legion remap settings
             LoadLegionRemapSettings();
 
-            // Load saved Scroll wheel remap settings
-            LoadScrollRemapSettings();
-
             // Load the saved brightness gesture settings (guarded - see
             // _brightnessGestureLoaded below, ToggleSwitch/ListView fire their change
             // events even for this programmatic assignment)
@@ -101,7 +98,7 @@ namespace XboxGamingBar
                     await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                     {
                         ApplyLegionRemapSettingsToHelper();
-                        ApplyScrollRemapSettingsToHelper();
+                        _ = RequestScrollRemapSettingsFromHelperAsync();
                         ApplyBrightnessGestureSettingsToHelper();
                     });
                 }

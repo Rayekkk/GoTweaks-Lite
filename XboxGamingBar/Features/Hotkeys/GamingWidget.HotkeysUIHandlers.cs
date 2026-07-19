@@ -64,90 +64,23 @@ namespace XboxGamingBar
             }
         }
 
-        private void LoadHotkeySettings()
+        private async void LoadHotkeySettings()
         {
+            if (!App.IsConnected) return;
             isLoadingHotkeys = true;
             try
             {
-                // Ensure defaults are applied
-                ApplyHotkeyDefaults();
-
-                var settings = ApplicationData.Current.LocalSettings;
-
-                // Menu+A
-                int actionA = (int)(settings.Values["Hotkey_MenuA_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuAComboBox, actionA);
-                LoadKeysFromString("HotkeyMenuA", settings.Values["Hotkey_MenuA_Key"] as string ?? "", HotkeyMenuAKeyTags);
-                if (HotkeyMenuAKeyPanel != null)
-                    HotkeyMenuAKeyPanel.Visibility = (actionA == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+B
-                int actionB = (int)(settings.Values["Hotkey_MenuB_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuBComboBox, actionB);
-                LoadKeysFromString("HotkeyMenuB", settings.Values["Hotkey_MenuB_Key"] as string ?? "", HotkeyMenuBKeyTags);
-                if (HotkeyMenuBKeyPanel != null)
-                    HotkeyMenuBKeyPanel.Visibility = (actionB == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+X
-                int actionX = (int)(settings.Values["Hotkey_MenuX_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuXComboBox, actionX);
-                LoadKeysFromString("HotkeyMenuX", settings.Values["Hotkey_MenuX_Key"] as string ?? "", HotkeyMenuXKeyTags);
-                if (HotkeyMenuXKeyPanel != null)
-                    HotkeyMenuXKeyPanel.Visibility = (actionX == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+Y
-                int actionY = (int)(settings.Values["Hotkey_MenuY_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuYComboBox, actionY);
-                LoadKeysFromString("HotkeyMenuY", settings.Values["Hotkey_MenuY_Key"] as string ?? "", HotkeyMenuYKeyTags);
-                if (HotkeyMenuYKeyPanel != null)
-                    HotkeyMenuYKeyPanel.Visibility = (actionY == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+DpadUp
-                int actionDpadUp = (int)(settings.Values["Hotkey_MenuDpadUp_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuDpadUpComboBox, actionDpadUp);
-                LoadKeysFromString("HotkeyMenuDpadUp", settings.Values["Hotkey_MenuDpadUp_Key"] as string ?? "", HotkeyMenuDpadUpKeyTags);
-                if (HotkeyMenuDpadUpKeyPanel != null)
-                    HotkeyMenuDpadUpKeyPanel.Visibility = (actionDpadUp == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+DpadDown
-                int actionDpadDown = (int)(settings.Values["Hotkey_MenuDpadDown_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuDpadDownComboBox, actionDpadDown);
-                LoadKeysFromString("HotkeyMenuDpadDown", settings.Values["Hotkey_MenuDpadDown_Key"] as string ?? "", HotkeyMenuDpadDownKeyTags);
-                if (HotkeyMenuDpadDownKeyPanel != null)
-                    HotkeyMenuDpadDownKeyPanel.Visibility = (actionDpadDown == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+DpadLeft
-                int actionDpadLeft = (int)(settings.Values["Hotkey_MenuDpadLeft_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuDpadLeftComboBox, actionDpadLeft);
-                LoadKeysFromString("HotkeyMenuDpadLeft", settings.Values["Hotkey_MenuDpadLeft_Key"] as string ?? "", HotkeyMenuDpadLeftKeyTags);
-                if (HotkeyMenuDpadLeftKeyPanel != null)
-                    HotkeyMenuDpadLeftKeyPanel.Visibility = (actionDpadLeft == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Menu+DpadRight
-                int actionDpadRight = (int)(settings.Values["Hotkey_MenuDpadRight_Action"] ?? 0);
-                SelectHotkeyComboBoxByTag(HotkeyMenuDpadRightComboBox, actionDpadRight);
-                LoadKeysFromString("HotkeyMenuDpadRight", settings.Values["Hotkey_MenuDpadRight_Key"] as string ?? "", HotkeyMenuDpadRightKeyTags);
-                if (HotkeyMenuDpadRightKeyPanel != null)
-                    HotkeyMenuDpadRightKeyPanel.Visibility = (actionDpadRight == 1) ? Visibility.Visible : Visibility.Collapsed;
-
-                // Sync all hotkey settings to fallback file for elevated helper
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "Hotkey_MenuA_Action", actionA },
-                    { "Hotkey_MenuB_Action", actionB },
-                    { "Hotkey_MenuX_Action", actionX },
-                    { "Hotkey_MenuY_Action", actionY },
-                    { "Hotkey_MenuDpadUp_Action", actionDpadUp },
-                    { "Hotkey_MenuDpadDown_Action", actionDpadDown },
-                    { "Hotkey_MenuDpadLeft_Action", actionDpadLeft },
-                    { "Hotkey_MenuDpadRight_Action", actionDpadRight }
+                    { "Command", (int)Command.Get },
+                    { "Function", (int)Function.ControllerHotkeyConfig },
                 });
-
-                Logger.Info("Hotkey settings loaded");
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyHotkeyConfigSnapshot(content.ToString());
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error loading hotkey settings: {ex.Message}");
+                Logger.Error($"Failed to get controller hotkey configuration from helper: {ex.Message}");
             }
             finally
             {
@@ -155,6 +88,27 @@ namespace XboxGamingBar
             }
         }
 
+        private void ApplyHotkeyConfigSnapshot(string configJson)
+        {
+            var config = Windows.Data.Json.JsonObject.Parse(configJson);
+            ApplyHotkeySnapshot(config, "MenuA", HotkeyMenuAComboBox, HotkeyMenuAKeyPanel, "HotkeyMenuA", HotkeyMenuAKeyTags);
+            ApplyHotkeySnapshot(config, "MenuB", HotkeyMenuBComboBox, HotkeyMenuBKeyPanel, "HotkeyMenuB", HotkeyMenuBKeyTags);
+            ApplyHotkeySnapshot(config, "MenuX", HotkeyMenuXComboBox, HotkeyMenuXKeyPanel, "HotkeyMenuX", HotkeyMenuXKeyTags);
+            ApplyHotkeySnapshot(config, "MenuY", HotkeyMenuYComboBox, HotkeyMenuYKeyPanel, "HotkeyMenuY", HotkeyMenuYKeyTags);
+            ApplyHotkeySnapshot(config, "MenuDpadUp", HotkeyMenuDpadUpComboBox, HotkeyMenuDpadUpKeyPanel, "HotkeyMenuDpadUp", HotkeyMenuDpadUpKeyTags);
+            ApplyHotkeySnapshot(config, "MenuDpadDown", HotkeyMenuDpadDownComboBox, HotkeyMenuDpadDownKeyPanel, "HotkeyMenuDpadDown", HotkeyMenuDpadDownKeyTags);
+            ApplyHotkeySnapshot(config, "MenuDpadLeft", HotkeyMenuDpadLeftComboBox, HotkeyMenuDpadLeftKeyPanel, "HotkeyMenuDpadLeft", HotkeyMenuDpadLeftKeyTags);
+            ApplyHotkeySnapshot(config, "MenuDpadRight", HotkeyMenuDpadRightComboBox, HotkeyMenuDpadRightKeyPanel, "HotkeyMenuDpadRight", HotkeyMenuDpadRightKeyTags);
+        }
+
+        private void ApplyHotkeySnapshot(Windows.Data.Json.JsonObject config, string name, ComboBox combo, StackPanel keyPanel, string keyStore, ItemsControl tags)
+        {
+            int action = config.TryGetValue(name + "_Action", out var actionValue) ? (int)actionValue.GetNumber() : 0;
+            string keys = config.TryGetValue(name + "_Key", out var keyValue) ? keyValue.GetString() ?? "" : "";
+            SelectHotkeyComboBoxByTag(combo, action);
+            LoadKeysFromString(keyStore, keys, tags);
+            if (keyPanel != null) keyPanel.Visibility = action == 1 ? Visibility.Visible : Visibility.Collapsed;
+        }
         private void SelectHotkeyComboBoxByTag(ComboBox comboBox, int tagValue)
         {
             if (comboBox == null) return;
@@ -222,14 +176,6 @@ namespace XboxGamingBar
             if (comboBox?.SelectedItem is ComboBoxItem selected && selected.Tag is string tagStr)
             {
                 int action = int.Parse(tagStr);
-                ApplicationData.Current.LocalSettings.Values[$"Hotkey_{hotkeyName}_Action"] = action;
-
-                // Also save to JSON fallback file for elevated helper
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
-                {
-                    { $"Hotkey_{hotkeyName}_Action", action }
-                });
-
                 // Show/hide key panel based on action (1=Keyboard Shortcut)
                 if (keyPanel != null)
                 {

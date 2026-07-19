@@ -666,40 +666,46 @@ namespace XboxGamingBar
         /// Send current controller hotkey config to helper via pipe so it can update
         /// its cached config for XInput-based button combo detection.
         /// </summary>
-        private void SendControllerHotkeyConfigToHelper()
+        private async void SendControllerHotkeyConfigToHelper()
         {
             try
             {
                 if (!App.IsConnected) return;
 
-                var settings = ApplicationData.Current.LocalSettings;
-                var hotkeyNames = new[] { "MenuA", "MenuB", "MenuX", "MenuY", "MenuDpadUp", "MenuDpadDown", "MenuDpadLeft", "MenuDpadRight" };
-
-                // Build JSON config matching what ApplyControllerHotkeyConfig expects
                 var jsonObj = new Windows.Data.Json.JsonObject();
-                foreach (var name in hotkeyNames)
-                {
-                    int action = (int)(settings.Values[$"Hotkey_{name}_Action"] ?? 0);
-                    string key = settings.Values[$"Hotkey_{name}_Key"] as string ?? "";
-                    jsonObj[$"{name}_Action"] = Windows.Data.Json.JsonValue.CreateNumberValue(action);
-                    jsonObj[$"{name}_Key"] = Windows.Data.Json.JsonValue.CreateStringValue(key);
-                }
-
-                string configJson = jsonObj.Stringify();
+                AddHotkeyIntent(jsonObj, "MenuA", HotkeyMenuAComboBox, "HotkeyMenuA");
+                AddHotkeyIntent(jsonObj, "MenuB", HotkeyMenuBComboBox, "HotkeyMenuB");
+                AddHotkeyIntent(jsonObj, "MenuX", HotkeyMenuXComboBox, "HotkeyMenuX");
+                AddHotkeyIntent(jsonObj, "MenuY", HotkeyMenuYComboBox, "HotkeyMenuY");
+                AddHotkeyIntent(jsonObj, "MenuDpadUp", HotkeyMenuDpadUpComboBox, "HotkeyMenuDpadUp");
+                AddHotkeyIntent(jsonObj, "MenuDpadDown", HotkeyMenuDpadDownComboBox, "HotkeyMenuDpadDown");
+                AddHotkeyIntent(jsonObj, "MenuDpadLeft", HotkeyMenuDpadLeftComboBox, "HotkeyMenuDpadLeft");
+                AddHotkeyIntent(jsonObj, "MenuDpadRight", HotkeyMenuDpadRightComboBox, "HotkeyMenuDpadRight");
 
                 var request = new Windows.Foundation.Collections.ValueSet
                 {
                     { "Command", (int)Shared.Enums.Command.Set },
                     { "Function", (int)Shared.Enums.Function.ControllerHotkeyConfig },
-                    { "Content", configJson }
+                    { "Content", jsonObj.Stringify() }
                 };
-                App.PipeClient?.SendValueSet(request);
-                Logger.Info($"Sent controller hotkey config to helper");
+                var response = await App.SendMessageAsync(request);
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyHotkeyConfigSnapshot(content.ToString());
+                Logger.Info("Controller hotkey config confirmed by helper");
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error sending controller hotkey config: {ex.Message}");
             }
+        }
+
+        private void AddHotkeyIntent(Windows.Data.Json.JsonObject json, string name, ComboBox combo, string keyStore)
+        {
+            int action = 0;
+            if (combo?.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+                int.TryParse(tag, out action);
+            json[name + "_Action"] = Windows.Data.Json.JsonValue.CreateNumberValue(action);
+            json[name + "_Key"] = Windows.Data.Json.JsonValue.CreateStringValue(GetKeysAsString(keyStore));
         }
 
         /// <summary>

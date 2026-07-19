@@ -230,7 +230,6 @@ namespace XboxGamingBar
         private void SaveHotkeyKeys(string hotkeyName, string keyStorageName)
         {
             var keysString = GetKeysAsString(keyStorageName);
-            ApplicationData.Current.LocalSettings.Values[$"Hotkey_{hotkeyName}_Key"] = keysString;
             Logger.Info($"Hotkey {hotkeyName} keys saved: {keysString}");
 
             // Sync updated config to helper so its XInput monitor uses the new key
@@ -285,17 +284,11 @@ namespace XboxGamingBar
 
         private void SaveScrollKeys()
         {
-            var keysString = GetKeysAsString("Scroll");
-            ApplicationData.Current.LocalSettings.Values["Scroll_Shortcut"] = keysString;
-            SaveScrollRemapSettings();
             ApplyScrollWheelConfig("Scroll");
         }
 
         private void SaveScrollClickKeys()
         {
-            var keysString = GetKeysAsString("ScrollClick");
-            ApplicationData.Current.LocalSettings.Values["ScrollClick_Shortcut"] = keysString;
-            SaveScrollRemapSettings();
             ApplyScrollWheelConfig("Click");
         }
 

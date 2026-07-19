@@ -57,9 +57,6 @@ namespace XboxGamingBar
             if (ScrollCommandGrid != null)
                 ScrollCommandGrid.Visibility = isCommand ? Visibility.Visible : Visibility.Collapsed;
 
-            // Always save settings immediately when selection changes
-            SaveScrollRemapSettings();
-
             // Apply immediately for Disabled, Xbox Guide, or Focus GoTweaks
             if (selection != 2 && selection != 3)
                 ApplyScrollWheelConfig("Scroll");
@@ -69,7 +66,6 @@ namespace XboxGamingBar
 
         private void ScrollCommandApplyButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveScrollRemapSettings();
             ApplyScrollWheelConfig("Scroll");
             UpdateScrollRemapDescription();
         }
@@ -87,9 +83,6 @@ namespace XboxGamingBar
             if (ScrollClickCommandGrid != null)
                 ScrollClickCommandGrid.Visibility = isCommand ? Visibility.Visible : Visibility.Collapsed;
 
-            // Always save settings immediately when selection changes
-            SaveScrollRemapSettings();
-
             if (selection != 2 && selection != 3)
                 ApplyScrollWheelConfig("Click");
 
@@ -98,7 +91,6 @@ namespace XboxGamingBar
 
         private void ScrollClickCommandApplyButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveScrollRemapSettings();
             ApplyScrollWheelConfig("Click");
             UpdateScrollRemapDescription();
         }
@@ -108,111 +100,46 @@ namespace XboxGamingBar
             // Description text removed in consolidated Special Remapping card
         }
 
-        private void SaveScrollRemapSettings()
+        private async Task RequestScrollRemapSettingsFromHelperAsync()
         {
+            if (!App.IsConnected) return;
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
-                int scrollAction = ScrollActionComboBox?.SelectedIndex ?? 0;
-                string scrollShortcut = GetKeysAsString("Scroll");
-                string scrollCommand = ScrollCommandTextBox?.Text ?? "";
-                int clickAction = ScrollClickActionComboBox?.SelectedIndex ?? 0;
-                string clickShortcut = GetKeysAsString("ScrollClick");
-                string clickCommand = ScrollClickCommandTextBox?.Text ?? "";
-
-                settings.Values["Scroll_Action"] = scrollAction;
-                settings.Values["Scroll_Shortcut"] = scrollShortcut;
-                settings.Values["Scroll_Command"] = scrollCommand;
-                settings.Values["ScrollClick_Action"] = clickAction;
-                settings.Values["ScrollClick_Shortcut"] = clickShortcut;
-                settings.Values["ScrollClick_Command"] = clickCommand;
-
-                // Also save to JSON fallback file for elevated helper
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
+                var response = await App.SendMessageAsync(new Windows.Foundation.Collections.ValueSet
                 {
-                    { "Scroll_Action", scrollAction },
-                    { "Scroll_Shortcut", scrollShortcut },
-                    { "Scroll_Command", scrollCommand },
-                    { "ScrollClick_Action", clickAction },
-                    { "ScrollClick_Shortcut", clickShortcut },
-                    { "ScrollClick_Command", clickCommand }
+                    { "Command", (int)Command.Get },
+                    { "Function", (int)Function.Labs_LegionScrollRemap },
                 });
-
-                Logger.Info("Scroll wheel remap settings saved");
+                if (response != null && response.TryGetValue("Content", out object content) && content != null)
+                    ApplyScrollRemapSnapshot(content.ToString());
             }
             catch (Exception ex)
             {
-                Logger.Error($"Failed to save scroll wheel remap settings: {ex.Message}");
+                Logger.Error($"Failed to get scroll remap settings from helper: {ex.Message}");
             }
         }
 
-        private void LoadScrollRemapSettings()
+        private void ApplyScrollRemapSnapshot(string configJson)
         {
             try
             {
-                var settings = ApplicationData.Current.LocalSettings;
+                var config = Windows.Data.Json.JsonObject.Parse(configJson);
+                int GetAction(string key) => config.TryGetValue(key, out var value) ? (int)value.GetNumber() : 0;
+                string GetText(string key) => config.TryGetValue(key, out var value) ? value.GetString() ?? "" : "";
 
-                // Load Scroll (unified) settings
-                if (settings.Values.TryGetValue("Scroll_Action", out var scrollAction) && scrollAction is int scrollActionInt)
-                {
-                    if (ScrollActionComboBox != null && scrollActionInt >= 0 && scrollActionInt <= 4)
-                        ScrollActionComboBox.SelectedIndex = scrollActionInt;
-                }
-                if (settings.Values.TryGetValue("Scroll_Shortcut", out var scrollShortcut) && scrollShortcut is string scrollShortcutStr)
-                {
-                    LoadKeysFromString("Scroll", scrollShortcutStr, ScrollKeyTags);
-                }
-                if (settings.Values.TryGetValue("Scroll_Command", out var scrollCommand) && scrollCommand is string scrollCommandStr)
-                {
-                    if (ScrollCommandTextBox != null)
-                        ScrollCommandTextBox.Text = scrollCommandStr;
-                }
-
-                // Load Scroll Click settings
-                if (settings.Values.TryGetValue("ScrollClick_Action", out var clickAction) && clickAction is int clickActionInt)
-                {
-                    if (ScrollClickActionComboBox != null && clickActionInt >= 0 && clickActionInt <= 4)
-                        ScrollClickActionComboBox.SelectedIndex = clickActionInt;
-                }
-                if (settings.Values.TryGetValue("ScrollClick_Shortcut", out var clickShortcut) && clickShortcut is string clickShortcutStr)
-                {
-                    LoadKeysFromString("ScrollClick", clickShortcutStr, ScrollClickKeyTags);
-                }
-                if (settings.Values.TryGetValue("ScrollClick_Command", out var clickCommand) && clickCommand is string clickCommandStr)
-                {
-                    if (ScrollClickCommandTextBox != null)
-                        ScrollClickCommandTextBox.Text = clickCommandStr;
-                }
-
-                // Update visibility of shortcut/command grids based on loaded settings
+                if (ScrollActionComboBox != null) ScrollActionComboBox.SelectedIndex = GetAction("Scroll_Action");
+                LoadKeysFromString("Scroll", GetText("Scroll_Shortcut"), ScrollKeyTags);
+                if (ScrollCommandTextBox != null) ScrollCommandTextBox.Text = GetText("Scroll_Command");
+                if (ScrollClickActionComboBox != null) ScrollClickActionComboBox.SelectedIndex = GetAction("ScrollClick_Action");
+                LoadKeysFromString("ScrollClick", GetText("ScrollClick_Shortcut"), ScrollClickKeyTags);
+                if (ScrollClickCommandTextBox != null) ScrollClickCommandTextBox.Text = GetText("ScrollClick_Command");
                 UpdateScrollGridVisibility();
-
-                // Also sync to JSON fallback file for elevated helper
-                int scrollActionLoaded = ScrollActionComboBox?.SelectedIndex ?? 0;
-                string scrollShortcutLoaded = GetKeysAsString("Scroll");
-                string scrollCommandLoaded = ScrollCommandTextBox?.Text ?? "";
-                int clickActionLoaded = ScrollClickActionComboBox?.SelectedIndex ?? 0;
-                string clickShortcutLoaded = GetKeysAsString("ScrollClick");
-                string clickCommandLoaded = ScrollClickCommandTextBox?.Text ?? "";
-
-                SaveToFallbackSettingsFile(new Dictionary<string, object>
-                {
-                    { "Scroll_Action", scrollActionLoaded },
-                    { "Scroll_Shortcut", scrollShortcutLoaded },
-                    { "Scroll_Command", scrollCommandLoaded },
-                    { "ScrollClick_Action", clickActionLoaded },
-                    { "ScrollClick_Shortcut", clickShortcutLoaded },
-                    { "ScrollClick_Command", clickCommandLoaded }
-                });
-
-                Logger.Info("Scroll wheel remap settings loaded");
             }
             catch (Exception ex)
             {
-                Logger.Error($"Failed to load scroll wheel remap settings: {ex.Message}");
+                Logger.Error($"Failed to render helper scroll remap snapshot: {ex.Message}");
             }
         }
-
         private void UpdateScrollGridVisibility()
         {
             int scrollSelection = ScrollActionComboBox?.SelectedIndex ?? 0;
@@ -226,16 +153,6 @@ namespace XboxGamingBar
                 ScrollClickShortcutPanel.Visibility = clickSelection == 2 ? Visibility.Visible : Visibility.Collapsed;
             if (ScrollClickCommandGrid != null)
                 ScrollClickCommandGrid.Visibility = clickSelection == 3 ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private async void ApplyScrollRemapSettingsToHelper()
-        {
-            // Always send scroll config to helper (including disabled state) to clear any stale monitor config
-            ApplyScrollWheelConfig("Scroll");
-
-            await Task.Delay(100);
-
-            ApplyScrollWheelConfig("Click");
         }
 
         private async void ApplyScrollWheelConfig(string direction)
@@ -323,9 +240,11 @@ namespace XboxGamingBar
                             }
                         }
 
-                        // Save settings on success
-                        if (success || !enabled)
-                            SaveScrollRemapSettings();
+                        // The helper is authoritative: on a failed enabled request this restores
+                        // the last persisted, applied configuration instead of leaving the UI at
+                        // the optimistic selection.
+                        if (response.TryGetValue("Content", out object content) && content != null)
+                            ApplyScrollRemapSnapshot(content.ToString());
 
                         Logger.Info($"Scroll Wheel Remap: {direction}, Enabled={enabled}, Action={actionType}, Value={shortcutOrCommand}, Success={success}");
                     }

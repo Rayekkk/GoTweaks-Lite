@@ -24,9 +24,8 @@ namespace XboxGamingBar.Data
         {
             if (owner == null) return;
 
-            // gamepadButtonMappings is a plain Dictionary read/written elsewhere only on the UI
-            // thread (button handlers, ApplyControllerProfile) - dispatch the mutation to avoid a
-            // cross-thread race, matching LegionButtonMappingProperty's same-shaped hook.
+            // gamepadButtonMappings is a plain Dictionary accessed by UI handlers, so dispatch
+            // this mutation to the UI thread, matching LegionButtonMappingProperty's hook.
             string json = Value;
             var ignore = owner.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
                 () => owner.ApplyGamepadButtonMappingsFromHelper(json));

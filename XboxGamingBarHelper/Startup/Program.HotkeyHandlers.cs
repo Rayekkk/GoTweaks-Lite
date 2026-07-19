@@ -37,6 +37,7 @@ namespace XboxGamingBarHelper
 {
     internal partial class Program
     {
+        private const string ControllerHotkeyConfigSettingsKey = "ControllerHotkeyConfig";
 
         /// <summary>
         /// Initializes the hotkey manager and registers global hotkeys
@@ -98,6 +99,10 @@ namespace XboxGamingBarHelper
                 controllerHotkeyMonitor.OnViewB = () => ExecuteControllerHotkeyAction("MenuB");
                 controllerHotkeyMonitor.OnViewX = () => ExecuteControllerHotkeyAction("MenuX");
                 controllerHotkeyMonitor.OnViewY = () => ExecuteControllerHotkeyAction("MenuY");
+
+                // Helper-owned configuration must be restored before deciding whether the
+                // background monitor should run; the widget may be suspended indefinitely.
+                ApplyControllerHotkeyConfig(GetControllerHotkeyConfigSnapshot());
 
                 // Skip the 60Hz XInput polling thread until at least one combo is bound.
                 // ApplyControllerHotkeyConfig will call SyncControllerHotkeyMonitorRunState
@@ -254,7 +259,7 @@ namespace XboxGamingBarHelper
 
         /// <summary>
         /// Executes the configured action for a controller hotkey combo.
-        /// Uses cached config from Named Pipe, falls back to LocalSettings.
+        /// Uses the helper-owned cached configuration.
         /// </summary>
         private static void ExecuteControllerHotkeyAction(string hotkeyName)
         {
@@ -276,16 +281,8 @@ namespace XboxGamingBarHelper
                         keyParam = keyElement.GetString() ?? "";
                 }
 
-                // Fallback to LocalSettings if not in cached config
-                // Widget saves as "Hotkey_{hotkeyName}_Action" and "Hotkey_{hotkeyName}_Key"
                 if (!foundInConfig)
-                {
-                    if (LocalSettingsHelper.TryGetValue<int>($"Hotkey_{hotkeyName}_Action", out var localAction))
-                        action = localAction;
-                    if (LocalSettingsHelper.TryGetValue<string>($"Hotkey_{hotkeyName}_Key", out var localKey))
-                        keyParam = localKey ?? "";
-                    Logger.Debug($"ExecuteControllerHotkeyAction: Using LocalSettings fallback for {hotkeyName}");
-                }
+                    Logger.Warn($"ExecuteControllerHotkeyAction: no confirmed config for {hotkeyName}");
 
                 Logger.Info($"ExecuteControllerHotkeyAction: {hotkeyName} action={action} key={keyParam}");
 
@@ -415,9 +412,16 @@ namespace XboxGamingBarHelper
                 Logger.Info($"Applying controller hotkey config from widget");
 
                 var config = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(configJson);
-                if (config == null || controllerHotkeyMonitor == null)
+                if (config == null)
                 {
-                    Logger.Warn("ApplyControllerHotkeyConfig: Config is null or monitor not initialized");
+                    Logger.Warn("ApplyControllerHotkeyConfig: Config is null");
+                    return;
+                }
+
+                LocalSettingsHelper.SetValue(ControllerHotkeyConfigSettingsKey, configJson);
+                if (controllerHotkeyMonitor == null)
+                {
+                    Logger.Info("Controller hotkey config persisted until monitor initialization");
                     return;
                 }
 
@@ -459,6 +463,15 @@ namespace XboxGamingBarHelper
 
         // Cached controller hotkey config for action execution
         private static Dictionary<string, System.Text.Json.JsonElement> _controllerHotkeyConfig;
+
+        internal static string GetControllerHotkeyConfigSnapshot()
+        {
+            if (LocalSettingsHelper.TryGetValue<string>(ControllerHotkeyConfigSettingsKey, out var saved)
+                && !string.IsNullOrWhiteSpace(saved))
+                return saved;
+
+            return "{\"MenuA_Action\":0,\"MenuA_Key\":\"\",\"MenuB_Action\":7,\"MenuB_Key\":\"\",\"MenuX_Action\":4,\"MenuX_Key\":\"\",\"MenuY_Action\":10,\"MenuY_Key\":\"\",\"MenuDpadUp_Action\":0,\"MenuDpadUp_Key\":\"\",\"MenuDpadDown_Action\":0,\"MenuDpadDown_Key\":\"\",\"MenuDpadLeft_Action\":0,\"MenuDpadLeft_Key\":\"\",\"MenuDpadRight_Action\":0,\"MenuDpadRight_Key\":\"\"}";
+        }
 
         /// <summary>
         /// Toggles Desktop Controls preset via global hotkey (Ctrl+Shift+D)

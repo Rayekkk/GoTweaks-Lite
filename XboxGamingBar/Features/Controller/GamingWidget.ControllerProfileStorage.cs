@@ -28,7 +28,6 @@ using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
 using Windows.System.Power;
-using Windows.Storage;
 using Windows.System;
 using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
@@ -43,292 +42,6 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        #if false // Pre-2.0 LocalSettings controller-profile persistence.
-        private void SaveControllerProfileToStorage(string profileName, ControllerProfile profile)
-        {
-            // Never save to "No game detected" profile
-            if (profileName.IndexOf("No game detected", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                Logger.Warn($"Attempted to save controller profile with invalid name: {profileName}, skipping");
-                return;
-            }
-
-            var settings = ApplicationData.Current.LocalSettings;
-            var container = settings.CreateContainer($"ControllerProfile_{profileName}", ApplicationDataCreateDisposition.Always);
-
-            // Button mappings (serialized as JSON)
-            var y1Json = profile.ButtonY1.ToJson();
-            var y2Json = profile.ButtonY2.ToJson();
-            var desktopJson = profile.ButtonDesktop.ToJson();
-            container.Values["ButtonY1"] = y1Json;
-            container.Values["ButtonY2"] = y2Json;
-            container.Values["ButtonY3"] = profile.ButtonY3.ToJson();
-            container.Values["ButtonM1"] = profile.ButtonM1.ToJson();
-            container.Values["ButtonM2"] = profile.ButtonM2.ToJson();
-            container.Values["ButtonM3"] = profile.ButtonM3.ToJson();
-            container.Values["ButtonDesktop"] = desktopJson;
-            container.Values["ButtonPage"] = profile.ButtonPage.ToJson();
-            Logger.Info($"SaveControllerProfile: {profileName} ButtonY1={y1Json}, ButtonY2={y2Json}, ButtonDesktop={desktopJson}");
-            container.Values["NintendoLayout"] = profile.NintendoLayout;
-            container.Values["VibrationLevel"] = profile.VibrationLevel;
-            container.Values["VibrationMode"] = profile.VibrationMode;
-
-            // Gyro settings
-            container.Values["GyroTarget"] = profile.GyroTarget;
-            container.Values["GyroSensitivityX"] = profile.GyroSensitivityX;
-            container.Values["GyroSensitivityY"] = profile.GyroSensitivityY;
-            container.Values["GyroInvertX"] = profile.GyroInvertX;
-            container.Values["GyroInvertY"] = profile.GyroInvertY;
-            container.Values["GyroMappingType"] = profile.GyroMappingType;
-            container.Values["GyroActivationMode"] = profile.GyroActivationMode;
-            container.Values["GyroActivationButton"] = profile.GyroActivationButton;
-
-            // Advanced gyro settings
-            container.Values["GyroDeadzone"] = profile.GyroDeadzone;
-
-            // Stick deadzones
-            container.Values["LeftStickDeadzone"] = profile.LeftStickDeadzone;
-            container.Values["RightStickDeadzone"] = profile.RightStickDeadzone;
-
-            // Trigger travel
-            container.Values["LeftTriggerStart"] = profile.LeftTriggerStart;
-            container.Values["LeftTriggerEnd"] = profile.LeftTriggerEnd;
-            container.Values["RightTriggerStart"] = profile.RightTriggerStart;
-            container.Values["RightTriggerEnd"] = profile.RightTriggerEnd;
-            container.Values["HairTriggers"] = profile.HairTriggers;
-
-            // Joystick as mouse
-            container.Values["JoystickAsMouseMode"] = profile.JoystickAsMouseMode;
-            container.Values["JoystickMouseSens"] = profile.JoystickMouseSens;
-
-            // Gamepad button mappings (serialize dictionary as JSON)
-            if (profile.GamepadButtonMappings != null && profile.GamepadButtonMappings.Count > 0)
-            {
-                var gamepadMappingsJson = SerializeGamepadButtonMappings(profile.GamepadButtonMappings);
-                container.Values["GamepadButtonMappings"] = gamepadMappingsJson;
-            }
-            else
-            {
-                container.Values["GamepadButtonMappings"] = "";
-            }
-
-            // Desktop Controls preset
-            container.Values["DesktopControlsEnabled"] = profile.DesktopControlsEnabled;
-
-            // Lighting
-            container.Values["LightMode"] = profile.LightMode;
-            container.Values["LightColorR"] = profile.LightColorR;
-            container.Values["LightColorG"] = profile.LightColorG;
-            container.Values["LightColorB"] = profile.LightColorB;
-            container.Values["LightSpeed"] = profile.LightSpeed;
-            container.Values["LightBrightness"] = profile.LightBrightness;
-            container.Values["PowerLight"] = profile.PowerLight;
-
-            // Store the game exe path for game profiles (used for loading icons)
-            if (profileName.StartsWith("Game_") && !string.IsNullOrEmpty(currentGameExePath))
-            {
-                container.Values["GameExePath"] = currentGameExePath;
-            }
-
-            Logger.Info($"Saved controller profile: {profileName}, LightMode={profile.LightMode}, Color=#{profile.LightColorR:X2}{profile.LightColorG:X2}{profile.LightColorB:X2}, Brightness={profile.LightBrightness}");
-        }
-
-        private ButtonMapping LoadButtonMapping(ApplicationDataContainer container, string key)
-        {
-            if (!container.Values.ContainsKey(key))
-                return new ButtonMapping();
-
-            var value = container.Values[key];
-
-            // Handle backwards compatibility: old format stored int, new format stores JSON string
-            if (value is int intValue)
-            {
-                // Old format: convert simple int to ButtonMapping with gamepad type
-                return new ButtonMapping { Type = 0, GamepadAction = intValue };
-            }
-            else if (value is string jsonValue)
-            {
-                return ButtonMapping.FromJson(jsonValue);
-            }
-
-            return new ButtonMapping();
-        }
-
-        private void LoadControllerProfileFromStorage(string profileName, ControllerProfile profile)
-        {
-            var settings = ApplicationData.Current.LocalSettings;
-            var containerKey = $"ControllerProfile_{profileName}";
-            if (settings.Containers.ContainsKey(containerKey))
-            {
-                var container = settings.Containers[containerKey];
-
-                // Log what's in the container for debugging
-                var y1Raw = container.Values.ContainsKey("ButtonY1") ? container.Values["ButtonY1"]?.ToString() : "(not found)";
-                var y2Raw = container.Values.ContainsKey("ButtonY2") ? container.Values["ButtonY2"]?.ToString() : "(not found)";
-                var desktopRaw = container.Values.ContainsKey("ButtonDesktop") ? container.Values["ButtonDesktop"]?.ToString() : "(not found)";
-                Logger.Info($"LoadControllerProfile: {profileName} raw values: ButtonY1={y1Raw}, ButtonY2={y2Raw}, ButtonDesktop={desktopRaw}");
-
-                // Button mappings (with backwards compatibility for old int format)
-                profile.ButtonY1 = LoadButtonMapping(container, "ButtonY1");
-                profile.ButtonY2 = LoadButtonMapping(container, "ButtonY2");
-                profile.ButtonY3 = LoadButtonMapping(container, "ButtonY3");
-                profile.ButtonM1 = LoadButtonMapping(container, "ButtonM1");
-                profile.ButtonM2 = LoadButtonMapping(container, "ButtonM2");
-                profile.ButtonM3 = LoadButtonMapping(container, "ButtonM3");
-                profile.ButtonDesktop = LoadButtonMapping(container, "ButtonDesktop");
-                profile.ButtonPage = LoadButtonMapping(container, "ButtonPage");
-
-                Logger.Info($"LoadControllerProfile: {profileName} parsed: Y1={FormatButtonMapping(profile.ButtonY1)}, Y2={FormatButtonMapping(profile.ButtonY2)}, Desktop={FormatButtonMapping(profile.ButtonDesktop)}");
-                profile.NintendoLayout = container.Values.ContainsKey("NintendoLayout") ? (bool)container.Values["NintendoLayout"] : false;
-                profile.VibrationLevel = container.Values.ContainsKey("VibrationLevel") ? (int)container.Values["VibrationLevel"] : 2;
-                profile.VibrationMode = container.Values.ContainsKey("VibrationMode") ? (int)container.Values["VibrationMode"] : 1;
-
-                // Gyro settings
-                profile.GyroTarget = container.Values.ContainsKey("GyroTarget") ? (int)container.Values["GyroTarget"] : 0;
-                profile.GyroSensitivityX = container.Values.ContainsKey("GyroSensitivityX") ? (int)container.Values["GyroSensitivityX"] : 50;
-                profile.GyroSensitivityY = container.Values.ContainsKey("GyroSensitivityY") ? (int)container.Values["GyroSensitivityY"] : 50;
-                profile.GyroInvertX = container.Values.ContainsKey("GyroInvertX") ? (bool)container.Values["GyroInvertX"] : false;
-                profile.GyroInvertY = container.Values.ContainsKey("GyroInvertY") ? (bool)container.Values["GyroInvertY"] : false;
-                profile.GyroMappingType = container.Values.ContainsKey("GyroMappingType") ? (int)container.Values["GyroMappingType"] : 0;
-                profile.GyroActivationMode = container.Values.ContainsKey("GyroActivationMode") ? (int)container.Values["GyroActivationMode"] : 0;
-                profile.GyroActivationButton = container.Values.ContainsKey("GyroActivationButton") ? (int)container.Values["GyroActivationButton"] : 0;
-
-                // Advanced gyro settings
-                profile.GyroDeadzone = container.Values.ContainsKey("GyroDeadzone") ? (int)container.Values["GyroDeadzone"] : 10;
-
-                // Stick deadzones
-                profile.LeftStickDeadzone = container.Values.ContainsKey("LeftStickDeadzone") ? (int)container.Values["LeftStickDeadzone"] : 4;
-                profile.RightStickDeadzone = container.Values.ContainsKey("RightStickDeadzone") ? (int)container.Values["RightStickDeadzone"] : 4;
-
-                // Trigger travel
-                profile.LeftTriggerStart = container.Values.ContainsKey("LeftTriggerStart") ? (int)container.Values["LeftTriggerStart"] : 0;
-                profile.LeftTriggerEnd = container.Values.ContainsKey("LeftTriggerEnd") ? (int)container.Values["LeftTriggerEnd"] : 0;
-                profile.RightTriggerStart = container.Values.ContainsKey("RightTriggerStart") ? (int)container.Values["RightTriggerStart"] : 0;
-                profile.RightTriggerEnd = container.Values.ContainsKey("RightTriggerEnd") ? (int)container.Values["RightTriggerEnd"] : 0;
-                profile.HairTriggers = container.Values.ContainsKey("HairTriggers") ? (bool)container.Values["HairTriggers"] : false;
-
-                // Joystick as mouse
-                profile.JoystickAsMouseMode = container.Values.ContainsKey("JoystickAsMouseMode") ? (int)container.Values["JoystickAsMouseMode"] : 0;
-                profile.JoystickMouseSens = container.Values.ContainsKey("JoystickMouseSens") ? (int)container.Values["JoystickMouseSens"] : 50;
-
-                // Gamepad button mappings (deserialize from JSON)
-                profile.GamepadButtonMappings = new Dictionary<string, ButtonMapping>();
-                if (container.Values.ContainsKey("GamepadButtonMappings"))
-                {
-                    var gamepadMappingsJson = container.Values["GamepadButtonMappings"] as string;
-                    if (!string.IsNullOrEmpty(gamepadMappingsJson))
-                    {
-                        try
-                        {
-                            profile.GamepadButtonMappings = DeserializeGamepadButtonMappings(gamepadMappingsJson);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error($"Error loading gamepad button mappings: {ex.Message}");
-                        }
-                    }
-                }
-
-                // Desktop Controls preset
-                profile.DesktopControlsEnabled = container.Values.ContainsKey("DesktopControlsEnabled")
-                    ? (bool)container.Values["DesktopControlsEnabled"]
-                    : false;
-
-                // Lighting - only load if explicitly saved (to avoid defaulting to white for old profiles)
-                profile.HasExplicitLighting = container.Values.ContainsKey("LightColorR");
-                profile.LightMode = container.Values.ContainsKey("LightMode") ? (int)container.Values["LightMode"] : 1;
-                profile.LightSpeed = container.Values.ContainsKey("LightSpeed") ? (int)container.Values["LightSpeed"] : 50;
-                profile.LightBrightness = container.Values.ContainsKey("LightBrightness") ? (int)container.Values["LightBrightness"] : 50;
-                profile.PowerLight = container.Values.ContainsKey("PowerLight") ? (bool)container.Values["PowerLight"] : true;
-
-                if (profile.HasExplicitLighting)
-                {
-                    profile.LightColorR = (byte)container.Values["LightColorR"];
-                    profile.LightColorG = container.Values.ContainsKey("LightColorG") ? (byte)container.Values["LightColorG"] : (byte)255;
-                    profile.LightColorB = container.Values.ContainsKey("LightColorB") ? (byte)container.Values["LightColorB"] : (byte)255;
-
-                    // Check if saved color is the default white (#FFFFFF) with high brightness
-                    // This likely means the profile was saved before the user set their preferred color
-                    // In this case, inherit from main lighting to prevent unexpected white lights
-                    bool isDefaultWhite = profile.LightColorR == 255 && profile.LightColorG == 255 && profile.LightColorB == 255;
-                    bool hasHighBrightness = profile.LightBrightness >= 90;  // 90% or higher suggests default
-                    if (isDefaultWhite && hasHighBrightness)
-                    {
-                        Logger.Info($"Controller profile '{profileName}' has default white (#FFFFFF) with high brightness ({profile.LightBrightness}%) - inheriting main lighting instead");
-                        InheritMainLightingSettings(profile);
-                    }
-                }
-                else
-                {
-                    // No explicit lighting saved - inherit from current main lighting settings
-                    // This prevents profiles from defaulting to white and ensures consistency
-                    InheritMainLightingSettings(profile);
-                }
-
-                Logger.Info($"Loaded controller profile: {profileName} (HasExplicitLighting={profile.HasExplicitLighting}, LightMode={profile.LightMode}, Color=#{profile.LightColorR:X2}{profile.LightColorG:X2}{profile.LightColorB:X2}, Brightness={profile.LightBrightness})");
-            }
-            else
-            {
-                Logger.Warn($"Controller profile container not found: {containerKey} - using defaults");
-                // Even for new profiles, inherit current main lighting settings
-                InheritMainLightingSettings(profile);
-            }
-        }
-
-        /// <summary>
-        /// Copies current main lighting settings into a controller profile.
-        /// Used when a profile has no explicit lighting saved to prevent defaulting to white.
-        /// </summary>
-        private void InheritMainLightingSettings(ControllerProfile profile)
-        {
-            try
-            {
-                // Get current light mode
-                if (legionLightMode != null)
-                {
-                    profile.LightMode = legionLightMode.Value;
-                }
-
-                // Get current light color from hex string (e.g., "#RRGGBB" or "RRGGBB")
-                if (legionLightColor != null && !string.IsNullOrEmpty(legionLightColor.Value))
-                {
-                    string hex = legionLightColor.Value.TrimStart('#');
-                    if (hex.Length >= 6)
-                    {
-                        profile.LightColorR = Convert.ToByte(hex.Substring(0, 2), 16);
-                        profile.LightColorG = Convert.ToByte(hex.Substring(2, 2), 16);
-                        profile.LightColorB = Convert.ToByte(hex.Substring(4, 2), 16);
-                    }
-                }
-
-                // Get current brightness
-                if (legionLightBrightness != null)
-                {
-                    profile.LightBrightness = legionLightBrightness.Value;
-                }
-
-                // Get current speed
-                if (legionLightSpeed != null)
-                {
-                    profile.LightSpeed = legionLightSpeed.Value;
-                }
-
-                // Get current power light state
-                if (legionPowerLight != null)
-                {
-                    profile.PowerLight = legionPowerLight.Value;
-                }
-
-                Logger.Info($"Inherited main lighting settings: Mode={profile.LightMode}, Color=#{profile.LightColorR:X2}{profile.LightColorG:X2}{profile.LightColorB:X2}, Brightness={profile.LightBrightness}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error inheriting main lighting settings: {ex.Message}");
-            }
-        }
-
-        #endif
-
         private void InitializeButtonMappingEvents(string buttonName)
         {
             var typeCombo = FindName($"LegionButton{buttonName}TypeComboBox") as ComboBox;
@@ -377,7 +90,7 @@ namespace XboxGamingBar
             UpdateButtonGamepadComboControls(buttonName);
 
             // Update the profile and send command
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(typeCombo, null);
             }
@@ -582,7 +295,7 @@ namespace XboxGamingBar
                 UpdateGamepadComboActionTags(buttonName, GetStoredGamepadComboActions(buttonName));
             }
 
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(null, null);
             }
@@ -626,7 +339,7 @@ namespace XboxGamingBar
             }
 
             UpdateButtonGamepadComboControls(buttonName);
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(modeCombo, null);
             }
@@ -657,7 +370,7 @@ namespace XboxGamingBar
                 SetStoredGamepadComboActions(buttonName, actions);
                 UpdateGamepadComboActionTags(buttonName, actions);
 
-                if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+                if (!isLoadingControllerProfile)
                 {
                     ControllerSettingChanged(addCombo, null);
                 }
@@ -679,7 +392,7 @@ namespace XboxGamingBar
             }
 
             SetStoredButtonTurbo(buttonName, turboCheck.IsChecked == true);
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(turboCheck, null);
             }
@@ -692,7 +405,7 @@ namespace XboxGamingBar
             SetStoredGamepadComboActions(buttonName, actions);
             UpdateGamepadComboActionTags(buttonName, actions);
 
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(null, null);
             }
@@ -844,7 +557,7 @@ namespace XboxGamingBar
                 UpdateKeyboardKeyTags(buttonName, keys);
 
                 // Trigger profile save and command send
-                if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+                if (!isLoadingControllerProfile)
                 {
                     ControllerSettingChanged(keyCombo, null);
                 }
@@ -917,7 +630,7 @@ namespace XboxGamingBar
             UpdateKeyboardKeyTags(buttonName, keys);
 
             // Trigger profile save and command send
-            if (!isLoadingControllerProfile && !isSwitchingControllerProfile)
+            if (!isLoadingControllerProfile)
             {
                 ControllerSettingChanged(null, null);
             }
@@ -1234,114 +947,7 @@ namespace XboxGamingBar
             _buttonKeyboardKeys[buttonName] = new List<int>(keys ?? new List<int>());
         }
 
-        #if false // Pre-2.0 widget-side controller-profile application.
-        private void ApplyControllerProfile(ControllerProfile profile)
-        {
-            isLoadingControllerProfile = true;
-
-            try
-            {
-                // [2.0 rebuild - Faza B/slices 1-8] Button remaps (Y1-Page + gamepad-mapping dict +
-                // Nintendo layout), vibration, gyro, stick deadzones, and trigger travel + HairTriggers
-                // are all helper-authoritative now - the widget no longer seeds any of them from its
-                // LocalSettings ControllerProfile here. Each reflects the helper's pushed value via its
-                // own bound property (buttons via ApplyButtonMappingFromHelper /
-                // LegionButtonMappingProperty.OnValueSyncedFromHelper for the composite UI; everything
-                // else via plain bound WidgetToggleProperty/WidgetSliderProperty + the already-guarded
-                // ControllerSettingChanged/ControllerSliderSettingChanged/LegionHairTriggers_Toggled).
-                // See WidgetProperties.NeverSyncFromHelper (now empty) for the full history.
-
-                // Apply joystick as mouse settings
-                if (LegionJoystickAsMouseComboBox != null)
-                {
-                    // Set UI first
-                    if (LegionJoystickAsMouseComboBox.Items.Count > profile.JoystickAsMouseMode)
-                    {
-                        LegionJoystickAsMouseComboBox.SelectedIndex = profile.JoystickAsMouseMode;
-                    }
-                    // Show/hide sensitivity grid based on mode
-                    if (LegionJoystickMouseSensGrid != null)
-                        LegionJoystickMouseSensGrid.Visibility = profile.JoystickAsMouseMode > 0
-                            ? Windows.UI.Xaml.Visibility.Visible
-                            : Windows.UI.Xaml.Visibility.Collapsed;
-                    // Send value to helper (SetValue instead of SetValueSilent)
-                    legionJoystickAsMouseMode?.SetValue(profile.JoystickAsMouseMode);
-                }
-                if (LegionJoystickMouseSensSlider != null)
-                {
-                    LegionJoystickMouseSensSlider.Value = profile.JoystickMouseSens;
-                    if (LegionJoystickMouseSensValue != null)
-                        LegionJoystickMouseSensValue.Text = profile.JoystickMouseSens.ToString();
-                }
-
-                // [2.0 rebuild - slice 8] gamepadButtonMappings (the arbitrary Nintendo/Desktop-preset
-                // remap dict) is now helper-authoritative - the widget no longer seeds it from
-                // LocalSettings here. A helper push (LegionGamepadMappingProperty.OnValueSyncedFromHelper
-                // -> ApplyGamepadButtonMappingsFromHelper) replaces the dict directly. The Desktop
-                // Controls block below still WRITES into gamepadButtonMappings from its own LocalSettings
-                // flag (pre-existing, accepted "benign" clobber per the DesktopControls/JoystickAsMouse
-                // note above - out of scope here); it just no longer gets synchronously resent from this
-                // method (see the removed send at the end of this method).
-
-                // Apply Desktop Controls toggle state (with event unsubscription to prevent handler firing)
-                if (LegionDesktopControlsToggle != null)
-                {
-                    LegionDesktopControlsToggle.Toggled -= LegionDesktopControls_Toggled;
-                    try
-                    {
-                        LegionDesktopControlsToggle.IsOn = profile.DesktopControlsEnabled;
-                        // Apply/clear Desktop Controls mappings
-                        if (profile.DesktopControlsEnabled)
-                        {
-                            // Override Joystick as Mouse to Right Stick for Desktop Controls preset
-                            if (LegionJoystickAsMouseComboBox != null)
-                                LegionJoystickAsMouseComboBox.SelectedIndex = 2; // Right Stick
-                            if (LegionJoystickMouseSensGrid != null)
-                                LegionJoystickMouseSensGrid.Visibility = Windows.UI.Xaml.Visibility.Visible;
-                            // Send joystick as mouse mode to helper
-                            legionJoystickAsMouseMode?.SetValue(2);
-                            // Apply the desktop control button mappings to the controller
-                            ApplyDesktopControlMappings();
-                        }
-                        else
-                        {
-                            // Clear the desktop control button mappings from the controller
-                            // Note: JoystickAsMouseMode is preserved from profile (already applied above)
-                            ClearDesktopControlMappings();
-                        }
-                    }
-                    finally
-                    {
-                        LegionDesktopControlsToggle.Toggled += LegionDesktopControls_Toggled;
-                    }
-                }
-
-                Logger.Info($"Applied controller profile: Y1={FormatButtonMapping(profile.ButtonY1)}, Y2={FormatButtonMapping(profile.ButtonY2)}, Y3={FormatButtonMapping(profile.ButtonY3)}, M1={FormatButtonMapping(profile.ButtonM1)}, M2={FormatButtonMapping(profile.ButtonM2)}, M3={FormatButtonMapping(profile.ButtonM3)}, Nintendo={profile.NintendoLayout}, Vib={profile.VibrationLevel}, VibMode={profile.VibrationMode}, GyroTarget={profile.GyroTarget}, LDZ={profile.LeftStickDeadzone}, RDZ={profile.RightStickDeadzone}, GamepadMappings={profile.GamepadButtonMappings?.Count ?? 0}, DesktopControls={profile.DesktopControlsEnabled}, LightMode={profile.LightMode}");
-
-                // Set timestamp BEFORE sending to prevent any queued events from causing duplicate sends
                 // Use 2 second window since HID commands take ~1.5s to complete (50ms per button × ~30 buttons)
-                lastProfileApplyTime = DateTime.Now;
-
-                // [2.0 rebuild] Everything but JoystickAsMouse + Desktop Controls above is now
-                // helper-authoritative (buttons, gamepad-mapping dict, Nintendo layout, vibration,
-                // gyro, deadzones, triggers, lighting) - applied+pushed by the helper at startup/game
-                // switch. The widget must NOT reseed/resend any of it here (would clobber the
-                // helper's persisted values with stale LocalSettings). User edits still flow via each
-                // setting's own bound property / ApplyControllerSettingChange.
-
-                // Re-evaluate enhanced remap UI after profile/UI values settle.
-                // This avoids startup ordering issues where improved input state arrives
-                // after initial profile controls are populated.
-                RefreshLegionEnhancedRemapUi();
-            }
-            finally
-            {
-                isLoadingControllerProfile = false;
-            }
-        }
-
-        #endif
-
         private ControllerProfile GetCurrentControllerProfileFromUI()
         {
             // This object is an ephemeral intent payload. UI values are helper-confirmed
@@ -1418,80 +1024,6 @@ namespace XboxGamingBar
                 return;
             }
 
-#if false // Pre-2.0 LocalSettings controller-profile implementation.
-            // Protect entire toggle change sequence
-            isSwitchingControllerProfile = true;
-
-            try
-            {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                if (LegionControllerProfileToggle.IsOn)
-                {
-                    // Per-game controller profiles enabled - only proceed if we have a valid game
-                    if (HasValidGame(currentGameName))
-                    {
-                        // Clear the disabled preference since user is enabling it
-                        string disabledKey = $"ControllerProfileDisabled_{currentGameName}";
-                        if (settings.Values.ContainsKey(disabledKey))
-                        {
-                            settings.Values.Remove(disabledKey);
-                            Logger.Info($"Cleared controller profile disabled preference for {currentGameName}");
-                        }
-
-                        // Load or create game controller profile
-                        string profileKey = $"ControllerProfile_Game_{currentGameName}";
-                        if (!settings.Containers.ContainsKey(profileKey))
-                        {
-                            // Initialize new game controller profile from current UI state (global)
-                            gameControllerProfile = GetCurrentControllerProfileFromUI();
-                            SaveControllerProfileToStorage($"Game_{currentGameName}", gameControllerProfile);
-                            Logger.Info($"Initialized game controller profile for {currentGameName} from current settings");
-
-                            // Refresh saved profiles list if expanded
-                            if (isSavedProfilesExpanded)
-                            {
-                                RefreshSavedProfilesList();
-                            }
-                        }
-                        else
-                        {
-                            // Load existing game controller profile
-                            LoadControllerProfileFromStorage($"Game_{currentGameName}", gameControllerProfile);
-                            ApplyControllerProfile(gameControllerProfile);
-                            Logger.Info($"Loaded existing controller profile for {currentGameName}");
-                        }
-                    }
-                    else
-                    {
-                        // No valid game, turn toggle back off
-                        Logger.Warn($"Cannot enable per-game controller profile without a valid game, forcing toggle OFF");
-                        LegionControllerProfileToggle.IsOn = false;
-                        return;
-                    }
-                }
-                else
-                {
-                    // Toggle is being turned OFF
-                    if (HasValidGame(currentGameName))
-                    {
-                        // Save user's preference to disable per-game controller profile for this game
-                        string disabledKey = $"ControllerProfileDisabled_{currentGameName}";
-                        settings.Values[disabledKey] = true;
-                        Logger.Info($"Saved controller profile disabled preference for {currentGameName}");
-                    }
-
-                    // Switch back to global controller profile
-                    LoadControllerProfileFromStorage("Global", globalControllerProfile);
-                    ApplyControllerProfile(globalControllerProfile);
-                    Logger.Info("Switched to global controller profile");
-                }
-            }
-            finally
-            {
-                isSwitchingControllerProfile = false;
-            }
-#endif
         }
 
         private void ControllerSettingChanged(object sender, object e)
@@ -1505,23 +1037,21 @@ namespace XboxGamingBar
         /// Debounced entry point for slider ValueChanged events (gyro sensitivity/deadzone,
         /// stick deadzones, trigger travel, joystick-mouse sensitivity, light brightness/speed).
         /// Raw ValueChanged fires continuously while the thumb moves; ControllerSettingChanged
-        /// does a profile-storage write plus button-mapping/lighting IPC sends on every call,
-        /// so without this a drag fires dozens of writes+sends in under a second. The value
-        /// display still updates live; only the save/send is coalesced to ~300ms after the
+        /// sends button-mapping/lighting intents on every call, so without this a drag fires
+        /// dozens of sends in under a second. The value display still updates live; only the
+        /// intent is coalesced to ~300ms after the
         /// drag settles. Matches the FPSLimitSlider debounce pattern
         /// (GamingWidget.QuickSettings.Actions.cs).
         /// </summary>
         private void ControllerSliderSettingChanged(object sender, object e)
         {
-            // Update slider value displays immediately - only the save/send is debounced
+            // Update slider value displays immediately - only the direct user intent is debounced.
             UpdateControllerSliderDisplays(sender);
 
             // [audit fix - Section 1] See ApplyControllerSettingChange's comment for why
             // HelperSyncCount is needed alongside isApplyingHelperUpdate here.
-            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate
+            if (isLoadingControllerProfile || isUnloading || isApplyingHelperUpdate
                 || WidgetSliderProperty.HelperSyncCount > 0)
-                return;
-            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
                 return;
 
             controllerSliderDebouncePendingSender = sender;
@@ -1540,15 +1070,16 @@ namespace XboxGamingBar
         private void ControllerSliderDebounceTimer_Tick(object sender, object e)
         {
             controllerSliderDebounceTimer?.Stop();
-            // Re-checks the same guards inside ApplyControllerSettingChange - state may have
-            // changed (e.g. a profile switch started) during the debounce wait.
+            // Re-check the same guards inside ApplyControllerSettingChange: helper state may
+            // have arrived during the debounce wait.
             ApplyControllerSettingChange(controllerSliderDebouncePendingSender);
             controllerSliderDebouncePendingSender = null;
         }
 
         private void ApplyControllerSettingChange(object sender)
         {
-            // Don't save during profile loading, switching, widget unloading, or helper sync.
+            // Do not send an intent while helper-confirmed state is being rendered or the widget
+            // is unloading.
             // [audit fix - Section 1] isApplyingHelperUpdate alone isn't sufficient: it's reset
             // (PipeClient.cs's outer Dispatcher.RunAsync callback) before a per-property
             // NotifyPropertyChanged's own NESTED Dispatcher.RunAsync (WidgetSliderProperty /
@@ -1561,12 +1092,8 @@ namespace XboxGamingBar
             // SendLightingToHelper call latches LegionLightColorProperty.HasSavedProfileColor,
             // which then PERMANENTLY blocks all future helper->widget lighting-color sync for the
             // rest of the session - triggered by something as unrelated as a deadzone slider drag.
-            if (isLoadingControllerProfile || isSwitchingControllerProfile || isUnloading || isApplyingHelperUpdate
+            if (isLoadingControllerProfile || isUnloading || isApplyingHelperUpdate
                 || WidgetSliderProperty.HelperSyncCount > 0)
-                return;
-
-            // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
-            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
                 return;
 
             // This is a transient payload for the direct user edit below, never a

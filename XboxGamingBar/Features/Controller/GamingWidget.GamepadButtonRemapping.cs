@@ -87,20 +87,11 @@ namespace XboxGamingBar
 
         private void SaveAndSendGamepadMappings()
         {
-            // Don't save during profile loading - we're just applying the profile, not modifying it
-            // The profile will be fully applied and any saves will happen after isLoadingControllerProfile is cleared
+            // Do not send while helper-confirmed state is being rendered.
             if (isLoadingControllerProfile)
             {
                 // Skip sending if this is a duplicate call during profile loading
                 // The helper publishes the confirmed mapping state after the active edit completes.
-                return;
-            }
-
-            // Skip if a profile was just applied (prevents duplicate sends from queued UI events)
-            // HID commands take ~1.5s to complete, so use 2 second window
-            if ((DateTime.Now - lastProfileApplyTime).TotalMilliseconds < 2000)
-            {
-                Logger.Info("SaveAndSendGamepadMappings skipped - profile was just applied");
                 return;
             }
 
