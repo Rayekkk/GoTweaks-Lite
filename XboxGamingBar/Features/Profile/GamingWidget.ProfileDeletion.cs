@@ -19,9 +19,6 @@ namespace XboxGamingBar
                 DeleteGameProfile(currentGameName);
         }
 
-        // Kept only as a migration-safe no-op: widget LocalSettings profiles no longer exist.
-        private void CleanupInvalidProfiles() { }
-
         private void DeleteGameProfile(string gameName)
         {
             if (string.IsNullOrWhiteSpace(gameName)) return;
