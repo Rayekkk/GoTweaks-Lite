@@ -2381,7 +2381,7 @@ namespace XboxGamingBar
             // wattage, silently reverting the drag. Reuses this method's own existing guards + the
             // Custom-TDP-specific save debounce (CUSTOM_TDP_SAVE_DEBOUNCE_MS), same shape as
             // SettingChanged's resync call.
-            SendPowerSourceProfileValuesToHelper();
+            SendPowerSourceProfileValuesToHelper("TDP");
         }
 
         /// <summary>

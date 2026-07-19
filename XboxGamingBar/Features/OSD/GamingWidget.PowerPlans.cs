@@ -43,6 +43,110 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        // LocalSettings remains only a UI cache. On every connection it is refreshed from the
+        // helper before any direct user edit can use it as an edit buffer.
+        private async Task SyncPowerSourceProfilesFromHelperAsync()
+        {
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Get },
+                    { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues }
+                };
+                var response = await App.PipeClient.SendRequestAsync(request);
+                if (response == null || !response.TryGetValue("Content", out object content) || !(content is string json) || string.IsNullOrWhiteSpace(json))
+                {
+                    Logger.Warn("Power-source profile snapshot was empty; leaving UI cache unchanged");
+                    return;
+                }
+
+                var values = Windows.Data.Json.JsonObject.Parse(json);
+                double Number(string key, double fallback) => values.ContainsKey(key) ? values.GetNamedNumber(key, fallback) : fallback;
+                bool Bool(string key, bool fallback) => values.ContainsKey(key) ? values.GetNamedBoolean(key, fallback) : fallback;
+                string Text(string key, string fallback) => values.ContainsKey(key) ? values.GetNamedString(key, fallback) : fallback;
+                PerformanceProfile Read(string prefix)
+                {
+                    int fps = (int)Number(prefix + "FpsLimit", 0);
+                    int refresh = (int)Number(prefix + "RefreshRate", 0);
+                    return new PerformanceProfile
+                    {
+                        LegionPerformanceMode = (int)Number(prefix + "LegionPerformanceMode", 2),
+                        TDP = Number(prefix + "Tdp", 15), TDPFast = Number(prefix + "TdpFast", 15), TDPPeak = Number(prefix + "TdpPeak", 15),
+                        CPUBoost = Bool(prefix + "CpuBoost", false), CPUEPP = Number(prefix + "CpuEpp", 80),
+                        MaxCPUState = (int)Number(prefix + "MaxCpuState", 100), MinCPUState = (int)Number(prefix + "MinCpuState", 5),
+                        FPSLimitEnabled = fps > 0, FPSLimitValue = fps > 0 ? fps : 60,
+                        HDREnabled = Bool(prefix + "HdrEnabled", false), Resolution = Text(prefix + "Resolution", ""), RefreshRate = refresh > 0 ? (int?)refresh : null,
+                        FluidMotionFrames = Bool(prefix + "FluidMotionFrames", false), RadeonSuperResolution = Bool(prefix + "RadeonSuperResolution", false),
+                        RadeonSuperResolutionSharpness = Number(prefix + "RadeonSuperResolutionSharpness", 80),
+                        ImageSharpening = Bool(prefix + "ImageSharpening", false), ImageSharpeningSharpness = Number(prefix + "ImageSharpeningSharpness", 80),
+                        RadeonAntiLag = Bool(prefix + "RadeonAntiLag", false), RadeonBoost = Bool(prefix + "RadeonBoost", false),
+                        RadeonBoostResolution = Number(prefix + "RadeonBoostResolution", 0), RadeonChill = Bool(prefix + "RadeonChill", false),
+                        RadeonChillMinFPS = Number(prefix + "RadeonChillMinFPS", 30), RadeonChillMaxFPS = Number(prefix + "RadeonChillMaxFPS", 60)
+                    };
+                }
+
+                var ac = Read("Ac");
+                var dc = Read("Dc");
+                if (Bool("IsGlobal", true))
+                {
+                    globalProfile = ac.Clone();
+                    acProfile = ac;
+                    dcProfile = dc;
+                }
+                else
+                {
+                    gameProfile = ac.Clone();
+                    gameACProfile = ac;
+                    gameDCProfile = dc;
+                }
+                Logger.Info("Hydrated AC/DC profile cache from helper");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to hydrate power-source profiles from helper: {ex.Message}");
+            }
+        }
+
+        private async Task SendProfileFieldIntentAsync(string field, object value)
+        {
+            if (!App.IsConnected) return;
+            try
+            {
+                bool dc = currentProfileName != null && currentProfileName.EndsWith("_DC");
+                var json = new Windows.Data.Json.JsonObject
+                {
+                    ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetProfileField"),
+                    ["Field"] = Windows.Data.Json.JsonValue.CreateStringValue(field),
+                    ["Power"] = Windows.Data.Json.JsonValue.CreateStringValue(dc ? "DC" : "AC")
+                };
+                if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);
+                else json["Value"] = Windows.Data.Json.JsonValue.CreateNumberValue(Convert.ToDouble(value));
+
+                var response = await App.PipeClient.SendRequestAsync(new Windows.Foundation.Collections.ValueSet
+                {
+                    { "Command", (int)Shared.Enums.Command.Set },
+                    { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues },
+                    { "Content", json.Stringify() }
+                });
+                if (response == null || !response.TryGetValue("Content", out object raw) || !(raw is string content))
+                {
+                    Logger.Warn($"Profile intent {field} was not confirmed by helper");
+                    await SyncPowerSourceProfilesFromHelperAsync();
+                    return;
+                }
+                var result = Windows.Data.Json.JsonObject.Parse(content);
+                string outcome = result.GetNamedString("Outcome", "Rejected");
+                if (outcome != "Applied") Logger.Warn($"Profile intent {field} rejected: {result.GetNamedString("Reason", "unknown reason")}");
+                await SyncPowerSourceProfilesFromHelperAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Profile intent {field} failed: {ex.Message}");
+                await SyncPowerSourceProfilesFromHelperAsync();
+            }
+        }
+
         /// <summary>
         /// Pipes the active profile's AC and DC TDP / TDPBoost values to the helper. Helper
         /// caches both states and applies the appropriate set when SystemManager fires
@@ -52,11 +156,18 @@ namespace XboxGamingBar
         /// on pipe connect. Only sends per-game game AC/DC profile if a per-game profile is
         /// in use; otherwise sends the global AC/DC profiles.
         /// </summary>
-        internal void SendPowerSourceProfileValuesToHelper()
+        internal void SendPowerSourceProfileValuesToHelper(string changedGroup = null)
         {
             try
             {
                 if (!App.IsConnected) return;
+                // A whole-profile payload is no longer a valid sync primitive. It is only an
+                // edit patch for the group the user explicitly changed.
+                if (string.IsNullOrEmpty(changedGroup))
+                {
+                    Logger.Debug("Skipping unscoped PowerSourceProfileValues send");
+                    return;
+                }
 
                 // Pick which AC/DC pair drives the helper's per-state cache.
                 //   1. Per-game profile with per-game AC/DC split enabled → game AC/DC.
@@ -176,6 +287,24 @@ namespace XboxGamingBar
                 jsonObj["DcRadeonChillMinFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonChillMinFPS);
                 jsonObj["AcRadeonChillMaxFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(ac.RadeonChillMaxFPS);
                 jsonObj["DcRadeonChillMaxFPS"] = Windows.Data.Json.JsonValue.CreateNumberValue(dc.RadeonChillMaxFPS);
+
+                bool Keep(string key)
+                {
+                    switch (changedGroup)
+                    {
+                        case "TDP": return key.Contains("Tdp") || key.Contains("LegionPerformanceMode");
+                        case "CPUBoost": return key.Contains("CpuBoost");
+                        case "CPUEPP": return key.Contains("CpuEpp");
+                        case "CPUState": return key.Contains("CpuState");
+                        case "FPSLimit": return key.Contains("FpsLimit");
+                        case "HDR": return key.Contains("HdrEnabled");
+                        case "Resolution": return key.Contains("Resolution");
+                        case "RefreshRate": return key.Contains("RefreshRate");
+                        case "AMD": return key.Contains("FluidMotion") || key.Contains("Radeon") || key.Contains("ImageSharpening");
+                        default: return false;
+                    }
+                }
+                foreach (var key in jsonObj.Keys.Where(key => !Keep(key)).ToList()) jsonObj.Remove(key);
 
                 var request = new Windows.Foundation.Collections.ValueSet
                 {

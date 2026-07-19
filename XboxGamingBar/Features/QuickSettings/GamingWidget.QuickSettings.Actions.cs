@@ -522,7 +522,7 @@ namespace XboxGamingBar
             // 2026-07-19 (round 13): same missing-resync gap as CycleFPSLimit above - this only
             // ever saved locally (via the shared ProfileTrackedProperty_ChangedResyncProfile
             // handler subscribed to refreshRate.PropertyChanged) and never resynced to the helper.
-            SendPowerSourceProfileValuesToHelper();
+            SendPowerSourceProfileValuesToHelper("RefreshRate");
         }
 
         private void ToggleLosslessScaling()
@@ -808,7 +808,7 @@ namespace XboxGamingBar
                 SaveCurrentSettingsToProfile(currentProfileName);
                 // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's comment
                 // below - same missing-resync gap, found in an independent audit 2026-07-19.
-                SendPowerSourceProfileValuesToHelper();
+                SendPowerSourceProfileValuesToHelper("FPSLimit");
             }
         }
 
@@ -870,7 +870,7 @@ namespace XboxGamingBar
                 // resynced to the helper's persisted AC/DC GameProfile - so a live FPS Limit
                 // edit could be silently reverted by a stale profile value on the next AC/DC
                 // transition or helper restart, same failure shape as the TDP bug (d2f9db0).
-                SendPowerSourceProfileValuesToHelper();
+                SendPowerSourceProfileValuesToHelper("FPSLimit");
             }
         }
 
@@ -1032,7 +1032,7 @@ namespace XboxGamingBar
                     SaveCurrentSettingsToProfile(currentProfileName);
                     // [2.0 rebuild - AC/DC persistence follow-up] See FPSLimitToggle_Toggled's
                     // comment above - same missing-resync gap.
-                    SendPowerSourceProfileValuesToHelper();
+            SendPowerSourceProfileValuesToHelper("RefreshRate");
                 }
             }
         }

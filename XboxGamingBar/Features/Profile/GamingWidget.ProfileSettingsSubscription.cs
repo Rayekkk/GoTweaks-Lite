@@ -179,15 +179,40 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Auto-save to current profile
-            SaveCurrentSettingsToProfile(currentProfileName);
+            string group = GetPowerSourceProfileChangedGroup(sender);
+            // First vertical 2.0 slice: these fields no longer write the widget-local
+            // PerformanceProfile. The helper owns persistence and confirms the resulting state.
+            if (group == "CPUBoost")
+            {
+                _ = SendProfileFieldIntentAsync("CPUBoost", CPUBoostToggle?.IsOn ?? false);
+                return;
+            }
+            if (group == "CPUEPP")
+            {
+                _ = SendProfileFieldIntentAsync("CPUEPP", (int)(CPUEPPSlider?.Value ?? 80));
+                return;
+            }
 
-            // [2.0 rebuild - AC/DC persistence] Resync the AC/DC pair to the helper so a live
-            // edit (e.g. flipping an AMD toggle while on battery) reaches the helper's persisted
-            // _DC fields promptly, not just at the next game switch/profile load/pipe reconnect.
-            // Reuses this method's own existing guards + debounce (SettingChangedDebounced's
-            // 300ms timer already coalesces rapid changes) rather than adding a second timer.
-            SendPowerSourceProfileValuesToHelper();
+            // Legacy local cache path for groups not yet migrated to SetProfileField.
+            SaveCurrentSettingsToProfile(currentProfileName);
+            if (group != null) SendPowerSourceProfileValuesToHelper(group);
+        }
+
+        private string GetPowerSourceProfileChangedGroup(object sender)
+        {
+            if (sender == CPUBoostToggle) return "CPUBoost";
+            if (sender == CPUEPPSlider) return "CPUEPP";
+            if (sender == MinCPUStateComboBox || sender == MaxCPUStateComboBox) return "CPUState";
+            if (sender == HDRToggle) return "HDR";
+            if (sender == ResolutionComboBox) return "Resolution";
+            if (sender == RefreshRatesComboBox) return "RefreshRate";
+            if (sender == AMDFluidMotionFrameToggle || sender == AMDRadeonSuperResolutionToggle ||
+                sender == AMDRadeonSuperResolutionSharpnessSlider || sender == AMDImageSharpeningToggle ||
+                sender == AMDImageSharpeningSlider || sender == AMDRadeonAntiLagToggle ||
+                sender == AMDRadeonBoostToggle || sender == AMDRadeonBoostResolutionComboBox ||
+                sender == AMDRadeonChillToggle || sender == AMDRadeonChillMinFPSSlider || sender == AMDRadeonChillMaxFPSSlider)
+                return "AMD";
+            return null;
         }
 
         /// <summary>

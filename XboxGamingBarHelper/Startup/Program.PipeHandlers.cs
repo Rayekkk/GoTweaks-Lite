@@ -1505,12 +1505,81 @@ namespace XboxGamingBarHelper
         // Per-state TDP / TDPBoost values from the widget.
         private static global::Windows.Foundation.Collections.ValueSet HandlePowerSourceProfileValues(Shared.IPC.PipeMessage request)
         {
+            // 2.0: the helper owns the persisted AC/DC profile.  On connection the widget
+            // requests a snapshot; it must never seed this state from its LocalSettings copy.
+            if (request.Command == Command.Get)
+            {
+                return new global::Windows.Foundation.Collections.ValueSet
+                {
+                    { "Content", GetPowerSourceProfileValuesSnapshot() }
+                };
+            }
+
             global::Windows.Foundation.Collections.ValueSet response = null;
             if (request.Content != null)
             {
-                ApplyPowerSourceProfileValues(request.Content.ToString());
+                string content = request.Content.ToString();
+                var cfg = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(content);
+                if (cfg != null && cfg.TryGetValue("Intent", out var intent)
+                    && intent.ValueKind == System.Text.Json.JsonValueKind.String
+                    && intent.GetString() == "SetProfileField")
+                {
+                    bool applied = ApplyProfileFieldIntent(cfg, out string reason);
+                    return new global::Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Content", System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+                            {
+                                { "Outcome", applied ? "Applied" : "Rejected" },
+                                { "Reason", reason ?? "" },
+                                { "Snapshot", GetPowerSourceProfileValuesSnapshot() }
+                            }) }
+                    };
+                }
+                ApplyPowerSourceProfileValues(content);
             }
             return response;
+        }
+
+        private static string GetPowerSourceProfileValuesSnapshot()
+        {
+            var profile = profileManager?.CurrentProfile;
+            if (profile == null)
+                return "{}";
+
+            int DcInt(int? value, int ac) => value ?? ac;
+            bool DcBool(bool? value, bool ac) => value ?? ac;
+            string DcString(string value, string ac) => string.IsNullOrEmpty(value) ? (ac ?? "") : value;
+
+            var values = new Dictionary<string, object>
+            {
+                { "IsGlobal", profile.IsGlobalProfile },
+                { "AcLegionPerformanceMode", profile.LegionPerformanceMode ?? 2 },
+                { "DcLegionPerformanceMode", DcInt(profile.LegionPerformanceMode_DC, profile.LegionPerformanceMode ?? 2) },
+                { "AcTdp", profile.TDP }, { "DcTdp", DcInt(profile.TDP_DC, profile.TDP) },
+                { "AcTdpFast", profile.TDPFast }, { "DcTdpFast", DcInt(profile.TDPFast_DC, profile.TDPFast) },
+                { "AcTdpPeak", profile.TDPPeak }, { "DcTdpPeak", DcInt(profile.TDPPeak_DC, profile.TDPPeak) },
+                { "AcCpuBoost", profile.CPUBoost }, { "DcCpuBoost", DcBool(profile.CPUBoost_DC, profile.CPUBoost) },
+                { "AcCpuEpp", profile.CPUEPP }, { "DcCpuEpp", DcInt(profile.CPUEPP_DC, profile.CPUEPP) },
+                { "AcMaxCpuState", profile.MaxCPUState }, { "DcMaxCpuState", DcInt(profile.MaxCPUState_DC, profile.MaxCPUState) },
+                { "AcMinCpuState", profile.MinCPUState }, { "DcMinCpuState", DcInt(profile.MinCPUState_DC, profile.MinCPUState) },
+                { "AcFpsLimit", profile.FPSLimit ?? 0 }, { "DcFpsLimit", DcInt(profile.FPSLimit_DC, profile.FPSLimit ?? 0) },
+                { "AcHdrEnabled", profile.HDREnabled ?? false }, { "DcHdrEnabled", DcBool(profile.HDREnabled_DC, profile.HDREnabled ?? false) },
+                { "AcResolution", profile.Resolution ?? "" }, { "DcResolution", DcString(profile.Resolution_DC, profile.Resolution) },
+                { "AcRefreshRate", profile.RefreshRate ?? 0 }, { "DcRefreshRate", DcInt(profile.RefreshRate_DC, profile.RefreshRate ?? 0) },
+                { "AcFluidMotionFrames", profile.FluidMotionFrames ?? false }, { "DcFluidMotionFrames", DcBool(profile.FluidMotionFrames_DC, profile.FluidMotionFrames ?? false) },
+                { "AcRadeonSuperResolution", profile.RadeonSuperResolution ?? false }, { "DcRadeonSuperResolution", DcBool(profile.RadeonSuperResolution_DC, profile.RadeonSuperResolution ?? false) },
+                { "AcRadeonSuperResolutionSharpness", profile.RadeonSuperResolutionSharpness ?? 80 }, { "DcRadeonSuperResolutionSharpness", DcInt(profile.RadeonSuperResolutionSharpness_DC, profile.RadeonSuperResolutionSharpness ?? 80) },
+                { "AcImageSharpening", profile.ImageSharpening ?? false }, { "DcImageSharpening", DcBool(profile.ImageSharpening_DC, profile.ImageSharpening ?? false) },
+                { "AcImageSharpeningSharpness", profile.ImageSharpeningSharpness ?? 80 }, { "DcImageSharpeningSharpness", DcInt(profile.ImageSharpeningSharpness_DC, profile.ImageSharpeningSharpness ?? 80) },
+                { "AcRadeonAntiLag", profile.RadeonAntiLag ?? false }, { "DcRadeonAntiLag", DcBool(profile.RadeonAntiLag_DC, profile.RadeonAntiLag ?? false) },
+                { "AcRadeonBoost", profile.RadeonBoost ?? false }, { "DcRadeonBoost", DcBool(profile.RadeonBoost_DC, profile.RadeonBoost ?? false) },
+                { "AcRadeonBoostResolution", profile.RadeonBoostResolution ?? 0 }, { "DcRadeonBoostResolution", DcInt(profile.RadeonBoostResolution_DC, profile.RadeonBoostResolution ?? 0) },
+                { "AcRadeonChill", profile.RadeonChill ?? false }, { "DcRadeonChill", DcBool(profile.RadeonChill_DC, profile.RadeonChill ?? false) },
+                { "AcRadeonChillMinFPS", profile.RadeonChillMinFPS ?? 30 }, { "DcRadeonChillMinFPS", DcInt(profile.RadeonChillMinFPS_DC, profile.RadeonChillMinFPS ?? 30) },
+                { "AcRadeonChillMaxFPS", profile.RadeonChillMaxFPS ?? 60 }, { "DcRadeonChillMaxFPS", DcInt(profile.RadeonChillMaxFPS_DC, profile.RadeonChillMaxFPS ?? 60) }
+            };
+
+            return System.Text.Json.JsonSerializer.Serialize(values);
         }
 
         // Quick Metrics: Enable/disable metrics push timer

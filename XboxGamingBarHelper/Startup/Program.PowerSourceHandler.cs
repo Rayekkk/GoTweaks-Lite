@@ -70,6 +70,17 @@ namespace XboxGamingBarHelper
                 var cfg = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(configJson);
                 if (cfg == null) return;
 
+                // 2.0 profile-edit contract.  Unlike the legacy AC/DC blob, this is an
+                // explicit user intent: one field, one target profile, one power-state scope.
+                // Keep the legacy parser below temporarily for older widgets during migration.
+                if (cfg.TryGetValue("Intent", out var intent)
+                    && intent.ValueKind == System.Text.Json.JsonValueKind.String
+                    && intent.GetString() == "SetProfileField")
+                {
+                    ApplyProfileFieldIntent(cfg, out _);
+                    return;
+                }
+
                 int? ParseInt(string key)
                 {
                     if (!cfg.TryGetValue(key, out var el)) return null;
@@ -275,6 +286,62 @@ namespace XboxGamingBarHelper
             {
                 Logger.Error($"ApplyPowerSourceProfileValues: {ex.Message}");
             }
+        }
+
+        private static bool ApplyProfileFieldIntent(Dictionary<string, System.Text.Json.JsonElement> cfg, out string reason)
+        {
+            reason = null;
+            string field = cfg.TryGetValue("Field", out var fieldElement) ? fieldElement.GetString() : null;
+            string power = cfg.TryGetValue("Power", out var powerElement) ? powerElement.GetString() : null;
+            if (string.IsNullOrEmpty(field) || (power != "AC" && power != "DC")
+                || !cfg.TryGetValue("Value", out var value))
+            {
+                reason = "missing or invalid Field, Power, or Value";
+                Logger.Warn("Rejected SetProfileField: " + reason);
+                return false;
+            }
+
+            var profile = profileManager?.CurrentProfile;
+            if (profile == null)
+            {
+                reason = "profile manager not ready";
+                Logger.Warn($"Rejected SetProfileField({field}): {reason}");
+                return false;
+            }
+
+            bool dc = power == "DC";
+            if (field == "TDP" && value.TryGetInt32(out int watts))
+            {
+                if (watts < 5 || watts > 50)
+                {
+                    reason = "TDP outside 5-50W";
+                    Logger.Warn($"Rejected SetProfileField(TDP): {watts}W outside 5-50W");
+                    return false;
+                }
+                if (dc) profile.TDP_DC = watts;
+                else profile.TDP = watts;
+            }
+            else if (field == "CPUEPP" && value.TryGetInt32(out int epp))
+            {
+                if (epp < 0 || epp > 100) { reason = "CPUEPP outside 0-100"; Logger.Warn($"Rejected SetProfileField(CPUEPP): {epp}"); return false; }
+                if (dc) profile.CPUEPP_DC = epp;
+                else profile.CPUEPP = epp;
+            }
+            else if (field == "CPUBoost" && (value.ValueKind == System.Text.Json.JsonValueKind.True || value.ValueKind == System.Text.Json.JsonValueKind.False))
+            {
+                bool enabled = value.GetBoolean();
+                if (dc) profile.CPUBoost_DC = enabled;
+                else profile.CPUBoost = enabled;
+            }
+            else
+            {
+                reason = "unsupported field or value type";
+                Logger.Warn($"Rejected SetProfileField: unsupported field '{field}' or value type");
+                return false;
+            }
+
+            Logger.Info($"Applied SetProfileField intent: {field} ({power}) to {profile.GameId.Name}");
+            return true;
         }
 
         private static void SystemManager_PowerSourceChanged(object sender, global::Windows.System.Power.PowerSupplyStatus newStatus)

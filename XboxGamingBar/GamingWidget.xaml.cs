@@ -3521,7 +3521,10 @@ namespace XboxGamingBar
                 SendQuickMetricsEnabledToHelper();
                 SendScreenSaverEnabledToHelper();
                 SendProfileSaveFlagsToHelper();
-                SendPowerSourceProfileValuesToHelper();
+                // 2.0 invariant: never let the widget's persisted LocalSettings profiles
+                // seed the helper on connect.  The helper owns the durable profile and sends a
+                // snapshot back for this display/edit cache instead.
+                await SyncPowerSourceProfilesFromHelperAsync();
                 // Without this, the helper's ControllerHotkeyMonitor only learns the
                 // widget's View+ABXY / Menu+DPad bindings on the next dropdown change.
                 // Before that, helper-side detection sits at the default-all-disabled
