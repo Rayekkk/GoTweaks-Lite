@@ -273,9 +273,7 @@ namespace XboxGamingBar
             if (perGameProfile != null && runningGame != null && runningGame.Value.IsValid())
             {
                 bool newValue = !perGameProfile.Value;
-                isUserInitiatedProfileToggle = true; // Flag this as user-initiated
                 perGameProfile.SetValue(newValue);
-                isUserInitiatedProfileToggle = false;
                 Logger.Info($"Per-game profile toggled to {newValue}");
             }
             else

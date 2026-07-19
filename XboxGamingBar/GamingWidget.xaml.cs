@@ -897,9 +897,6 @@ namespace XboxGamingBar
         private bool isSwitchingProfile = false;
         private bool isApplyingHelperUpdate = false; // Prevents saves when helper echoes values back
         private bool isInitialSync = true; // Prevents saves during initial app startup sync
-        private bool isCleanInstall = false; // True if no saved Global profile existed on startup
-        private bool isInternalToggleDisable = false; // Indicates toggle is being disabled internally (game close)
-        private bool isUserInitiatedProfileToggle = false; // Indicates user clicked Profile tile to toggle
         private bool isUserInitiatedTDPModeChange = false; // Indicates user clicked TDP Mode tile in Quick Tab
         private bool isUpdatingPowerSourceProfileToggle = false; // Prevents programmatic toggle sync from triggering profile writes
 
@@ -1812,10 +1809,6 @@ namespace XboxGamingBar
             // Initialize CPU State comboboxes with percentage values
             InitializeCPUStateComboBoxes();
 
-            // 2.0: performance profiles are helper-owned. Never hydrate the widget
-            // display cache from LocalSettings; the initial helper snapshot fills it.
-            isCleanInstall = false;
-
             // Initialize power source profile
             PowerSourceProfileToggle.Toggled += PowerSourceProfileToggle_Toggled;
             SyncPowerSourceProfileToggleForCurrentContext();
@@ -2358,9 +2351,7 @@ namespace XboxGamingBar
                 if (!App.IsConnected && !HasValidGame(newGameName) && PerGameProfileToggle?.IsOn == true)
                 {
                     Logger.Info($"No valid game detected (was: '{rawGameName}'), disabling per-game toggle BEFORE updating game name");
-                    isInternalToggleDisable = true; // Flag this as internal disable
                     PerGameProfileToggle.IsOn = false;  // This triggers UpdateActiveProfileIndicator which switches to Global
-                    isInternalToggleDisable = false;
 
                     // Show notification for global profile revert
                     _ = ShowProfileNotificationAsync("", isPerGameProfile: false);
