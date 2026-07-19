@@ -2446,77 +2446,22 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Protect entire toggle change sequence from auto-saves
-            isSwitchingProfile = true;
-
-            try
+            // The helper's PerGameProfile property owns creation, persistence and application
+            // of game profiles. The widget only rejects an impossible request and refreshes its
+            // display cache; it must not create LocalSettings profiles or persist a competing
+            // "disabled" preference.
+            if (PerGameProfileToggle.IsOn && !HasValidGame(currentGameName))
             {
-                var settings = ApplicationData.Current.LocalSettings;
-
-                if (PerGameProfileToggle.IsOn)
-                {
-                    // Per-game profiles enabled - only proceed if we have a valid game
-                    if (HasValidGame(currentGameName))
-                    {
-                        // Clear the disabled preference since user is enabling it
-                        string disabledKey = $"PerGameProfileDisabled_{currentGameName}";
-                        if (settings.Values.ContainsKey(disabledKey))
-                        {
-                            settings.Values.Remove(disabledKey);
-                            Logger.Info($"Cleared per-game profile disabled preference for {currentGameName}");
-                        }
-                        LoadOrCreateGameProfiles();
-
-                        // Show notification for per-game profile
-                        _ = ShowProfileNotificationAsync(currentGameName, isPerGameProfile: true);
-                    }
-                    else
-                    {
-                        // No valid game, turn toggle back off
-                        Logger.Warn($"Cannot enable per-game profile without a valid game (currentGameName='{currentGameName}'), forcing toggle OFF");
-                        PerGameProfileToggle.IsOn = false;
-                        return;
-                    }
-                }
-                else
-                {
-                    // Toggle is being turned OFF - check if we should reject this
-                    // (Prevents helper messages from disabling auto-enabled toggle)
-                    // But ALLOW internal disables (when game closes) and user-initiated toggles
-                    if (HasValidGame(currentGameName) && isApplyingHelperUpdate && !isInternalToggleDisable && !isUserInitiatedProfileToggle)
-                    {
-                        bool hasExistingProfile = HasAnyGameProfile(currentGameName);
-
-                        if (hasExistingProfile)
-                        {
-                            Logger.Info($"Ignoring helper request to disable toggle - game '{currentGameName}' has saved profile");
-                            PerGameProfileToggle.IsOn = true; // Keep it on
-                            return;
-                        }
-                    }
-
-                    // Save user's preference to disable per-game profile for this game
-                    // (only for valid games and user-initiated toggles, not internal/game-close disables)
-                    if (HasValidGame(currentGameName) && !isInternalToggleDisable)
-                    {
-                        string disabledKey = $"PerGameProfileDisabled_{currentGameName}";
-                        settings.Values[disabledKey] = true;
-                        Logger.Info($"Saved per-game profile disabled preference for {currentGameName}");
-                    }
-                }
-
-                SyncPowerSourceProfileToggleForCurrentContext();
-                UpdateActiveProfileIndicator();
-                // Refresh the active profile card so it hides immediately when the
-                // user flips the toggle off — otherwise the card lingers showing
-                // per-game default values that aren't actually being applied.
-                UpdateGameProfileCardVisibility();
-                UpdateProfileDisplay();
+                Logger.Warn("Cannot enable per-game profile without a valid running game");
+                isUpdatingPowerSourceProfileToggle = true;
+                try { PerGameProfileToggle.IsOn = false; }
+                finally { isUpdatingPowerSourceProfileToggle = false; }
+                return;
             }
-            finally
-            {
-                isSwitchingProfile = false;
-            }
+            SyncPowerSourceProfileToggleForCurrentContext();
+            UpdateActiveProfileIndicator();
+            UpdateGameProfileCardVisibility();
+            UpdateProfileDisplay();
         }
 
         private void OnGameTextChanged(DependencyObject sender, DependencyProperty dp)
