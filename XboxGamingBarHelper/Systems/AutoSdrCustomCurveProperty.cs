@@ -1,3 +1,4 @@
+using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 
@@ -9,8 +10,11 @@ namespace XboxGamingBarHelper.Systems
     /// Persistence + validation are routed through SystemManager, same split as
     /// AutoSdrEnabledProperty.
     /// </summary>
-    internal class AutoSdrCustomCurveProperty : HelperProperty<string, SystemManager>
+    internal class AutoSdrCustomCurveProperty : HelperProperty<string, SystemManager>, IHardwareApplyResult
     {
+        public bool LastApplySucceeded { get; private set; } = true;
+        public string LastApplyFailureReason { get; private set; }
+
         public AutoSdrCustomCurveProperty(string inValue, SystemManager inManager)
             : base(inValue, null, Function.AutoSdrCustomCurve, inManager)
         {
@@ -35,7 +39,8 @@ namespace XboxGamingBarHelper.Systems
         {
             base.NotifyPropertyChanged(propertyName);
 
-            Manager.SetAutoSdrCustomCurve(Value);
+            LastApplySucceeded = Manager.SetAutoSdrCustomCurve(Value, out string reason);
+            LastApplyFailureReason = LastApplySucceeded ? null : (reason ?? "Auto SDR curve could not be applied.");
         }
     }
 }

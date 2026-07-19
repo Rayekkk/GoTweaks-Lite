@@ -1187,15 +1187,16 @@ namespace XboxGamingBarHelper.Systems
         /// point from the widget's +/-1 spinner, or a freshly imported file already routed
         /// through ImportAutoSdrCurve). Persists on success; rejects and logs on malformed input.
         /// </summary>
-        public void SetAutoSdrCustomCurve(string curveJson)
+        public bool SetAutoSdrCustomCurve(string curveJson, out string failureReason)
         {
-            if (!autoSdrManager.SetCustomCurveFromJson(curveJson, out var error))
+            if (!autoSdrManager.SetCustomCurveFromJson(curveJson, out failureReason))
             {
-                Logger.Warn($"SetAutoSdrCustomCurve rejected: {error}");
-                return;
+                Logger.Warn($"SetAutoSdrCustomCurve rejected: {failureReason}");
+                return false;
             }
             try { XboxGamingBarHelper.Settings.LocalSettingsHelper.SetValue(AutoSdrCustomCurveKey, autoSdrManager.GetCustomCurveJson()); } catch { }
             Logger.Info("SetAutoSdrCustomCurve applied.");
+            return true;
         }
 
         /// <summary>Writes the currently ACTIVE curve (whichever preset) to a JSON file.</summary>
