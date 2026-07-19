@@ -1025,79 +1025,21 @@ namespace XboxGamingBar
 
         }
 
+        // Every regular controller control (combobox/toggle/slider) is already paired with its
+        // own WidgetProperty, whose direct value IS the complete user intent - these two shared
+        // handlers exist only to keep the on-screen slider value labels current; they never
+        // rebuild or resend a controller/lighting snapshot (an earlier version did, via
+        // ApplyControllerSettingChange, and that path caused a real bug where a deadzone-slider
+        // drag could permanently block future helper->widget lighting-color sync - see git
+        // history / memory controller-status-card-redesign.md if resurrecting anything similar).
         private void ControllerSettingChanged(object sender, object e)
         {
-            // Update slider value displays
             UpdateControllerSliderDisplays(sender);
-            ApplyControllerSettingChange(sender);
         }
 
-        /// <summary>
-        /// Debounced entry point for slider ValueChanged events (gyro sensitivity/deadzone,
-        /// stick deadzones, trigger travel, joystick-mouse sensitivity, light brightness/speed).
-        /// Raw ValueChanged fires continuously while the thumb moves; ControllerSettingChanged
-        /// sends button-mapping/lighting intents on every call, so without this a drag fires
-        /// dozens of sends in under a second. The value display still updates live; only the
-        /// intent is coalesced to ~300ms after the
-        /// drag settles. Matches the FPSLimitSlider debounce pattern
-        /// (GamingWidget.QuickSettings.Actions.cs).
-        /// </summary>
         private void ControllerSliderSettingChanged(object sender, object e)
         {
-            // Update slider value displays immediately - only the direct user intent is debounced.
             UpdateControllerSliderDisplays(sender);
-
-            // [audit fix - Section 1] See ApplyControllerSettingChange's comment for why
-            // HelperSyncCount is needed alongside isApplyingHelperUpdate here.
-            if (isLoadingControllerProfile || isUnloading || isApplyingHelperUpdate
-                || WidgetSliderProperty.HelperSyncCount > 0)
-                return;
-
-            controllerSliderDebouncePendingSender = sender;
-
-            if (controllerSliderDebounceTimer == null)
-            {
-                controllerSliderDebounceTimer = new DispatcherTimer();
-                controllerSliderDebounceTimer.Interval = TimeSpan.FromMilliseconds(CONTROLLER_SLIDER_DEBOUNCE_MS);
-                controllerSliderDebounceTimer.Tick += ControllerSliderDebounceTimer_Tick;
-            }
-
-            controllerSliderDebounceTimer.Stop();
-            controllerSliderDebounceTimer.Start();
-        }
-
-        private void ControllerSliderDebounceTimer_Tick(object sender, object e)
-        {
-            controllerSliderDebounceTimer?.Stop();
-            // Re-check the same guards inside ApplyControllerSettingChange: helper state may
-            // have arrived during the debounce wait.
-            ApplyControllerSettingChange(controllerSliderDebouncePendingSender);
-            controllerSliderDebouncePendingSender = null;
-        }
-
-        private void ApplyControllerSettingChange(object sender)
-        {
-            // Do not send an intent while helper-confirmed state is being rendered or the widget
-            // is unloading.
-            // [audit fix - Section 1] isApplyingHelperUpdate alone isn't sufficient: it's reset
-            // (PipeClient.cs's outer Dispatcher.RunAsync callback) before a per-property
-            // NotifyPropertyChanged's own NESTED Dispatcher.RunAsync (WidgetSliderProperty /
-            // WidgetToggleProperty / the Legion*ComboBox properties) actually runs and fires this
-            // control's ValueChanged/SelectionChanged/Toggled event - a helper-driven push could
-            // reach here with isApplyingHelperUpdate already false and be treated as a live user
-            // edit. WidgetSliderProperty.HelperSyncCount is incremented/decremented synchronously
-            // around that same nested UI write (self-consistent regardless of dispatch timing), so
-            // checking it here closes the race. Confirmed root cause of a real bug: this path's
-            // SendLightingToHelper call latches LegionLightColorProperty.HasSavedProfileColor,
-            // which then PERMANENTLY blocks all future helper->widget lighting-color sync for the
-            // rest of the session - triggered by something as unrelated as a deadzone slider drag.
-            if (isLoadingControllerProfile || isUnloading || isApplyingHelperUpdate
-                || WidgetSliderProperty.HelperSyncCount > 0)
-                return;
-
-            // Every regular controller control is already paired with its own WidgetProperty.
-            // Its direct value is the complete user intent; do not rebuild and resend an entire
-            // controller/lighting snapshot in reaction to an unrelated control event.
         }
 
         private void SendButtonMappingForName(string buttonName)

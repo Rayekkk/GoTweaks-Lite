@@ -896,13 +896,6 @@ namespace XboxGamingBar
         // Controller profile state
         private bool isLoadingControllerProfile = false;
 
-        // Debounces the controller-profile save/send for slider drags (gyro sensitivity/
-        // deadzone, stick deadzones, trigger travel, joystick-mouse sens, light brightness/
-        // speed) - see ControllerSliderSettingChanged.
-        private DispatcherTimer controllerSliderDebounceTimer;
-        private object controllerSliderDebouncePendingSender;
-        private const int CONTROLLER_SLIDER_DEBOUNCE_MS = 300;
-
         // Helper to check if we have a valid game (not null, not empty, not "No game detected")
         private bool HasValidGame(string gameName)
         {

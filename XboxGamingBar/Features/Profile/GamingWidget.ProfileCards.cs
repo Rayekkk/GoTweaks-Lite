@@ -403,8 +403,6 @@ namespace XboxGamingBar
         {
             try
             {
-                // Load profiles
-                var settings = ApplicationData.Current.LocalSettings;
                 bool hasAC = helperProfileCatalog.ContainsKey($"Game_{gameName}_AC");
                 bool hasDC = helperProfileCatalog.ContainsKey($"Game_{gameName}_DC");
                 bool hasACDC = hasAC || hasDC;
