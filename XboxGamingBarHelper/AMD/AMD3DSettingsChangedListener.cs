@@ -27,6 +27,12 @@ namespace XboxGamingBarHelper.AMD
         private DateTime lastChillChange = DateTime.MinValue;
         private DateTime lastBoostChange = DateTime.MinValue;
         private const int CHANGE_COOLDOWN_MS = 2000; // 2 second cooldown
+        // Anti-Lag/Chill/Boost specifically: on-device logging showed the native ADLX callback can
+        // straggle in several seconds late (observed up to ~5.7s) after our own write, well past
+        // the 2s window AFMF/RSR/RIS get away with (their own writes are comparatively infrequent
+        // in a normal test). A longer, dedicated cooldown for these three reduces the chance of
+        // treating our own delayed echo as a genuine external change and re-applying a stale value.
+        private const int ANTILAG_CHILL_BOOST_COOLDOWN_MS = 6000;
 
         internal AMD3DSettingsChangedListener(AMDManager inAMDManager) : base()
         {
@@ -93,7 +99,7 @@ namespace XboxGamingBarHelper.AMD
 
             if (p3DSettingsChangedEvent.IsAntiLagChanged())
             {
-                if ((DateTime.Now - lastAntiLagChange).TotalMilliseconds < CHANGE_COOLDOWN_MS)
+                if ((DateTime.Now - lastAntiLagChange).TotalMilliseconds < ANTILAG_CHILL_BOOST_COOLDOWN_MS)
                 {
                     Logger.Debug("Skipping Anti-Lag read from driver - still in cooldown period");
                 }
@@ -110,7 +116,7 @@ namespace XboxGamingBarHelper.AMD
 
             if (p3DSettingsChangedEvent.IsChillChanged())
             {
-                if ((DateTime.Now - lastChillChange).TotalMilliseconds < CHANGE_COOLDOWN_MS)
+                if ((DateTime.Now - lastChillChange).TotalMilliseconds < ANTILAG_CHILL_BOOST_COOLDOWN_MS)
                 {
                     Logger.Debug("Skipping Chill read from driver - still in cooldown period");
                 }
@@ -145,7 +151,7 @@ namespace XboxGamingBarHelper.AMD
 
             if (p3DSettingsChangedEvent.IsBoostChanged())
             {
-                if ((DateTime.Now - lastBoostChange).TotalMilliseconds < CHANGE_COOLDOWN_MS)
+                if ((DateTime.Now - lastBoostChange).TotalMilliseconds < ANTILAG_CHILL_BOOST_COOLDOWN_MS)
                 {
                     Logger.Debug("Skipping Boost read from driver - still in cooldown period");
                 }

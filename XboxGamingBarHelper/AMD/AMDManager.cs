@@ -752,7 +752,6 @@ namespace XboxGamingBarHelper.AMD
                 });
             }
 
-            amdFluidMotionFrameEnabled.PropertyChanged += AmdFluidMotionFrameEnabled;
             amdRadeonAntiLagEnabled.PropertyChanged += AmdRadeonAntiLagEnabled;
             amdRadeonBoostEnabled.PropertyChanged += AmdRadeonBoostEnabled;
             amdRadeonChillEnabled.PropertyChanged += AmdRadeonChillEnabled;
@@ -964,36 +963,19 @@ namespace XboxGamingBarHelper.AMD
             }
         }
 
-        // [AFMF-forces-AntiLag fix] Tracks whether WE forced Anti-Lag on because of AFMF, so it
-        // can be restored to its prior (off) state when AFMF turns back off. Without this, Anti-Lag
-        // stayed stuck on after disabling AFMF (found on-device 2026-07-18) - there was no "AFMF
-        // turned off" branch at all, only the force-on one. Only restores when WE were the ones who
-        // forced it - if the user had Anti-Lag on independently before enabling AFMF, turning AFMF
-        // off must not touch it.
-        private bool antiLagForcedByAfmf = false;
-
-        private void AmdFluidMotionFrameEnabled(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (amdFluidMotionFrameEnabled)
-            {
-                if (amdRadeonAntiLagSupported && !amdRadeonAntiLagEnabled)
-                {
-                    Logger.Info($"AMD Fluid Motion Frame enabled, Radeon Anti-Lag should be enabled too.");
-                    antiLagForcedByAfmf = true;
-                    amdRadeonAntiLagEnabled.SetValue(true);
-                }
-                else
-                {
-                    Logger.Info($"AMD Fluid Motion Frame enabled but Radeon Anti-Lag is not supported or already enabled.");
-                }
-            }
-            else if (antiLagForcedByAfmf)
-            {
-                Logger.Info($"AMD Fluid Motion Frame disabled - restoring Radeon Anti-Lag to its prior (off) state.");
-                antiLagForcedByAfmf = false;
-                amdRadeonAntiLagEnabled.SetValue(false);
-            }
-        }
+        // [2026-07-20] Removed the old event-driven "AmdFluidMotionFrameEnabled" handler that used
+        // to live here (an antiLagForcedByAfmf flag forcing/restoring Anti-Lag whenever this
+        // property changed). It raced with ApplyAMDFeaturesFromProfile's own, newer, AC/DC-aware
+        // computation of the SAME effective Anti-Lag value (Program.ProfileHandlers.cs) - every
+        // widget-driven FluidMotionFrames change wrote to Anti-Lag from BOTH mechanisms within the
+        // same call, and on-device logging showed the resulting extra SetValue traffic compounding
+        // with AMD3DSettingsChangedListener's driver-echo re-reads into a multi-second Anti-Lag
+        // on/off oscillation with no user interaction at all. ApplyAMDFeaturesFromProfile alone
+        // now owns forcing Anti-Lag on/off in step with FluidMotionFrames for every path that
+        // actually goes through the profile (the widget toggle, profile switches, AC/DC
+        // transitions) - the only case this doesn't cover is AFMF toggled directly in Adrenalin
+        // with the widget/profile never involved, which is untested and considered acceptable to
+        // defer against removing an actively-misbehaving mechanism.
 
         protected override void Dispose(bool disposing)
         {
