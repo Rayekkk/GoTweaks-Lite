@@ -626,28 +626,7 @@ namespace XboxGamingBar
                 // Cycle: Efficiency (0) -> Balanced (1) -> Performance (2) -> Efficiency (0)
                 int currentMode = osPowerMode.Value;
                 int nextMode = (currentMode + 1) % 3;
-                osPowerMode.SetValue(nextMode);
-
-                // Update the combobox and value text in Performance tab
-                isLoadingOSPowerMode = true;
-                try
-                {
-                    OSPowerModeComboBox.SelectedIndex = nextMode;
-                    OSPowerModeValue.Text = OSPowerModeNames[nextMode];
-                }
-                finally
-                {
-                    isLoadingOSPowerMode = false;
-                }
-
-                Logger.Info($"Power Mode cycled to {OSPowerModeNames[nextMode]}");
-
-                // Save the change to profile
-                if (!isInitialSync && !isApplyingHelperUpdate && !isLoadingProfile && SaveOSPowerMode)
-                {
-                    Logger.Info($"Saving OS Power Mode change to profile: {currentProfileName}");
-                    SaveCurrentSettingsToProfile(currentProfileName);
-                }
+                _ = SendProfileFieldIntentAsync("OSPowerMode", nextMode);
             }
         }
 

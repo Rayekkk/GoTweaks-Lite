@@ -402,6 +402,7 @@ namespace XboxGamingBarHelper
             powerManager.CPUEPP.SetValue(isOnAC ? globalProfile.CPUEPP : (globalProfile.CPUEPP_DC ?? globalProfile.CPUEPP));
             powerManager.MaxCPUState.SetValue(isOnAC ? globalProfile.MaxCPUState : (globalProfile.MaxCPUState_DC ?? globalProfile.MaxCPUState));
             powerManager.MinCPUState.SetValue(isOnAC ? globalProfile.MinCPUState : (globalProfile.MinCPUState_DC ?? globalProfile.MinCPUState));
+            ApplyOSPowerModeFromProfile(globalProfile, isOnAC, "Restoring global profile");
             // [2.0 rebuild - Faza C1] Nullable-gated (code review fix, also required to compile
             // now that FPSLimit/HDREnabled are int?/bool?).
             int? targetFpsLimit = isOnAC ? globalProfile.FPSLimit : (globalProfile.FPSLimit_DC ?? globalProfile.FPSLimit);
@@ -602,6 +603,7 @@ namespace XboxGamingBarHelper
                         powerManager.CPUEPP.SetValue(isOnAC ? cp.CPUEPP : (cp.CPUEPP_DC ?? cp.CPUEPP));
                         powerManager.MaxCPUState.SetValue(isOnAC ? cp.MaxCPUState : (cp.MaxCPUState_DC ?? cp.MaxCPUState));
                         powerManager.MinCPUState.SetValue(isOnAC ? cp.MinCPUState : (cp.MinCPUState_DC ?? cp.MinCPUState));
+                        ApplyOSPowerModeFromProfile(cp, isOnAC, "Applying current profile");
                         profileManager.PerGameProfile.SetValue(cp.Use);
 
                         // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
@@ -732,6 +734,7 @@ namespace XboxGamingBarHelper
                     powerManager.CPUEPP.SetValue(isOnAC ? gameProfile.CPUEPP : (gameProfile.CPUEPP_DC ?? gameProfile.CPUEPP));
                     powerManager.MaxCPUState.SetValue(isOnAC ? gameProfile.MaxCPUState : (gameProfile.MaxCPUState_DC ?? gameProfile.MaxCPUState));
                     powerManager.MinCPUState.SetValue(isOnAC ? gameProfile.MinCPUState : (gameProfile.MinCPUState_DC ?? gameProfile.MinCPUState));
+                    ApplyOSPowerModeFromProfile(gameProfile, isOnAC, "Enabling per-game profile");
 
                     // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
                     // 2026-07-19 (round 11, re-checking round 10's own fix): this branch also never
@@ -1163,6 +1166,7 @@ namespace XboxGamingBarHelper
                             powerManager.CPUEPP.SetValue(isOnAC ? runningGameProfile.CPUEPP : (runningGameProfile.CPUEPP_DC ?? runningGameProfile.CPUEPP));
                             powerManager.MaxCPUState.SetValue(isOnAC ? runningGameProfile.MaxCPUState : (runningGameProfile.MaxCPUState_DC ?? runningGameProfile.MaxCPUState));
                             powerManager.MinCPUState.SetValue(isOnAC ? runningGameProfile.MinCPUState : (runningGameProfile.MinCPUState_DC ?? runningGameProfile.MinCPUState));
+                            ApplyOSPowerModeFromProfile(runningGameProfile, isOnAC, "Applying running-game profile");
                             // [2.0 rebuild - Faza C1] Nullable-gated (code review fix) - matches
                             // Resolution/RefreshRate/AMD below; a profile that never explicitly set
                             // FPSLimit/HDR must not force it off/unlimited on activation.

@@ -16,19 +16,6 @@ namespace XboxGamingBarHelper
     /// </summary>
     internal partial class Program
     {
-        // [2.0 rebuild - AC/DC persistence] Slimmed to ONLY OSPowerMode. Every other field this
-        // used to cache ephemerally (TDP triplet, CPUBoost/EPP/CPUState, FPSLimit) is now
-        // persisted directly into the active GameProfile/GlobalProfile's base + _DC fields
-        // (see ApplyPowerSourceProfileValues below) - real, durable storage instead of a
-        // static in-memory cache lost on every helper restart. OSPowerMode stays ephemeral: it's
-        // explicitly out of scope for the persistence migration (a direct Windows-OS-setting
-        // mirror, not something needing helper-authoritative treatment).
-        private static class PowerSourceProfileState
-        {
-            public static int? AcOsPowerMode = null;
-            public static int? DcOsPowerMode = null;
-        }
-
         // Resolves a DC-side value against its AC counterpart using the "null when equal"
         // convention already established by GameProfile's existing _DC fields: an explicit
         // override is only stored when the DC value genuinely differs from AC, so an unconfigured
@@ -36,6 +23,25 @@ namespace XboxGamingBarHelper
         private static int? ResolveDcOverride(int? dc, int ac) => (dc.HasValue && dc.Value != ac) ? dc : (int?)null;
         private static bool? ResolveDcOverride(bool? dc, bool ac) => (dc.HasValue && dc.Value != ac) ? dc : (bool?)null;
         private static string ResolveDcOverride(string dc, string ac) => (!string.IsNullOrEmpty(dc) && dc != ac) ? dc : null;
+
+        // OSPowerMode was historically serialized as a string in GameProfile. Preserve that
+        // XML contract, but treat only numeric 0/1/2 values as valid 2.0 state.
+        private static int? ParseProfileOSPowerMode(string value)
+        {
+            return int.TryParse(value, out int mode) && mode >= 0 && mode <= 2 ? mode : (int?)null;
+        }
+
+        private static void ApplyOSPowerModeFromProfile(Shared.Data.GameProfile profile, bool isOnAC, string context)
+        {
+            int? target = isOnAC
+                ? ParseProfileOSPowerMode(profile.OSPowerMode)
+                : (ParseProfileOSPowerMode(profile.OSPowerMode_DC) ?? ParseProfileOSPowerMode(profile.OSPowerMode));
+            if (target.HasValue && powerManager?.OSPowerMode != null && target.Value != powerManager.OSPowerMode.Value)
+            {
+                Logger.Info($"{context}: applying OSPowerMode={target.Value} from persisted {(isOnAC ? "AC" : "DC")} profile");
+                powerManager.OSPowerMode.SetValue(target.Value);
+            }
+        }
 
         // Tracks last observed isOnAC so we can skip the (relatively expensive) plan-switch
         // and TDP-reapply work when SystemManager fires PowerSourceChanged for a status
@@ -102,10 +108,6 @@ namespace XboxGamingBarHelper
                     string s = el.GetString();
                     return string.IsNullOrEmpty(s) ? null : s;
                 }
-
-                // OSPowerMode: unchanged, stays ephemeral (out of scope for persistence).
-                PowerSourceProfileState.AcOsPowerMode = ParseInt("AcOsPowerMode");
-                PowerSourceProfileState.DcOsPowerMode = ParseInt("DcOsPowerMode");
 
                 // LegionPerformanceMode (TDP Mode dropdown) - gated on the same TDP flag as the
                 // triplet below, since it's the mode selector for the same feature.
@@ -280,7 +282,7 @@ namespace XboxGamingBarHelper
                     + $"cpuState={acMinCpuState?.ToString() ?? "-"}-{acMaxCpuState?.ToString() ?? "-"}, "
                     + $"fpsLimit={acFpsLimit?.ToString() ?? "-"}, hdr={acHdr?.ToString() ?? "-"}, "
                     + $"resolution={acResolution ?? "-"}, refreshRate={acRefreshRate?.ToString() ?? "-"}, "
-                    + $"osMode={PowerSourceProfileState.AcOsPowerMode?.ToString() ?? "-"} [ephemeral])");
+                    + "osMode=ignored (legacy payload; use SetProfileField intent))");
             }
             catch (Exception ex)
             {
@@ -347,6 +349,17 @@ namespace XboxGamingBarHelper
                 }
                 if (dc) profile.FPSLimit_DC = fpsLimit;
                 else profile.FPSLimit = fpsLimit;
+            }
+            else if (field == "OSPowerMode" && value.TryGetInt32(out int osPowerMode))
+            {
+                if (osPowerMode < 0 || osPowerMode > 2)
+                {
+                    reason = "OS power mode outside 0-2";
+                    Logger.Warn($"Rejected SetProfileField(OSPowerMode): {osPowerMode}");
+                    return false;
+                }
+                if (dc) profile.OSPowerMode_DC = osPowerMode.ToString();
+                else profile.OSPowerMode = osPowerMode.ToString();
             }
             else if (field == "CPUState"
                 && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
@@ -681,14 +694,7 @@ namespace XboxGamingBarHelper
                     rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
                 }
 
-                // OSPowerMode: unchanged, still reads the ephemeral (out-of-scope) cache.
-                int? perStateOsMode = isOnAC ? PowerSourceProfileState.AcOsPowerMode : PowerSourceProfileState.DcOsPowerMode;
-                if (perStateOsMode.HasValue && powerManager?.OSPowerMode != null
-                    && perStateOsMode.Value != powerManager.OSPowerMode.Value)
-                {
-                    Logger.Info($"Helper-side AC/DC handler: applying OSPowerMode={perStateOsMode.Value} from per-state {state} profile");
-                    powerManager.OSPowerMode.SetValue(perStateOsMode.Value);
-                }
+                ApplyOSPowerModeFromProfile(profile, isOnAC, "Helper-side AC/DC handler");
 
                 // 2c) AMD Radeon features (11 fields) — reuses ApplyAMDFeaturesFromProfile's
                 // existing mutual-exclusion correction (RSR/RIS, Chill/AntiLag/Boost), now AC/DC-aware.

@@ -257,10 +257,6 @@ namespace XboxGamingBar
                 profile.FPSLimitEnabled = FPSLimitToggle.IsOn;
                 profile.FPSLimitValue = (int)FPSLimitSlider.Value;
             }
-            if (SaveOSPowerMode && OSPowerModeComboBox != null)
-            {
-                profile.OSPowerMode = OSPowerModeComboBox.SelectedIndex;
-            }
             // HDR
             if (SaveHDR)
             {
@@ -382,24 +378,8 @@ namespace XboxGamingBar
                 // ChangedResyncProfile (wired in GamingWidget.xaml.cs) keeps the Profiles-tab card's
                 // LocalSettings snapshot in sync with that push so SaveCurrentSettingsToProfile's
                 // read of these controls still finds the correct value for profile-card display.
-                if (SaveOSPowerMode)
-                {
-                    isLoadingOSPowerMode = true;
-                    try
-                    {
-                        OSPowerModeComboBox.SelectedIndex = profile.OSPowerMode;
-                        if (profile.OSPowerMode >= 0 && profile.OSPowerMode < OSPowerModeNames.Length)
-                        {
-                            OSPowerModeValue.Text = OSPowerModeNames[profile.OSPowerMode];
-                        }
-                        // Send to helper explicitly
-                        osPowerMode?.SetValue(profile.OSPowerMode);
-                    }
-                    finally
-                    {
-                        isLoadingOSPowerMode = false;
-                    }
-                }
+                // OSPowerMode is applied by the helper together with the selected profile.
+                // The widget only renders its confirmed OSPowerMode property push.
                 // Legion Performance Mode handling
                 // Skip TDP mode loading during initial sync (let helper's value take precedence)
                 Logger.Info($"LoadProfileSettings Legion check: legionGoDetected={legionGoDetected?.Value}, TDPModeComboBox={TDPModeComboBox != null}, isInitialSync={isInitialSync}");

@@ -83,6 +83,7 @@ namespace XboxGamingBar
                         TDP = Number(prefix + "Tdp", 15), TDPFast = Number(prefix + "TdpFast", 15), TDPPeak = Number(prefix + "TdpPeak", 15),
                         CPUBoost = Bool(prefix + "CpuBoost", false), CPUEPP = Number(prefix + "CpuEpp", 80),
                         MaxCPUState = (int)Number(prefix + "MaxCpuState", 100), MinCPUState = (int)Number(prefix + "MinCpuState", 5),
+                        OSPowerMode = (int)Number(prefix + "OsPowerMode", 1),
                         FPSLimitEnabled = fps > 0, FPSLimitValue = fps > 0 ? fps : 60,
                         HDREnabled = Bool(prefix + "HdrEnabled", false), Resolution = Text(prefix + "Resolution", ""), RefreshRate = refresh > 0 ? (int?)refresh : null,
                         FluidMotionFrames = Bool(prefix + "FluidMotionFrames", false), RadeonSuperResolution = Bool(prefix + "RadeonSuperResolution", false),
@@ -133,6 +134,7 @@ namespace XboxGamingBar
                 if (FPSLimitToggle != null) FPSLimitToggle.IsEnabled = false;
                 if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = false;
             }
+            else if (field == "OSPowerMode") pendingControl = OSPowerModeComboBox;
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -268,6 +270,12 @@ namespace XboxGamingBar
                         (int)values.GetNamedNumber(prefix + "Tdp"),
                         (int)values.GetNamedNumber(prefix + "TdpFast"),
                         (int)values.GetNamedNumber(prefix + "TdpPeak"));
+                }
+                else if (field == "OSPowerMode" && values.ContainsKey(prefix + "OsPowerMode"))
+                {
+                    osPowerMode.SuppressRemoteSync = true;
+                    try { osPowerMode.ForceSetValue((int)values.GetNamedNumber(prefix + "OsPowerMode")); }
+                    finally { osPowerMode.SuppressRemoteSync = false; }
                 }
             }
             catch (Exception ex)

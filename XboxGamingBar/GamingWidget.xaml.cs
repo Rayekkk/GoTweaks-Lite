@@ -3126,14 +3126,6 @@ namespace XboxGamingBar
 
                         // Accept helper's LegionPerformanceMode as-is - helper is source of truth
 
-                        // Skip OS Power Mode sync if profile has it saved
-                        // This prevents sync from overwriting profile-loaded OS Power Mode with hardware state
-                        if (SaveOSPowerMode && osPowerMode != null)
-                        {
-                            osPowerMode.SkipSync = true;
-                            Logger.Info("OSPowerMode sync will be skipped - profile has OS Power Mode saved");
-                        }
-
                         await properties.Sync();
                         Logger.Info("Property sync completed.");
 
@@ -3162,12 +3154,6 @@ namespace XboxGamingBar
 
                     // Stop any pending slider updates from the sync
                     properties.StopPendingUpdates();
-
-                    // Re-enable OS Power Mode sync for future syncs
-                    if (osPowerMode != null)
-                    {
-                        osPowerMode.SkipSync = false;
-                    }
 
                     // Don't apply profile TDP mode to helper - helper is source of truth
                     // Helper already has correct mode from its own profile

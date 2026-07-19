@@ -1556,6 +1556,7 @@ namespace XboxGamingBarHelper
             int DcInt(int? value, int ac) => value ?? ac;
             bool DcBool(bool? value, bool ac) => value ?? ac;
             string DcString(string value, string ac) => string.IsNullOrEmpty(value) ? (ac ?? "") : value;
+            int ProfileOsPowerMode(string value) => int.TryParse(value, out int mode) && mode >= 0 && mode <= 2 ? mode : 1;
 
             var values = new Dictionary<string, object>
             {
@@ -1569,6 +1570,7 @@ namespace XboxGamingBarHelper
                 { "AcCpuEpp", selected.CPUEPP }, { "DcCpuEpp", DcInt(selected.CPUEPP_DC, selected.CPUEPP) },
                 { "AcMaxCpuState", selected.MaxCPUState }, { "DcMaxCpuState", DcInt(selected.MaxCPUState_DC, selected.MaxCPUState) },
                 { "AcMinCpuState", selected.MinCPUState }, { "DcMinCpuState", DcInt(selected.MinCPUState_DC, selected.MinCPUState) },
+                { "AcOsPowerMode", ProfileOsPowerMode(selected.OSPowerMode) }, { "DcOsPowerMode", ProfileOsPowerMode(string.IsNullOrEmpty(selected.OSPowerMode_DC) ? selected.OSPowerMode : selected.OSPowerMode_DC) },
                 { "AcFpsLimit", selected.FPSLimit ?? 0 }, { "DcFpsLimit", DcInt(selected.FPSLimit_DC, selected.FPSLimit ?? 0) },
                 { "AcHdrEnabled", selected.HDREnabled ?? false }, { "DcHdrEnabled", DcBool(selected.HDREnabled_DC, selected.HDREnabled ?? false) },
                 { "AcResolution", selected.Resolution ?? "" }, { "DcResolution", DcString(selected.Resolution_DC, selected.Resolution) },

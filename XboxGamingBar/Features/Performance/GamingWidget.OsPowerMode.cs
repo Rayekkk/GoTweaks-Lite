@@ -84,16 +84,7 @@ namespace XboxGamingBar
             int selectedIndex = OSPowerModeComboBox.SelectedIndex;
             if (selectedIndex >= 0 && selectedIndex < OSPowerModeNames.Length)
             {
-                osPowerMode.SetValue(selectedIndex);
-                OSPowerModeValue.Text = OSPowerModeNames[selectedIndex];
-                Logger.Info($"OS Power Mode changed to: {OSPowerModeNames[selectedIndex]}");
-
-                // Save the change to profile
-                if (!isInitialSync && !isApplyingHelperUpdate && !isLoadingProfile && SaveOSPowerMode)
-                {
-                    Logger.Info($"Saving OS Power Mode change to profile: {currentProfileName}");
-                    SaveCurrentSettingsToProfile(currentProfileName);
-                }
+                _ = SendProfileFieldIntentAsync("OSPowerMode", selectedIndex);
             }
         }
 
