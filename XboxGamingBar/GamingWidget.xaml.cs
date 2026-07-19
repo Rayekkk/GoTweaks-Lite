@@ -885,6 +885,10 @@ namespace XboxGamingBar
         private PerformanceProfile gameProfile = new PerformanceProfile();
         private PerformanceProfile gameACProfile = new PerformanceProfile();
         private PerformanceProfile gameDCProfile = new PerformanceProfile();
+        private readonly Dictionary<string, PerformanceProfile> helperProfileCatalog = new Dictionary<string, PerformanceProfile>();
+        private readonly Dictionary<string, string> helperProfileCatalogPaths = new Dictionary<string, string>();
+        private bool helperProfileCatalogLoaded;
+        private bool helperProfileCatalogLoading;
         private string currentProfileName = ""; // Helper-derived display label; never an intent target
         private string currentGameName = "";
         private string currentGameExePath = "";

@@ -121,6 +121,15 @@ namespace XboxGamingBar
             if (string.IsNullOrWhiteSpace(gameName))
                 return;
 
+            if (App.IsConnected)
+            {
+                deleteGameProfile?.ForceSetValue(gameName);
+                helperProfileCatalog.Remove($"Game_{gameName}"); helperProfileCatalog.Remove($"Game_{gameName}_AC"); helperProfileCatalog.Remove($"Game_{gameName}_DC");
+                helperProfileCatalogPaths.Remove(gameName);
+                UpdateAllGameProfilesDisplay();
+                return;
+            }
+
             var settings = ApplicationData.Current.LocalSettings;
             bool profileDeleted = false;
 

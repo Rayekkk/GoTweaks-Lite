@@ -1510,6 +1510,13 @@ namespace XboxGamingBarHelper
             // requests a snapshot; it must never seed this state from its LocalSettings copy.
             if (request.Command == Command.Get)
             {
+                if (request.Extra != null && request.Extra.ContainsKey("GetProfileCatalog"))
+                {
+                    return new global::Windows.Foundation.Collections.ValueSet
+                    {
+                        { "Content", GetProfileCatalogSnapshot() }
+                    };
+                }
                 return new global::Windows.Foundation.Collections.ValueSet
                 {
                     { "Content", GetPowerSourceProfileValuesSnapshot() }
@@ -1543,6 +1550,25 @@ namespace XboxGamingBarHelper
                 ApplyPowerSourceProfileValues(content);
             }
             return response;
+        }
+
+        private static string GetProfileCatalogSnapshot()
+        {
+            var entries = new List<Dictionary<string, object>>();
+            if (profileManager != null)
+            {
+                foreach (var entry in profileManager.GameProfiles.Values)
+                {
+                    entries.Add(new Dictionary<string, object>
+                    {
+                        { "Name", entry.GameId.Name ?? "" },
+                        { "Path", entry.GameId.Path ?? "" },
+                        { "SplitEnabled", entry.PowerSourceProfileEnabled },
+                        { "Snapshot", GetPowerSourceProfileValuesSnapshot(entry) }
+                    });
+                }
+            }
+            return System.Text.Json.JsonSerializer.Serialize(entries);
         }
 
         private static string GetPowerSourceProfileValuesSnapshot(Shared.Data.GameProfile? requestedProfile = null)

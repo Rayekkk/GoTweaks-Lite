@@ -94,6 +94,17 @@ namespace XboxGamingBar
 
         private void LoadProfileFromStorage(string profileName, PerformanceProfile profile)
         {
+            if (helperProfileCatalog.TryGetValue(profileName, out var confirmed))
+            {
+                var copy = confirmed.Clone();
+                profile.TDP = copy.TDP; profile.TDPFast = copy.TDPFast; profile.TDPPeak = copy.TDPPeak;
+                profile.CPUBoost = copy.CPUBoost; profile.CPUEPP = copy.CPUEPP; profile.MaxCPUState = copy.MaxCPUState; profile.MinCPUState = copy.MinCPUState;
+                profile.LegionPerformanceMode = copy.LegionPerformanceMode; profile.FPSLimitEnabled = copy.FPSLimitEnabled; profile.FPSLimitValue = copy.FPSLimitValue;
+                profile.OSPowerMode = copy.OSPowerMode; profile.HDREnabled = copy.HDREnabled; profile.Resolution = copy.Resolution; profile.RefreshRate = copy.RefreshRate;
+                profile.FluidMotionFrames = copy.FluidMotionFrames; profile.RadeonSuperResolution = copy.RadeonSuperResolution; profile.ImageSharpening = copy.ImageSharpening;
+                profile.RadeonAntiLag = copy.RadeonAntiLag; profile.RadeonBoost = copy.RadeonBoost; profile.RadeonChill = copy.RadeonChill;
+                return;
+            }
             var settings = ApplicationData.Current.LocalSettings;
             if (settings.Containers.ContainsKey($"Profile_{profileName}"))
             {

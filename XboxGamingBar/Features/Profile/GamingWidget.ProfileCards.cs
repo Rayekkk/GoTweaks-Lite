@@ -43,6 +43,29 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        private async Task SyncProfileCatalogFromHelperAsync()
+        {
+            helperProfileCatalogLoading = true;
+            try
+            {
+                var request = new Windows.Foundation.Collections.ValueSet { { "Command", (int)Shared.Enums.Command.Get }, { "Function", (int)Shared.Enums.Function.PowerSourceProfileValues }, { "GetProfileCatalog", true } };
+                var response = await App.PipeClient.SendRequestAsync(request);
+                if (response == null || !response.TryGetValue("Content", out object raw) || !(raw is string json)) return;
+                var entries = Windows.Data.Json.JsonArray.Parse(json);
+                helperProfileCatalog.Clear(); helperProfileCatalogPaths.Clear();
+                foreach (var item in entries)
+                {
+                    var entry = item.GetObject(); string name = entry.GetNamedString("Name", ""); if (string.IsNullOrEmpty(name)) continue;
+                    var values = Windows.Data.Json.JsonObject.Parse(entry.GetNamedString("Snapshot", "{}"));
+                    PerformanceProfile Read(string p) => new PerformanceProfile { TDP = values.GetNamedNumber(p + "Tdp", 15), TDPFast = values.GetNamedNumber(p + "TdpFast", 15), TDPPeak = values.GetNamedNumber(p + "TdpPeak", 15), CPUBoost = values.GetNamedBoolean(p + "CpuBoost", false), CPUEPP = values.GetNamedNumber(p + "CpuEpp", 80), MaxCPUState = (int)values.GetNamedNumber(p + "MaxCpuState", 100), MinCPUState = (int)values.GetNamedNumber(p + "MinCpuState", 5), LegionPerformanceMode = (int)values.GetNamedNumber(p + "LegionPerformanceMode", 2), FPSLimitValue = (int)values.GetNamedNumber(p + "FpsLimit", 0), HDREnabled = values.GetNamedBoolean(p + "HdrEnabled", false), Resolution = values.GetNamedString(p + "Resolution", "") };
+                    var ac = Read("Ac"); ac.FPSLimitEnabled = ac.FPSLimitValue > 0; var dc = Read("Dc"); dc.FPSLimitEnabled = dc.FPSLimitValue > 0;
+                    bool split = entry.GetNamedBoolean("SplitEnabled", false); helperProfileCatalog[$"Game_{name}"] = ac; if (split) { helperProfileCatalog[$"Game_{name}_AC"] = ac; helperProfileCatalog[$"Game_{name}_DC"] = dc; } helperProfileCatalogPaths[name] = entry.GetNamedString("Path", "");
+                }
+                helperProfileCatalogLoaded = true; UpdateAllGameProfilesDisplay();
+            }
+            catch (Exception ex) { Logger.Warn($"Profile catalog sync failed: {ex.Message}"); }
+            finally { helperProfileCatalogLoading = false; }
+        }
 
         private void UpdateGameProfileCardVisibility()
         {
@@ -81,6 +104,8 @@ namespace XboxGamingBar
 
         private List<string> GetAllSavedGameProfiles()
         {
+            if (App.IsConnected)
+                return helperProfileCatalog.Keys.Where(k => k.StartsWith("Game_")).Select(k => k.Substring(5).Replace("_AC", "").Replace("_DC", "")).Distinct().OrderBy(n => n).ToList();
             var gameNames = new HashSet<string>();
             var settings = ApplicationData.Current.LocalSettings;
 
@@ -122,6 +147,8 @@ namespace XboxGamingBar
         {
             if (AllGameProfilesContainer == null)
                 return;
+            if (App.IsConnected && !helperProfileCatalogLoaded && !helperProfileCatalogLoading)
+                _ = SyncProfileCatalogFromHelperAsync();
 
             // Restore the persisted sort mode on the first render. The XAML default is
             // "name"; on subsequent app starts we honor whatever the user picked last.
@@ -574,10 +601,10 @@ namespace XboxGamingBar
             {
                 // Load profiles
                 var settings = ApplicationData.Current.LocalSettings;
-                bool hasAC = settings.Containers.ContainsKey($"Profile_Game_{gameName}_AC");
-                bool hasDC = settings.Containers.ContainsKey($"Profile_Game_{gameName}_DC");
+                bool hasAC = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}_AC") : settings.Containers.ContainsKey($"Profile_Game_{gameName}_AC");
+                bool hasDC = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}_DC") : settings.Containers.ContainsKey($"Profile_Game_{gameName}_DC");
                 bool hasACDC = hasAC || hasDC;
-                bool hasSingle = settings.Containers.ContainsKey($"Profile_Game_{gameName}");
+                bool hasSingle = App.IsConnected ? helperProfileCatalog.ContainsKey($"Game_{gameName}") : settings.Containers.ContainsKey($"Profile_Game_{gameName}");
                 bool gamePowerSourceSplit = GetPerGamePowerSourceProfileEnabled(gameName);
 
                 Border profileCard = new Border
