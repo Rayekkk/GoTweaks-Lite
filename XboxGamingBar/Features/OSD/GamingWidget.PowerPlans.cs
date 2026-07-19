@@ -43,6 +43,9 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        // Monotonic widget-side intent revision. A late response must never overwrite the
+        // newer requested/confirmed state after rapid slider movement.
+        private long latestProfileIntentRevision;
         // LocalSettings remains only a UI cache. On every connection it is refreshed from the
         // helper before any direct user edit can use it as an edit buffer.
         private async Task SyncPowerSourceProfilesFromHelperAsync(string snapshotJson = null)
@@ -116,6 +119,7 @@ namespace XboxGamingBar
         private async Task SendProfileFieldIntentAsync(string field, object value)
         {
             if (!App.IsConnected) return;
+            long intentRevision = ++latestProfileIntentRevision;
             Windows.UI.Xaml.Controls.Control pendingControl = null;
             if (field == "CPUBoost") pendingControl = CPUBoostToggle;
             else if (field == "CPUEPP") pendingControl = CPUEPPSlider;
@@ -173,6 +177,11 @@ namespace XboxGamingBar
                     return;
                 }
                 var result = Windows.Data.Json.JsonObject.Parse(content);
+                if (intentRevision != latestProfileIntentRevision)
+                {
+                    Logger.Debug($"Ignoring stale profile intent response for {field} (revision {intentRevision})");
+                    return;
+                }
                 string outcome = result.GetNamedString("Outcome", "Rejected");
                 if (outcome != "Applied") Logger.Warn($"Profile intent {field} rejected: {result.GetNamedString("Reason", "unknown reason")}");
                 string snapshot = result.GetNamedString("Snapshot", "");

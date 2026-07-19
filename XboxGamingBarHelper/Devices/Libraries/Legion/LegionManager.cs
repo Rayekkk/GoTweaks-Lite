@@ -1644,12 +1644,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             ScheduleTDPReapply(slow, fast, peak);
         }
 
-        public void SetCustomTDP(int slow, int fast, int peak)
+        public bool SetCustomTDP(int slow, int fast, int peak)
         {
             if (wmiService == null)
             {
                 Logger.Warn("Cannot set custom TDP: WMI service not available");
-                return;
+                return false;
             }
 
             try
@@ -1660,7 +1660,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 if (performanceMode != 255)
                 {
                     Logger.Info($"Skipping SetCustomTDP({slow}, {fast}, {peak}) - not in Custom mode (current mode: {performanceMode})");
-                    return;
+                    return false;
                 }
 
                 // If there's a pending Custom mode change waiting on debounce, apply it immediately
@@ -1686,7 +1686,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                         else
                         {
                             Logger.Error($"Failed to set performance mode: {modeResult.Message}");
-                            return; // Don't try to set TDP if mode change failed
+                            return false; // Don't try to set TDP if mode change failed
                         }
                     }
                 }
@@ -1715,14 +1715,14 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                     {
                         Logger.Warn("Hardware did not confirm Custom mode within 500ms, applying TDP anyway and scheduling reapply");
                         // Apply TDP values now and schedule a reapply to ensure they stick
-                        ApplyTDPValues(slow, fast, peak);
+                        bool appliedAfterTimeout = ApplyTDPValues(slow, fast, peak);
                         ScheduleTDPReapply(slow, fast, peak);
-                        return;
+                        return appliedAfterTimeout;
                     }
                 }
 
                 // Apply TDP values
-                ApplyTDPValues(slow, fast, peak);
+                if (!ApplyTDPValues(slow, fast, peak)) return false;
 
                 // Keep the helper's internal cache (customTDPSlow/Fast/Peak via these properties) in
                 // sync with the applied values, but do NOT SyncToRemote: the widget owns the Custom
@@ -1733,10 +1733,12 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 LegionCustomTDPFast.SetValueSilent(fast);
                 LegionCustomTDPPeak.SetValueSilent(peak);
                 Logger.Info($"Synced Legion Custom TDP cache (internal): Slow={slow}W, Fast={fast}W, Peak={peak}W");
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error setting custom TDP: {ex.Message}");
+                return false;
             }
         }
 
@@ -1764,7 +1766,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         /// Applies TDP values via WMI with rollback on partial failure.
         /// All three values are applied atomically - if any fails, previous values are restored.
         /// </summary>
-        private void ApplyTDPValues(int slow, int fast, int peak)
+        private bool ApplyTDPValues(int slow, int fast, int peak)
         {
             // Store previous values for rollback on partial failure
             int previousSlow = customTDPSlow;
@@ -1776,7 +1778,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             if (!slowResult.Success)
             {
                 Logger.Error($"Failed to set Slow TDP: {slowResult.Message}");
-                return; // Nothing to rollback yet
+                return false; // Nothing to rollback yet
             }
             Logger.Info($"Slow TDP (SPL) set to {slow}W");
 
@@ -1788,7 +1790,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 // Rollback Slow TDP
                 Logger.Warn($"Rolling back Slow TDP to {previousSlow}W due to Fast TDP failure");
                 wmiService.SetCPUShortTermPowerLimit(previousSlow);
-                return;
+                return false;
             }
             Logger.Info($"Fast TDP (SPPL) set to {fast}W");
 
@@ -1801,7 +1803,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
                 Logger.Warn($"Rolling back Slow TDP to {previousSlow}W and Fast TDP to {previousFast}W due to Peak TDP failure");
                 wmiService.SetCPUShortTermPowerLimit(previousSlow);
                 wmiService.SetCPULongTermPowerLimit(previousFast);
-                return;
+                return false;
             }
             Logger.Info($"Peak TDP (FPPT) set to {peak}W");
 
@@ -1811,6 +1813,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             customTDPPeak = peak;
             Logger.Info($"All TDP values applied successfully: SPL={slow}W, SPPL={fast}W, FPPT={peak}W");
             CustomTDPApplied?.Invoke();
+            return true;
         }
 
         /// <summary>

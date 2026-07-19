@@ -311,6 +311,7 @@ namespace XboxGamingBarHelper
             }
 
             bool dc = power == "DC";
+            var previousProfile = profile;
             if (field == "TDP" && value.TryGetInt32(out int watts))
             {
                 if (watts < 5 || watts > 50)
@@ -392,7 +393,22 @@ namespace XboxGamingBarHelper
             // the helper's power-source handler applies it on the next real transition.
             // isApplyingProfile prevents the regular property handlers from treating this
             // helper-owned apply as a second user edit.
-            if (targetIsActive && dc != IsCurrentlyOnAC)
+            if (field == "CustomTDP" && targetIsActive && dc != IsCurrentlyOnAC)
+            {
+                int slow = dc ? (profile.TDP_DC ?? profile.TDP) : profile.TDP;
+                int fast = dc ? (profile.TDPFast_DC ?? profile.TDPFast) : profile.TDPFast;
+                int peak = dc ? (profile.TDPPeak_DC ?? profile.TDPPeak) : profile.TDPPeak;
+                if (legionManager == null || !legionManager.SetCustomTDP(slow, fast, peak))
+                {
+                    if (dc) { profile.TDP_DC = previousProfile.TDP_DC; profile.TDPFast_DC = previousProfile.TDPFast_DC; profile.TDPPeak_DC = previousProfile.TDPPeak_DC; }
+                    else { profile.TDP = previousProfile.TDP; profile.TDPFast = previousProfile.TDPFast; profile.TDPPeak = previousProfile.TDPPeak; }
+                    confirmedProfile = profile;
+                    reason = "custom TDP WMI apply failed";
+                    Logger.Warn($"Rejected SetProfileField(CustomTDP): {reason}");
+                    return false;
+                }
+            }
+            else if (targetIsActive && dc != IsCurrentlyOnAC)
             {
                 lock (profileApplicationLock)
                 {

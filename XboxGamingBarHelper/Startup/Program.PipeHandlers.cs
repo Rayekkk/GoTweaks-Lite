@@ -37,6 +37,7 @@ namespace XboxGamingBarHelper
 {
     internal partial class Program
     {
+        private static long profileIntentRevision;
 
         // NOTE: Connection_RequestReceived (AppService handler) was removed - using Named Pipes only
         // See PipeServer_MessageReceived below for the pipe-based message handler
@@ -1525,12 +1526,14 @@ namespace XboxGamingBarHelper
                     && intent.GetString() == "SetProfileField")
                 {
                     bool applied = ApplyProfileFieldIntent(cfg, out string reason, out Shared.Data.GameProfile confirmedProfile);
+                    long revision = System.Threading.Interlocked.Increment(ref profileIntentRevision);
                     return new global::Windows.Foundation.Collections.ValueSet
                     {
                         { "Content", System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
                             {
                                 { "Outcome", applied ? "Applied" : "Rejected" },
                                 { "Reason", reason ?? "" },
+                                { "Revision", revision },
                                 { "Snapshot", GetPowerSourceProfileValuesSnapshot(confirmedProfile) }
                             }) }
                     };
