@@ -225,9 +225,10 @@ namespace XboxGamingBar
                 return;
             }
 
-            // Legacy local cache path for groups not yet migrated to SetProfileField.
-            SaveCurrentSettingsToProfile(currentProfileName);
-            if (group != null) SendPowerSourceProfileValuesToHelper(group);
+            // Functional profile changes must be explicit helper intents. A sender with no
+            // mapped intent is intentionally ignored rather than captured into a local
+            // whole-profile snapshot.
+            Logger.Debug($"Ignoring unmigrated local profile save group: {group ?? "none"}");
         }
 
         private string GetPowerSourceProfileChangedGroup(object sender)

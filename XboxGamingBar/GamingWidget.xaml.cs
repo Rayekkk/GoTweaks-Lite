@@ -1905,18 +1905,9 @@ namespace XboxGamingBar
             // Initialize CPU State comboboxes with percentage values
             InitializeCPUStateComboBoxes();
 
-            // Check if this is a clean install (no saved Global profile)
-            var settings = ApplicationData.Current.LocalSettings;
-            isCleanInstall = !settings.Containers.ContainsKey("Profile_Global");
-            if (isCleanInstall)
-            {
-                Logger.Info("Clean install detected - will initialize profile with current system values after helper sync");
-            }
-
-            // Load profiles from storage
-            LoadProfileFromStorage("Global", globalProfile);
-            LoadProfileFromStorage("AC", acProfile);
-            LoadProfileFromStorage("DC", dcProfile);
+            // 2.0: performance profiles are helper-owned. Never hydrate the widget
+            // display cache from LocalSettings; the initial helper snapshot fills it.
+            isCleanInstall = false;
 
             // Load global controller profile from storage
             LoadControllerProfileFromStorage("Global", globalControllerProfile);
@@ -2487,7 +2478,7 @@ namespace XboxGamingBar
 
                 // IMPORTANT: Disable toggle BEFORE changing currentGameName
                 // This prevents race condition where profile switching happens with invalid state
-                if (!HasValidGame(newGameName) && PerGameProfileToggle?.IsOn == true)
+                if (!App.IsConnected && !HasValidGame(newGameName) && PerGameProfileToggle?.IsOn == true)
                 {
                     Logger.Info($"No valid game detected (was: '{rawGameName}'), disabling per-game toggle BEFORE updating game name");
                     isInternalToggleDisable = true; // Flag this as internal disable
@@ -2511,6 +2502,14 @@ namespace XboxGamingBar
                 // Check if we have a valid game
                 if (HasValidGame(currentGameName))
                 {
+                    if (App.IsConnected)
+                    {
+                        // The helper decides whether this game has an enabled profile and
+                        // applies it. The widget only refreshes its confirmed display cache.
+                        _ = SyncPowerSourceProfilesFromHelperAsync();
+                    }
+                    else
+                    {
                     // Valid game detected
                     var settings = ApplicationData.Current.LocalSettings;
                     bool hasExistingProfile = HasAnyGameProfile(currentGameName);
@@ -2555,6 +2554,7 @@ namespace XboxGamingBar
                         isInternalToggleDisable = true;
                         PerGameProfileToggle.IsOn = false;
                         isInternalToggleDisable = false;
+                    }
                     }
                 }
 
@@ -3493,25 +3493,6 @@ namespace XboxGamingBar
                 {
                     Logger.Info("[PIPE] Inside dispatcher - calling HideConnectionBanner()");
                     HideConnectionBanner();
-
-                    // Update current profile's TDP and mode from helper's synced values
-                    // This prevents stale profile values from being loaded in subsequent LoadProfileSettings calls
-                    if (tdp != null && !string.IsNullOrEmpty(currentProfileName))
-                    {
-                        var profile = GetProfile(currentProfileName);
-                        if (profile != null && legionPerformanceMode != null)
-                        {
-                            int helperMode = legionPerformanceMode.Value;
-                            double helperTDP = tdp.Value;
-                            if (profile.LegionPerformanceMode != helperMode || Math.Abs(profile.TDP - helperTDP) > 0.5)
-                            {
-                                Logger.Info($"[PIPE] Syncing profile '{currentProfileName}' with helper: TDP {profile.TDP}→{helperTDP}W, Mode {profile.LegionPerformanceMode}→{helperMode}");
-                                profile.LegionPerformanceMode = helperMode;
-                                profile.TDP = helperTDP;
-                                SaveProfileToStorage(currentProfileName, profile);
-                            }
-                        }
-                    }
 
                     Logger.Info("[PIPE] Inside dispatcher - calling UpdateProfileDisplay()");
                     UpdateProfileDisplay();

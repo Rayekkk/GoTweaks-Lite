@@ -645,22 +645,7 @@ namespace XboxGamingBar
 
                 Logger.Info($"EPP cycled from {currentValue} to {nextValue}");
 
-                // Save the change to profile
-                // Use direct save to bypass isApplyingHelperUpdate check - this is a user-initiated action
-                if (!isInitialSync && !isLoadingProfile && SaveCPUEPP && !string.IsNullOrEmpty(currentProfileName))
-                {
-                    try
-                    {
-                        var profile = GetProfile(currentProfileName);
-                        profile.CPUEPP = nextValue;
-                        SaveProfileToStorage(currentProfileName, profile);
-                        Logger.Info($"Saved EPP {nextValue} to profile: {currentProfileName}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error($"Failed to save EPP to profile: {ex.Message}");
-                    }
-                }
+                _ = SendProfileFieldIntentAsync("CPUEPP", nextValue);
             }
         }
 

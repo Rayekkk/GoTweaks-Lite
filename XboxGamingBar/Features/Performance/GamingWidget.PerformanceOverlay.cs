@@ -92,18 +92,7 @@ namespace XboxGamingBar
                     {
                         SavePerformanceOverlaySetting();
 
-                        // Also update current profile's OverlayLevel if SaveOverlayLevel is enabled
-                        // This ensures the profile stays in sync with the user's selection
-                        if (SaveOverlayLevel && !string.IsNullOrEmpty(currentProfileName))
-                        {
-                            var profile = GetProfile(currentProfileName);
-                            if (profile != null)
-                            {
-                                profile.OverlayLevel = index;
-                                SaveProfileToStorage(currentProfileName, profile);
-                                Logger.Debug($"Updated profile '{currentProfileName}' OverlayLevel to {index}");
-                            }
-                        }
+                        // OSD level is helper-owned and persisted by its OSD property path.
                     }
                 }
             }

@@ -1935,7 +1935,7 @@ namespace XboxGamingBar
 
             // Save profile when TDP Mode changes (if not during initialization or helper update)
             // Allow save if user-initiated from Quick Tab tile (bypasses isApplyingHelperUpdate)
-            if (!isInitialSync && !isLoadingProfile && SaveTDP && (!isApplyingHelperUpdate || isUserInitiatedTDPModeChange))
+            if (!App.IsConnected && !isInitialSync && !isLoadingProfile && SaveTDP && (!isApplyingHelperUpdate || isUserInitiatedTDPModeChange))
             {
                 // Don't save to game profile if per-game profile is disabled.
                 // During game close, helper sends global mode via pipe → ComboBox changes → handler fires.
