@@ -181,7 +181,6 @@ namespace XboxGamingBar
             // Pull the title→exe-basename map from the helper's per-exe XML profiles
             // so legacy widget profiles (saved before we started stamping GameExePath
             // into LocalSettings containers) can still be grouped by their owning exe.
-            var helperTitleMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             // Bucket every saved game profile by the exe it belongs to. Profiles for
             // the same exe (e.g. multiple titles played in Citron) collapse into one
@@ -193,7 +192,7 @@ namespace XboxGamingBar
                 if (gameName == currentGameName && HasValidGame(currentGameName))
                     continue;
 
-                string groupKey = ResolveGroupKeyForProfile(gameName, helperTitleMap) ?? gameName;
+                string groupKey = ResolveGroupKeyForProfile(gameName) ?? gameName;
                 if (!groups.TryGetValue(groupKey, out var list))
                 {
                     list = new List<string>();
@@ -268,7 +267,7 @@ namespace XboxGamingBar
         /// recorded name for that exe). Returns null when no mapping is available — the
         /// caller will fall back to using the title as the group key (1-profile group).
         /// </summary>
-        private string ResolveGroupKeyForProfile(string gameName, Dictionary<string, string> helperTitleMap)
+        private string ResolveGroupKeyForProfile(string gameName)
         {
             return helperProfileCatalogPaths.TryGetValue(gameName, out var path) && !string.IsNullOrEmpty(path)
                 ? Path.GetFileNameWithoutExtension(path)
