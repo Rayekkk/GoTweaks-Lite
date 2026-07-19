@@ -173,7 +173,7 @@ namespace XboxGamingBar
             // Don't save during profile loading, switching, initial sync, when helper is updating values,
             // or when any property is syncing from helper pipe
             if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync
-                || WidgetSliderProperty.HelperSyncCount > 0)
+                || WidgetSliderProperty.HelperSyncCount > 0 || refreshRate?.IsUpdatingUI == true)
             {
                 Logger.Debug($"Skipping auto-save during profile operation (loading={isLoadingProfile}, switching={isSwitchingProfile}, helperUpdate={isApplyingHelperUpdate}, initialSync={isInitialSync})");
                 return;
@@ -199,6 +199,12 @@ namespace XboxGamingBar
                     GetSelectedCPUStateValue(MinCPUStateComboBox),
                     GetSelectedCPUStateValue(MaxCPUStateComboBox)
                 });
+                return;
+            }
+            if (group == "RefreshRate")
+            {
+                if (RefreshRatesComboBox?.SelectedItem is int selectedRefreshRate)
+                    _ = SendProfileFieldIntentAsync("RefreshRate", selectedRefreshRate);
                 return;
             }
 

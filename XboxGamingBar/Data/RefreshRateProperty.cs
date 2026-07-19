@@ -8,6 +8,7 @@ namespace XboxGamingBar.Data
 {
     internal class RefreshRateProperty : WidgetControlProperty<int, ComboBox>
     {
+        public bool IsUpdatingUI { get; private set; }
         public RefreshRateProperty(ComboBox inUI, Page inOwner) : base(SystemConstants.DEFAULT_REFRESH_RATE, Function.RefreshRate, inUI, inOwner)
         {
             if (UI != null)
@@ -20,8 +21,9 @@ namespace XboxGamingBar.Data
         {
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is int intValue && intValue != Value)
             {
-                Logger.Info($"{Function} combo box updated to {intValue}.");
-                SetValue(intValue);
+                // A selection is only a user request. GamingWidget.SettingChanged relays the
+                // intent to the helper; this display property changes only after confirmation.
+                Logger.Info($"{Function} combo box requested {intValue}Hz.");
             }
             else
             {
@@ -44,28 +46,36 @@ namespace XboxGamingBar.Data
         {
             await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                bool found = false;
-                for (var i = 0; i < UI.Items.Count; i++)
+                IsUpdatingUI = true;
+                try
                 {
-                    if (UI.Items[i] is int intValue && intValue == Value)
+                    bool found = false;
+                    for (var i = 0; i < UI.Items.Count; i++)
                     {
-                        Logger.Info($"{Function} combo box selected index {i} ({Value}Hz).");
-                        UI.SelectedIndex = i;
-                        found = true;
-                        break;
+                        if (UI.Items[i] is int intValue && intValue == Value)
+                        {
+                            Logger.Info($"{Function} combo box selected index {i} ({Value}Hz).");
+                            UI.SelectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found && retryCount < 3)
+                    {
+                        // ComboBox items may not be populated yet (race condition with RefreshRatesProperty)
+                        // Retry after a short delay
+                        Logger.Info($"{Function} value {Value}Hz not found in ComboBox items (count={UI.Items.Count}), retry {retryCount + 1}/3...");
+                        await System.Threading.Tasks.Task.Delay(100);
+                        await SelectValueInComboBox(retryCount + 1);
+                    }
+                    else if (!found)
+                    {
+                        Logger.Warn($"{Function} value {Value}Hz not found in ComboBox items after retries.");
                     }
                 }
-                if (!found && retryCount < 3)
+                finally
                 {
-                    // ComboBox items may not be populated yet (race condition with RefreshRatesProperty)
-                    // Retry after a short delay
-                    Logger.Info($"{Function} value {Value}Hz not found in ComboBox items (count={UI.Items.Count}), retry {retryCount + 1}/3...");
-                    await System.Threading.Tasks.Task.Delay(100);
-                    await SelectValueInComboBox(retryCount + 1);
-                }
-                else if (!found)
-                {
-                    Logger.Warn($"{Function} value {Value}Hz not found in ComboBox items after retries.");
+                    IsUpdatingUI = false;
                 }
             });
         }

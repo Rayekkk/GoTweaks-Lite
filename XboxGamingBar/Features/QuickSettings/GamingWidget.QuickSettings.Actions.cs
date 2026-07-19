@@ -515,14 +515,8 @@ namespace XboxGamingBar
                 return;
             }
 
-            refreshRate.SetValue(next);
-            Logger.Info($"Refresh rate cycled from {current}Hz to {next}Hz");
-
-            // [2.0 rebuild - AC/DC persistence follow-up] Found in an independent audit
-            // 2026-07-19 (round 13): same missing-resync gap as CycleFPSLimit above - this only
-            // ever saved locally (via the shared ProfileTrackedProperty_ChangedResyncProfile
-            // handler subscribed to refreshRate.PropertyChanged) and never resynced to the helper.
-            SendPowerSourceProfileValuesToHelper("RefreshRate");
+            _ = SendProfileFieldIntentAsync("RefreshRate", next);
+            Logger.Info($"Requested refresh-rate cycle from {current}Hz to {next}Hz");
         }
 
         private void ToggleLosslessScaling()

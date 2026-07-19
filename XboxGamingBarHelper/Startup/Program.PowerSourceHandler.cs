@@ -361,6 +361,18 @@ namespace XboxGamingBarHelper
                 if (dc) profile.OSPowerMode_DC = osPowerMode.ToString();
                 else profile.OSPowerMode = osPowerMode.ToString();
             }
+            else if (field == "RefreshRate" && value.TryGetInt32(out int refreshRate))
+            {
+                var supportedRates = systemManager?.RefreshRates?.Value;
+                if (refreshRate <= 0 || supportedRates == null || !supportedRates.Contains(refreshRate))
+                {
+                    reason = "refresh rate is not supported by the active display";
+                    Logger.Warn($"Rejected SetProfileField(RefreshRate): {refreshRate}");
+                    return false;
+                }
+                if (dc) profile.RefreshRate_DC = refreshRate;
+                else profile.RefreshRate = refreshRate;
+            }
             else if (field == "CPUState"
                 && cfg.TryGetValue("MinValue", out var minElement) && minElement.TryGetInt32(out int minState)
                 && cfg.TryGetValue("MaxValue", out var maxElement) && maxElement.TryGetInt32(out int maxState))

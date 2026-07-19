@@ -135,6 +135,7 @@ namespace XboxGamingBar
                 if (FPSLimitSlider != null) FPSLimitSlider.IsEnabled = false;
             }
             else if (field == "OSPowerMode") pendingControl = OSPowerModeComboBox;
+            else if (field == "RefreshRate") pendingControl = RefreshRatesComboBox;
             if (pendingControl != null) pendingControl.IsEnabled = false;
             try
             {
@@ -276,6 +277,16 @@ namespace XboxGamingBar
                     osPowerMode.SuppressRemoteSync = true;
                     try { osPowerMode.ForceSetValue((int)values.GetNamedNumber(prefix + "OsPowerMode")); }
                     finally { osPowerMode.SuppressRemoteSync = false; }
+                }
+                else if (field == "RefreshRate" && values.ContainsKey(prefix + "RefreshRate"))
+                {
+                    int confirmed = (int)values.GetNamedNumber(prefix + "RefreshRate");
+                    if (confirmed > 0)
+                    {
+                        refreshRate.SuppressRemoteSync = true;
+                        try { refreshRate.ForceSetValue(confirmed); }
+                        finally { refreshRate.SuppressRemoteSync = false; }
+                    }
                 }
             }
             catch (Exception ex)
