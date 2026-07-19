@@ -93,24 +93,103 @@ namespace XboxGamingBarHelper
                 return false;
             }
 
+            string trimmedName = delete ? null : name.Trim();
+            string trimmedShortcut = delete ? null : shortcut.Trim();
+            string resolvedIcon = delete ? null : (string.IsNullOrWhiteSpace(icon) ? "\uE768" : icon);
+
             lock (CustomQuickSettingsLock)
             {
-                var definitions = LoadCustomQuickSettings();
-                definitions.RemoveAll(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
-                if (!delete)
+                try
                 {
-                    definitions.Add(new CustomQuickSettingDefinition
+                    var definitions = LoadCustomQuickSettings();
+                    definitions.RemoveAll(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+                    if (!delete)
                     {
-                        Id = id,
-                        Name = name.Trim(),
-                        Icon = string.IsNullOrWhiteSpace(icon) ? "\uE768" : icon,
-                        Shortcut = shortcut.Trim()
-                    });
+                        definitions.Add(new CustomQuickSettingDefinition
+                        {
+                            Id = id,
+                            Name = trimmedName,
+                            Icon = resolvedIcon,
+                            Shortcut = trimmedShortcut
+                        });
+                    }
+                    LocalSettingsHelper.SetValue(CustomQuickSettingsKey,
+                        System.Text.Json.JsonSerializer.Serialize(definitions));
+
+                    // LocalSettingsHelper.SetValue swallows disk I/O failures internally (it only
+                    // logs at Debug level), so a void call here can never be trusted as proof of
+                    // persistence. Read the registry back and confirm the change actually landed
+                    // before reporting success - a silent write failure must surface as a
+                    // correlated rejection instead of a false "Success" (permanent confirmed-state
+                    // rule, section 13).
+                    var confirmed = LoadCustomQuickSettings();
+                    var match = confirmed.FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+                    bool persisted = delete
+                        ? match == null
+                        : match != null && match.Name == trimmedName && match.Icon == resolvedIcon && match.Shortcut == trimmedShortcut;
+                    if (!persisted)
+                    {
+                        Logger.Error($"Custom quick setting '{id}' did not persist (readback mismatch).");
+                        reason = "Failed to persist the custom quick action.";
+                        return false;
+                    }
                 }
-                LocalSettingsHelper.SetValue(CustomQuickSettingsKey,
-                    System.Text.Json.JsonSerializer.Serialize(definitions));
+                catch (Exception ex)
+                {
+                    Logger.Error($"Failed to persist custom quick setting '{id}': {ex.Message}");
+                    reason = "Failed to persist the custom quick action.";
+                    return false;
+                }
             }
+
+            // A deleted custom tile can still have a dangling controller-combo binding in the
+            // tile-hotkey registry (a different store, keyed by tile id). Left in place, the
+            // combo would silently no-op forever (ExecuteQuickSettingAction falls through to the
+            // "unknown quick setting" case) while permanently occupying that button combination.
+            if (delete)
+            {
+                RemoveTileHotkeyBindingForDeletedCustomTile(id);
+            }
+
             return true;
+        }
+
+        /// <summary>
+        /// Removes any controller-combo binding pointed at a custom tile id that no longer
+        /// exists, so deleting a custom shortcut also frees its combo instead of leaving a
+        /// dead entry in the helper-owned tile-hotkey registry.
+        /// </summary>
+        private static void RemoveTileHotkeyBindingForDeletedCustomTile(string id)
+        {
+            try
+            {
+                if (!LocalSettingsHelper.TryGetValue<string>(TileHotkeyConfigSettingsKey, out string currentJson)
+                    || string.IsNullOrWhiteSpace(currentJson)) return;
+
+                List<Dictionary<string, object>> entries;
+                try
+                {
+                    entries = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object>>>(currentJson)
+                        ?? new List<Dictionary<string, object>>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Discarding invalid saved tile bindings while cleaning up deleted custom tile: {ex.Message}");
+                    return;
+                }
+
+                int before = entries.Count;
+                entries.RemoveAll(entry => entry.TryGetValue("id", out object existing)
+                    && string.Equals(existing?.ToString().Trim('"'), id, StringComparison.OrdinalIgnoreCase));
+                if (entries.Count == before) return;
+
+                ApplyTileHotkeys(System.Text.Json.JsonSerializer.Serialize(entries));
+                Logger.Info($"Removed dangling controller-combo binding for deleted custom tile '{id}'");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"RemoveTileHotkeyBindingForDeletedCustomTile failed: {ex.Message}");
+            }
         }
 
         private static bool TryGetCustomQuickSettingShortcut(string id, out string shortcut)
