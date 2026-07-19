@@ -114,10 +114,12 @@ namespace XboxGamingBar
             try
             {
                 bool dc = currentProfileName != null && currentProfileName.EndsWith("_DC");
+                bool perGame = currentProfileName != null && currentProfileName.StartsWith("Game_");
                 var json = new Windows.Data.Json.JsonObject
                 {
                     ["Intent"] = Windows.Data.Json.JsonValue.CreateStringValue("SetProfileField"),
                     ["Field"] = Windows.Data.Json.JsonValue.CreateStringValue(field),
+                    ["Scope"] = Windows.Data.Json.JsonValue.CreateStringValue(perGame ? "PerGame" : "Global"),
                     ["Power"] = Windows.Data.Json.JsonValue.CreateStringValue(dc ? "DC" : "AC")
                 };
                 if (value is bool boolean) json["Value"] = Windows.Data.Json.JsonValue.CreateBooleanValue(boolean);

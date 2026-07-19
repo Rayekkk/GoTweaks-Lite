@@ -292,8 +292,9 @@ namespace XboxGamingBarHelper
         {
             reason = null;
             string field = cfg.TryGetValue("Field", out var fieldElement) ? fieldElement.GetString() : null;
+            string scope = cfg.TryGetValue("Scope", out var scopeElement) ? scopeElement.GetString() : null;
             string power = cfg.TryGetValue("Power", out var powerElement) ? powerElement.GetString() : null;
-            if (string.IsNullOrEmpty(field) || (power != "AC" && power != "DC")
+            if (string.IsNullOrEmpty(field) || (scope != "Global" && scope != "PerGame") || (power != "AC" && power != "DC")
                 || !cfg.TryGetValue("Value", out var value))
             {
                 reason = "missing or invalid Field, Power, or Value";
@@ -305,6 +306,12 @@ namespace XboxGamingBarHelper
             if (profile == null)
             {
                 reason = "profile manager not ready";
+                Logger.Warn($"Rejected SetProfileField({field}): {reason}");
+                return false;
+            }
+            if ((scope == "Global") != profile.IsGlobalProfile)
+            {
+                reason = "requested scope does not match helper's active profile";
                 Logger.Warn($"Rejected SetProfileField({field}): {reason}");
                 return false;
             }
