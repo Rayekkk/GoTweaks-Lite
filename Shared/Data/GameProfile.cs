@@ -21,6 +21,15 @@ namespace Shared.Data
         /// </summary>
         private static readonly object ProfileLock = new object();
 
+        // [full-audit fix, 2026-07-20 — A#10] Fast in-memory lock guarding the PendingWrites +
+        // PendingTimers pair so a debounced flush's (remove-write + remove/dispose-timer) and a
+        // concurrent Save's (add-write + add/update-timer) are each atomic. Kept SEPARATE from
+        // ProfileLock (which serializes the slow XML disk write) so Save never blocks for the disk
+        // I/O duration. Previously the two removals in FlushPendingWrite were non-atomic, so a
+        // Save landing between them could have its freshly-created timer disposed, orphaning its
+        // snapshot with no timer to flush it.
+        private static readonly object PendingLock = new object();
+
         [XmlElement("GameId")]
         public GameId GameId;
 
@@ -1617,11 +1626,20 @@ namespace Shared.Data
         public void Save()
         {
             // Update cache synchronously so other code sees the latest state immediately.
-            lock (ProfileLock)
+            // [full-audit fix, 2026-07-20 — A#7] Lock on the cache dictionary INSTANCE (not the
+            // GameProfile-static ProfileLock) so this write is mutually excluded with
+            // ProfileManager's reads/iterations of the same dictionary, which now also lock on the
+            // instance. Save() is called synchronously from property setters on the pipe / power /
+            // controller-monitor threads, so an unsynchronized cache write here could corrupt or
+            // throw against a concurrent lock-free iteration in ProfileManager (TryGetProfile
+            // fallback, DeleteProfile, catalog snapshot). ProfileLock still guards the debounced
+            // XML disk write below — a separate concern.
+            var c = cache;
+            if (c != null)
             {
-                if (cache != null)
+                lock (c)
                 {
-                    cache[GameId] = this;
+                    c[GameId] = this;
                 }
             }
 
@@ -1631,15 +1649,24 @@ namespace Shared.Data
             }
 
             // Queue the disk write; coalesce bursts of changes into a single debounced write.
-            PendingWrites[Path] = this;
-
-            var newTimer = new Timer(FlushPendingWrite, Path, SaveDebounceMs, Timeout.Infinite);
-            if (PendingTimers.TryGetValue(Path, out var existing))
+            // Path is copied to a local first - GameProfile is a struct, and a lambda/closure
+            // can't capture an instance member ("this") of a struct directly.
+            string path = Path;
+            // [A#10] The write + timer add/update are one atomic unit under PendingLock so a
+            // concurrent FlushPendingWrite can't remove/dispose the timer we just created.
+            lock (PendingLock)
             {
-                // Cancel and dispose the previous timer to reset the debounce window.
-                existing.Dispose();
+                PendingWrites[path] = this;
+                // AddOrUpdate makes the read-dispose-replace of the timer atomic per key; Timer.
+                // Dispose() is documented idempotent, so a retried updateValueFactory is safe.
+                PendingTimers.AddOrUpdate(path,
+                    addValueFactory: _ => new Timer(FlushPendingWrite, path, SaveDebounceMs, Timeout.Infinite),
+                    updateValueFactory: (_, existing) =>
+                    {
+                        existing.Dispose();
+                        return new Timer(FlushPendingWrite, path, SaveDebounceMs, Timeout.Infinite);
+                    });
             }
-            PendingTimers[Path] = newTimer;
         }
 
         /// <summary>
@@ -1648,13 +1675,22 @@ namespace Shared.Data
         private static void FlushPendingWrite(object state)
         {
             var path = (string)state;
-            if (!PendingWrites.TryRemove(path, out var profile))
+            GameProfile profile;
+            // [A#10] Remove the pending write + dispose its timer atomically under PendingLock,
+            // consistent with Save's atomic add. Either this sees {old snapshot, old timer} (Save
+            // hasn't run) or {new snapshot, new timer} (Save ran) - never a mix that would orphan
+            // a fresh snapshot. The slow disk write below stays under ProfileLock, outside
+            // PendingLock, so Save isn't blocked for the I/O duration.
+            lock (PendingLock)
             {
-                return;
-            }
-            if (PendingTimers.TryRemove(path, out var timer))
-            {
-                timer.Dispose();
+                if (!PendingWrites.TryRemove(path, out profile))
+                {
+                    return;
+                }
+                if (PendingTimers.TryRemove(path, out var timer))
+                {
+                    timer.Dispose();
+                }
             }
 
             lock (ProfileLock)

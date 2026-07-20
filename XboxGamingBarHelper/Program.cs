@@ -124,7 +124,25 @@ namespace XboxGamingBarHelper
         /// Prevents race conditions during rapid game switches.
         /// Also used by TDPBoostProperties to skip redundant TDP re-apply during profile application.
         /// </summary>
-        internal static bool isApplyingProfile = false;
+        internal static volatile bool isApplyingProfile = false;
+
+        /// <summary>
+        /// [root-cause fix, 2026-07-20] Set for the duration of RouteProfileSave's body
+        /// (Program.ProfileHandlers.cs). RouteProfileSave persists ONE already-applied field's
+        /// value into CurrentProfile - a pure persistence write, never a request to reapply
+        /// anything to hardware. But mutating CurrentProfile (a GameProfileProperty) raises its own
+        /// PropertyChanged event, which CurrentProfile_PropertyChanged listens to and - unless this
+        /// flag short-circuits it - responds to by reapplying ALL 11 AMD fields unscoped
+        /// (ApplyAMDFeaturesFromProfile with onlyFields=null). Confirmed on-device: any single AMD
+        /// field save triggered the chain <field>_PropertyChanged -> RouteProfileSave ->
+        /// CurrentProfile mutation -> CurrentProfile_PropertyChanged -> "Profile changed, apply it"
+        /// -> full unscoped AMD reapply, re-flipping the just-edited control - the same "one field's
+        /// save cascades into re-applying everything" bug class ApplyProfileFieldIntent's onlyFields
+        /// narrowing already fixed for ITS trigger path, present here via this separate path.
+        /// RouteProfileSave itself runs under profileApplicationLock, so setting this flag inside
+        /// that same critical section is race-free.
+        /// </summary>
+        internal static volatile bool isRoutingProfileSave = false;
 
         /// <summary>
         /// Timestamp when the last profile switch completed.
@@ -1563,6 +1581,15 @@ namespace XboxGamingBarHelper
             systemManager.RunningGame.PropertyChanged += RunningGame_PropertyChanged;
             systemManager.ResumeFromSleep += SystemManager_ResumeFromSleep;
             systemManager.PowerSourceChanged += SystemManager_PowerSourceChanged;
+            // [full-audit fix, 2026-07-20] Seed IsCurrentlyOnAC from the live power status.
+            // SystemManager deliberately seeds its OWN dedupe baseline at startup so it does NOT
+            // fire an initial PowerSourceChanged event - which left _lastIsOnAC null (=> "AC") for
+            // the entire session whenever the helper started on battery: startup/game-launch
+            // applies resolved the AC side (ignoring DC overrides) and every live single-field
+            // save handler wrote battery-time edits into the base AC field, corrupting the user's
+            // configured AC values - the same corruption class commit 7a444e0 fixed for the
+            // transition paths, reintroduced for boot-on-battery.
+            SeedInitialPowerSource();
             profileManager.PerGameProfile.PropertyChanged += PerGameProfile_PropertyChanged;
             performanceManager.TDP.PropertyChanged += TDP_PropertyChanged;
             powerManager.CPUBoost.PropertyChanged += CPUBoost_PropertyChanged;
@@ -1659,14 +1686,20 @@ namespace XboxGamingBarHelper
             if (profileManager?.CurrentProfile != null)
             {
                 Logger.Info($"Restoring global profile settings on startup: {profileManager.CurrentProfile.GameId.Name}");
-                isApplyingProfile = true;
-                try
+                // [race fix, 2.0 rebuild - profile-system consolidation] Same profileApplicationLock
+                // every other full-reapply trigger site now takes - this startup call previously set
+                // isApplyingProfile with no lock at all.
+                lock (profileApplicationLock)
                 {
-                    RestoreGlobalProfileSettings();
-                }
-                finally
-                {
-                    isApplyingProfile = false;
+                    isApplyingProfile = true;
+                    try
+                    {
+                        RestoreGlobalProfileSettings();
+                    }
+                    finally
+                    {
+                        isApplyingProfile = false;
+                    }
                 }
             }
 

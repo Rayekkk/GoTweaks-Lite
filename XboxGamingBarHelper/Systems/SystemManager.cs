@@ -33,6 +33,12 @@ namespace XboxGamingBarHelper.Systems
 
         private global::Windows.System.Power.PowerSupplyStatus lastPowerSupplyStatus = global::Windows.System.Power.PowerSupplyStatus.NotPresent;
         private bool hasSeenInitialPowerSupplyStatus = false;
+        // [root-cause fix, 2026-07-20] Adequate<->Inadequate flapping (charger connected, battery
+        // near/at full) is common and NOT a real AC/DC transition - only NotPresent means true
+        // battery. Dedupe PowerSourceChanged on this collapsed boolean, not raw status equality,
+        // so a flaky-charger flap doesn't fire a reapply storm every few seconds. See
+        // SystemEvents_PowerModeChanged's StatusChange case for the full explanation.
+        private bool lastIsOnAC = true;
         private static readonly string[] IgnoredProcesses =
         {
             // Windows shell and system processes - never games
@@ -350,6 +356,7 @@ namespace XboxGamingBarHelper.Systems
             try
             {
                 lastPowerSupplyStatus = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
+                lastIsOnAC = lastPowerSupplyStatus != global::Windows.System.Power.PowerSupplyStatus.NotPresent;
                 hasSeenInitialPowerSupplyStatus = true;
                 Logger.Debug($"SystemManager seeded initial power supply status: {lastPowerSupplyStatus}");
             }
@@ -382,20 +389,43 @@ namespace XboxGamingBarHelper.Systems
                     // StatusChange fires on AC/DC line transitions AND on battery percentage
                     // changes. Dedupe against the last observed PowerSupplyStatus so we only
                     // raise PowerSourceChanged on actual AC↔DC transitions.
+                    //
+                    // [root-cause fix, 2026-07-20] Raw PowerSupplyStatus equality was too strict:
+                    // on this device (charger connected, battery near/at full) the status flaps
+                    // between Adequate and Inadequate every few seconds - confirmed on-device via
+                    // 16 raw "transitions" in 2 minutes, none of them a real plug/unplug. Both
+                    // values mean "something is plugged in" (only NotPresent means true battery -
+                    // see Program.PowerSourceHandler.cs's SystemManager_PowerSourceChanged, which
+                    // already treats Adequate/Inadequate identically downstream). Firing
+                    // PowerSourceChanged on every raw flap anyway pushed a full profile/AMD reapply
+                    // every few seconds, fighting any change the user had just made directly in
+                    // Adrenalin or the widget. Gate the event on the same AC/DC-equivalent boolean
+                    // every consumer actually cares about, not the raw status - this cuts the event
+                    // (and the reapply storm) off at the source instead of relying on every
+                    // downstream consumer to dedupe it independently.
                     try
                     {
                         var currentStatus = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
+                        bool currentIsOnAC = currentStatus != global::Windows.System.Power.PowerSupplyStatus.NotPresent;
                         if (!hasSeenInitialPowerSupplyStatus)
                         {
                             lastPowerSupplyStatus = currentStatus;
+                            lastIsOnAC = currentIsOnAC;
                             hasSeenInitialPowerSupplyStatus = true;
                             Logger.Debug($"Initial power supply status captured: {currentStatus}");
                         }
-                        else if (currentStatus != lastPowerSupplyStatus)
+                        else if (currentIsOnAC != lastIsOnAC)
                         {
                             Logger.Info($"AC/DC transition: {lastPowerSupplyStatus} -> {currentStatus}");
                             lastPowerSupplyStatus = currentStatus;
+                            lastIsOnAC = currentIsOnAC;
                             PowerSourceChanged?.Invoke(this, currentStatus);
+                        }
+                        else if (currentStatus != lastPowerSupplyStatus)
+                        {
+                            // Same AC/DC bucket (e.g. Adequate <-> Inadequate flapping) - track the
+                            // raw status for logging/diagnostics only, no event, no reapply.
+                            lastPowerSupplyStatus = currentStatus;
                         }
                     }
                     catch (Exception ex)
@@ -842,7 +872,13 @@ namespace XboxGamingBarHelper.Systems
                     // Check for existing profile - try both exe name and window title based on preferExe setting
                     // If user created a profile for this app, trust it as a game regardless of gamesOnly setting
                     var profileGameName = GetGameName(processWindow.Value.Path, processWindow.Value.Title);
-                    if (Profiles.ContainsKey(new GameId(profileGameName, processWindow.Value.Path)))
+                    // [full-audit fix, 2026-07-20 — A#7] Profiles is the live ProfileManager
+                    // dictionary instance, written synchronously by GameProfile.Save() on other
+                    // threads. Lock on the same instance every writer/reader now uses, so this
+                    // periodic game-detection read can't race a concurrent cache write.
+                    bool hasProfile;
+                    lock (Profiles) { hasProfile = Profiles.ContainsKey(new GameId(profileGameName, processWindow.Value.Path)); }
+                    if (hasProfile)
                     {
                         // User-created profile is always trusted as a game - no FPS check needed
                         Logger.Debug($"Found window \"{processWindow.Value.Title}\" running {(processWindow.Value.IsForeground ? "foreground" : "background")} process id {processWindow.Key} at path \"{processWindow.Value.Path}\" named \"{processWindow.Value.ProcessName}\" has profile, use it (FPS={fps}).");

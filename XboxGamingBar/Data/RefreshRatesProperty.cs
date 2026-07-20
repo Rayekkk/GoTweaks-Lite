@@ -49,7 +49,22 @@ namespace XboxGamingBar.Data
                             if (UI.Items[i] is int rate && rate == currentRate)
                             {
                                 Logger.Info($"Restoring {Function} selection to index {i} ({currentRate}Hz) after list update.");
-                                UI.SelectedIndex = i;
+                                // [widget-side fix, 2.0 rebuild] Without this guard, a live
+                                // (non-batch) helper push of the available-rates list (e.g.
+                                // dock/undock) restoring the SAME selection still fires
+                                // RefreshRatesComboBox.SelectionChanged -> SettingChanged, which
+                                // would re-send a SetProfileField(RefreshRate) intent as if the
+                                // user had just picked it - same bug class as the already-fixed
+                                // IntTagComboProperty.
+                                WidgetSliderProperty.HelperSyncCount++;
+                                try
+                                {
+                                    UI.SelectedIndex = i;
+                                }
+                                finally
+                                {
+                                    WidgetSliderProperty.HelperSyncCount--;
+                                }
                                 break;
                             }
                         }

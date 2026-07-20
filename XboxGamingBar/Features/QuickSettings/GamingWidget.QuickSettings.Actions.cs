@@ -323,6 +323,15 @@ namespace XboxGamingBar
             UpdateFPSLimitControls(rtssInstalled?.Value == true);
         }
 
+        // [full-audit fix, 2026-07-20 — B8] Reflect a live helper-pushed FPSLimit value into the
+        // Performance-tab toggle/slider. Called from FPSLimitProperty.OnValueSyncedFromHelper
+        // (the property is headless, so a push otherwise never reaches these controls).
+        // UpdateFPSLimitControls already dispatches to the UI thread and reads fpsLimit.Value.
+        internal void ReflectFPSLimitFromHelper()
+        {
+            UpdateFPSLimitControls();
+        }
+
         /// <summary>
         /// Update FPS Limit controls based on RTSS installed status
         /// </summary>

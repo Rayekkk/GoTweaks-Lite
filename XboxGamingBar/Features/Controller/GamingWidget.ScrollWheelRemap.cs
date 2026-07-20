@@ -42,10 +42,18 @@ namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
+        // [full-audit fix, 2026-07-20 — B7] Set while ApplyScrollRemapSnapshot programmatically
+        // renders a helper-pushed scroll config into the combos. Without it, setting
+        // ScrollActionComboBox.SelectedIndex during hydration fired the SelectionChanged handler,
+        // which auto-applied (re-sent) the just-received config for selections 0/1/4 - the
+        // render-becomes-intent anti-pattern the sibling snapshots (ApplyLegionRemapSnapshot,
+        // ApplyBrightnessGestureSnapshot) already guard against.
+        private bool isRenderingScrollSnapshot;
+
         // Scroll (unified) event handlers - direction not available via Raw Input API
         private void ScrollActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!labsSectionInitialized) return;
+            if (!labsSectionInitialized || isRenderingScrollSnapshot) return;
 
             int selection = ScrollActionComboBox?.SelectedIndex ?? 0;
             // 0=Disabled, 1=Xbox Guide, 2=Keyboard Shortcut, 3=Run Command, 4=Focus GoTweaks
@@ -72,7 +80,7 @@ namespace XboxGamingBar
         // Scroll Click event handlers
         private void ScrollClickActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!labsSectionInitialized) return;
+            if (!labsSectionInitialized || isRenderingScrollSnapshot) return;
 
             int selection = ScrollClickActionComboBox?.SelectedIndex ?? 0;
             bool isShortcut = selection == 2;
@@ -120,6 +128,7 @@ namespace XboxGamingBar
 
         private void ApplyScrollRemapSnapshot(string configJson)
         {
+            isRenderingScrollSnapshot = true; // [B7] suppress the SelectionChanged auto-apply echo
             try
             {
                 var config = Windows.Data.Json.JsonObject.Parse(configJson);
@@ -137,6 +146,10 @@ namespace XboxGamingBar
             catch (Exception ex)
             {
                 Logger.Error($"Failed to render helper scroll remap snapshot: {ex.Message}");
+            }
+            finally
+            {
+                isRenderingScrollSnapshot = false;
             }
         }
         private void UpdateScrollGridVisibility()

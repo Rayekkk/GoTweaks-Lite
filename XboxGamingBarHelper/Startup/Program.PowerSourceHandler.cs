@@ -52,12 +52,49 @@ namespace XboxGamingBarHelper
         // the first real transition always fires (initial seeding is done in SystemManager).
         private static bool? _lastIsOnAC;
 
+        // [full-audit fix, 2026-07-20] See the call site in Program.cs Initialize() - seeds
+        // IsCurrentlyOnAC at startup so a helper session that begins on battery doesn't run as
+        // "AC" until the first real plug/unplug event.
+        internal static void SeedInitialPowerSource()
+        {
+            try
+            {
+                var status = global::Windows.System.Power.PowerManager.PowerSupplyStatus;
+                _lastIsOnAC = status != global::Windows.System.Power.PowerSupplyStatus.NotPresent;
+                Logger.Info($"Seeded initial power source: {status} -> isOnAC={_lastIsOnAC}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to seed initial power source (defaulting to AC): {ex.Message}");
+            }
+        }
+
         // [2.0 rebuild - AC/DC live-edit fix] Lets any live single-field save handler
         // (TDP_PropertyChanged, the AMD/CPU-cluster *_PropertyChanged handlers, etc.) find out
         // which power state to persist a live edit under - defaults to AC (true) when no real
         // transition has fired yet, matching the pre-existing "base field = AC" convention so an
         // early edit before the first PowerSourceChanged event lands where it always used to.
         internal static bool IsCurrentlyOnAC => _lastIsOnAC ?? true;
+
+        // [full-audit fix, 2026-07-20 — A#3/A#4] Single source of truth for the AC/DC-split
+        // collapse. PowerSourceProfileEnabled (the per-profile AC/DC split) defaults to FALSE, and
+        // when it is off there is only ONE value per field (the base/AC field) regardless of the
+        // physical power state. These two helpers make every save handler AND every apply/resolve
+        // site agree on that rule — previously the ~19 live save handlers and the 4 full-reapply
+        // sites ignored the split flag (always writing/reading _DC on battery) while the intent
+        // path (writeDc) and ApplyPowerSourceChangeInternal (resolveAcValues) honored it, so a
+        // battery-time edit on a split-off profile was written into _DC and then silently reverted
+        // by the next apply that read base.
+        //
+        // ShouldWriteDc: a live edit persists into the _DC shadow ONLY when physically on battery
+        //   AND the profile actually has the split enabled; otherwise it lands in the base field.
+        // ResolvesOnAc: an apply resolves the base (AC) value whenever physically on AC OR the
+        //   split is off; only a split-enabled profile on battery resolves the _DC override.
+        internal static bool ShouldWriteDc(Shared.Data.GameProfile profile)
+            => !IsCurrentlyOnAC && profile.PowerSourceProfileEnabled;
+
+        internal static bool ResolvesOnAc(Shared.Data.GameProfile profile)
+            => IsCurrentlyOnAC || !profile.PowerSourceProfileEnabled;
 
         /// <summary>
         /// Persists the widget's per-state (AC/DC) values into the currently-targeted profile's
@@ -314,6 +351,15 @@ namespace XboxGamingBarHelper
                 return false;
             }
 
+            // [full-audit fix, 2026-07-20 — A#6] Hold profileApplicationLock across the whole
+            // resolve → mutate → persist → apply → ForceSetValue sequence. RouteProfileSave and the
+            // 4 full-reapply sites already take this lock; without it here, a concurrent
+            // read-modify-whole-struct-write (e.g. a power-event-thread apply, or any future
+            // off-pipe-thread RouteProfileSave) could interleave between this method's resolve and
+            // its field mutation and lose one of the two edits (whole-struct Save clobber). Monitor
+            // is reentrant, so the inner apply branches that re-acquire this lock are unaffected.
+            lock (profileApplicationLock)
+            {
             if (!TryResolveProfileIntentTarget(scope, cfg, out var profile, out bool targetIsActive, out reason))
             {
                 Logger.Warn($"Rejected SetProfileField({field}): {reason}");
@@ -496,17 +542,55 @@ namespace XboxGamingBarHelper
                 int slow = writeDc ? (profile.TDP_DC ?? profile.TDP) : profile.TDP;
                 int fast = writeDc ? (profile.TDPFast_DC ?? profile.TDPFast) : profile.TDPFast;
                 int peak = writeDc ? (profile.TDPPeak_DC ?? profile.TDPPeak) : profile.TDPPeak;
-                if (legionManager == null || !legionManager.SetCustomTDP(slow, fast, peak))
+                // [full-audit fix, 2026-07-20 — A#9] SetCustomTDP returns false both for a real WMI
+                // failure AND for "device not in Custom mode". The latter is NOT a failure - the
+                // triplet is already persisted above, and it applies when the user next enters
+                // Custom mode (LegionManager re-reads the cached triplet on the mode switch).
+                // Rolling back + rejecting here lost a valid CustomTDP edit made while a preset mode
+                // was active. Only treat a genuine in-Custom-mode WMI failure as an apply failure.
+                bool applyFailed;
+                if (legionManager == null)
+                {
+                    applyFailed = true; // non-Legion: no Custom TDP surface at all
+                }
+                else if (!legionManager.IsInCustomMode)
+                {
+                    applyFailed = false;
+                    Logger.Info($"CustomTDP {slow}/{fast}/{peak}W persisted; not applied now (not in Custom mode - applies on next Custom switch)");
+                }
+                else
+                {
+                    applyFailed = !legionManager.SetCustomTDP(slow, fast, peak);
+                }
+                if (applyFailed)
                 {
                     if (writeDc) { profile.TDP_DC = previousProfile.TDP_DC; profile.TDPFast_DC = previousProfile.TDPFast_DC; profile.TDPPeak_DC = previousProfile.TDPPeak_DC; }
                     else { profile.TDP = previousProfile.TDP; profile.TDPFast = previousProfile.TDPFast; profile.TDPPeak = previousProfile.TDPPeak; }
+                    // [2.0 rebuild - profile-system consolidation] See the ForceSetValue at this
+                    // method's normal return path below for why this is guarded the same way.
+                    if (targetIsActive)
+                    {
+                        lock (profileApplicationLock)
+                        {
+                            bool wasAlreadyApplying = isApplyingProfile;
+                            if (!wasAlreadyApplying) isApplyingProfile = true;
+                            try
+                            {
+                                profileManager.CurrentProfile.ForceSetValue(profile);
+                            }
+                            finally
+                            {
+                                if (!wasAlreadyApplying) isApplyingProfile = false;
+                            }
+                        }
+                    }
                     confirmedProfile = profile;
                     reason = "custom TDP WMI apply failed";
                     Logger.Warn($"Rejected SetProfileField(CustomTDP): {reason}");
                     return false;
                 }
             }
-            else if (targetIsActive && dc != IsCurrentlyOnAC)
+            else if (targetIsActive && dc != IsCurrentlyOnAC && !IsAmdProfileField(field))
             {
                 lock (profileApplicationLock)
                 {
@@ -526,23 +610,105 @@ namespace XboxGamingBarHelper
             }
 
             // AMD controls may be delayed, dropped, or rejected by ADLX. Reapply the
-            // helper-owned effective profile for an edit to the currently-active power side,
-            // then return the persisted snapshot as the widget's sole confirmed state.
-            if (targetIsActive && dc == IsCurrentlyOnAC && IsAmdProfileField(field))
+            // helper-owned effective profile for an edit to an AMD field, on either power side -
+            // [2026-07-20 simplification] previously restricted to dc == IsCurrentlyOnAC, so an
+            // edit to the ACTIVE side's AMD field fell into the branch above instead, which
+            // reapplies via ApplyPowerSourceChangeInternal's unscoped ApplyAMDFeaturesFromProfile
+            // (all 11 fields, no onlyFields narrowing) - exactly the class of "unrelated widget
+            // echo cascades into re-flipping Boost/RSR" bug already fixed once for this same
+            // scoped path. AMD fields now always take this properly-narrowed path regardless of
+            // which side was edited; the block below already resolves against whichever side is
+            // actually active via IsCurrentlyOnAC, so this is correct for both cases.
+            if (targetIsActive && IsAmdProfileField(field))
             {
                 lock (profileApplicationLock)
                 {
                     if (!isApplyingProfile)
                     {
-                        try { isApplyingProfile = true; ApplyAMDFeaturesFromProfile(profile, IsCurrentlyOnAC); }
+                        try
+                        {
+                            isApplyingProfile = true;
+                            // [race fix, found on-device 2026-07-20] `profile` was captured at the
+                            // top of this method, before this field's own mutation - if a
+                            // CONCURRENT GoTweaks-side write to a different AMD field (e.g. another
+                            // profile-reapply trigger firing on another thread) saved via
+                            // RouteProfileSave in that window, this snapshot's OTHER 10 AMD fields
+                            // are stale relative to it. Reapplying them below would silently undo
+                            // that concurrent write. RouteProfileSave now takes the same
+                            // profileApplicationLock, so re-reading here - inside the lock - is
+                            // guaranteed to see any save that already completed, and blocks until
+                            // one in progress finishes. Re-run this field's own resolution against
+                            // the fresh copy (mutual-exclusion corrections are deterministic from
+                            // field+value+dc, so this reproduces the exact same result) before
+                            // reapplying, so the just-made edit isn't lost either.
+                            var freshProfile = profile.IsGlobalProfile
+                                ? RefreshedGlobalProfileSnapshot()
+                                : (profileManager.TryGetProfile(profile.GameId, out var reloaded) ? reloaded : profile);
+                            TryApplyAmdProfileField(field, value, writeDc, ref freshProfile, out _, out _);
+                            // [2.0 rebuild - profile-system consolidation] Narrow the reapply to
+                            // just the edited field + its conflict partner(s) instead of all 11 AMD
+                            // fields - see ApplyAMDFeaturesFromProfile's onlyFields doc comment for
+                            // why (this used to be the mechanism that let an unrelated widget echo
+                            // cascade into re-flipping Boost/RSR).
+                            var affectedAmdFields = new HashSet<string> { field };
+                            if (AmdConflictPartners.TryGetValue(field, out var partners))
+                            {
+                                foreach (var partner in partners) affectedAmdFields.Add(partner);
+                            }
+                            // [full-audit fix, 2026-07-20 — A#4] Resolve via ResolvesOnAc so a
+                            // split-disabled profile's base value is reapplied even on battery
+                            // (the immediate reapply must not read a stale _DC override when the
+                            // persist above correctly wrote base). Matches every other apply site.
+                            ApplyAMDFeaturesFromProfile(freshProfile, ResolvesOnAc(freshProfile), affectedAmdFields);
+                            profile = freshProfile;
+                        }
                         finally { isApplyingProfile = false; }
                     }
                 }
             }
 
+            // [2.0 rebuild - profile-system consolidation] TryResolveProfileIntentTarget already
+            // computed targetIsActive by comparing GameId against profileManager.CurrentProfile -
+            // so by this point `profile` is the fully-mutated, mutual-exclusion-resolved struct
+            // for that SAME GameId. Without this, profileManager.CurrentProfile.TDP/.CPUBoost/etc
+            // (and anything seeded from it, notably ProfileManager.AddNewProfile) could keep
+            // reporting pre-edit values until the next full profile-switch event - which could
+            // itself no-op for a same-GameId re-application before the Stage 1 ForceSetValue fix.
+            //
+            // [root-cause fix, 2026-07-20] ForceSetValue raises CurrentProfile.PropertyChanged,
+            // which CurrentProfile_PropertyChanged listens to and responds to by reapplying
+            // EVERYTHING (TDP/CPU/display/all 11 AMD fields, unscoped) unless isApplyingProfile is
+            // already true. The two reapply branches above (ApplyPowerSourceChangeInternal and the
+            // AMD onlyFields-scoped block) each reset isApplyingProfile to false in their own
+            // `finally` BEFORE control reaches here - so this call always ran with the guard
+            // already cleared, triggering a second, redundant, unscoped reapply on every single
+            // SetProfileField intent. Confirmed on-device via helper log: every AMD toggle/slider
+            // edit produced two "Refreshed GlobalProfile from disk" + a "Profile changed to global,
+            // apply it." cascade, pushing confirmation updates for all 11 AMD properties back to
+            // the widget on every edit - which the widget's own echo-guards (HelperSyncCount) don't
+            // fully cover for every control, causing an edited toggle to visibly flicker back to
+            // its old value before a second click "took". Holding isApplyingProfile true across
+            // this call closes the gap without touching the earlier branches' own narrower locking.
+            if (targetIsActive)
+            {
+                lock (profileApplicationLock)
+                {
+                    bool wasAlreadyApplying = isApplyingProfile;
+                    if (!wasAlreadyApplying) isApplyingProfile = true;
+                    try
+                    {
+                        profileManager.CurrentProfile.ForceSetValue(profile);
+                    }
+                    finally
+                    {
+                        if (!wasAlreadyApplying) isApplyingProfile = false;
+                    }
+                }
+            }
             confirmedProfile = profile;
             Logger.Info($"Applied SetProfileField intent: {field} ({power}) to {profile.GameId.Name}");
             return true;
+            } // [A#6] end profileApplicationLock
         }
 
         private static bool IsAmdProfileField(string field)
@@ -664,11 +830,21 @@ namespace XboxGamingBarHelper
             {
                 lock (profileApplicationLock)
                 {
-                    if (!isApplyingProfile)
+                    bool wasAlreadyApplying = isApplyingProfile;
+                    if (!wasAlreadyApplying) isApplyingProfile = true;
+                    try
                     {
-                        try { isApplyingProfile = true; ApplyPowerSourceChangeInternal(IsCurrentlyOnAC, profile); }
-                        finally { isApplyingProfile = false; }
+                        ApplyPowerSourceChangeInternal(IsCurrentlyOnAC, profile);
+                        // [full-audit fix, 2026-07-20 — A#5] Re-sync CurrentProfile so its cached
+                        // PowerSourceProfileEnabled isn't stale. Without this, disabling the split
+                        // here left CurrentProfile.Value.PowerSourceProfileEnabled == true, so the
+                        // NEXT real AC↔DC transition (which reads CurrentProfile.Value) re-applied
+                        // the DC overrides the user just turned off. Held under isApplyingProfile so
+                        // ForceSetValue's PropertyChanged doesn't trigger a redundant full reapply
+                        // (same guarded pattern ApplyProfileFieldIntent uses).
+                        profileManager.CurrentProfile.ForceSetValue(profile);
                     }
+                    finally { if (!wasAlreadyApplying) isApplyingProfile = false; }
                 }
             }
             confirmedProfile = profile;
@@ -707,6 +883,15 @@ namespace XboxGamingBarHelper
 
             targetIsActive = profileManager.CurrentProfile != null && profileManager.CurrentProfile.Value.GameId == profile.GameId;
             return true;
+        }
+
+        // Small helper for the AMD reapply race fix above - re-reads GlobalProfile fresh
+        // (flushing any pending debounced write first, same as TryResolveProfileIntentTarget's
+        // own Global-scope read) rather than trusting a snapshot taken earlier in the same call.
+        private static Shared.Data.GameProfile RefreshedGlobalProfileSnapshot()
+        {
+            profileManager.RefreshGlobalProfile();
+            return profileManager.GlobalProfile;
         }
 
         private static void SystemManager_PowerSourceChanged(object sender, global::Windows.System.Power.PowerSupplyStatus newStatus)
@@ -918,6 +1103,18 @@ namespace XboxGamingBarHelper
                 }
 
                 int targetMaxCpuState = resolveAcValues ? profile.MaxCPUState : (profile.MaxCPUState_DC ?? profile.MaxCPUState);
+                // [self-heal, matches ApplyTDPAndCPUFromProfile/the AMD mutual-exclusion pattern]
+                // Windows cannot boost above a max CPU state below 100% - persist the correction
+                // through the profile's own setter (mutating the local `profile` copy - safe, see
+                // GameProfile.Save()'s Path-keyed PendingWrites) so this doesn't need re-fixing on
+                // every future AC/DC transition.
+                if (targetMaxCpuState < 100 && targetCpuBoost)
+                {
+                    Logger.Warn($"Helper-side AC/DC handler: profile has CPUBoost enabled with MaxCPUState={targetMaxCpuState}% (<100%) - disabling CPUBoost");
+                    targetCpuBoost = false;
+                    if (resolveAcValues) profile.CPUBoost = false; else profile.CPUBoost_DC = false;
+                    if (powerManager?.CPUBoost != null) powerManager.CPUBoost.SetValue(targetCpuBoost);
+                }
                 if (powerManager?.MaxCPUState != null && targetMaxCpuState != powerManager.MaxCPUState.Value)
                 {
                     Logger.Info($"Helper-side AC/DC handler: applying MaxCPUState={targetMaxCpuState}% from persisted {state} profile");
@@ -931,13 +1128,6 @@ namespace XboxGamingBarHelper
                     powerManager.MinCPUState.SetValue(targetMinCpuState);
                 }
 
-                int? targetFpsLimit = resolveAcValues ? profile.FPSLimit : (profile.FPSLimit_DC ?? profile.FPSLimit);
-                if (targetFpsLimit.HasValue && rtssManager?.FPSLimit != null && targetFpsLimit.Value != rtssManager.FPSLimit.Value)
-                {
-                    Logger.Info($"Helper-side AC/DC handler: applying FPSLimit={targetFpsLimit.Value} from persisted {state} profile");
-                    rtssManager.FPSLimit.SetValue(targetFpsLimit.Value);
-                }
-
                 ApplyOSPowerModeFromProfile(profile, resolveAcValues, "Helper-side AC/DC handler");
 
                 // 2c) AMD Radeon features (11 fields) — reuses ApplyAMDFeaturesFromProfile's
@@ -947,28 +1137,11 @@ namespace XboxGamingBarHelper
                     ApplyAMDFeaturesFromProfile(profile, resolveAcValues);
                 }
 
-                // 2d) HDR / Resolution / RefreshRate — same HasValue/IsNullOrEmpty-gated shape
-                // RunningGame_PropertyChanged's own profile-switch block already uses.
-                bool? targetHdr = resolveAcValues ? profile.HDREnabled : (profile.HDREnabled_DC ?? profile.HDREnabled);
-                if (targetHdr.HasValue && systemManager?.HDREnabled != null && targetHdr.Value != systemManager.HDREnabled.Value)
-                {
-                    Logger.Info($"Helper-side AC/DC handler: applying HDREnabled={targetHdr.Value} from persisted {state} profile");
-                    systemManager.HDREnabled.SetValue(targetHdr.Value);
-                }
-
-                string targetResolution = resolveAcValues ? profile.Resolution : (profile.Resolution_DC ?? profile.Resolution);
-                if (!string.IsNullOrEmpty(targetResolution) && systemManager?.Resolution != null && targetResolution != systemManager.Resolution.Value)
-                {
-                    Logger.Info($"Helper-side AC/DC handler: applying Resolution={targetResolution} from persisted {state} profile");
-                    systemManager.Resolution.SetValue(targetResolution);
-                }
-
-                int? targetRefreshRate = resolveAcValues ? profile.RefreshRate : (profile.RefreshRate_DC ?? profile.RefreshRate);
-                if (targetRefreshRate.HasValue && systemManager?.RefreshRate != null && targetRefreshRate.Value != systemManager.RefreshRate.Value)
-                {
-                    Logger.Info($"Helper-side AC/DC handler: applying RefreshRate={targetRefreshRate.Value} from persisted {state} profile");
-                    systemManager.RefreshRate.SetValue(targetRefreshRate.Value);
-                }
+                // 2d) FPSLimit / HDR / Resolution / RefreshRate — consolidated (2.0 rebuild -
+                // profile-system consolidation) onto the same shared function every other
+                // full-reapply site uses; the old inline `!= currentValue` guards here were
+                // redundant (GenericProperty<T>.SetValue already no-ops on an equal value).
+                ApplyDisplaySettingsFromProfile(profile, resolveAcValues);
             }
             catch (Exception ex)
             {

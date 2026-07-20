@@ -56,7 +56,16 @@ namespace XboxGamingBar
             // Applying the hair-trigger travel preset (0/99) and saving is a USER action. On a helper
             // push the helper already sent the correct trigger travel values, so don't overwrite them
             // with the preset or re-save/echo. Just reflect the toggle + enablement (done above).
-            if (isApplyingHelperUpdate)
+            //
+            // [full-audit fix, 2026-07-20 — B2] This used to guard on isApplyingHelperUpdate, which
+            // PipeClient has already RESET by the time this handler runs: the toggle reflect happens
+            // inside WidgetToggleProperty.NotifyPropertyChanged's QUEUED dispatcher lambda (a later
+            // pass), so isApplyingHelperUpdate is false and the preset branch fired on a helper push
+            // - zeroing the four travel sliders whose 500ms debounce then overwrote the profile's
+            // saved custom travel. IsUpdatingUI / HelperSyncCount ARE true here, because the
+            // synchronous Toggled fires DURING that lambda's UI.IsOn write (inside the
+            // HelperSyncCount++/IsUpdatingUI=true bracket) - the correct guard.
+            if (legionHairTriggers?.IsUpdatingUI == true || WidgetSliderProperty.HelperSyncCount > 0)
             {
                 Logger.Info($"Hair Triggers reflected from helper: {enabled}");
                 return;

@@ -51,7 +51,19 @@ namespace XboxGamingBar.Data
                             if (UI.Items[i] is string res && res == currentRes)
                             {
                                 Logger.Info($"Restoring {Function} selection to index {i} ({currentRes}) after list update.");
-                                UI.SelectedIndex = i;
+                                // [widget-side fix, 2.0 rebuild] Same guard as RefreshRatesProperty
+                                // - without it, a live helper push of the available-resolutions
+                                // list restoring the SAME selection still echoes a
+                                // SetProfileField(Resolution) intent back to the helper.
+                                WidgetSliderProperty.HelperSyncCount++;
+                                try
+                                {
+                                    UI.SelectedIndex = i;
+                                }
+                                finally
+                                {
+                                    WidgetSliderProperty.HelperSyncCount--;
+                                }
                                 break;
                             }
                         }

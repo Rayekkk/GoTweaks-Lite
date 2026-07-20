@@ -31,6 +31,12 @@ namespace XboxGamingBar.Data
             }
         }
 
+        // [widget-side fix, 2.0 rebuild] Same guard-lifetime fix as ResolutionProperty - see its
+        // comment for why a generation token is needed (CoreDispatcher.RunAsync's IAsyncAction
+        // completes at an async lambda's first await, letting two overlapping
+        // NotifyPropertyChanged calls interleave their guarded regions otherwise).
+        private int selectRequestToken;
+
         protected override async void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -38,14 +44,19 @@ namespace XboxGamingBar.Data
             if (UI != null && Owner != null)
             {
                 Logger.Info($"Update {Function} combo box value to {Value}Hz.");
-                await SelectValueInComboBox();
+                int myToken = System.Threading.Interlocked.Increment(ref selectRequestToken);
+                await SelectValueInComboBox(myToken);
             }
         }
 
-        private async System.Threading.Tasks.Task SelectValueInComboBox(int retryCount = 0)
+        private async System.Threading.Tasks.Task SelectValueInComboBox(int myToken, int retryCount = 0)
         {
             await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
+                if (myToken != selectRequestToken)
+                {
+                    return; // A newer NotifyPropertyChanged call superseded this one.
+                }
                 IsUpdatingUI = true;
                 try
                 {
@@ -66,7 +77,11 @@ namespace XboxGamingBar.Data
                         // Retry after a short delay
                         Logger.Info($"{Function} value {Value}Hz not found in ComboBox items (count={UI.Items.Count}), retry {retryCount + 1}/3...");
                         await System.Threading.Tasks.Task.Delay(100);
-                        await SelectValueInComboBox(retryCount + 1);
+                        if (myToken != selectRequestToken)
+                        {
+                            return;
+                        }
+                        await SelectValueInComboBox(myToken, retryCount + 1);
                     }
                     else if (!found)
                     {

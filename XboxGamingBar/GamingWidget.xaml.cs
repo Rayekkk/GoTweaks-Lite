@@ -1126,6 +1126,11 @@ namespace XboxGamingBar
                 UpdateDetectedGameScrollAnimation();
             });
             perGameProfile = new PerGameProfileProperty(PerGameProfileToggle, this);
+            // [widget-side fix, 2.0 rebuild] Wire up the late-binding link so
+            // RunningGameProperty's force-reset of the shared PerGameProfileToggle (on game
+            // close) goes through PerGameProfileProperty's own guard instead of touching
+            // UI.IsOn directly - see RunningGameProperty.SetPerGameProfileProperty's doc comment.
+            runningGame.SetPerGameProfileProperty(perGameProfile);
             deleteGameProfile = new DeleteGameProfileProperty();
             cpuBoost = new CPUBoostProperty(CPUBoostToggle, this);
             cpuEPP = new CPUEPPProperty(80, CPUEPPSlider, this);
@@ -1456,7 +1461,7 @@ namespace XboxGamingBar
             osPowerMode = new OSPowerModeProperty();
 
             // FPS Limit property
-            fpsLimit = new FPSLimitProperty();
+            fpsLimit = new FPSLimitProperty(this); // [B8] owner enables helper-push reflect to the Performance-tab controls
 
             // Profile Detection Settings
             profileMatchByExe = new ProfileMatchByExeProperty(ProfileMatchByExeToggle, this);
@@ -1878,9 +1883,11 @@ namespace XboxGamingBar
             if (fpsLimit != null)
             {
                 fpsLimit.PropertyChanged += QuickSettingsProperty_Changed;
-                // [2.0 rebuild - Faza C3] FPSLimit is now helper-authoritative (LoadProfileSettings
-                // no longer seeds it) - resync the Profiles-tab card snapshot on every push so it
-                // doesn't go stale after a game switch or an external RTSS change.
+                // [2.0 rebuild - Faza C3] FPSLimit is helper-authoritative. This subscription
+                // resyncs the Quick Settings tile on every push. [full-audit fix 2026-07-20 — B8]
+                // The Performance-tab FPSLimitToggle/Slider are reflected separately via
+                // FPSLimitProperty.OnValueSyncedFromHelper -> ReflectFPSLimitFromHelper (this
+                // subscription alone did NOT update those, leaving them stale after a game switch).
             }
             if (osPowerMode != null)
                 osPowerMode.PropertyChanged += OSPowerMode_PropertyChanged;

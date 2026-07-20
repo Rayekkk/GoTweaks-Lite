@@ -21,6 +21,25 @@ namespace XboxGamingBar.Data
         // the same double-send bug found in the AMD toggle/slider properties.
         private readonly bool suppressAutoSend;
 
+        // [bug fix, found on-device 2026-07-20] Every sibling property class (WidgetToggleProperty,
+        // WidgetSliderProperty, ResolutionProperty, AMDFluidMotionFrameComboProperty) guards its
+        // programmatic UI sync with an IsUpdatingUI flag (+ the shared HelperSyncCount, which
+        // GamingWidget.SettingChanged/SettingChangedDebounced check before sending). This class
+        // never had one, so a helper-pushed value (either a direct Function update, or the
+        // AMD "reapply all 11 fields from the confirmed profile snapshot" path in
+        // ApplyConfirmedAmdProfileFields) that changes UI.SelectedIndex fires SelectionChanged
+        // exactly like a real user pick. This class's OWN handler happens to no-op (it compares
+        // against Value, already updated) - but the EXTERNALLY subscribed SettingChanged handler
+        // (AMDRadeonBoostResolutionComboBox.SelectionChanged += SettingChanged, no wrapper) has no
+        // way to know the change was programmatic, so it unconditionally re-sent SetProfileField
+        // right back to the helper. That echoed intent triggers the helper's AMD reapply-from-
+        // profile safety net for ALL 11 AMD fields (not just BoostResolution), which could then
+        // force Boost/RSR back on from whatever was persisted - a widget<->helper ping-pong
+        // entirely independent of any real Adrenalin activity, matching the reported "GoTweaks
+        // turns Boost/RSR on by itself" symptom.
+        private bool isUpdatingUI;
+        public bool IsUpdatingUI => isUpdatingUI;
+
         public IntTagComboProperty(int initialValue, Function inFunction, ComboBox inUI, Page inOwner, bool suppressAutoSend = false)
             : base(initialValue, inFunction, inUI, inOwner)
         {
@@ -55,6 +74,13 @@ namespace XboxGamingBar.Data
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Skip if UI is being updated programmatically (from helper sync) - matches every
+            // sibling property class's guard, see the field's doc comment above.
+            if (isUpdatingUI)
+            {
+                return;
+            }
+
             var selectedItem = UI.SelectedItem as ComboBoxItem;
             if (selectedItem?.Tag is string tagString && int.TryParse(tagString, out int newValue))
             {
@@ -91,7 +117,23 @@ namespace XboxGamingBar.Data
 
             if (UI != null && Owner != null)
             {
-                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, SyncSelectedIndexFromValue);
+                await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    // Set flags to prevent SelectionChanged from echoing the value back and to
+                    // prevent SettingChanged from auto-sending during helper sync - same pattern
+                    // as WidgetToggleProperty/WidgetSliderProperty.
+                    WidgetSliderProperty.HelperSyncCount++;
+                    isUpdatingUI = true;
+                    try
+                    {
+                        SyncSelectedIndexFromValue();
+                    }
+                    finally
+                    {
+                        isUpdatingUI = false;
+                        WidgetSliderProperty.HelperSyncCount--;
+                    }
+                });
             }
         }
     }

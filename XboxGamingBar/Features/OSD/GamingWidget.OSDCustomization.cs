@@ -630,10 +630,48 @@ namespace XboxGamingBar
                     else if (key == "LabelColor") osdLabelColor = value;
                     else if (key == "Opacity" && int.TryParse(value, out int opacity)) osdOpacity = opacity;
                     else if (key == "FrametimeGraphPinned") frametimeGraphPinned = value == "1";
-                    else if (key.Length == 2 && key[0] == 'L' && int.TryParse(key.Substring(1), out int level) && osdLevelConfig.ContainsKey(level))
+                    else if (key.Length >= 2 && key[0] == 'L')
                     {
-                        foreach (var item in osdLevelConfig[level].Keys.ToList()) osdLevelConfig[level][item] = false;
-                        foreach (var item in value.Split(',')) if (osdLevelConfig[level].ContainsKey(item)) osdLevelConfig[level][item] = true;
+                        // [full-audit fix, 2026-07-20 — B3] Parse the full per-level key space that
+                        // SendOSDConfigToHelper emits, not just the bare enabled-list. Previously only
+                        // `L{n}` (key.Length == 2) was read back; `L{n}_Order`, `L{n}_Columns`,
+                        // `L{n}_Custom`, and `L{n}_{item}_Color` were dropped and LoadOSDConfigFromStorage
+                        // reset those fields to defaults every start - so the first OSD edit rebuilt the
+                        // whole config string from defaults and destroyed the helper's persisted layout.
+                        int di = 1;
+                        while (di < key.Length && char.IsDigit(key[di])) di++;
+                        if (di > 1 && int.TryParse(key.Substring(1, di - 1), out int level))
+                        {
+                            string suffix = key.Substring(di); // "" | "_Custom" | "_Columns" | "_Order" | "_<item>_Color"
+                            if (suffix.Length == 0)
+                            {
+                                if (osdLevelConfig.ContainsKey(level))
+                                {
+                                    foreach (var item in osdLevelConfig[level].Keys.ToList()) osdLevelConfig[level][item] = false;
+                                    foreach (var item in value.Split(',')) if (osdLevelConfig[level].ContainsKey(item)) osdLevelConfig[level][item] = true;
+                                }
+                            }
+                            else if (suffix == "_Custom")
+                            {
+                                osdCustomTags[level] = value;
+                            }
+                            else if (suffix == "_Columns" && int.TryParse(value, out int cols))
+                            {
+                                osdLevelColumns[level] = cols;
+                            }
+                            else if (suffix == "_Order")
+                            {
+                                osdLevelOrder[level] = value.Split(',').Where(s => !string.IsNullOrEmpty(s)).ToList();
+                            }
+                            else if (suffix.Length > 7 && suffix[0] == '_' && suffix.EndsWith("_Color"))
+                            {
+                                // suffix == "_<item>_Color" - strip the leading '_' and trailing '_Color'
+                                string item = suffix.Substring(1, suffix.Length - 1 - "_Color".Length);
+                                if (!osdItemLabelColors.ContainsKey(level))
+                                    osdItemLabelColors[level] = new Dictionary<string, string>();
+                                osdItemLabelColors[level][item] = value;
+                            }
+                        }
                     }
                 }
                 UpdateOSDLayoutUI();

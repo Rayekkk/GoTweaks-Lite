@@ -571,11 +571,15 @@ namespace XboxGamingBarHelper
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 var exportPath = Path.Combine(desktopPath, $"GoTweaks_Profiles_{timestamp}.xml");
 
-                // Collect all profiles for export
+                // Collect all profiles for export. [A#7] Iterate under the dictionary-instance lock
+                // (GameProfile.Save writes it concurrently from other threads).
                 var gameProfilesList = new List<Shared.Data.GameProfile>();
-                foreach (var kvp in profileManager.GameProfiles)
+                lock (profileManager.GameProfiles)
                 {
-                    gameProfilesList.Add(kvp.Value);
+                    foreach (var kvp in profileManager.GameProfiles)
+                    {
+                        gameProfilesList.Add(kvp.Value);
+                    }
                 }
 
                 // Get app version from assembly
@@ -801,6 +805,15 @@ namespace XboxGamingBarHelper
                 // missed it).
                 globalProfile.LegionPerformanceMode = import.GlobalProfile.LegionPerformanceMode;
                 globalProfile.LegionPerformanceMode_DC = import.GlobalProfile.LegionPerformanceMode_DC;
+                // [race fix, 2.0 rebuild - profile-system consolidation] `globalProfile` here is a
+                // disconnected COPY of profileManager.GlobalProfile (a bare struct field) - each
+                // setter above correctly persists via Save() (updates gameProfiles cache + queues
+                // the debounced disk write, both keyed by GameId/Path, unaffected by the struct
+                // copy), but profileManager.GlobalProfile ITSELF was never resynced, so it kept
+                // reporting PRE-import values until some unrelated later trigger happened to call
+                // RefreshGlobalProfile(). Same bug class RouteProfileSave's onGlobal branch
+                // already fixed once (Program.ProfileHandlers.cs) - same fix here.
+                profileManager.RefreshGlobalProfile();
                 Logger.Info("Global profile settings imported");
                 importedCount++;
 
@@ -1918,7 +1931,15 @@ namespace XboxGamingBarHelper
             var entries = new List<Dictionary<string, object>>();
             if (profileManager != null)
             {
-                foreach (var entry in profileManager.GameProfiles.Values)
+                // [A#7] Snapshot the entries under the dictionary-instance lock first, then build
+                // the catalog outside the lock (GetPowerSourceProfileValuesSnapshot does non-trivial
+                // work we don't want to hold the lock across).
+                List<Shared.Data.GameProfile> catalog;
+                lock (profileManager.GameProfiles)
+                {
+                    catalog = new List<Shared.Data.GameProfile>(profileManager.GameProfiles.Values);
+                }
+                foreach (var entry in catalog)
                 {
                     entries.Add(new Dictionary<string, object>
                     {

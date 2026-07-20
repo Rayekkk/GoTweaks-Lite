@@ -50,7 +50,17 @@ namespace XboxGamingBar.Data
                     if (targetIndex >= 0 && UI.Items.Count > targetIndex && UI.SelectedIndex != targetIndex)
                     {
                         Logger.Info($"{Function} combo box selected index {targetIndex} (level {Value}).");
-                        UI.SelectedIndex = targetIndex;
+                        // [audit fix - Section 1 reconciliation] Matches the guard 6 direct
+                        // siblings (e.g. LegionLightModeProperty) already have.
+                        WidgetSliderProperty.HelperSyncCount++;
+                        try
+                        {
+                            UI.SelectedIndex = targetIndex;
+                        }
+                        finally
+                        {
+                            WidgetSliderProperty.HelperSyncCount--;
+                        }
                     }
                 });
             }

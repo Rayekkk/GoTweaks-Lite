@@ -10,6 +10,7 @@ namespace XboxGamingBar.Data
     {
         private TextBlock detectedGameText;
         private Action onGameDetectionChanged;
+        private PerGameProfileProperty perGameProfileProperty;
 
         public RunningGameProperty(TextBlock inUI, ToggleSwitch inAdditionalUI, Page inOwner) : base(new RunningGame(), Function.RunningGame, inUI, inAdditionalUI, inOwner)
         {
@@ -27,6 +28,19 @@ namespace XboxGamingBar.Data
         public void SetGameDetectionCallback(Action callback)
         {
             onGameDetectionChanged = callback;
+        }
+
+        /// <summary>
+        /// Late-binding wire-up (RunningGameProperty is constructed before PerGameProfileProperty
+        /// in GamingWidget.xaml.cs). AdditionalUI (PerGameProfileToggle) is shared between this
+        /// class and PerGameProfileProperty - without this, NotifyPropertyChanged's force-reset
+        /// of AdditionalUI.IsOn had no way to guard PerGameProfileProperty's OWN Toggled handler,
+        /// which would see it as a real user click and send a "disable per-game profile" intent
+        /// to the helper, corrupting the Scope every subsequent SetProfileField call resolves.
+        /// </summary>
+        public void SetPerGameProfileProperty(PerGameProfileProperty property)
+        {
+            perGameProfileProperty = property;
         }
 
         /// <summary>
@@ -97,7 +111,17 @@ namespace XboxGamingBar.Data
                     AdditionalUI.IsEnabled = Value.IsValid();
                     if (!Value.IsValid())
                     {
-                        AdditionalUI.IsOn = false;
+                        if (perGameProfileProperty != null)
+                        {
+                            perGameProfileProperty.SetControlValueSilently(false);
+                        }
+                        else
+                        {
+                            // Fallback before SetPerGameProfileProperty is wired up - matches the
+                            // pre-fix behavior, only reachable in the brief window before
+                            // GamingWidget.xaml.cs finishes constructing both properties.
+                            AdditionalUI.IsOn = false;
+                        }
                     }
 
                     // Update detected game text on Performance tab

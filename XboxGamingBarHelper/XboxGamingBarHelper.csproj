@@ -433,7 +433,6 @@
     <Compile Include="ADLXDepends\SWIGTYPE_p_p_adlx__IADLX3DFidelityFXSuperResolution.cs" />
     <Compile Include="ADLXDepends\SWIGTYPE_p_p_adlx__IADLXDisplayResolution.cs" />
     <Compile Include="ADLXDepends\SWIGTYPE_p_p_adlx__IADLXDisplayResolutionList.cs" />
-    <Compile Include="AMD\AMD3DSettingsChangedListener.cs" />
     <Compile Include="AMD\AMDDelegates.cs" />
     <Compile Include="AMD\AMDManager.cs" />
     <Compile Include="AMD\AMDSetting.cs" />

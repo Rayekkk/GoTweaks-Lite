@@ -60,6 +60,15 @@ namespace XboxGamingBarHelper
             var profileName = profileManager.CurrentProfile.GameId.Name;
             bool saveButtonsToProfile = ProfileSaveFlagsState.ButtonMappings;
 
+            // [full-audit fix, 2026-07-20 — A#6] Hold profileApplicationLock across the whole
+            // dispatch. Several branches (deadzones, trigger travel, joystick-as-mouse,
+            // LegionControllerProfileEnabled) write profileManager.CurrentProfile.X directly rather
+            // than via RouteProfileSave, with no lock - so they could interleave with a concurrent
+            // RouteProfileSave (which DOES lock) on the same CurrentProfile struct and tear a field
+            // write. Wrapping the whole dispatch covers both; the RouteProfileSave branches
+            // re-acquire this lock reentrantly, so they are unaffected.
+            lock (profileApplicationLock)
+            {
             // Button mappings
             if (sender == legionManager?.LegionButtonY1)
             {
@@ -262,7 +271,7 @@ namespace XboxGamingBarHelper
                 // this used to capture the TDP Mode change into the per-game profile instead of
                 // routing to Global, contradicting the documented flag semantics and diverging from
                 // the wattage triplet's own (correctly-gated) behavior for the identical feature.
-                bool isOnAC = IsCurrentlyOnAC;
+                bool isOnAC = ResolvesOnAc(profileManager.CurrentProfile.Value); // [A#3] resolve/write base when split off
                 Logger.Info($"Saving LegionPerformanceMode to profile {profileName} ({(isOnAC ? "AC" : "DC")})");
                 RouteProfileSave(ProfileSaveFlagsState.TDP, "LegionPerformanceMode",
                     cur =>
@@ -275,22 +284,24 @@ namespace XboxGamingBarHelper
                         if (isOnAC) glo.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
                         else glo.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
                     });
-                // Also save directly to GlobalProfile to ensure it's always in sync
-                // This fixes an issue where the restore reads from GlobalProfile but save goes to
-                // CurrentProfile - profileManager.GlobalProfile is a separate struct field from the
-                // reference-type CurrentProfile property, so RouteProfileSave's onCurrent path above
-                // (used whenever CurrentProfile.IsGlobalProfile is true) doesn't touch it.
+                // Keep the separate GlobalProfile struct field in sync with what RouteProfileSave
+                // just persisted (the restore paths read from GlobalProfile, but the save above
+                // goes through the reference-type CurrentProfile).
+                //
+                // [full-audit fix, 2026-07-20] This used to assign
+                // profileManager.GlobalProfile.LegionPerformanceMode[_DC] = ... directly - a
+                // HIGH-severity stale-struct clobber: GlobalProfile is a bare struct field that
+                // goes stale the moment any live edit lands via CurrentProfile, and the property
+                // setter's Save() persists the ENTIRE stale struct over the cache + global.xml.
+                // Concretely: edit EPP via the quick tile (cache/disk now EPP=30, the GlobalProfile
+                // FIELD still holds EPP=80), then change TDP Mode -> the direct write here saved
+                // {EPP=80(stale), mode=new} over everything, silently reverting the EPP edit on the
+                // next restore. RefreshGlobalProfile() flushes pending writes and re-reads the
+                // freshly-persisted state instead - same end result, no clobber.
                 if (profileManager.CurrentProfile.IsGlobalProfile)
                 {
-                    if (isOnAC)
-                    {
-                        profileManager.GlobalProfile.LegionPerformanceMode = legionManager.LegionPerformanceMode.Value;
-                    }
-                    else
-                    {
-                        profileManager.GlobalProfile.LegionPerformanceMode_DC = legionManager.LegionPerformanceMode.Value;
-                    }
-                    Logger.Debug($"Also saved LegionPerformanceMode to GlobalProfile directly: {legionManager.LegionPerformanceMode.Value} ({(isOnAC ? "AC" : "DC")})");
+                    profileManager.RefreshGlobalProfile();
+                    Logger.Debug($"Refreshed GlobalProfile after LegionPerformanceMode save: {legionManager.LegionPerformanceMode.Value} ({(isOnAC ? "AC" : "DC")})");
                 }
             }
             // Lighting settings — share a single Lighting flag
@@ -324,6 +335,7 @@ namespace XboxGamingBarHelper
                     cur => cur.LegionPowerLight = legionManager.LegionPowerLight.Value,
                     glo => glo.LegionPowerLight = legionManager.LegionPowerLight.Value);
             }
+            } // [A#6] end profileApplicationLock
         }
 
     }

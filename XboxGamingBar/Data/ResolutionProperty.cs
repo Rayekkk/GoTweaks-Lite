@@ -24,6 +24,15 @@ namespace XboxGamingBar.Data
             }
         }
 
+        // [widget-side fix, 2.0 rebuild] CoreDispatcher.RunAsync given an async lambda completes
+        // its IAsyncAction at the lambda's first await, not at true completion - so two
+        // overlapping NotifyPropertyChanged calls (two Value pushes close together) could have
+        // their guarded regions interleave: the FIRST call's finally could reset IsUpdatingUI
+        // while the SECOND call's delayed retry (mid Task.Delay) still has a pending
+        // UI.SelectedIndex write, or vice versa. A generation token makes a superseded call's
+        // retry chain a no-op instead of racing the newer one's guard.
+        private int selectRequestToken;
+
         protected override async void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
@@ -31,14 +40,19 @@ namespace XboxGamingBar.Data
             if (UI != null && Owner != null)
             {
                 Logger.Info($"Update {Function} combo box value to {Value}.");
-                await SelectValueInComboBox();
+                int myToken = System.Threading.Interlocked.Increment(ref selectRequestToken);
+                await SelectValueInComboBox(myToken);
             }
         }
 
-        private async System.Threading.Tasks.Task SelectValueInComboBox(int retryCount = 0)
+        private async System.Threading.Tasks.Task SelectValueInComboBox(int myToken, int retryCount = 0)
         {
             await Owner.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
+                if (myToken != selectRequestToken)
+                {
+                    return; // A newer NotifyPropertyChanged call superseded this one.
+                }
                 IsUpdatingUI = true;
                 try
                 {
@@ -57,7 +71,11 @@ namespace XboxGamingBar.Data
                     {
                         Logger.Info($"{Function} value {Value} not found in ComboBox items (count={UI.Items.Count}), retry {retryCount + 1}/3...");
                         await System.Threading.Tasks.Task.Delay(100);
-                        await SelectValueInComboBox(retryCount + 1);
+                        if (myToken != selectRequestToken)
+                        {
+                            return;
+                        }
+                        await SelectValueInComboBox(myToken, retryCount + 1);
                     }
                     else if (!found)
                     {

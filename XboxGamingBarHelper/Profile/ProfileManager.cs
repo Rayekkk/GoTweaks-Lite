@@ -169,7 +169,7 @@ namespace XboxGamingBarHelper.Profile
                     var fromDisk = Shared.Utilities.XmlHelper.FromXMLFile<Shared.Data.GameProfile>(globalProfilePath);
                     fromDisk.Path = globalProfilePath;
                     fromDisk.Cache = gameProfiles;
-                    gameProfiles[fromDisk.GameId] = fromDisk;
+                    lock (gameProfiles) { gameProfiles[fromDisk.GameId] = fromDisk; } // [A#7]
                     GlobalProfile = fromDisk;
                     Logger.Info($"Refreshed GlobalProfile from disk: TDP={GlobalProfile.TDP}, CPUBoost={GlobalProfile.CPUBoost}, EPP={GlobalProfile.CPUEPP}, LightMode={GlobalProfile.LegionLightMode}, LightSpeed={GlobalProfile.LegionLightSpeed}");
                     return;
@@ -181,7 +181,10 @@ namespace XboxGamingBarHelper.Profile
             }
 
             // Fallback: use in-memory cache (matches prior behavior on read failure).
-            if (gameProfiles.TryGetValue(GlobalProfile.GameId, out GameProfile cached))
+            bool found;
+            GameProfile cached;
+            lock (gameProfiles) { found = gameProfiles.TryGetValue(GlobalProfile.GameId, out cached); } // [A#7]
+            if (found)
             {
                 GlobalProfile = cached;
                 Logger.Info($"Refreshed GlobalProfile from cache: TDP={GlobalProfile.TDP}, CPUBoost={GlobalProfile.CPUBoost}, EPP={GlobalProfile.CPUEPP}");
@@ -190,40 +193,46 @@ namespace XboxGamingBarHelper.Profile
 
         public bool TryGetProfile(GameId gameId, out GameProfile gameProfile)
         {
-            // Fast path: exact match
-            if (gameProfiles.TryGetValue(gameId, out gameProfile))
+            // [full-audit fix, 2026-07-20 — A#7] Lock the dictionary instance around every read/
+            // iterate - GameProfile.Save() writes the same instance synchronously from other
+            // threads, and .NET Dictionary throws/corrupts on concurrent write+iterate.
+            lock (gameProfiles)
             {
-                return true;
-            }
+                // Fast path: exact match
+                if (gameProfiles.TryGetValue(gameId, out gameProfile))
+                {
+                    return true;
+                }
 
-            // Fallback: try matching by path only (handles name variations like "Game Name" vs "Game: Name")
-            if (!string.IsNullOrEmpty(gameId.Path))
-            {
+                // Fallback: try matching by path only (handles name variations like "Game Name" vs "Game: Name")
+                if (!string.IsNullOrEmpty(gameId.Path))
+                {
+                    foreach (var kvp in gameProfiles)
+                    {
+                        if (string.Equals(kvp.Key.Path, gameId.Path, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Logger.Debug($"Profile matched by path (name mismatch: '{gameId.Name}' vs '{kvp.Key.Name}'): {gameId.Path}");
+                            gameProfile = kvp.Value;
+                            return true;
+                        }
+                    }
+                }
+
+                // Fallback: try normalized name match (removes punctuation, case-insensitive)
+                var normalizedName = NormalizeName(gameId.Name);
                 foreach (var kvp in gameProfiles)
                 {
-                    if (string.Equals(kvp.Key.Path, gameId.Path, StringComparison.OrdinalIgnoreCase))
+                    if (NormalizeName(kvp.Key.Name) == normalizedName)
                     {
-                        Logger.Debug($"Profile matched by path (name mismatch: '{gameId.Name}' vs '{kvp.Key.Name}'): {gameId.Path}");
+                        Logger.Debug($"Profile matched by normalized name: '{gameId.Name}' -> '{kvp.Key.Name}'");
                         gameProfile = kvp.Value;
                         return true;
                     }
                 }
-            }
 
-            // Fallback: try normalized name match (removes punctuation, case-insensitive)
-            var normalizedName = NormalizeName(gameId.Name);
-            foreach (var kvp in gameProfiles)
-            {
-                if (NormalizeName(kvp.Key.Name) == normalizedName)
-                {
-                    Logger.Debug($"Profile matched by normalized name: '{gameId.Name}' -> '{kvp.Key.Name}'");
-                    gameProfile = kvp.Value;
-                    return true;
-                }
+                gameProfile = default;
+                return false;
             }
-
-            gameProfile = default;
-            return false;
         }
 
         /// <summary>
@@ -272,28 +281,31 @@ namespace XboxGamingBarHelper.Profile
                 return false;
             }
 
-            // Find the profile by name
+            // Find the profile by name. [A#7] All dict access under the instance lock.
             GameId? targetKey = null;
-            foreach (var kvp in gameProfiles)
+            string filePath = null;
+            lock (gameProfiles)
             {
-                if (string.Equals(kvp.Key.Name, gameName, StringComparison.OrdinalIgnoreCase))
+                foreach (var kvp in gameProfiles)
                 {
-                    targetKey = kvp.Key;
-                    break;
+                    if (string.Equals(kvp.Key.Name, gameName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetKey = kvp.Key;
+                        break;
+                    }
                 }
+
+                if (!targetKey.HasValue)
+                {
+                    Logger.Warn($"No profile found for {gameName} to delete");
+                    return false;
+                }
+
+                filePath = gameProfiles[targetKey.Value].Path;
+
+                // Remove from dictionary
+                gameProfiles.Remove(targetKey.Value);
             }
-
-            if (!targetKey.HasValue)
-            {
-                Logger.Warn($"No profile found for {gameName} to delete");
-                return false;
-            }
-
-            var profile = gameProfiles[targetKey.Value];
-            var filePath = profile.Path;
-
-            // Remove from dictionary
-            gameProfiles.Remove(targetKey.Value);
 
             // Delete the XML file
             if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
@@ -307,6 +319,21 @@ namespace XboxGamingBarHelper.Profile
                 {
                     Logger.Error($"Failed to delete profile XML for {gameName}: {ex.Message}");
                 }
+            }
+
+            // [race fix, 2.0 rebuild - profile-system consolidation] This used to never check
+            // currentProfile at all - if the deleted game was the ACTIVE per-game profile, its
+            // GameId stayed in currentProfile.Value, and a later live-edit handler (writing
+            // through profileManager.CurrentProfile, whose Save() unconditionally does
+            // cache[GameId] = this) would silently RESURRECT the just-deleted profile on disk
+            // and back into gameProfiles. ForceSetValue also fires PropertyChanged ->
+            // CurrentProfile_PropertyChanged (already correctly guarded by
+            // profileApplicationLock/isApplyingProfile), so this also immediately re-applies
+            // global settings to hardware at the moment of deletion, not just fixes bookkeeping.
+            if (currentProfile != null && currentProfile.Value.GameId == targetKey.Value)
+            {
+                Logger.Info("Deleted profile was the active CurrentProfile - resetting to global");
+                currentProfile.ForceSetValue(GlobalProfile);
             }
 
             Logger.Info($"Deleted profile for {gameName}");
@@ -323,11 +350,14 @@ namespace XboxGamingBarHelper.Profile
                 return null;
             }
 
-            foreach (var kvp in gameProfiles)
+            lock (gameProfiles) // [A#7]
             {
-                if (string.Equals(kvp.Key.Path, gamePath, StringComparison.OrdinalIgnoreCase))
+                foreach (var kvp in gameProfiles)
                 {
-                    return kvp.Value;
+                    if (string.Equals(kvp.Key.Path, gamePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return kvp.Value;
+                    }
                 }
             }
 

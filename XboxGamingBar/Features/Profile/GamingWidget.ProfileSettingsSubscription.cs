@@ -173,54 +173,74 @@ namespace XboxGamingBar
             // or when any property is syncing from helper pipe
             if (isLoadingProfile || isSwitchingProfile || isApplyingHelperUpdate || isInitialSync
                 || WidgetSliderProperty.HelperSyncCount > 0 || refreshRate?.IsUpdatingUI == true
-                || hdrEnabled?.IsUpdatingUI == true || resolution?.IsUpdatingUI == true)
+                || hdrEnabled?.IsUpdatingUI == true || resolution?.IsUpdatingUI == true
+                // [full-audit fix, 2026-07-20 — B1] The Min/Max CPU State combos have TWO
+                // SelectionChanged subscribers; a helper push reflects via ApplyCPUStateFromHelper
+                // (which sets isApplyingCPUStateFromHelper synchronously around the SelectedIndex
+                // write), but this generic handler never consulted that flag - so the push echoed
+                // back as a user CPUState intent and could write a DC value into the AC field.
+                || isApplyingCPUStateFromHelper)
             {
-                Logger.Debug($"Skipping auto-save during profile operation (loading={isLoadingProfile}, switching={isSwitchingProfile}, helperUpdate={isApplyingHelperUpdate}, initialSync={isInitialSync})");
+                Logger.Debug($"Skipping auto-save during profile operation (loading={isLoadingProfile}, switching={isSwitchingProfile}, helperUpdate={isApplyingHelperUpdate}, initialSync={isInitialSync}, cpuStateFromHelper={isApplyingCPUStateFromHelper})");
                 return;
             }
 
             string group = GetPowerSourceProfileChangedGroup(sender);
             // First vertical 2.0 slice: these fields no longer write the widget-local
             // PerformanceProfile. The helper owns persistence and confirms the resulting state.
+            //
+            // [full-audit fix, 2026-07-20 — B4/B5/B6] Every send below is now gated by the
+            // timing-independent value-equality no-op IsFieldIntentUnchanged. A helper-driven UI
+            // update, by construction, sets the control to a value that already equals the bound
+            // property's confirmed .Value, so any echo that reaches this handler after the
+            // synchronous HelperSyncCount bracket has closed (a delayed/secondary event) is
+            // suppressed here without needing a time-based grace window on the shared counter
+            // (which caused B4/B5/B6). A genuine user edit always differs (the property's .Value
+            // only updates on helper confirmation), so real edits still go through.
             if (group == "CPUBoost")
             {
-                _ = SendProfileFieldIntentAsync("CPUBoost", CPUBoostToggle?.IsOn ?? false);
+                bool v = CPUBoostToggle?.IsOn ?? false;
+                if (!IsFieldIntentUnchanged("CPUBoost", v)) _ = SendProfileFieldIntentAsync("CPUBoost", v);
                 return;
             }
             if (group == "CPUEPP")
             {
-                _ = SendProfileFieldIntentAsync("CPUEPP", (int)(CPUEPPSlider?.Value ?? 80));
+                int cpuEppValue = (int)(CPUEPPSlider?.Value ?? 80);
+                if (!IsFieldIntentUnchanged("CPUEPP", cpuEppValue)) _ = SendProfileFieldIntentAsync("CPUEPP", cpuEppValue);
                 return;
             }
             if (group == "CPUState")
             {
-                _ = SendProfileFieldIntentAsync("CPUState", new[]
-                {
-                    GetSelectedCPUStateValue(MinCPUStateComboBox),
-                    GetSelectedCPUStateValue(MaxCPUStateComboBox)
-                });
+                int minV = GetSelectedCPUStateValue(MinCPUStateComboBox);
+                int maxV = GetSelectedCPUStateValue(MaxCPUStateComboBox);
+                if (!IsFieldIntentUnchanged("CPUState", new[] { minV, maxV }))
+                    _ = SendProfileFieldIntentAsync("CPUState", new[] { minV, maxV });
                 return;
             }
             if (group == "RefreshRate")
             {
-                if (RefreshRatesComboBox?.SelectedItem is int selectedRefreshRate)
+                if (RefreshRatesComboBox?.SelectedItem is int selectedRefreshRate
+                    && !IsFieldIntentUnchanged("RefreshRate", selectedRefreshRate))
                     _ = SendProfileFieldIntentAsync("RefreshRate", selectedRefreshRate);
                 return;
             }
             if (group == "HDR")
             {
-                _ = SendProfileFieldIntentAsync("HDR", HDRToggle?.IsOn ?? false);
+                bool v = HDRToggle?.IsOn ?? false;
+                if (!IsFieldIntentUnchanged("HDR", v)) _ = SendProfileFieldIntentAsync("HDR", v);
                 return;
             }
             if (group == "Resolution")
             {
-                if (ResolutionComboBox?.SelectedItem is string selectedResolution)
+                if (ResolutionComboBox?.SelectedItem is string selectedResolution
+                    && !IsFieldIntentUnchanged("Resolution", selectedResolution))
                     _ = SendProfileFieldIntentAsync("Resolution", selectedResolution);
                 return;
             }
             if (TryGetAmdProfileFieldIntent(sender, out string amdField, out object amdValue))
             {
-                _ = SendProfileFieldIntentAsync(amdField, amdValue);
+                if (!IsFieldIntentUnchanged(amdField, amdValue))
+                    _ = SendProfileFieldIntentAsync(amdField, amdValue);
                 return;
             }
 
@@ -263,6 +283,64 @@ namespace XboxGamingBar
             else if (sender == AMDRadeonChillMinFPSSlider) { field = "RadeonChillMinFPS"; value = (int)AMDRadeonChillMinFPSSlider.Value; }
             else if (sender == AMDRadeonChillMaxFPSSlider) { field = "RadeonChillMaxFPS"; value = (int)AMDRadeonChillMaxFPSSlider.Value; }
             return field != null;
+        }
+
+        /// <summary>
+        /// [full-audit fix, 2026-07-20 — B4/B5/B6, generalized from the AMD-only version]
+        /// Timing-independent value-equality no-op check for EVERY field sent through
+        /// SettingChanged. A control's change event can fire (and reach SettingChanged /
+        /// SettingChangedDebounced) from something other than a genuine user action - most often a
+        /// helper-driven programmatic UI update whose synchronous HelperSyncCount bracket has
+        /// already closed by the time a delayed/secondary event lands. Comparing the value about to
+        /// be sent against the bound property's own confirmed .Value is correct regardless of what
+        /// triggered the event: a helper push, by construction, sets the UI to a value that already
+        /// matches the cache, so this is a safe no-op there; a genuine user edit always differs
+        /// (the property's .Value only updates on helper confirmation), so real edits still go
+        /// through (including an edit that happens to land on the same value - nothing to send
+        /// either way). This replaces the fragile 200ms grace window that caused B4/B5/B6.
+        /// </summary>
+        private bool IsFieldIntentUnchanged(string field, object value)
+        {
+            switch (field)
+            {
+                // Performance / display fields
+                case "CPUBoost":
+                    return cpuBoost != null && value is bool cbV && cbV == cpuBoost.Value;
+                case "CPUEPP":
+                    return cpuEPP != null && value is int eppV && eppV == cpuEPP.Value;
+                case "CPUState":
+                    return minCPUState != null && maxCPUState != null && value is int[] st && st.Length == 2
+                        && st[0] == minCPUState.Value && st[1] == maxCPUState.Value;
+                case "RefreshRate":
+                    return refreshRate != null && value is int rrV && rrV == refreshRate.Value;
+                case "HDR":
+                    return hdrEnabled != null && value is bool hdrV && hdrV == hdrEnabled.Value;
+                case "Resolution":
+                    return resolution != null && value is string resV && resV == resolution.Value;
+                // AMD fields
+                case "FluidMotionFrames":
+                    return amdFluidMotionFrameEnabled != null && value is bool fmfV && fmfV == amdFluidMotionFrameEnabled.Value;
+                case "RadeonSuperResolution":
+                    return amdRadeonSuperResolutionEnabled != null && value is bool rsrEV && rsrEV == amdRadeonSuperResolutionEnabled.Value;
+                case "RadeonSuperResolutionSharpness":
+                    return amdRadeonSuperResolutionSharpness != null && value is int rsrV && rsrV == amdRadeonSuperResolutionSharpness.Value;
+                case "ImageSharpening":
+                    return amdImageSharpeningEnabled != null && value is bool risEV && risEV == amdImageSharpeningEnabled.Value;
+                case "ImageSharpeningSharpness":
+                    return amdImageSharpeningSharpness != null && value is int risV && risV == amdImageSharpeningSharpness.Value;
+                case "RadeonAntiLag":
+                    return amdRadeonAntiLagEnabled != null && value is bool antiLagV && antiLagV == amdRadeonAntiLagEnabled.Value;
+                case "RadeonBoost":
+                    return amdRadeonBoostEnabled != null && value is bool boostV && boostV == amdRadeonBoostEnabled.Value;
+                case "RadeonChill":
+                    return amdRadeonChillEnabled != null && value is bool chillV && chillV == amdRadeonChillEnabled.Value;
+                case "RadeonChillMinFPS":
+                    return amdRadeonChillMinFPSProperty != null && value is int minV && minV == amdRadeonChillMinFPSProperty.Value;
+                case "RadeonChillMaxFPS":
+                    return amdRadeonChillMaxFPSProperty != null && value is int maxV && maxV == amdRadeonChillMaxFPSProperty.Value;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>

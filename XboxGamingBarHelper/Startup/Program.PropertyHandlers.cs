@@ -62,7 +62,7 @@ namespace XboxGamingBarHelper
             // override, not silently overwrite the AC value (found on-device 2026-07-18: a live
             // AMD toggle edit was corrupting the AC/DC split because every one of these handlers
             // always wrote to base regardless of actual power state).
-            bool isOnAC = IsCurrentlyOnAC;
+            bool isOnAC = ResolvesOnAc(profileManager.CurrentProfile.Value); // [A#3] resolve/write base when split off
             RouteProfileSave(ProfileSaveFlagsState.CPUState, "CPUState",
                 cur => { if (isOnAC) { cur.MaxCPUState = powerManager.MaxCPUState.Value; cur.MinCPUState = powerManager.MinCPUState.Value; } else { cur.MaxCPUState_DC = powerManager.MaxCPUState.Value; cur.MinCPUState_DC = powerManager.MinCPUState.Value; } },
                 glo => { if (isOnAC) { glo.MaxCPUState = powerManager.MaxCPUState.Value; glo.MinCPUState = powerManager.MinCPUState.Value; } else { glo.MaxCPUState_DC = powerManager.MaxCPUState.Value; glo.MinCPUState_DC = powerManager.MinCPUState.Value; } });
@@ -119,7 +119,7 @@ namespace XboxGamingBarHelper
             // CPU Boost in-game. Verify the change goes to GlobalProfile, not the per-game
             // profile. Pre-flag baseline: always wrote to CurrentProfile.
             // [2.0 rebuild - AC/DC live-edit fix] See CPUState_PropertyChanged's comment above.
-            bool isOnAC = IsCurrentlyOnAC;
+            bool isOnAC = ResolvesOnAc(profileManager.CurrentProfile.Value); // [A#3] resolve/write base when split off
             RouteProfileSave(ProfileSaveFlagsState.CPUBoost, "CPUBoost",
                 cur => { if (isOnAC) cur.CPUBoost = powerManager.CPUBoost; else cur.CPUBoost_DC = powerManager.CPUBoost; },
                 glo => { if (isOnAC) glo.CPUBoost = powerManager.CPUBoost; else glo.CPUBoost_DC = powerManager.CPUBoost; });
@@ -145,7 +145,7 @@ namespace XboxGamingBarHelper
             // in-game. Verify the change goes to GlobalProfile, not the per-game profile.
             // Pre-flag baseline: always wrote to CurrentProfile.
             // [2.0 rebuild - AC/DC live-edit fix] See CPUState_PropertyChanged's comment above.
-            bool isOnAC = IsCurrentlyOnAC;
+            bool isOnAC = ResolvesOnAc(profileManager.CurrentProfile.Value); // [A#3] resolve/write base when split off
             RouteProfileSave(ProfileSaveFlagsState.CPUEPP, "CPUEPP",
                 cur => { if (isOnAC) cur.CPUEPP = powerManager.CPUEPP; else cur.CPUEPP_DC = powerManager.CPUEPP; },
                 glo => { if (isOnAC) glo.CPUEPP = powerManager.CPUEPP; else glo.CPUEPP_DC = powerManager.CPUEPP; });

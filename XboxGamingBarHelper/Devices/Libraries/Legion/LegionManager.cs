@@ -1686,6 +1686,16 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
             ScheduleTDPReapply(slow, fast, peak);
         }
 
+        // [full-audit fix, 2026-07-20 — C1] Absolute hardware bounds for a single power limit.
+        // The per-limit live-drag apply methods (ApplyCustomTDPSlow/Fast/Peak) write straight to
+        // WMI/EC; the helper must not trust widget-side clamping, so every value is pinned to
+        // [5, 50] before it reaches the firmware. Cross-limit ordering (SPL<=SPPT<=FPPT) is the
+        // widget's slider-coupling responsibility during a drag and is validated atomically by
+        // SetCustomTDP for the full-triplet path.
+        private const int CUSTOM_TDP_MIN_W = 5;
+        private const int CUSTOM_TDP_MAX_W = 50;
+        private static int ClampCustomTdpWatts(int w) => Math.Max(CUSTOM_TDP_MIN_W, Math.Min(CUSTOM_TDP_MAX_W, w));
+
         public bool SetCustomTDP(int slow, int fast, int peak)
         {
             if (slow < 5 || peak > 50 || slow > fast || fast > peak)
@@ -1909,6 +1919,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         public bool ApplyCustomTDPSlow(int slow, out string failureReason)
         {
             failureReason = null;
+            slow = ClampCustomTdpWatts(slow); // [C1] never let an out-of-range value reach the EC
             // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
             // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)
@@ -1959,6 +1970,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         public bool ApplyCustomTDPFast(int fast, out string failureReason)
         {
             failureReason = null;
+            fast = ClampCustomTdpWatts(fast); // [C1] never let an out-of-range value reach the EC
             // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
             // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)
@@ -2009,6 +2021,7 @@ namespace XboxGamingBarHelper.Devices.Libraries.Legion
         public bool ApplyCustomTDPPeak(int peak, out string failureReason)
         {
             failureReason = null;
+            peak = ClampCustomTdpWatts(peak); // [C1] never let an out-of-range value reach the EC
             // Only meaningful in Custom mode; preset modes are firmware-managed. Not applying is
             // the correct, intended behavior here - not a failure.
             if (performanceMode != 255)

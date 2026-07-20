@@ -190,6 +190,16 @@ namespace XboxGamingBar.Data
             }
         }
 
+        // [full-audit fix, 2026-07-20 — B4/B5/B6] Reverted to the original SYNCHRONOUS bracket.
+        // A prior version held HelperSyncCount for a 200ms grace window after the UI write to catch
+        // a delayed/secondary ValueChanged echo - but that shared static counter then suppressed a
+        // second genuine user gesture landing within 200ms (B4), could leak permanently if the
+        // widget was torn down mid-window (B5), and let overlapping pushes clear the per-property
+        // bool early (B6). The echo it was patching actually lives in the SEPARATE
+        // SettingChanged/SendProfileFieldIntentAsync subscriber, which is now closed by a
+        // timing-independent value-equality no-op (IsFieldIntentUnchanged in
+        // GamingWidget.ProfileSettingsSubscription.cs) - Slider_ValueChanged itself already
+        // self-guards via `newValue != Value`. So the grace window is unnecessary.
         protected override async void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);

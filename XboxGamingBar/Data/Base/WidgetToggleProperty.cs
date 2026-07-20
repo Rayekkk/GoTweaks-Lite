@@ -29,6 +29,27 @@ namespace XboxGamingBar.Data
             }
         }
 
+        /// <summary>
+        /// Sets the bound ToggleSwitch's IsOn programmatically without echoing back to the
+        /// helper. For a control ALSO independently driven by another property (e.g.
+        /// RunningGameProperty force-resetting the shared PerGameProfileToggle when a game
+        /// closes) - that other owner has no way to guard THIS property's own Toggled handler,
+        /// so it must go through this method instead of touching UI.IsOn directly.
+        /// </summary>
+        internal void SetControlValueSilently(bool value)
+        {
+            if (UI == null) return;
+            isUpdatingUI = true;
+            try
+            {
+                UI.IsOn = value;
+            }
+            finally
+            {
+                isUpdatingUI = false;
+            }
+        }
+
         protected virtual void ToggleSwitch_ValueChanged(object sender, RoutedEventArgs e)
         {
             // Skip if UI is being updated programmatically (from helper sync)
@@ -41,6 +62,10 @@ namespace XboxGamingBar.Data
             SetValue(UI.IsOn, DateTime.Now.Ticks);
         }
 
+        // [full-audit fix, 2026-07-20 — B4/B5/B6] Reverted to the original SYNCHRONOUS bracket -
+        // see WidgetSliderProperty.NotifyPropertyChanged for the full rationale (the 200ms grace
+        // window caused more problems than it solved; the real echo is closed by the
+        // timing-independent value-equality no-op IsFieldIntentUnchanged instead).
         protected override async void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);

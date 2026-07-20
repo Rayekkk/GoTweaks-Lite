@@ -154,6 +154,14 @@ namespace XboxGamingBar
                 var matches = System.Text.RegularExpressions.Regex.Matches(json,
                     @"""(\w+)""\s*:\s*(-?\d+\.?\d*|true|false)");
 
+                // [full-audit fix, 2026-07-20 — B10] Build into a fresh dictionary (seeded from the
+                // current snapshot so keys not present in this push are preserved) and publish it
+                // with a single atomic reference assignment. UpdateQuickMetrics runs on the pipe
+                // thread while UpdateMetricsDisplay reads currentMetricsData on the UI thread;
+                // mutating the shared dictionary in place could corrupt/throw against those
+                // concurrent reads. The reference swap means the UI thread always reads a
+                // dictionary that is never being mutated (concurrent reads alone are safe).
+                var updated = new Dictionary<string, double>(currentMetricsData);
                 foreach (System.Text.RegularExpressions.Match match in matches)
                 {
                     var key = match.Groups[1].Value;
@@ -165,9 +173,10 @@ namespace XboxGamingBar
                     }
                     else if (double.TryParse(value, out double numValue))
                     {
-                        currentMetricsData[key] = numValue;
+                        updated[key] = numValue;
                     }
                 }
+                currentMetricsData = updated;
 
                 // Update UI elements on dispatcher thread
                 _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
