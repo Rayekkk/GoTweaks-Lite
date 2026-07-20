@@ -1,4 +1,4 @@
-﻿using Shared.Data;
+using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 
@@ -20,24 +20,20 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        // [2026-07-20 simplification] GoTweaks->AMD is now the only sync direction - always push
+        // to the driver. GenericProperty.SetValue's equality skip prevents NotifyPropertyChanged
+        // from firing when our cached value matches the incoming value - and therefore the
+        // SetEnabled call below in NotifyPropertyChanged never reaches ADLX - so the cache can
+        // drift from the actual driver state (a prior SetEnabled silently failed, etc.), leaving
+        // the Display-tab toggle showing the new value in the widget UI while the driver stays in
+        // its previous state. Push to driver here whenever the result was accepted, regardless of
+        // whether the value changed.
         public override bool SetValue(object newValue, long updatedTime = 0)
         {
             bool prev = Value;
             bool result = base.SetValue(newValue, updatedTime);
-            // Display-tab fix: GenericProperty.SetValue's equality skip prevents
-            // NotifyPropertyChanged from firing when our cached value matches
-            // the incoming value — and therefore the SetEnabled call below in
-            // NotifyPropertyChanged never reaches ADLX. The cache CAN drift
-            // from the actual driver state (user toggled AFMF in Adrenalin
-            // directly, a prior SetEnabled silently failed, etc.), so the
-            // Display-tab toggle would persist the new value in the widget UI
-            // but the driver would stay in its previous state. Per-game
-            // profiles bypass this via ForceSetValue but the Display-tab path
-            // hits SetValue. Push to driver here whenever the result was
-            // accepted, regardless of whether the value changed.
             if (result && prev == Value)
             {
-                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
                 ApplyToDriver();
             }
             return result;
@@ -46,11 +42,6 @@ namespace XboxGamingBarHelper.AMD.Properties
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
-
-            // Notify the listener to start cooldown before we make the change
-            // This prevents the listener from reading stale values when the driver callback fires
-            Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
-
             ApplyToDriver();
         }
 
@@ -84,7 +75,6 @@ namespace XboxGamingBarHelper.AMD.Properties
             bool result = base.SetValue(newValue, updatedTime);
             if (result && prev == Value)
             {
-                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
                 ApplyToDriver();
             }
             return result;
@@ -93,7 +83,6 @@ namespace XboxGamingBarHelper.AMD.Properties
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
-            Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
             ApplyToDriver();
         }
 
@@ -121,7 +110,6 @@ namespace XboxGamingBarHelper.AMD.Properties
             bool result = base.SetValue(newValue, updatedTime);
             if (result && prev == Value)
             {
-                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
                 ApplyToDriver();
             }
             return result;
@@ -130,7 +118,6 @@ namespace XboxGamingBarHelper.AMD.Properties
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
-            Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
             ApplyToDriver();
         }
 
@@ -159,7 +146,6 @@ namespace XboxGamingBarHelper.AMD.Properties
             bool result = base.SetValue(newValue, updatedTime);
             if (result && prev == Value)
             {
-                Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
                 ApplyToDriver();
             }
             return result;
@@ -168,7 +154,6 @@ namespace XboxGamingBarHelper.AMD.Properties
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
-            Manager.AMD3DSettingsChangedListener?.NotifyAFMFChanged();
             ApplyToDriver();
         }
 

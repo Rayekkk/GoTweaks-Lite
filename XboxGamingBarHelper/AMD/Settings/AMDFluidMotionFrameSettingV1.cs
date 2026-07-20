@@ -75,17 +75,24 @@ namespace XboxGamingBarHelper.AMD.Settings
             return result == ADLX_RESULT.ADLX_OK;
         }
 
-        public ADLX_AFMF_SEARCH_MODE_TYPE GetSearchMode()
+        // Try-pattern getter: distinguishes a real read from a failed one instead of silently
+        // falling back to AFMF_SEARCH_MODE_AUTO (ordinal 0) on failure, which this device's driver
+        // hits often enough for AFMF getters to matter (see SetSearchMode's ADLX_ALREADY_ENABLED
+        // comment). Consumed by AMDManager's one-time startup probe of the AFMF 2.x extended
+        // controls. (Originally also used by the removed external-change-detection listener.)
+        public bool TryGetSearchMode(out ADLX_AFMF_SEARCH_MODE_TYPE mode)
         {
-            if (adlxSetting == null) return ADLX_AFMF_SEARCH_MODE_TYPE.AFMF_SEARCH_MODE_AUTO;
+            mode = ADLX_AFMF_SEARCH_MODE_TYPE.AFMF_SEARCH_MODE_AUTO;
+            if (adlxSetting == null) return false;
             var ptr = ADLX.new_afmfSearchModeP();
             try
             {
                 if (adlxSetting.GetSearchMode(ptr) != ADLX_RESULT.ADLX_OK)
                 {
-                    return ADLX_AFMF_SEARCH_MODE_TYPE.AFMF_SEARCH_MODE_AUTO;
+                    return false;
                 }
-                return ADLX.afmfSearchModeP_value(ptr);
+                mode = ADLX.afmfSearchModeP_value(ptr);
+                return true;
             }
             finally
             {
@@ -110,17 +117,20 @@ namespace XboxGamingBarHelper.AMD.Settings
             return result == ADLX_RESULT.ADLX_OK || result == ADLX_RESULT.ADLX_ALREADY_ENABLED;
         }
 
-        public ADLX_AFMF_PERFORMANCE_MODE_TYPE GetPerformanceMode()
+        // See TryGetSearchMode for why this is a Try-pattern rather than a fallback-to-Auto getter.
+        public bool TryGetPerformanceMode(out ADLX_AFMF_PERFORMANCE_MODE_TYPE mode)
         {
-            if (adlxSetting == null) return ADLX_AFMF_PERFORMANCE_MODE_TYPE.AFMF_PERFORMANCE_MODE_AUTO;
+            mode = ADLX_AFMF_PERFORMANCE_MODE_TYPE.AFMF_PERFORMANCE_MODE_AUTO;
+            if (adlxSetting == null) return false;
             var ptr = ADLX.new_afmfPerformanceModeP();
             try
             {
                 if (adlxSetting.GetPerformanceMode(ptr) != ADLX_RESULT.ADLX_OK)
                 {
-                    return ADLX_AFMF_PERFORMANCE_MODE_TYPE.AFMF_PERFORMANCE_MODE_AUTO;
+                    return false;
                 }
-                return ADLX.afmfPerformanceModeP_value(ptr);
+                mode = ADLX.afmfPerformanceModeP_value(ptr);
+                return true;
             }
             finally
             {
@@ -142,17 +152,20 @@ namespace XboxGamingBarHelper.AMD.Settings
             return result == ADLX_RESULT.ADLX_OK || result == ADLX_RESULT.ADLX_ALREADY_ENABLED;
         }
 
-        public ADLX_AFMF_FAST_MOTION_RESP GetFastMotionResponse()
+        // See TryGetSearchMode for why this is a Try-pattern rather than a fallback-to-default getter.
+        public bool TryGetFastMotionResponse(out ADLX_AFMF_FAST_MOTION_RESP response)
         {
-            if (adlxSetting == null) return ADLX_AFMF_FAST_MOTION_RESP.AFMF_RESP_REPEAT_FRAMES;
+            response = ADLX_AFMF_FAST_MOTION_RESP.AFMF_RESP_REPEAT_FRAMES;
+            if (adlxSetting == null) return false;
             var ptr = ADLX.new_afmfFastMotionRespP();
             try
             {
                 if (adlxSetting.GetFastMotionResponse(ptr) != ADLX_RESULT.ADLX_OK)
                 {
-                    return ADLX_AFMF_FAST_MOTION_RESP.AFMF_RESP_REPEAT_FRAMES;
+                    return false;
                 }
-                return ADLX.afmfFastMotionRespP_value(ptr);
+                response = ADLX.afmfFastMotionRespP_value(ptr);
+                return true;
             }
             finally
             {

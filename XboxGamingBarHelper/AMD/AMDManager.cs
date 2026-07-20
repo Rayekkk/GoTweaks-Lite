@@ -96,12 +96,6 @@ namespace XboxGamingBarHelper.AMD
             get { return amdDisplayCustomColorSetting; }
         }
 
-        private AMD3DSettingsChangedListener amd3DSettingsChangedListener;
-        public AMD3DSettingsChangedListener AMD3DSettingsChangedListener
-        {
-            get { return amd3DSettingsChangedListener; }
-        }
-
         // AMD Properties.
         private AMDRadeonSuperResolutionSupportedProperty amdRadeonSuperResolutionSupported;
         public AMDRadeonSuperResolutionSupportedProperty AMDRadeonSuperResolutionSupported
@@ -460,11 +454,14 @@ namespace XboxGamingBarHelper.AMD
                     var afmfV1Iface = new IADLX3DAMDFluidMotionFrames1(afmfV1Raw, false);
                     amdFluidMotionFrameSettingV1 = new AMDFluidMotionFrameSettingV1(afmfV1Iface);
                     bool algoSupported = amdFluidMotionFrameSettingV1.IsAlgorithmSupported();
+                    amdFluidMotionFrameSettingV1.TryGetSearchMode(out var initSearchMode);
+                    amdFluidMotionFrameSettingV1.TryGetPerformanceMode(out var initPerformanceMode);
+                    amdFluidMotionFrameSettingV1.TryGetFastMotionResponse(out var initFastMotionResponse);
                     Logger.Info($"AFMF v1 (extended controls) wrapper constructed (algorithmSupported={algoSupported}, "
                         + $"algo={amdFluidMotionFrameSettingV1.GetAlgorithm()}, "
-                        + $"searchMode={amdFluidMotionFrameSettingV1.GetSearchMode()}, "
-                        + $"performanceMode={amdFluidMotionFrameSettingV1.GetPerformanceMode()}, "
-                        + $"fastMotionResponse={amdFluidMotionFrameSettingV1.GetFastMotionResponse()})");
+                        + $"searchMode={initSearchMode}, "
+                        + $"performanceMode={initPerformanceMode}, "
+                        + $"fastMotionResponse={initFastMotionResponse})");
                 }
                 else
                 {
@@ -542,12 +539,16 @@ namespace XboxGamingBarHelper.AMD
             // wrapper when available and defaults when not, with V1Supported gating the UI.
             bool v1Available = amdFluidMotionFrameSettingV1 != null && amdFluidMotionFrameSettingV1.IsAlgorithmSupported();
             amdFluidMotionFrameV1Supported = new AMDFluidMotionFrameV1SupportedProperty(v1Available, this);
-            amdFluidMotionFrameSearchMode = new AMDFluidMotionFrameSearchModeProperty(
-                v1Available ? (int)amdFluidMotionFrameSettingV1.GetSearchMode() : 0, this);
-            amdFluidMotionFramePerformanceMode = new AMDFluidMotionFramePerformanceModeProperty(
-                v1Available ? (int)amdFluidMotionFrameSettingV1.GetPerformanceMode() : 0, this);
-            amdFluidMotionFrameFastMotionResponse = new AMDFluidMotionFrameFastMotionResponseProperty(
-                v1Available ? (int)amdFluidMotionFrameSettingV1.GetFastMotionResponse() : 0, this);
+            int initialSearchMode = 0, initialPerformanceMode = 0, initialFastMotionResponse = 0;
+            if (v1Available)
+            {
+                if (amdFluidMotionFrameSettingV1.TryGetSearchMode(out var sm)) initialSearchMode = (int)sm;
+                if (amdFluidMotionFrameSettingV1.TryGetPerformanceMode(out var pm)) initialPerformanceMode = (int)pm;
+                if (amdFluidMotionFrameSettingV1.TryGetFastMotionResponse(out var fmr)) initialFastMotionResponse = (int)fmr;
+            }
+            amdFluidMotionFrameSearchMode = new AMDFluidMotionFrameSearchModeProperty(initialSearchMode, this);
+            amdFluidMotionFramePerformanceMode = new AMDFluidMotionFramePerformanceModeProperty(initialPerformanceMode, this);
+            amdFluidMotionFrameFastMotionResponse = new AMDFluidMotionFrameFastMotionResponseProperty(initialFastMotionResponse, this);
 
             // GPU-specific 3D settings - only initialize if we have a GPU
             if (adlxInternalGPU != null)
@@ -755,13 +756,6 @@ namespace XboxGamingBarHelper.AMD
             amdRadeonAntiLagEnabled.PropertyChanged += AmdRadeonAntiLagEnabled;
             amdRadeonBoostEnabled.PropertyChanged += AmdRadeonBoostEnabled;
             amdRadeonChillEnabled.PropertyChanged += AmdRadeonChillEnabled;
-
-            var threeDSettingsChangedHandlingPointer = ADLX.new_threeDSettingsChangedHandlingP_Ptr();
-            //ADLX.new_threeDSettingsChangedHandlingP_Ptr
-            adlx3DSettingsServices.Get3DSettingsChangedHandling(threeDSettingsChangedHandlingPointer);
-            var threeDSettingsChangedHandling = ADLX.threeDSettingsChangedHandlingP_Ptr_value(threeDSettingsChangedHandlingPointer);
-            amd3DSettingsChangedListener = new AMD3DSettingsChangedListener(this);
-            threeDSettingsChangedHandling.Add3DSettingsEventListener(amd3DSettingsChangedListener);
 
             inputInjector = InputInjector.TryCreate();
             turnAMDOverlayOnOffKeyboardCombo = new InjectedInputKeyboardInfo[]

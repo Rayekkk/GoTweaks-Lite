@@ -21,6 +21,8 @@ namespace XboxGamingBarHelper.AMD.Properties
         {
         }
 
+        // [2026-07-20 simplification] GoTweaks->AMD is now the only sync direction - always push
+        // to the driver.
         public override bool SetValue(object newValue, long updatedTime = 0)
         {
             bool prev = Value;
@@ -30,7 +32,6 @@ namespace XboxGamingBarHelper.AMD.Properties
             // of whether the cached value changed.
             if (result && prev == Value)
             {
-                Manager.AMD3DSettingsChangedListener?.NotifyRISChanged();
                 ApplyToDriver();
             }
             return result;
@@ -39,11 +40,6 @@ namespace XboxGamingBarHelper.AMD.Properties
         protected override void NotifyPropertyChanged(string propertyName = "")
         {
             base.NotifyPropertyChanged(propertyName);
-
-            // Notify the listener to start cooldown before we make the change
-            // This prevents the listener from reading stale values when the driver callback fires
-            Manager.AMD3DSettingsChangedListener?.NotifyRISChanged();
-
             ApplyToDriver();
         }
 

@@ -9,51 +9,91 @@ namespace XboxGamingBarHelper.AMD
 
         internal static bool GetBoolValue(GetBool func)
         {
+            TryGetBoolValue(func, out bool value);
+            return value;
+        }
+
+        // The Try* variants distinguish a real read from a failed one (the plain GetBoolValue/
+        // GetIntValue/GetIntRangeValue wrappers above just fall back to false/0/(0,0) on failure).
+        // They were originally added for the external-change-detection listener; that listener was
+        // removed (GoTweaks→AMD is now the only sync direction), so today the plain wrappers - which
+        // delegate here - are the only live consumers. Kept because the wrappers depend on them.
+        internal static bool TryGetBoolValue(GetBool func, out bool value)
+        {
+            value = false;
             var boolPointer = ADLX.new_boolP();
-            var getValueResult = func(boolPointer);
-            if (getValueResult != ADLX_RESULT.ADLX_OK)
+            try
+            {
+                var getValueResult = func(boolPointer);
+                if (getValueResult != ADLX_RESULT.ADLX_OK)
+                {
+                    Logger.Error($"Failed to get AMD bool value. ADLX_RESULT: {getValueResult}");
+                    return false;
+                }
+                value = ADLX.boolP_value(boolPointer);
+                return true;
+            }
+            finally
             {
                 ADLX.delete_boolP(boolPointer);
-                Logger.Error($"Failed to get AMD bool value. ADLX_RESULT: {getValueResult}");
-                return false;
             }
-
-            var boolValue = ADLX.boolP_value(boolPointer);
-            ADLX.delete_boolP(boolPointer);
-            return boolValue;
         }
 
         internal static Tuple<int, int> GetIntRangeValue(GetIntRange func)
         {
+            TryGetIntRangeValue(func, out Tuple<int, int> value);
+            return value;
+        }
+
+        // See TryGetBoolValue for why this exists alongside the plain GetIntRangeValue above.
+        internal static bool TryGetIntRangeValue(GetIntRange func, out Tuple<int, int> value)
+        {
+            value = new Tuple<int, int>(0, 0);
             var intRangePointer = ADLX.new_intRangeP();
-            var getValueResult = func(intRangePointer);
-            if (getValueResult != ADLX_RESULT.ADLX_OK)
+            try
+            {
+                var getValueResult = func(intRangePointer);
+                if (getValueResult != ADLX_RESULT.ADLX_OK)
+                {
+                    Logger.Error($"Failed to get AMD int range value. ADLX_RESULT: {getValueResult}");
+                    return false;
+                }
+                var intRangeValue = ADLX.intRangeP_value(intRangePointer);
+                value = new Tuple<int, int>(intRangeValue.minValue, intRangeValue.maxValue);
+                return true;
+            }
+            finally
             {
                 ADLX.delete_intRangeP(intRangePointer);
-                Logger.Error($"Failed to get AMD int range value. ADLX_RESULT: {getValueResult}");
-                return new Tuple<int, int>(0, 0);
             }
-
-            var intRangeValue = ADLX.intRangeP_value(intRangePointer);
-            ADLX.delete_intRangeP(intRangePointer);
-            intRangePointer?.Dispose();
-            return new Tuple<int, int>(intRangeValue.minValue, intRangeValue.maxValue);
         }
 
         internal static int GetIntValue(GetInt func)
         {
+            TryGetIntValue(func, out int value);
+            return value;
+        }
+
+        // See TryGetBoolValue for why this exists alongside the plain GetIntValue above.
+        internal static bool TryGetIntValue(GetInt func, out int value)
+        {
+            value = 0;
             var intPointer = ADLX.new_intP();
-            var getValueResult = func(intPointer);
-            if (getValueResult != ADLX_RESULT.ADLX_OK)
+            try
+            {
+                var getValueResult = func(intPointer);
+                if (getValueResult != ADLX_RESULT.ADLX_OK)
+                {
+                    Logger.Error($"Failed to get AMD int value. ADLX_RESULT: {getValueResult}");
+                    return false;
+                }
+                value = ADLX.intP_value(intPointer);
+                return true;
+            }
+            finally
             {
                 ADLX.delete_intP(intPointer);
-                Logger.Error($"Failed to get AMD int value. ADLX_RESULT: {getValueResult}");
-                return 0;
             }
-
-            var intValue = ADLX.intP_value(intPointer);
-            ADLX.delete_intP(intPointer);
-            return intValue;
         }
     }
 }
