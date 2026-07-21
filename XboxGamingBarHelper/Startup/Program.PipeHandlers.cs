@@ -20,7 +20,6 @@ using Windows.UI.Input.Preview.Injection;
 using XboxGamingBarHelper.AMD;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.ControllerEmulation;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.LosslessScaling;
 using XboxGamingBarHelper.OnScreenDisplay;
@@ -1524,11 +1523,6 @@ namespace XboxGamingBarHelper
                 {
                     response = HandlePrepareForUninstall(request);
                 }
-                // System Restore: Get status of saved original values
-                else if (functionValue == (int)Function.SystemRestoreStatus)
-                {
-                    response = HandleSystemRestoreStatus(request);
-                }
                 // Export All Data (comprehensive backup)
                 else if (functionValue == (int)Function.ExportAllData)
                 {
@@ -2463,19 +2457,6 @@ namespace XboxGamingBarHelper
                 Logger.Error($"Pipe: PrepareForUninstall failed: {ex.Message}");
                 response.Add("Content", $"Error: {ex.Message}");
             }
-            return response;
-        }
-
-        // System Restore: Get status of saved original values
-        private static global::Windows.Foundation.Collections.ValueSet HandleSystemRestoreStatus(Shared.IPC.PipeMessage request)
-        {
-            int functionValue = (int)request.Function;
-            var response = new global::Windows.Foundation.Collections.ValueSet();
-            string status = Services.SystemRestoreService.GetSavedValuesStatus();
-            response.Add(nameof(Function), functionValue);
-            response.Add("Content", status);
-            response.Add("UpdatedTime", DateTimeOffset.Now.ToUnixTimeMilliseconds());
-            Logger.Info($"Pipe: SystemRestoreStatus requested");
             return response;
         }
 

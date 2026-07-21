@@ -13,7 +13,7 @@ namespace XboxGamingBarHelper.AMD.Settings
     /// Older drivers that don't ship AFMF 2.x return null from QueryInterface — callers
     /// should null-check the wrapper before using any v1-specific control.
     /// </summary>
-    internal class AMDFluidMotionFrameSettingV1
+    internal class AMDFluidMotionFrameSettingV1 : System.IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -22,6 +22,13 @@ namespace XboxGamingBarHelper.AMD.Settings
         public AMDFluidMotionFrameSettingV1(IADLX3DAMDFluidMotionFrames1 setting)
         {
             adlxSetting = setting;
+        }
+
+        // [full-audit fix, 2026-07-20 — C5] Release the underlying ADLX interface on teardown; the
+        // wrapper previously had no Dispose, so AMDManager could never release it.
+        public void Dispose()
+        {
+            adlxSetting?.Dispose();
         }
 
         public bool IsAvailable => adlxSetting != null;

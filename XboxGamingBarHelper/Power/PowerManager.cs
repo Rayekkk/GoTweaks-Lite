@@ -82,25 +82,6 @@ namespace XboxGamingBarHelper.Power
             get { return hibernateTimeoutDC; }
         }
 
-        // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
-        //private readonly LimitGPUClockProperty limitGPUClock;
-        //public LimitGPUClockProperty LimitGPUClock
-        //{
-        //    get { return limitGPUClock; }
-        //}
-
-        //private readonly GPUClockMinProperty gpuClockMin;
-        //public GPUClockMinProperty GPUClockMin
-        //{
-        //    get { return gpuClockMin; }
-        //}
-
-        //private readonly GPUClockMaxProperty gpuClockMax;
-        //public GPUClockMaxProperty GPUClockMax
-        //{
-        //    get { return gpuClockMax; }
-        //}
-
         public PowerManager(IntPtr ryzenAdjHandle) : base()
         {
             this.ryzenAdjHandle = ryzenAdjHandle;
@@ -142,13 +123,6 @@ namespace XboxGamingBarHelper.Power
             hibernateTimeoutAC = new HibernateTimeoutProperty(this, true, Shared.Enums.Function.SystemHibernateTimeoutAC);
             hibernateTimeoutDC = new HibernateTimeoutProperty(this, false, Shared.Enums.Function.SystemHibernateTimeoutDC);
             Logger.Info($"Initial Hibernate Timeout: AC={hibernateTimeoutAC.Value}min, DC={hibernateTimeoutDC.Value}min");
-
-            // GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1)
-            //// Initialize GPU Clock properties
-            //limitGPUClock = new LimitGPUClockProperty(false, this);
-            //gpuClockMin = new GPUClockMinProperty(200, this);
-            //gpuClockMax = new GPUClockMaxProperty(3000, this);
-            //Logger.Info($"GPU Clock limiter initialized (disabled by default).");
         }
 
         public static Guid GetActiveScheme()

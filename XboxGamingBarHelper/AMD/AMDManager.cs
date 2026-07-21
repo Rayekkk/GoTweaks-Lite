@@ -56,16 +56,6 @@ namespace XboxGamingBarHelper.AMD
             get { return amdFluidMotionFrameSettingV1; }
         }
 
-        // ADLX 1.5+: VGM (Variable Graphics Memory / UMA carveout). Acquired via
-        // IADLXSystem3.GetVariableGraphicsMemory(). Null on systems where the driver
-        // doesn't expose ADLX 1.5; on supported APUs (Legion Go 2 Z2 Extreme, etc.)
-        // returns the list of allocation options (Auto + fixed Custom sizes).
-        private readonly AMDVariableGraphicsMemorySetting amdVariableGraphicsMemorySetting;
-        public AMDVariableGraphicsMemorySetting AMDVariableGraphicsMemorySetting
-        {
-            get { return amdVariableGraphicsMemorySetting; }
-        }
-
         private AMDRadeonAntiLagSetting amdRadeonAntiLagSetting;
         public AMDRadeonAntiLagSetting AMDRadeonAntiLagSetting
         {
@@ -472,46 +462,6 @@ namespace XboxGamingBarHelper.AMD
             {
                 Logger.Warn($"AFMF v1 wrapper init threw {ex.GetType().Name}: {ex.Message} — extended controls unavailable");
             }
-
-            // ADLX 1.5+: VGM (Variable Graphics Memory / UMA carveout) probe — DISABLED again
-            // after a SECOND confirmed crash. Re-attempted 2026-07-14 using
-            // IADLXSystem.QueryInterface(IADLXSystem3.IID(), ppVoid) (the properly
-            // SWIG-generated IID accessor, not a hand-rolled string — ruling out the
-            // "bad IID string" theory from the original 2093 disable). Ran inside its own
-            // 3s watchdog thread, wrapped in try/catch. Result: an immediate, unrecoverable
-            // access violation in clr.dll (Windows Event Log: Application Error 0xc0000005 in
-            // clr.dll, .NET Runtime error 1023 exit code 80131506 — same signature as the
-            // original crash AND as the unrelated helper-CLR-crash investigation in §30) —
-            // no log line from inside the new code ever printed, meaning it crashed at or
-            // before the very first native call (IADLXSystem3.IID() or the QueryInterface
-            // dispatch itself), before the 3s watchdog or the try/catch could do anything —
-            // AV-class native crashes bypass both. Confirmed on-device on the real Legion Go 2
-            // dev unit, not a hang, not theoretical.
-            //
-            // Root cause theory (still unproven, but well-supported): the locally-vendored
-            // ADLX/SDK/Include headers in this repo's ADLX/ submodule only go up to
-            // ISystem2.h — there is no ISystem3.h checked in anywhere in this tree. Yet the
-            // prebuilt ADLXCSharpBind.dll this project ships DOES export working
-            // IADLXSystem3_IID / IADLXSystem3_GetVariableGraphicsMemory symbols (confirmed:
-            // calling them produces real ADLX_RESULT values / a real crash address, not a
-            // missing-export error). That native DLL must have been built from a different,
-            // more complete ADLX SDK snapshot than what's tracked here — likely with a
-            // System1/System2/System3 method layout that doesn't exactly match what the
-            // checked-in SWIG-generated C# proxies (and possibly the DLL's own internal
-            // vtable bookkeeping for the System family) assume, corrupting native state on
-            // the very first call into that specific interface family.
-            //
-            // Do not re-attempt without either (a) rebuilding ADLXCSharpBind.dll from a
-            // complete, internally-consistent ADLX SDK that actually includes ISystem3.h /
-            // IVariableGraphicsMemory.h (not just patching in generated .cs proxies against
-            // a partial header set), or (b) investigating whether Legion Space's path to the
-            // same setting goes through Lenovo's own WMI BIOS-setting mechanism instead —
-            // that would sidestep this ADLX interface entirely. See memory
-            // `vgm-uma-buffer-adlx-crash.md` for the full research + crash trail. The actual
-            // attempted code (QueryInterface + IADLXSystem3.IID(), 3s watchdog thread) is not
-            // kept here — it's in git history (this comment's commit) and in the memory file;
-            // re-derive it fresh next time rather than resurrecting dead code that already
-            // crashed twice.
 
             // GPU Tuning probe was REMOVED in 2090 — both 2088 (with DDR + tuning probes)
             // and 2089 (tuning only) crashed at AMDManager init with AccessViolation
@@ -980,6 +930,13 @@ namespace XboxGamingBarHelper.AMD
                 // promptly when it wakes from Task.Delay.
                 _disposed = true;
                 Logger.Info("AMDManager: Disposing ADLX resources");
+                // [full-audit fix, 2026-07-20 — C5] Unsubscribe the mutual-exclusion PropertyChanged
+                // handlers and dispose the AntiLag/Boost/Chill settings + the AFMF v1 wrapper, which
+                // the previous teardown missed (they leaked their ADLX interfaces / left the handlers
+                // wired). Null-guarded: a partial init (no GPU) may not have created them.
+                if (amdRadeonAntiLagEnabled != null) amdRadeonAntiLagEnabled.PropertyChanged -= AmdRadeonAntiLagEnabled;
+                if (amdRadeonBoostEnabled != null) amdRadeonBoostEnabled.PropertyChanged -= AmdRadeonBoostEnabled;
+                if (amdRadeonChillEnabled != null) amdRadeonChillEnabled.PropertyChanged -= AmdRadeonChillEnabled;
                 adlxDisplayServices?.Dispose();
                 adlxInternalGPU?.Dispose();
                 adlxDedicatedGPU?.Dispose();
@@ -987,7 +944,11 @@ namespace XboxGamingBarHelper.AMD
                 adlx3DSettingsServices?.Dispose();
                 amdRadeonSuperResolutionSetting?.Dispose();
                 amdFluidMotionFrameSetting?.Dispose();
+                amdFluidMotionFrameSettingV1?.Dispose();
                 amdImageSharpeningSetting?.Dispose();
+                amdRadeonAntiLagSetting?.Dispose();
+                amdRadeonBoostSetting?.Dispose();
+                amdRadeonChillSetting?.Dispose();
                 amdDisplayCustomColorSetting?.Dispose();
                 adlxHelper?.Dispose();
                 Logger.Info("AMDManager: ADLX resources disposed");
@@ -1347,31 +1308,5 @@ namespace XboxGamingBarHelper.AMD
             }
         }
 
-        private static bool SetCurrentMetricsProfile(int metricOverlayState, int metricProfile)
-        {
-            try
-            {
-                using (RegistryKey subKey = AMD_PERFORMANCE_KEY_ROOT.OpenSubKey(AMD_PERFORMANCE_KEY_PATH))
-                {
-                    if (subKey != null)
-                    {
-                        subKey.SetValue(AMD_PERFORMANCE_STATE_KEY_NAME, metricOverlayState);
-                        subKey.SetValue(AMD_PERFORMANCE_PROFILE_KEY_NAME, metricProfile);
-                        Logger.Debug($"Set registry key '{AMD_PERFORMANCE_KEY_PATH}\\{AMD_PERFORMANCE_STATE_KEY_NAME}' to {metricOverlayState} and '{AMD_PERFORMANCE_KEY_PATH}\\{AMD_PERFORMANCE_PROFILE_KEY_NAME}' to {metricProfile}.");
-                        return true;
-                    }
-                    else
-                    {
-                        Logger.Warn($"Registry key '{AMD_PERFORMANCE_KEY_PATH}' not found.");
-                        return false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"An error occurred: {ex.Message}");
-                return false;
-            }
-        }
     }
 }

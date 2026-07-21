@@ -85,9 +85,6 @@ namespace XboxGamingBarHelper.Services
             public uint? OriginalSleepTimeoutAC { get; set; }
             public uint? OriginalSleepTimeoutDC { get; set; }
             public bool SleepTimeoutSaved { get; set; } = false;
-
-            // Scheduled task was created
-            public bool ScheduledTaskCreated { get; set; } = false;
         }
 
         /// <summary>
@@ -343,16 +340,6 @@ namespace XboxGamingBarHelper.Services
             Save();
 
             Logger.Info($"Saved original Sleep Timeout values: AC={currentAC}s, DC={currentDC}s");
-        }
-
-        /// <summary>
-        /// Marks that a scheduled task was created.
-        /// </summary>
-        public static void MarkScheduledTaskCreated()
-        {
-            Initialize();
-            _restoreData.ScheduledTaskCreated = true;
-            Save();
         }
 
         /// <summary>
@@ -728,37 +715,6 @@ namespace XboxGamingBarHelper.Services
             Logger.Info(resultText);
 
             return resultText;
-        }
-
-        /// <summary>
-        /// Gets a summary of what original values are saved.
-        /// </summary>
-        public static string GetSavedValuesStatus()
-        {
-            Initialize();
-
-            var status = new System.Text.StringBuilder();
-            status.AppendLine("Saved Original Values:");
-
-            if (_restoreData.CpuBoostSaved)
-                status.AppendLine($"  CPU Boost: AC={_restoreData.OriginalCpuBoostAC}, DC={_restoreData.OriginalCpuBoostDC}");
-            else
-                status.AppendLine("  CPU Boost: Not saved");
-
-            if (_restoreData.EppSaved)
-                status.AppendLine($"  EPP: AC={_restoreData.OriginalEppAC}, DC={_restoreData.OriginalEppDC}");
-            else
-                status.AppendLine("  EPP: Not saved");
-
-            if (_restoreData.DAServiceSaved)
-                status.AppendLine($"  DAService: Originally enabled={_restoreData.OriginalDAServiceEnabled}");
-            else
-                status.AppendLine("  DAService: Not saved");
-
-            status.AppendLine($"  Scheduled Task Created: {_restoreData.ScheduledTaskCreated}");
-            status.AppendLine($"  First Run: {_restoreData.FirstRunDate}");
-
-            return status.ToString();
         }
 
         /// <summary>
