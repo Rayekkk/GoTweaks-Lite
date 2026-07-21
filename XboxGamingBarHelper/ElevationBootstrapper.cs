@@ -378,36 +378,6 @@ namespace XboxGamingBarHelper
             }
         }
 
-        /// <summary>
-        /// Legacy method for direct UAC elevation (fallback).
-        /// </summary>
-        private static bool LaunchElevated(string exePath, string[] args)
-        {
-            try
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    Arguments = args.Length > 0 ? string.Join(" ", args) : "",
-                    UseShellExecute = true,
-                    Verb = "runas" // This triggers UAC
-                };
-
-                var process = Process.Start(startInfo);
-                return process != null;
-            }
-            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
-            {
-                // User cancelled UAC prompt
-                Logger.Warn("User cancelled UAC elevation prompt");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error launching elevated process");
-                return false;
-            }
-        }
 
         /// <summary>
         /// Removes the scheduled task. Call this during uninstall.

@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -392,67 +391,6 @@ namespace XboxGamingBar
             }
         }
 
-        /// <summary>
-        /// Loads the game icon for a saved profile.
-        /// Checks helper-extracted cache first, falls back to Steam lookup.
-        /// Returns a BitmapImage if found, null otherwise.
-        /// </summary>
-        private async Task<BitmapImage> LoadSavedProfileIconAsync(string exePath)
-        {
-            if (string.IsNullOrEmpty(exePath))
-                return null;
-
-            try
-            {
-                string iconPath = null;
-
-                // Priority 1: Check helper-extracted icon cache
-                var cachedIconPath = GetCachedIconPath(exePath);
-                if (!string.IsNullOrEmpty(cachedIconPath) && File.Exists(cachedIconPath))
-                {
-                    iconPath = cachedIconPath;
-                }
-                else
-                {
-                    // Priority 2: Fall back to Steam icon lookup
-                    var steamAppId = GetSteamAppIdFromPath(exePath);
-                    if (!string.IsNullOrEmpty(steamAppId))
-                    {
-                        iconPath = GetSteamIconPath(steamAppId);
-                    }
-                }
-
-                if (string.IsNullOrEmpty(iconPath) || !File.Exists(iconPath))
-                    return null;
-
-                // Load icon on UI thread using TaskCompletionSource
-                var tcs = new TaskCompletionSource<BitmapImage>();
-
-                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-                {
-                    try
-                    {
-                        var file = await StorageFile.GetFileFromPathAsync(iconPath);
-                        using (var stream = await file.OpenAsync(FileAccessMode.Read))
-                        {
-                            var bitmapImage = new BitmapImage();
-                            await bitmapImage.SetSourceAsync(stream);
-                            tcs.TrySetResult(bitmapImage);
-                        }
-                    }
-                    catch
-                    {
-                        tcs.TrySetResult(null);
-                    }
-                });
-
-                return await tcs.Task;
-            }
-            catch
-            {
-                return null;
-            }
-        }
 
         /// <summary>
         /// Gets the cached icon path for an executable from the helper's icon cache.

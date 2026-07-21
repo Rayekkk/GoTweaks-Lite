@@ -61,7 +61,5 @@ namespace XboxGamingBar
             return index == 3;
         }
 
-        /// <summary>Dropdown index of the "Custom" mode.</summary>
-        private int GetCustomTdpModeIndex() => 3;
     }
 }

@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -363,18 +362,6 @@ namespace XboxGamingBar
             }
         }
 
-        private Border FindParentCard(DependencyObject element)
-        {
-            while (element != null)
-            {
-                if (element is Border border && border.Style == (Style)Resources["CardStyle"])
-                {
-                    return border;
-                }
-                element = VisualTreeHelper.GetParent(element);
-            }
-            return null;
-        }
 
     }
 }

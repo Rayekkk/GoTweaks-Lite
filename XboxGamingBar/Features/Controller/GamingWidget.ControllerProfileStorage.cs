@@ -33,7 +33,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -635,25 +634,6 @@ namespace XboxGamingBar
             }
         }
 
-        private string FormatButtonMapping(ButtonMapping mapping)
-        {
-            if (mapping == null) return "none";
-            switch (mapping.Type)
-            {
-                case 0:
-                    if (mapping.GamepadMode == 1)
-                    {
-                        string actions = mapping.GamepadActions != null && mapping.GamepadActions.Count > 0
-                            ? string.Join("+", mapping.GamepadActions)
-                            : mapping.GamepadAction.ToString();
-                        return $"GP:Combo[{actions}] {(mapping.Turbo ? "Turbo" : "")}".Trim();
-                    }
-                    return $"GP:{mapping.GamepadAction}{(mapping.Turbo ? " Turbo" : "")}";
-                case 1: return $"KB:[{string.Join(",", mapping.KeyboardKeys)}]";
-                case 2: return $"MS:{mapping.MouseButton}";
-                default: return "?";
-            }
-        }
 
         private void ApplyButtonMappingToUI(string buttonName, ButtonMapping mapping)
         {

@@ -727,8 +727,6 @@ namespace XboxGamingBarHelper.Labs
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CancelIo(SafeFileHandle hFile);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CancelIoEx(SafeFileHandle hFile, IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool ResetEvent(IntPtr hEvent);

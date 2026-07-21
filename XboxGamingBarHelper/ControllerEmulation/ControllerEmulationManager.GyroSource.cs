@@ -9,7 +9,6 @@ using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.Devices;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Labs;
 using XboxGamingBarHelper.Settings;
@@ -301,25 +300,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
             }
         }
 
-        private void UpdateVirtualXboxBridgeDeviceIds(IReadOnlyCollection<string> bridgeIdsBeforeVirtualConnect)
-        {
-            virtualXboxBridgeDeviceIds.Clear();
-
-            var before = bridgeIdsBeforeVirtualConnect == null
-                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                : new HashSet<string>(bridgeIdsBeforeVirtualConnect, StringComparer.OrdinalIgnoreCase);
-
-            IReadOnlyCollection<string> after = ControllerSuppressionManager.QueryXboxBridgeDeviceIds();
-            foreach (string id in after)
-            {
-                if (!before.Contains(id))
-                {
-                    virtualXboxBridgeDeviceIds.Add(id);
-                }
-            }
-
-            Logger.Info($"Controller emulation tracked virtual Xbox bridge HID instance count: {virtualXboxBridgeDeviceIds.Count}");
-        }
 
         private void DisableSuppression()
         {

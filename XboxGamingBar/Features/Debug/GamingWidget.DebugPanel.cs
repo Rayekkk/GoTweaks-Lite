@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -278,40 +277,6 @@ namespace XboxGamingBar
             }
         }
 
-        /// <summary>
-        /// Compares two version strings (e.g., "v0.3.902" vs "v0.3.1001.0").
-        /// Returns true if latestVersion is newer than currentVersion.
-        /// </summary>
-        private bool IsNewerVersion(string latestVersion, string currentVersion)
-        {
-            // Strip 'v' prefix if present
-            var latest = latestVersion.TrimStart('v', 'V');
-            var current = currentVersion.TrimStart('v', 'V');
-
-            // Split into parts
-            var latestParts = latest.Split('.');
-            var currentParts = current.Split('.');
-
-            // Compare each part numerically
-            int maxLength = Math.Max(latestParts.Length, currentParts.Length);
-            for (int i = 0; i < maxLength; i++)
-            {
-                int latestNum = 0;
-                int currentNum = 0;
-
-                if (i < latestParts.Length && int.TryParse(latestParts[i], out int lp))
-                    latestNum = lp;
-                if (i < currentParts.Length && int.TryParse(currentParts[i], out int cp))
-                    currentNum = cp;
-
-                if (latestNum > currentNum)
-                    return true;
-                if (latestNum < currentNum)
-                    return false;
-            }
-
-            return false; // Versions are equal
-        }
 
         /// <summary>
         /// Pulls the dotted build version out of a release asset filename

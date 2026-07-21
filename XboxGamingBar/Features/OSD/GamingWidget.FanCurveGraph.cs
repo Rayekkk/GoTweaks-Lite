@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -122,10 +121,6 @@ namespace XboxGamingBar
             }
         }
 
-        // Stub kept so per-edit code paths still compile. With per-mode storage, manual
-        // curve edits stick in whatever mode is selected in the dropdown — no separate
-        // "Custom preset" concept anymore.
-        private void SwitchToCustomPreset() { }
 
         // Auto-jump: when the running power mode changes externally (Lenovo button,
         // TDP card, helper push), jump the dropdown to the new active mode so the
@@ -279,9 +274,6 @@ namespace XboxGamingBar
         private bool IsViewingActiveFanCurveMode()
             => legionPerformanceMode != null && legionPerformanceMode.Value == selectedFanCurveMode;
 
-        // Legacy preset-name persistence is obsolete now (we don't store a "preset name"
-        // separately from power mode). Kept as a no-op so older code paths don't crash.
-        private void SaveFanCurvePresetSetting(string presetName) { }
 
         // Legacy: persisted preset name was used by the old preset dropdown
         // (Silent/Balanced/Performance/MaxCooling/Custom). The dropdown is now keyed

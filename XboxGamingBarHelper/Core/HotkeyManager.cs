@@ -46,9 +46,6 @@ namespace XboxGamingBarHelper.Core
         private static extern bool DestroyWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
-        private static extern bool GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
-
-        [DllImport("user32.dll")]
         private static extern bool TranslateMessage(ref MSG lpMsg);
 
         [DllImport("user32.dll")]
@@ -61,9 +58,6 @@ namespace XboxGamingBarHelper.Core
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         // UIPI (User Interface Privilege Isolation) - allow WM_HOTKEY through elevation boundary
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool ChangeWindowMessageFilterEx(IntPtr hwnd, uint message, uint action, IntPtr changeFilterStruct);
-
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool ChangeWindowMessageFilter(uint message, uint dwFlag);
 

@@ -21,7 +21,6 @@ using Windows.UI.Input.Preview.Injection;
 using XboxGamingBarHelper.AMD;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.ControllerEmulation;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.LosslessScaling;
 using XboxGamingBarHelper.OnScreenDisplay;
@@ -210,89 +209,6 @@ namespace XboxGamingBarHelper
             }
         }
 
-        /// <summary>
-        /// Parses global widget settings from a serialized ValueSet XML string.
-        /// The widget sends settings as a ValueSet serialized to XML.
-        /// </summary>
-        private static Shared.Data.GlobalWidgetSettings ParseGlobalSettingsFromValueSet(string valueSetXml)
-        {
-            // The widget sends a compact XML representation of a ValueSet
-            // We need to extract the key-value pairs and build a GlobalWidgetSettings object
-            var gs = new Shared.Data.GlobalWidgetSettings();
-
-            try
-            {
-                // Parse the XML to extract values
-                var doc = new System.Xml.XmlDocument();
-                doc.LoadXml(valueSetXml);
-
-                // Helper to get int value
-                int? GetInt(string key)
-                {
-                    var node = doc.SelectSingleNode($"//*[local-name()='{key}']");
-                    if (node != null && int.TryParse(node.InnerText, out int val))
-                        return val;
-                    return null;
-                }
-
-                // Helper to get string value
-                string GetString(string key)
-                {
-                    var node = doc.SelectSingleNode($"//*[local-name()='{key}']");
-                    return node?.InnerText;
-                }
-
-                // Legion Button Remapping
-                gs.LegionL_Action = GetInt("LegionL_Action");
-                gs.LegionL_Shortcut = GetString("LegionL_Shortcut");
-                gs.LegionL_Command = GetString("LegionL_Command");
-                gs.LegionR_Action = GetInt("LegionR_Action");
-                gs.LegionR_Shortcut = GetString("LegionR_Shortcut");
-                gs.LegionR_Command = GetString("LegionR_Command");
-
-                // Scroll Wheel Remapping
-                gs.Scroll_Action = GetInt("Scroll_Action");
-                gs.Scroll_Shortcut = GetString("Scroll_Shortcut");
-                gs.Scroll_Command = GetString("Scroll_Command");
-                gs.ScrollClick_Action = GetInt("ScrollClick_Action");
-                gs.ScrollClick_Shortcut = GetString("ScrollClick_Shortcut");
-                gs.ScrollClick_Command = GetString("ScrollClick_Command");
-
-                // OSD Customization
-                gs.OSD_TextSize = GetInt("OSD_TextSize");
-                gs.OSD_TextColor = GetString("OSD_TextColor");
-                gs.OSD_LabelColor = GetString("OSD_LabelColor");
-                gs.OSD_Opacity = GetInt("OSD_Opacity");
-
-                // OSD Level Configuration - Order
-                gs.OSD_L1_Order = GetString("OSD_L1_Order");
-                gs.OSD_L2_Order = GetString("OSD_L2_Order");
-                gs.OSD_L3_Order = GetString("OSD_L3_Order");
-
-                // OSD Level Configuration - Enabled items
-                gs.OSD_L1_Enabled = GetString("OSD_L1_Enabled");
-                gs.OSD_L2_Enabled = GetString("OSD_L2_Enabled");
-                gs.OSD_L3_Enabled = GetString("OSD_L3_Enabled");
-
-                // OSD Level Configuration - Per-item colors
-                gs.OSD_L1_ItemColors = GetString("OSD_L1_ItemColors");
-                gs.OSD_L2_ItemColors = GetString("OSD_L2_ItemColors");
-                gs.OSD_L3_ItemColors = GetString("OSD_L3_ItemColors");
-
-                // OSD Level Configuration - Columns
-                gs.OSD_L1_Columns = GetInt("OSD_L1_Columns");
-                gs.OSD_L2_Columns = GetInt("OSD_L2_Columns");
-                gs.OSD_L3_Columns = GetInt("OSD_L3_Columns");
-
-                Logger.Info($"Parsed global settings: LegionL={gs.LegionL_Action}, LegionR={gs.LegionR_Action}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Error parsing global settings XML: {ex.Message}");
-            }
-
-            return gs;
-        }
 
         /// <summary>
         /// Export all per-game profiles to a folder on the Desktop.

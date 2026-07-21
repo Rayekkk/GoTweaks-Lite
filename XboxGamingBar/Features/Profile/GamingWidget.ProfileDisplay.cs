@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -410,22 +409,6 @@ namespace XboxGamingBar
             return GetLegionModeShortName(profile.LegionPerformanceMode);
         }
 
-        /// <summary>
-        /// Gets the TDPModeComboBox index from a profile, accounting for custom presets.
-        /// Returns the index to use for TDPModeComboBox.SelectedIndex.
-        /// </summary>
-        private int GetProfileTDPModeIndex(PerformanceProfile profile)
-        {
-            // If TDPModeIndex is set, use it directly
-            if (profile.TDPModeIndex >= 0 && profile.TDPModeIndex <= 3)
-            {
-                return profile.TDPModeIndex;
-            }
-            // Fall back to legacy: convert LegionPerformanceMode to index
-            int[] modeValues = { 1, 2, 3, 255 }; // Quiet, Balanced, Performance, Custom
-            int index = Array.IndexOf(modeValues, profile.LegionPerformanceMode);
-            return index >= 0 ? index : 1; // Default to Balanced if not found
-        }
 
     }
 }

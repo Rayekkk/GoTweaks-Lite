@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -548,21 +547,6 @@ namespace XboxGamingBar
             // Description text removed in consolidated Special Remapping card
         }
 
-        private string GetCommandDisplayName(string commandPath)
-        {
-            if (string.IsNullOrEmpty(commandPath))
-                return null;
-            // Show just the exe name if it's a path
-            try
-            {
-                var fileName = System.IO.Path.GetFileName(commandPath.Split(' ')[0]);
-                return !string.IsNullOrEmpty(fileName) ? fileName : commandPath;
-            }
-            catch
-            {
-                return commandPath;
-            }
-        }
 
         private async Task RequestLegionRemapSettingsFromHelperAsync()
         {

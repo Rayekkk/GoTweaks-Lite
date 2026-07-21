@@ -175,9 +175,8 @@ namespace XboxGamingBar
 
         /// <summary>
         /// In Always-On mode (index 0) the activation button doesn't matter — gyro
-        /// is on whenever the master enable is true. Mirror legacy CE's behavior at
-        /// GpdTabCallbacks.cs:247-249 by disabling the button picker so the user
-        /// isn't fooled into thinking it's wired up.
+        /// is on whenever the master enable is true. Disable the button picker so the
+        /// user isn't fooled into thinking it's wired up.
         /// </summary>
         private void UpdateActivationButtonEnabledState()
         {
@@ -944,15 +943,6 @@ namespace XboxGamingBar
         }
 
         private static string FormatSensitivity(double v) => $"{v / 100.0:F2}x";
-        private static string FormatDegPerSec(double v) => $"{v:F0}°/s";
-        private static string FormatPercent(double v) => $"{v:F0}%";
-        private static string FormatPowerCurve(double v) => $"{v / 100.0:F1}";
-        private static string FormatPrecisionSpeed(double v) => v <= 0 ? "Off" : $"{v:F0}°/s";
-        private static string FormatOutputMix(double v)
-        {
-            if (Math.Abs(v) < 0.5) return "Balanced";
-            return v > 0 ? $"Horizontal {v:F0}%" : $"Vertical {-v:F0}%";
-        }
 
         /// <summary>
         /// Show/hide the Gyro → Right Stick section based on the currently

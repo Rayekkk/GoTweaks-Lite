@@ -196,34 +196,6 @@ namespace XboxGamingBarHelper.Devices
             }
         }
 
-        /// <summary>
-        /// Queries Win32_ComputerSystemProduct for Vendor, Name, and Version
-        /// </summary>
-        [Obsolete("Use QueryDeviceInfoCombined instead for better performance")]
-        private static void QueryComputerSystemProduct(DeviceInfo deviceInfo)
-        {
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher("SELECT Vendor, Name, Version FROM Win32_ComputerSystemProduct"))
-                {
-                    searcher.Options.Timeout = TimeSpan.FromSeconds(5);
-
-                    foreach (var obj in searcher.Get())
-                    {
-                        deviceInfo.Manufacturer = obj["Vendor"]?.ToString()?.Trim() ?? "Unknown";
-                        deviceInfo.Model = obj["Name"]?.ToString()?.Trim() ?? "Unknown";
-                        deviceInfo.Version = obj["Version"]?.ToString()?.Trim() ?? "Unknown";
-                        break; // Only one result expected
-                    }
-                }
-
-                Logger.Debug($"Win32_ComputerSystemProduct: Vendor={deviceInfo.Manufacturer}, Name={deviceInfo.Model}, Version={deviceInfo.Version}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to query Win32_ComputerSystemProduct: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// Applies debug overrides from debug.json if present in LocalState folder.
@@ -339,32 +311,6 @@ namespace XboxGamingBarHelper.Devices
             }
         }
 
-        /// <summary>
-        /// Queries Win32_ComputerSystem for SystemFamily
-        /// </summary>
-        [Obsolete("Use QueryDeviceInfoCombined instead for better performance")]
-        private static void QueryComputerSystem(DeviceInfo deviceInfo)
-        {
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher("SELECT SystemFamily FROM Win32_ComputerSystem"))
-                {
-                    searcher.Options.Timeout = TimeSpan.FromSeconds(5);
-
-                    foreach (var obj in searcher.Get())
-                    {
-                        deviceInfo.SystemFamily = obj["SystemFamily"]?.ToString()?.Trim() ?? "Unknown";
-                        break; // Only one result expected
-                    }
-                }
-
-                Logger.Debug($"Win32_ComputerSystem: SystemFamily={deviceInfo.SystemFamily}");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to query Win32_ComputerSystem: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// Logs detailed device information

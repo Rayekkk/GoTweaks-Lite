@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -842,17 +841,6 @@ namespace XboxGamingBar
             return long.MinValue;
         }
 
-        private static string FormatRelativeTime(DateTime utc)
-        {
-            var diff = DateTime.UtcNow - utc;
-            if (diff.TotalSeconds < 60) return "just now";
-            if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
-            if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
-            if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
-            if (diff.TotalDays < 30) return $"{(int)(diff.TotalDays / 7)}w ago";
-            if (diff.TotalDays < 365) return $"{(int)(diff.TotalDays / 30)}mo ago";
-            return utc.ToLocalTime().ToString("yyyy-MM-dd");
-        }
 
     }
 }
