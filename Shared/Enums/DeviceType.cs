@@ -27,22 +27,10 @@ namespace Shared.Enums
         /// </summary>
         LegionGoS = 3,
 
-        /// <summary>
-        /// GPD Win Mini - Models: G1617
-        /// Supports fan control
-        /// </summary>
+        // RESERVED - GPD support removed 2026-07-20 (Legion-only build). Members kept: explicit
+        // numeric values, no longer detected by DeviceDetector but preserved for wire/profile compat.
         GPDWinMini = 50,
-
-        /// <summary>
-        /// GPD Win 4 Series - Models: G1618-04
-        /// Supports fan control
-        /// </summary>
         GPDWin4 = 51,
-
-        /// <summary>
-        /// GPD Win 5 - Models: G1618-05
-        /// Supports fan control
-        /// </summary>
         GPDWin5 = 52,
 
         // Future device types can be added here:

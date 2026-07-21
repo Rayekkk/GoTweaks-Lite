@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -924,17 +923,13 @@ namespace XboxGamingBar
                     ceTile.TileButton.Background = enabled ? tileOnBrush : tileOffBrush;
                 }
 
-                // Fan Full Speed tile (Legion or GPD)
+                // Fan Full Speed tile (Legion)
                 if (qsTileMap.TryGetValue("LegionFanFullSpeed", out var fanFullSpeedTile) && fanFullSpeedTile.TileButton != null)
                 {
                     bool enabled = false;
                     if (legionGoDetected?.Value == true)
                     {
                         enabled = legionFanFullSpeed?.Value ?? false;
-                    }
-                    else if (gpdDetected?.Value == true)
-                    {
-                        enabled = gpdFanMaxActive;
                     }
                     fanFullSpeedTile.StateText.Text = enabled ? "On" : "Off";
                     fanFullSpeedTile.StateText.Foreground = enabled ? accentForeground : offForeground;

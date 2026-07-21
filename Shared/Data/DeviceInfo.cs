@@ -73,7 +73,7 @@ namespace Shared.Data
         public bool HasDetachableControllers { get; set; } = false;
 
         /// <summary>
-        /// Whether this device supports fan control (e.g., GPD devices)
+        /// Whether this device supports fan control (e.g., Legion Go 2)
         /// </summary>
         public bool SupportsFanControl { get; set; } = false;
 

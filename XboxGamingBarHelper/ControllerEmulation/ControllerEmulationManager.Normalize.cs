@@ -9,7 +9,6 @@ using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.Devices;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Labs;
 using XboxGamingBarHelper.Settings;
@@ -28,7 +27,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 case SharedDeviceType.LegionGo:
                 case SharedDeviceType.LegionGo2:
                 case SharedDeviceType.LegionGoS:
-                case SharedDeviceType.GPDWin5:
                     return true;
                 default:
                     return false;
@@ -319,14 +317,9 @@ namespace XboxGamingBarHelper.ControllerEmulation
                     hideTarget = 0;
                 }
 
-                // Prefer new handheld-agnostic keys, fall back to legacy GPD keys.
                 if (LocalSettingsHelper.TryGetValue("ControllerEmulationGyroSource", out int savedGyroSource))
                 {
                     gyroSource = NormalizeGyroSource(savedGyroSource);
-                }
-                else if (LocalSettingsHelper.TryGetValue("GPDControllerEmulationGyroSource", out int legacyGyroSource))
-                {
-                    gyroSource = NormalizeGyroSource(legacyGyroSource);
                 }
                 else
                 {
@@ -336,10 +329,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 if (LocalSettingsHelper.TryGetValue("ControllerEmulationMode", out int savedMode))
                 {
                     mode = NormalizeMode(savedMode);
-                }
-                else if (LocalSettingsHelper.TryGetValue("GPDControllerEmulationMode", out int legacyMode))
-                {
-                    mode = NormalizeMode(legacyMode);
                 }
                 else
                 {
@@ -718,10 +707,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
                 LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTouchDeactivateThreshold", stickGyroTouchDeactivateThreshold);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickGyroTouchDeactivateHoldoff", stickGyroTouchDeactivateHoldoff);
                 LocalSettingsHelper.SetValue("ControllerEmulationStickGyroSmoothing", stickGyroSmoothing);
-
-                // Keep legacy keys in sync for compatibility with older builds.
-                LocalSettingsHelper.SetValue("GPDControllerEmulationGyroSource", gyroSource);
-                LocalSettingsHelper.SetValue("GPDControllerEmulationMode", mode);
             }
             catch (Exception ex)
             {

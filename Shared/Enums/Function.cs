@@ -195,7 +195,8 @@
         // Legion Go Touchpad Vibration (GLOBAL setting)
         LegionTouchpadVibration,        // bool - on/off toggle for touchpad haptics
 
-        // GPD specific functions
+        // RESERVED - GPD support removed 2026-07-20 (Legion-only build). Ordinals kept: positional
+        // wire ids, deleting shifts every later value and breaks the pipe protocol + old profiles (see §7).
         GPDDetected,                    // bool - whether a GPD device is detected (Win Mini, Win 4, etc.)
         GPDWin5Connected,               // bool - whether GPD Win 5 HID controller is connected
         GPDRestoreDefaults,             // bool - trigger to restore default button mappings on Win 5
@@ -209,7 +210,7 @@
         GPDFanCurveVisible,             // bool - graph is visible (triggers temp pushes)
         GPDCPUTemp,                     // int - CPU temp pushed to widget for graph
 
-        // GPD Win 5 Button Remapping (ushort keycodes using GPDWin5Keycodes values)
+        // RESERVED - GPD Win 5 Button Remapping (removed 2026-07-20; ordinals kept per §7)
         GPDButtonA,                     // ushort - A button keycode
         GPDButtonB,                     // ushort - B button keycode
         GPDButtonX,                     // ushort - X button keycode
@@ -340,7 +341,7 @@
 
         // System Restore (for clean uninstall)
         PrepareForUninstall,            // Trigger: restore original system values and remove scheduled task
-        SystemRestoreStatus,            // string - status of saved original values (read-only)
+        SystemRestoreStatus,            // RESERVED - status readout removed 2026-07-21 (no consumer); ordinal kept per §7
 
         // Import/Export (comprehensive backup/restore)
         ExportAllData,                  // Trigger: export profiles, settings, Q-learning model to Desktop folder
@@ -364,7 +365,7 @@
         AutoHibernateIdleMinutes,       // RESERVED - int
         AutoHibernateMode,              // RESERVED - int
 
-        // GPD Controller Emulation
+        // RESERVED - GPD Controller Emulation (removed 2026-07-20; ordinals kept per §7)
         GPDGyroSource,                  // int - gyro source (0=Internal Handheld, 1=Controller Internal)
         GPDGyroSimulateMode,            // int - gyro simulation mode (0=Mouse, 1=XboxStick, 2=PS4Motion, 3=PS4Stick)
         GPDApplyMappings,               // bool - trigger to apply staged GPD Win 5 button mappings
@@ -401,7 +402,7 @@
         ControllerEmulationGyroActivationButton, // int - activation button mapping (0=None, 1=RT, 2=LT, ...)
         ControllerEmulationImprovedInput, // bool - Legion Go/Go2 HID gamepad-read path to avoid XInput blocking in Game Bar/FSE
 
-        // GPD Win 5 HID diagnostics/configuration (appended to preserve prior enum values)
+        // RESERVED - GPD Win 5 HID diagnostics/configuration (removed 2026-07-20; ordinals kept per §7)
         GPDWin5HidDebug,              // bool - enable verbose Win 5 HID TX/RX debug logging
         GPDWin5HidDevices,            // string - JSON array of deterministic Win 5 HID candidate interfaces
         ControllerEmulationRumbleProfile, // int - rumble response profile (0=Balanced, 1=Sharp, 2=Soft, 3=Impact, 4=Boosted)

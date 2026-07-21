@@ -138,10 +138,6 @@
     <Compile Include="Data\IsForegroundProperty.cs" />
     <Compile Include="Data\MaxCPUStateProperty.cs" />
     <Compile Include="Data\MinCPUStateProperty.cs" />
-    <!-- GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1) -->
-    <!--<Compile Include="Data\LimitGPUClockProperty.cs" />
-    <Compile Include="Data\GPUClockMinProperty.cs" />
-    <Compile Include="Data\GPUClockMaxProperty.cs" />-->
     <Compile Include="Data\CPUEPPProperty.cs" />
     <Compile Include="Data\LosslessScaling\LosslessScalingInstalledProperty.cs" />
     <Compile Include="Data\LosslessScaling\LosslessScalingRunningProperty.cs" />
@@ -174,19 +170,6 @@
     <Compile Include="Data\LosslessScaling\LosslessScalingMaxFrameLatencyProperty.cs" />
     <Compile Include="Data\LosslessScaling\LosslessScalingLS1SharpnessProperty.cs" />
     <Compile Include="Data\Legion\LegionGoDetectedProperty.cs" />
-    <Compile Include="Data\GPD\GPDDetectedProperty.cs" />
-    <Compile Include="Data\GPD\GPDWin5ConnectedProperty.cs" />
-    <Compile Include="Data\GPD\GPDDeviceNameProperty.cs" />
-    <Compile Include="Data\GPD\GPDSupportsFanControlProperty.cs" />
-    <Compile Include="Data\GPD\GPDFanSpeedProperty.cs" />
-    <Compile Include="Data\GPD\GPDFanRPMProperty.cs" />
-    <Compile Include="Data\GPD\GPDFanModeProperty.cs" />
-    <Compile Include="Data\GPD\GPDFanCurveProperty.cs" />
-    <Compile Include="Data\GPD\GPDButtonProperty.cs" />
-    <Compile Include="Data\GPD\GPDRestoreDefaultsProperty.cs" />
-    <Compile Include="Data\GPD\GPDApplyMappingsProperty.cs" />
-    <Compile Include="Data\GPD\GPDButtonL4Property.cs" />
-    <Compile Include="Data\GPD\GPDButtonR4Property.cs" />
     <Compile Include="Data\Controller\ControllerEmulationProperties.cs" />
     <Compile Include="Data\Legion\LegionTouchpadEnabledProperty.cs" />
     <Compile Include="Data\Legion\LegionLightModeProperty.cs" />
@@ -284,7 +267,6 @@
     <Compile Include="Data\Base\WidgetProperty.cs" />
     <Compile Include="Data\Base\WidgetPropertyWithAdditionalUI.cs" />
     <Compile Include="Data\Base\WidgetToggleProperty.cs" />
-    <Compile Include="Event\BackgroundTaskCancellationEventArgs.cs" />
     <Compile Include="IPC\NamedPipeClient.cs" />
     <Compile Include="GamingWidget.xaml.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
@@ -391,7 +373,7 @@
     <Compile Include="Features\Controller\GamingWidget.NintendoLayoutPreset.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Features\Devices\GamingWidget.GpdFanCurve.cs">
+    <Compile Include="Features\Controller\GamingWidget.ControllerEmulationUi.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Hotkeys\GamingWidget.KeyDropdowns.cs">
@@ -413,12 +395,6 @@
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Performance\GamingWidget.TdpCustomPresets.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Devices\GamingWidget.GpdTabCallbacks.cs">
-      <DependentUpon>GamingWidget.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Features\Devices\GamingWidget.GpdTabEventHandlers.cs">
       <DependentUpon>GamingWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="Features\Controller\GamingWidget.GamepadButtonRemapping.cs">

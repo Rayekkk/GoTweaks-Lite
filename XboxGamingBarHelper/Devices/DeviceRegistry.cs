@@ -1,7 +1,6 @@
 using NLog;
 using Shared.Data;
 using System.Collections.Generic;
-using XboxGamingBarHelper.Devices.GPD;
 using XboxGamingBarHelper.Devices.LegionGo;
 using XboxGamingBarHelper.Devices.LegionGo2;
 using XboxGamingBarHelper.Devices.LegionGoS;
@@ -27,15 +26,7 @@ namespace XboxGamingBarHelper.Devices
             new LegionGoSConfig(),   // Check Go S before original Go
             new LegionGoConfig(),    // Original Legion Go
 
-            // GPD devices (check Win Mini before Win 4/5 as Win Mini has more specific model)
-            new GPDWinMiniConfig(),  // GPD Win Mini (G1617)
-            new GPDWin4Config(),     // GPD Win 4 Series (G1618-04)
-            new GPDWin5Config(),     // GPD Win 5 (G1618-05)
-
-            // Future devices can be added here:
-            // new ROGAllyConfig(),
-            // new SteamDeckConfig(),
-            // new AyaNeoConfig(),
+            // [GPD removed 2026-07-20 — Legion-only build]
         };
 
         /// <summary>

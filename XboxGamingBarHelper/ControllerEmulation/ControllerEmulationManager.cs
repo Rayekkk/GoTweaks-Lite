@@ -9,7 +9,6 @@ using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.Devices;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Labs;
 using XboxGamingBarHelper.Settings;
@@ -110,7 +109,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
         /// </summary>
         internal ControllerSuppressionManager SuppressionManager => suppressionManager;
 
-        /// <summary>The detected handheld device type (Legion Go, GPD, etc.).</summary>
+        /// <summary>The detected handheld device type (Legion Go / Go 2 / Go S).</summary>
         internal SharedDeviceType HandheldDeviceType => deviceType;
 
         /// <summary>Current HideTarget setting (0=all gamepads, 1=matching VID:PID only, etc.).</summary>
@@ -489,7 +488,7 @@ namespace XboxGamingBarHelper.ControllerEmulation
             }
         }
 
-        public ControllerEmulationManager(LegionManager inLegionManager, GPDManager inGpdManager, SettingsManager inSettingsManager)
+        public ControllerEmulationManager(LegionManager inLegionManager, SettingsManager inSettingsManager)
         {
             activeInstance = this;
             suppressionManager = new ControllerSuppressionManager();

@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -191,7 +190,6 @@ namespace XboxGamingBar
                 AMDScrollViewer.Visibility = Visibility.Collapsed;
                 ScalingScrollViewer.Visibility = Visibility.Collapsed;
                 LegionScrollViewer.Visibility = Visibility.Collapsed;
-                GPDScrollViewer.Visibility = Visibility.Collapsed;
                 SystemScrollViewer.Visibility = Visibility.Collapsed;
 
                 // Stop fan curve updates when leaving Legion tab (will be re-enabled if Legion is selected)
@@ -240,10 +238,6 @@ namespace XboxGamingBar
                         UpdateTaskViewFixStatus();
                         // Force remap UI refresh when Legion tab becomes active.
                         RefreshLegionEnhancedRemapUi();
-                        break;
-                    case "GPD":
-                        GPDScrollViewer.Visibility = Visibility.Visible;
-                        GPDScrollViewer.ChangeView(null, 0, null, true);
                         break;
                     case "System":
                         SystemScrollViewer.Visibility = Visibility.Visible;
@@ -361,7 +355,6 @@ namespace XboxGamingBar
             if (GraphicsNavItem.FocusState != FocusState.Unfocused) return true;
             if (ScalingNavItem.FocusState != FocusState.Unfocused) return true;
             if (LegionNavItem.FocusState != FocusState.Unfocused) return true;
-            if (GPDNavItem.FocusState != FocusState.Unfocused) return true;
             if (SystemNavItem.FocusState != FocusState.Unfocused) return true;
 
             // Fallback: walk visual tree for other nav-related elements
@@ -432,7 +425,6 @@ namespace XboxGamingBar
                 case "AMD": return AMDScrollViewer;
                 case "Scaling": return ScalingScrollViewer;
                 case "Legion": return LegionScrollViewer;
-                case "GPD": return GPDScrollViewer;
                 case "System": return SystemScrollViewer;
                 default: return null;
             }

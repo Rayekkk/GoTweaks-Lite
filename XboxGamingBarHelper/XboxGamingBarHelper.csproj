@@ -448,7 +448,6 @@
     <Compile Include="LosslessScaling\Properties\LosslessScalingProperties.cs" />
     <Compile Include="AMD\Settings\AMDFluidMotionFrameSetting.cs" />
     <Compile Include="AMD\Settings\AMDFluidMotionFrameSettingV1.cs" />
-    <Compile Include="AMD\Settings\AMDVariableGraphicsMemorySetting.cs" />
     <Compile Include="AMD\Settings\AMDRadeonAntiLagSetting.cs" />
     <Compile Include="AMD\Settings\AMDRadeonBoostSetting.cs" />
     <Compile Include="AMD\Settings\AMDRadeonChillSetting.cs" />
@@ -499,10 +498,6 @@
     <Compile Include="Power\CPUBoostProperty.cs" />
     <Compile Include="Power\MaxCPUStateProperty.cs" />
     <Compile Include="Power\MinCPUStateProperty.cs" />
-    <!-- GPU Clock - DISABLED: Not supported by RyzenAdj on this hardware (returns error -1) -->
-    <!--<Compile Include="Power\LimitGPUClockProperty.cs" />
-    <Compile Include="Power\GPUClockMinProperty.cs" />
-    <Compile Include="Power\GPUClockMaxProperty.cs" />-->
     <Compile Include="Power\CPUEPPProperty.cs" />
     <Compile Include="Power\OSPowerModeProperty.cs" />
     <Compile Include="Power\PowerButtonActionProperty.cs" />
@@ -572,9 +567,6 @@
     <Compile Include="ControllerEmulation\Viiper\LibViiper.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperService.cs" />
     <Compile Include="ControllerEmulation\Viiper\UsbipCli.cs" />
-    <Compile Include="ControllerEmulation\Viiper\ViiperModels.cs" />
-    <Compile Include="ControllerEmulation\Viiper\VirtualButtonNames.cs" />
-    <Compile Include="ControllerEmulation\Viiper\InputStateSnapshot.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperEmulationManager.cs" />
     <Compile Include="ControllerEmulation\Viiper\XInputNative.cs" />
     <Compile Include="ControllerEmulation\Viiper\ViiperInputForwarder.cs" />
@@ -648,9 +640,6 @@
     <Compile Include="Devices\LegionGo\LegionGoConfig.cs" />
     <Compile Include="Devices\LegionGo2\LegionGo2Config.cs" />
     <Compile Include="Devices\LegionGoS\LegionGoSConfig.cs" />
-    <Compile Include="Devices\GPD\GPDWinMiniConfig.cs" />
-    <Compile Include="Devices\GPD\GPDWin4Config.cs" />
-    <Compile Include="Devices\GPD\GPDWin5Config.cs" />
     <Compile Include="Devices\Libraries\Legion\LegionGoController.cs" />
     <Compile Include="Devices\Libraries\Legion\LegionGoSController.cs" />
     <Compile Include="Devices\Libraries\Legion\LegionGoLibrary.cs" />
@@ -665,12 +654,6 @@
     <Compile Include="Devices\Libraries\Legion\LegionManager.ControllerBattery.cs" />
     <Compile Include="Devices\Libraries\Legion\LegionGo2EcAccess.cs" />
     <Compile Include="Devices\Libraries\Legion\LegionProperties.cs" />
-    <Compile Include="Devices\EC\EcController.cs" />
-    <Compile Include="Devices\Libraries\GPD\GPDManager.cs" />
-    <Compile Include="Devices\Libraries\GPD\GPDProperties.cs" />
-    <Compile Include="Devices\Libraries\GPD\GPDFanController.cs" />
-    <Compile Include="Devices\Libraries\GPD\GPDWin5Controller.cs" />
-    <Compile Include="Devices\Libraries\GPD\GPDWin5Keycodes.cs" />
     <Compile Include="ControllerEmulation\ControllerEmulationManager.cs" />
     <Compile Include="ControllerEmulation\ControllerEmulationManager.Setters.cs" />
     <Compile Include="ControllerEmulation\ControllerEmulationStartupLock.cs" />

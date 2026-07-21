@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.UI;
 using XboxGamingBar.Data;
-using XboxGamingBar.Event;
 using XboxGamingBar.IPC;
 using Shared.Enums;
 
@@ -408,7 +407,7 @@ namespace XboxGamingBar
             }
 
             // Skip Controller Emulation tile if helper has reported the backend as unavailable
-            // (handheld-agnostic emulation requires LegionGo / GPD / similar, gated by the helper).
+            // (emulation requires a supported Legion controller, gated by the helper).
             if (tile.Id == "ControllerEmulation" && (controllerEmulationAvailable?.Value != true))
             {
                 return true;

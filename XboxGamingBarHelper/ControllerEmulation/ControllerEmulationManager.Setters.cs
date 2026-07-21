@@ -9,7 +9,6 @@ using Shared.Data;
 using Shared.Enums;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.Devices;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.Labs;
 using XboxGamingBarHelper.Settings;

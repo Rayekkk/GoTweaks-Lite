@@ -1,119 +1,16 @@
-using Microsoft.Gaming.XboxGameBar;
-using Microsoft.Gaming.XboxGameBar.Input;
-using Microsoft.UI.Xaml.Controls;
 using NLog;
-using Shared.Data;
-using Shared.Utilities;
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Windows.ApplicationModel;
-using Windows.Data.Json;
-using Windows.Foundation;
-using Windows.Foundation.Metadata;
-using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Media.Animation;
-using Windows.UI.Xaml.Media.Imaging;
-using Windows.UI.Xaml.Navigation;
-using Windows.System.Power;
-using Windows.Storage;
-using Windows.System;
-using Windows.UI.Xaml.Input;
-using System.Runtime.InteropServices;
-using Windows.UI;
-using XboxGamingBar.Data;
-using XboxGamingBar.Event;
-using XboxGamingBar.IPC;
-using Shared.Enums;
 
 namespace XboxGamingBar
 {
     public sealed partial class GamingWidget
     {
-        /// <summary>
-        /// Sets GPD tab visibility based on device detection.
-        /// </summary>
-        private void SetGPDTabVisibility(bool visible)
-        {
-            if (GPDNavItem != null)
-            {
-                GPDNavItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"GPD tab visibility set to: {visible}");
-            }
-
-            // Update connection status text
-            if (GPDConnectionStatusText != null)
-            {
-                GPDConnectionStatusText.Text = visible ? "Connected" : "Detecting...";
-                GPDConnectionStatusText.Foreground = new SolidColorBrush(visible ?
-                    Windows.UI.Color.FromArgb(255, 76, 175, 80) :  // Green
-                    Windows.UI.Color.FromArgb(255, 136, 136, 136)); // Gray
-            }
-
-            UpdateSystemControllerEmulationNavigation();
-        }
-
-        /// <summary>
-        /// Sets the GPD device name text from the helper.
-        /// </summary>
-        private void SetGPDDeviceName(string name)
-        {
-            if (GPDDeviceNameText != null && !string.IsNullOrEmpty(name))
-            {
-                GPDDeviceNameText.Text = name;
-                Logger.Info($"GPD device name set to: {name}");
-            }
-        }
-
-        /// <summary>
-        /// Sets visibility of fan control section based on device capability.
-        /// Fan control uses EC commands, independent of HID controller connection.
-        /// </summary>
-        private void SetGPDFanControlVisibility(bool supported)
-        {
-            if (GPDFanControlSection != null)
-            {
-                GPDFanControlSection.Visibility = supported ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"GPD fan control section visibility set to: {supported}");
-            }
-
-            // The helper owns and persists the enabled state. Render the last confirmed value;
-            // never resurrect a stale widget LocalSettings value when the section becomes visible.
-            if (supported)
-                ApplyConfirmedGPDFanCurveEnabled(gpdFanCurveEnabled?.Value == true);
-        }
-
-        /// <summary>
-        /// Sets visibility of button remapping section based on HID controller connection.
-        /// Button remapping requires HID connection to the Win 5 controller.
-        /// </summary>
-        private void SetGPDButtonRemapVisibility(bool connected)
-        {
-            if (GPDButtonRemapSection != null)
-            {
-                GPDButtonRemapSection.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
-                Logger.Info($"GPD button remap section visibility set to: {connected}");
-            }
-
-            if (GPDApplyMappingsButton != null)
-            {
-                GPDApplyMappingsButton.IsEnabled = connected;
-            }
-
-            UpdateSystemControllerEmulationNavigation();
-        }
+        // Controller Emulation card UI (System tab). Split out of the former
+        // GamingWidget.GpdTabCallbacks.cs when GPD support was removed 2026-07-20 — these
+        // methods are handheld-agnostic (VIIPER-backed emulation) and reference no GPD state.
 
         /// <summary>
         /// Controls visibility and enabled state for the handheld-agnostic Controller Emulation card.
@@ -326,43 +223,5 @@ namespace XboxGamingBar
                 DebugExpandButton.XYFocusUp = HotkeysExpandButton;
             }
         }
-
-        /// <summary>
-        /// Updates the fan RPM display.
-        /// </summary>
-        private void UpdateGPDFanRPM(int rpm)
-        {
-            if (GPDFanRPMText != null)
-            {
-                GPDFanRPMText.Text = rpm > 0 ? $"{rpm} RPM" : "-- RPM";
-            }
-        }
-
-        /// <summary>
-        /// Updates the fan mode UI.
-        /// </summary>
-        private void UpdateGPDFanMode(int mode)
-        {
-            bool isManual = mode == 1;
-
-            if (GPDFanModeToggle != null)
-            {
-                // Temporarily remove handler to avoid triggering property update
-                GPDFanModeToggle.Toggled -= GPDFanModeToggle_Toggled;
-                GPDFanModeToggle.IsOn = isManual;
-                GPDFanModeToggle.Toggled += GPDFanModeToggle_Toggled;
-            }
-
-            if (GPDFanModeText != null)
-            {
-                GPDFanModeText.Text = isManual ? "Manual" : "Auto";
-            }
-
-            if (GPDFanSpeedSection != null)
-            {
-                GPDFanSpeedSection.Visibility = isManual ? Visibility.Visible : Visibility.Collapsed;
-            }
-        }
-
     }
 }

@@ -1382,11 +1382,6 @@ namespace XboxGamingBarHelper.ControllerEmulation
                         .Concat(QueryUsbDeviceIds(0x1A86, 0xE310, 0xE311));
                     break;
 
-                case DeviceType.GPDWin5:
-                    nativeIds = QueryPnpDeviceIds(0x2F24, 0x0137, 0x0135)
-                        .Concat(QueryUsbDeviceIds(0x2F24, 0x0137, 0x0135));
-                    break;
-
                 default:
                     nativeIds = Enumerable.Empty<string>();
                     break;

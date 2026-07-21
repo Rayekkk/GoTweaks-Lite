@@ -20,7 +20,6 @@ using Windows.UI.Input.Preview.Injection;
 using XboxGamingBarHelper.AMD;
 using XboxGamingBarHelper.Core;
 using XboxGamingBarHelper.ControllerEmulation;
-using XboxGamingBarHelper.Devices.Libraries.GPD;
 using XboxGamingBarHelper.Devices.Libraries.Legion;
 using XboxGamingBarHelper.LosslessScaling;
 using XboxGamingBarHelper.OnScreenDisplay;
@@ -109,7 +108,6 @@ namespace XboxGamingBarHelper
         private static LosslessScalingManager losslessScalingManager;
         private static SettingsManager settingsManager;
         private static LegionManager legionManager;
-        private static GPDManager gpdManager;
         private static ControllerEmulationManager controllerEmulationManager;
         private static XboxGamingBarHelper.ControllerEmulation.Viiper.ViiperEmulationManager viiperEmulationManager;
         private static List<IManager> Managers;
@@ -988,7 +986,7 @@ namespace XboxGamingBarHelper
             Logger.Info($"[TIMING] Pipe server started early: {pipeTimer.ElapsedMilliseconds}ms");
 
             // PRE-POPULATE DeviceDetector cache BEFORE parallel initialization
-            // This avoids duplicate WMI queries when LegionManager and GPDManager both call DetectDevice()
+            // This avoids duplicate WMI queries when managers call DetectDevice()
             var deviceTimer = System.Diagnostics.Stopwatch.StartNew();
             var deviceInfo = Devices.DeviceDetector.DetectDevice();
             deviceTimer.Stop();
@@ -1044,7 +1042,7 @@ namespace XboxGamingBarHelper
 
             // Wave 1: Independent managers (no dependencies) - run in parallel
             var wave1Timer = System.Diagnostics.Stopwatch.StartNew();
-            Logger.Info("Wave 1: PerformanceManager, ProfileManager, AMDManager, LosslessScalingManager, SettingsManager, LegionManager, GPDManager");
+            Logger.Info("Wave 1: PerformanceManager, ProfileManager, AMDManager, LosslessScalingManager, SettingsManager, LegionManager");
             LogManager.Flush();
 
             PerformanceManager tempPerfMgr = null;
@@ -1053,7 +1051,6 @@ namespace XboxGamingBarHelper
             LosslessScalingManager tempLosslessMgr = null;
             SettingsManager tempSettingsMgr = null;
             LegionManager tempLegionMgr = null;
-            GPDManager tempGpdMgr = null;
 
             var wave1Tasks = new[]
             {
@@ -1080,10 +1077,6 @@ namespace XboxGamingBarHelper
                 Task.Run(() => {
                     try { tempLegionMgr = new LegionManager(); Logger.Info("Wave1: LegionManager DONE"); }
                     catch (Exception ex) { Logger.Error(ex, "Wave1: LegionManager FAILED"); throw; }
-                }),
-                Task.Run(() => {
-                    try { tempGpdMgr = new GPDManager(); Logger.Info("Wave1: GPDManager DONE"); }
-                    catch (Exception ex) { Logger.Error(ex, "Wave1: GPDManager FAILED"); throw; }
                 })
             };
 
@@ -1110,7 +1103,6 @@ namespace XboxGamingBarHelper
             losslessScalingManager = tempLosslessMgr;
             settingsManager = tempSettingsMgr;
             legionManager = tempLegionMgr;
-            gpdManager = tempGpdMgr;
 
             wave1Timer.Stop();
             Logger.Info($"[TIMING] Wave 1 (parallel): {wave1Timer.ElapsedMilliseconds}ms");
@@ -1160,11 +1152,8 @@ namespace XboxGamingBarHelper
             // Set PerformanceManager reference in LegionManager for CPU temperature sensor access
             legionManager.SetPerformanceManager(performanceManager);
 
-            // Set PerformanceManager reference in GPDManager for software fan curve CPU temperature access
-            gpdManager?.SetPerformanceManager(performanceManager);
-
             // Initialize handheld-agnostic controller emulation manager.
-            controllerEmulationManager = new ControllerEmulationManager(legionManager, gpdManager, settingsManager);
+            controllerEmulationManager = new ControllerEmulationManager(legionManager, settingsManager);
 
             // Initialize VIIPER emulation manager (toggle-driven; mutually exclusive with legacy).
             // legionManager is passed so VIIPER can forward LED color reports to the Legion stick lights.
@@ -1260,7 +1249,6 @@ namespace XboxGamingBarHelper
                 losslessScalingManager,
                 settingsManager,
                 legionManager,
-                gpdManager,
                 controllerEmulationManager
             };
 
@@ -1437,43 +1425,7 @@ namespace XboxGamingBarHelper
                 settingsManager.ProfileGamesOnly,
                 settingsManager.ProfileBlacklistPaths,
                 systemManager.ForegroundApp,
-                // GPD specific properties
-                gpdManager.GPDDetected,
-                gpdManager.Win5Connected,
-                gpdManager.Win5HidDebug,
-                gpdManager.Win5HidDevices,
-                gpdManager.DeviceName,
-                gpdManager.SupportsFanControlProp,
-                gpdManager.RestoreDefaults,
-                gpdManager.ApplyMappings,
-                // GPD Win 5 button remapping properties
-                gpdManager.ButtonA,
-                gpdManager.ButtonB,
-                gpdManager.ButtonX,
-                gpdManager.ButtonY,
-                gpdManager.ButtonDPadUp,
-                gpdManager.ButtonDPadDown,
-                gpdManager.ButtonDPadLeft,
-                gpdManager.ButtonDPadRight,
-                gpdManager.ButtonL3,
-                gpdManager.ButtonR3,
-                gpdManager.ButtonL4,
-                gpdManager.ButtonR4,
-                gpdManager.ButtonLSUp,
-                gpdManager.ButtonLSDown,
-                gpdManager.ButtonLSLeft,
-                gpdManager.ButtonLSRight,
-                // GPD fan control properties
-                gpdManager.FanSpeed,
-                gpdManager.FanRPM,
-                gpdManager.FanMode,
-                // GPD software fan curve properties
-                gpdManager.FanCurveEnabled,
-                gpdManager.FanCurveData,
-                gpdManager.FanCurveVisibleProp,
-                gpdManager.CPUTemp,
-                gpdManager.GyroSource,
-                gpdManager.GyroSimulateMode,
+                // [GPD properties removed 2026-07-20 — Legion-only build]
                 // Handheld-agnostic controller emulation properties
                 controllerEmulationManager.ControllerEmulationAvailable,
                 controllerEmulationManager.ControllerEmulationEnabled,
@@ -1931,70 +1883,5 @@ namespace XboxGamingBarHelper
             Logger.Info("Main loop exited");
         }
 
-        /// <summary>
-        /// Disposes all managers to free resources
-        /// </summary>
-        private static void DisposeManagers()
-        {
-            Logger.Info("Disposing all managers...");
-            if (Managers != null)
-            {
-                // Create a copy of the list to avoid "collection was modified" exception
-                var managersCopy = Managers.ToList();
-                Managers.Clear();
-                Managers = null;
-
-                foreach (var manager in managersCopy)
-                {
-                    try
-                    {
-                        manager?.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error($"Error disposing manager: {ex.Message}");
-                    }
-                }
-            }
-
-            // Dispose hotkey manager
-            try
-            {
-                hotkeyManager?.Dispose();
-                hotkeyManager = null;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error disposing hotkey manager: {ex.Message}");
-            }
-
-            // Dispose Legion button monitor
-            try
-            {
-                DisposeLegionButtonMonitor();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error disposing Legion button monitor: {ex.Message}");
-            }
-
-            // Clear references
-            performanceManager = null;
-            rtssManager = null;
-            profileManager = null;
-            systemManager = null;
-            powerManager = null;
-            amdManager = null;
-            losslessScalingManager = null;
-            settingsManager = null;
-            legionManager = null;
-            controllerEmulationManager = null;
-
-            try { viiperEmulationManager?.Dispose(); }
-            catch (Exception ex) { Logger.Warn($"viiperEmulationManager.Dispose threw: {ex.Message}"); }
-            viiperEmulationManager = null;
-
-            Logger.Info("All managers disposed.");
-        }
     }
 }

@@ -597,10 +597,10 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
         /// • Legion Go / Go 2:        Legion controller IMU adapters (Right/Left/Mixed)
         ///                             driven by the user's gyroSource setting (1/2/3),
         ///                             defaulting to Mixed.
-        /// • Legion Go S / GPD Win 5: Windows Sensor stack (handheld IMU exposed by
+        /// • Legion Go S:              Windows Sensor stack (handheld IMU exposed by
         ///                             the device's own Windows driver). The
         ///                             gyroSource setting is ignored — there's only
-        ///                             one source available on these devices.
+        ///                             one source available on this device.
         /// • Generic / unknown:       Windows Sensor fallback as well, so non-Legion
         ///                             handhelds (ROG Ally, Steam Deck, MSI Claw, etc.)
         ///                             still get a working gyro→stick path. Same
@@ -634,10 +634,6 @@ namespace XboxGamingBarHelper.ControllerEmulation.Viiper
 
                 case SharedDeviceType.LegionGoS:
                     activeAdapter = new WindowsSensorGyroSourceAdapter("Legion Go S Internal Gyro");
-                    break;
-
-                case SharedDeviceType.GPDWin5:
-                    activeAdapter = new WindowsSensorGyroSourceAdapter("GPD Internal Gyro");
                     break;
 
                 default:
